@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#181D2E">
+<title>Work order upload · Shop Floor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --midnight:#181D2E; --orange:#ED5E0F; --bright:#F0A721; --teal:#00B4B2;
+    --teal-ink:#00807E; --teal-bg:#DDF2F1; --sawdust:#FFF4D5; --gray:#C2BAA0;
+    --paper:#EFEDE6; --line:#E4DFCF; --ink2:#6B7082; --warn:#8A4B00;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--paper); color:var(--midnight);
+    font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:17px; line-height:1.45}
+  header{background:var(--midnight); color:var(--sawdust); padding:16px 20px; display:flex; align-items:baseline; gap:14px; flex-wrap:wrap}
+  .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.16em; color:var(--orange)}
+  .brand span{color:var(--sawdust)}
+  header h1{margin:0; font-size:20px; font-weight:600}
+  main{max-width:640px; margin:0 auto; padding:24px 16px 60px}
+  .card{background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:16px}
+  h2{margin:0 0 6px; font-size:22px}
+  .sub{color:var(--ink2); margin:0 0 16px}
+  label.f{display:block; font-weight:600; margin:12px 0 4px}
+  input[type=email],input[type=password]{width:100%; font:inherit; padding:12px; border:1px solid var(--gray); border-radius:9px; background:#fff}
+  button{font:inherit; font-weight:600; border-radius:9px; padding:13px 18px; cursor:pointer; border:1px solid var(--gray); background:#fff; color:var(--midnight)}
+  button.go{background:var(--orange); color:#fff; border-color:transparent; width:100%; margin-top:16px}
+  button.go:disabled{opacity:.45; cursor:default}
+  button.link{background:none; border:none; padding:4px; color:var(--ink2); text-decoration:underline; font-weight:500}
+  .who{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; color:var(--ink2); margin-bottom:14px}
+  .who b{color:var(--midnight)}
+  .drop{display:block; border:2px dashed var(--gray); border-radius:12px; background:#fff; padding:36px 20px; text-align:center; cursor:pointer}
+  .drop.over{border-color:var(--orange); background:var(--sawdust)}
+  .drop b{display:block; font-size:19px; margin-bottom:4px}
+  .drop span{color:var(--ink2)}
+  .facts{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:14px 0 4px}
+  .fact{background:var(--paper); border-radius:9px; padding:10px 12px}
+  .fact .v{font-family:'Barlow Condensed',sans-serif; font-size:30px; font-weight:700; line-height:1}
+  .fact .k{font-size:14px; color:var(--ink2)}
+  .pname{font-weight:600}
+  ol.steps{list-style:none; padding:0; margin:0}
+  ol.steps li{display:flex; gap:12px; align-items:baseline; padding:9px 0; border-bottom:1px solid var(--line)}
+  ol.steps li:last-child{border-bottom:none}
+  .mark{width:22px; flex-shrink:0; text-align:center; font-weight:700}
+  li.waiting .mark{color:var(--gray)}
+  li.working .mark{color:var(--orange)}
+  li.done .mark{color:var(--teal-ink)}
+  li.failed .mark{color:var(--warn)}
+  .detail{margin-left:auto; color:var(--ink2); font-size:15px; text-align:right}
+  .ok{background:var(--teal-bg); color:var(--teal-ink); border-radius:12px; padding:16px 18px}
+  .ok p{margin:0 0 8px} .ok p:last-child{margin:0}
+  .ok .head{font-weight:700; font-size:19px}
+  .bad{background:var(--sawdust); color:var(--warn); border-left:5px solid var(--bright); border-radius:10px; padding:14px 16px}
+  .bad p{margin:0 0 6px} .bad p:last-child{margin:0}
+  .alarm{background:var(--midnight); color:var(--sawdust); border-radius:12px; padding:20px}
+  .alarm h2{color:var(--bright)}
+  .alarm code{background:#2C3348; padding:2px 6px; border-radius:4px}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">PURPOSEFUL <span>DESIGN</span></div>
+  <h1>Work order upload</h1>
+</header>
+
+<main>
+  <!-- shown only if the two settings at the bottom of this file are wrong -->
+  <section id="configProblem" class="alarm" hidden>
+    <h2 id="configTitle">This page isn't set up yet</h2>
+    <p id="configBody"></p>
+  </section>
+
+  <section id="signIn" class="card" hidden>
+    <h2>Sign in</h2>
+    <p class="sub">Use your manager login — the one you made in Supabase.</p>
+    <form id="signInForm">
+      <label class="f" for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" required>
+      <label class="f" for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button class="go" type="submit" id="signInBtn">Sign in</button>
+    </form>
+    <div id="signInError" class="bad" style="margin-top:14px" hidden></div>
+  </section>
+
+  <section id="uploadArea" hidden>
+    <div class="who">
+      <span>Signed in as <b id="whoName"></b></span>
+      <button class="link" id="signOutBtn">Sign out</button>
+    </div>
+
+    <div id="roleWarning" class="bad" style="margin-bottom:14px" hidden></div>
+
+    <label class="drop" id="drop">
+      <input type="file" id="fileInput" accept=".json,application/json" hidden>
+      <b>Drop an upload file here</b>
+      <span>or tap to choose one — it's the <i>PROJ-…_upload.json</i> file the generator makes</span>
+    </label>
+
+    <div id="fileError" class="bad" style="margin-top:14px" hidden></div>
+
+    <div id="preview" class="card" style="margin-top:16px" hidden>
+      <div class="pname" id="pvName"></div>
+      <div class="facts">
+        <div class="fact"><div class="v" id="pvProject"></div><div class="k">Project</div></div>
+        <div class="fact"><div class="v" id="pvSheets"></div><div class="k">Sheets</div></div>
+        <div class="fact"><div class="v" id="pvPieces"></div><div class="k">Pieces</div></div>
+      </div>
+      <div id="pvNote" class="sub" style="margin:8px 0 0" hidden></div>
+      <button class="go" id="uploadBtn">Upload this work order</button>
+    </div>
+
+    <div id="progress" class="card" hidden>
+      <ol class="steps" id="steps"></ol>
+    </div>
+
+    <div id="outcome"></div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* =====================================================================
+   THE TWO SETTINGS — fill these in (walkthrough 2, step 3).
+   Both come from Supabase → Project Settings → API Keys.
+
+   Use the PUBLISHABLE key (older screens: "anon public").
+   NEVER the secret key — this file is public on GitHub.
+   The page checks, and refuses to run if you paste the wrong one.
+   ===================================================================== */
+const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
+const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
+
+
+/* ---- core: no screen code in here, so it can be tested on its own ---- */
+
+/** Returns a problem description if the settings are wrong, otherwise null. */
+function keyProblem(url, key) {
+  if (!url || !key || url.includes("PASTE-") || key.includes("PASTE-")) {
+    return { secret: false, text: "The project address and key at the bottom of this file haven't been filled in yet. Walkthrough 2, step 3 shows where they come from." };
+  }
+  const secret = { secret: true, text: "This is the SECRET key, not the publishable one. It bypasses every security rule, and this file is public. Take it out of the file right now, then use the publishable key instead. If this file was already put on GitHub with the secret key in it, create a new secret key in Supabase (Project Settings → API Keys) so the old one stops working." };
+  if (key.startsWith("sb_secret_")) return secret;
+  const parts = key.split(".");
+  if (parts.length === 3) {                       // older-style keys are JWTs; read the role inside
+    try {
+      const claims = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+      if (claims.role === "service_role") return secret;
+    } catch (e) { /* not a readable token — let Supabase judge it */ }
+  }
+  if (!/^https:\/\//.test(url)) {
+    return { secret: false, text: "The project address should start with https:// — copy it again from Supabase → Project Settings → API Keys." };
+  }
+  return null;
+}
+
+/** Checks a dropped file is a real upload file and returns its contents. */
+function readPackage(text) {
+  let pkg;
+  try { pkg = JSON.parse(text); }
+  catch (e) { throw new Error("That file isn't an upload file — it couldn't be read. Make sure it's the PROJ-…_upload.json file, not the PDF."); }
+  if (!pkg || pkg.kind !== "shop-floor-work-order") {
+    throw new Error("That file isn't an upload file. Look for the one ending in _upload.json that the generator makes alongside the PDF.");
+  }
+  if (pkg.format > 1) {
+    throw new Error("This upload file was made by a newer version of the generator than this page understands. The page needs updating.");
+  }
+  const p = pkg.payload || {};
+  if (!p.project_id || !Array.isArray(p.sheets) || p.sheets.length === 0) {
+    throw new Error("The upload file is missing its project number or sheets. Try making it again in the generator.");
+  }
+  if (!Array.isArray(pkg.files) || pkg.files.length !== p.sheets.length) {
+    throw new Error("The upload file has a different number of pages than sheets. Try making it again in the generator.");
+  }
+  for (const f of pkg.files) {
+    if (!f.sheet_number || !f.png || !f.pdf) {
+      throw new Error(`Sheet ${f.sheet_number || "?"} is missing its page image or PDF. Try making the upload file again.`);
+    }
+  }
+  return pkg;
+}
+
+function b64ToBlob(b64, type) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type });
+}
+
+/**
+ * Save the work order, then its pages, then record that the pages arrived.
+ * report(step, status, detail) keeps the screen informed.
+ * Throws an Error with .saved = true if it failed AFTER the work order was saved.
+ */
+async function runUpload(pkg, db, report) {
+  report("save", "working");
+  const { data: result, error } = await db.rpc("upload_work_order", { payload: pkg.payload });
+  if (error) { report("save", "failed"); throw error; }
+  report("save", "done", `version ${result.version}`);
+
+  const total = pkg.files.length;
+  const recorded = [];
+  try {
+    for (let i = 0; i < total; i++) {
+      const f = pkg.files[i];
+      report("pages", "working", `sheet ${i + 1} of ${total}`);
+      const paths = {};
+      for (const [ext, type] of [["png", "image/png"], ["pdf", "application/pdf"]]) {
+        const path = `${result.file_folder}/sheet-${f.sheet_number}.${ext}`;
+        const { error: upErr } = await db.storage.from("work-orders")
+          .upload(path, b64ToBlob(f[ext], type), { contentType: type, upsert: true });
+        if (upErr) throw upErr;
+        paths[ext] = path;
+      }
+      recorded.push({ sheet_number: f.sheet_number, png_path: paths.png, pdf_path: paths.pdf });
+    }
+    report("pages", "done", `${total} sheets`);
+
+    report("record", "working");
+    const { error: mErr } = await db.rpc("mark_sheet_files", { p_work_order: result.work_order_id, files: recorded });
+    if (mErr) throw mErr;
+    report("record", "done");
+  } catch (err) {
+    report(recorded.length === total ? "record" : "pages", "failed");
+    err.saved = true;
+    throw err;
+  }
+  return result;
+}
+
+function sheetList(nums) {
+  const n = [...nums];
+  if (n.length === 1) return `sheet ${n[0]}`;
+  return `sheets ${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`;
+}
+
+/** The result, as plain sentences. */
+function explainResult(r) {
+  const out = [`Saved ${r.project_id} — version ${r.version}, ${r.sheets} sheets, ${r.pieces} pieces.`];
+  if (r.carried_forward?.length) out.push(`Counts kept on ${sheetList(r.carried_forward)}, because ${r.carried_forward.length === 1 ? "its drawing hasn't" : "their drawings haven't"} changed.`);
+  if (r.clamped_to_new_qty?.length) out.push(`${cap(sheetList(r.clamped_to_new_qty))} had more pieces finished than ${r.clamped_to_new_qty.length === 1 ? "it now needs, so its count was" : "they now need, so their counts were"} capped at the new quantity.`);
+  if (r.reset_by_change?.length) out.push(`${cap(sheetList(r.reset_by_change))} changed, so ${r.reset_by_change.length === 1 ? "its count starts" : "their counts start"} again from zero.`);
+  if (r.removed?.length) out.push(`${cap(sheetList(r.removed))} ${r.removed.length === 1 ? "is" : "are"} no longer on the work order.`);
+  for (const w of r.warnings || []) out.push(w);
+  return out;
+}
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+/** Errors, in words that say what to do. */
+function friendlyError(err) {
+  const m = String((err && (err.message || err.error_description || err.error)) || err || "");
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(m))
+    return "Couldn't reach the database. Check the internet connection and try again.";
+  if (/invalid login credentials/i.test(m))
+    return "That email and password didn't match. Check them and try again.";
+  if (/jwt expired|refresh token/i.test(m))
+    return "Your sign-in has expired. Sign out, sign back in, and try again.";
+  if (/row-level security|unauthorized|403/i.test(m))
+    return "Your login isn't allowed to add sheet pages. Only a manager login can upload work orders.";
+  if (/email not confirmed/i.test(m))
+    return "This login hasn't been confirmed. In Supabase → Authentication → Users, check it was created with Auto Confirm ticked.";
+  return m || "Something went wrong, with no further detail. Try again, and if it keeps happening, copy this screen into a chat.";
+}
+
+/* ---- end core ---- */
+
+
+/* ---- the screen ---- */
+if (typeof document !== "undefined") (function () {
+  const $ = (id) => document.getElementById(id);
+  const show = (id, on = true) => { $(id).hidden = !on; };
+
+  const problem = keyProblem(SUPABASE_URL, SUPABASE_KEY);
+  if (problem) {
+    $("configTitle").textContent = problem.secret ? "Stop — wrong key in this file" : "This page isn't set up yet";
+    $("configBody").textContent = problem.text;
+    show("configProblem");
+    return;
+  }
+
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  let pkg = null;
+
+  async function enter(user) {
+    show("signIn", false); show("uploadArea");
+    $("whoName").textContent = user.email;
+    // say early if this login can't upload, rather than after a failed attempt
+    const { data: me } = await db.from("profiles").select("full_name, role").eq("id", user.id).maybeSingle();
+    if (me) $("whoName").textContent = `${me.full_name} (${me.role})`;
+    const canUpload = me && (me.role === "manager" || me.role === "admin");
+    $("roleWarning").textContent = me
+      ? "This login is a supervisor, and only a manager can upload work orders. Sign out and sign in with your own login."
+      : "This login has no role yet. Give it one with walkthrough 1, step 8, then sign in again.";
+    show("roleWarning", !canUpload);
+  }
+
+  function leave() {
+    show("uploadArea", false); show("signIn");
+    resetUpload();
+  }
+
+  function resetUpload() {
+    pkg = null;
+    show("preview", false); show("progress", false); show("fileError", false);
+    $("outcome").innerHTML = "";
+    $("fileInput").value = "";
+  }
+
+  db.auth.getSession().then(({ data }) => data.session ? enter(data.session.user) : leave());
+
+  $("signInForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    show("signInError", false);
+    $("signInBtn").disabled = true;
+    const { data, error } = await db.auth.signInWithPassword({
+      email: $("email").value.trim(), password: $("password").value,
+    });
+    $("signInBtn").disabled = false;
+    if (error) { $("signInError").textContent = friendlyError(error); show("signInError"); return; }
+    $("password").value = "";
+    enter(data.user);
+  });
+
+  $("signOutBtn").addEventListener("click", async () => { await db.auth.signOut(); leave(); });
+
+  // choosing or dropping a file
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => { if (e.dataTransfer.files[0]) takeFile(e.dataTransfer.files[0]); });
+  $("fileInput").addEventListener("change", (e) => { if (e.target.files[0]) takeFile(e.target.files[0]); });
+
+  async function takeFile(file) {
+    resetUpload();
+    try {
+      pkg = readPackage(await file.text());
+    } catch (err) {
+      $("fileError").textContent = err.message; show("fileError"); return;
+    }
+    const p = pkg.payload;
+    const pieces = p.sheets.reduce((a, s) => a + (s.qty || 0), 0);
+    $("pvName").textContent = p.project_name || "";
+    $("pvProject").textContent = p.project_id.replace(/^PROJ-/, "");
+    $("pvSheets").textContent = p.sheets.length;
+    $("pvPieces").textContent = pieces;
+    const mismatch = p.total_items && p.total_items !== pieces;
+    $("pvNote").textContent = mismatch ? `Heads up: the sheets add up to ${pieces} pieces, but the work order says ${p.total_items}. You can still upload it.` : "";
+    show("pvNote", mismatch);
+    $("uploadBtn").disabled = false;
+    show("preview");
+  }
+
+  const STEPS = { save: "Saving the work order", pages: "Uploading the sheet pages", record: "Recording that the pages arrived" };
+  function report(step, status, detail) {
+    const li = document.querySelector(`li[data-step="${step}"]`);
+    li.className = status;
+    li.querySelector(".mark").textContent = { waiting: "○", working: "…", done: "✓", failed: "✕" }[status];
+    li.querySelector(".detail").textContent = detail || "";
+  }
+
+  $("uploadBtn").addEventListener("click", async () => {
+    $("uploadBtn").disabled = true;
+    $("outcome").innerHTML = "";
+    $("steps").innerHTML = Object.entries(STEPS).map(([k, label]) =>
+      `<li data-step="${k}" class="waiting"><span class="mark">○</span><span>${label}</span><span class="detail"></span></li>`).join("");
+    show("progress");
+    try {
+      const result = await runUpload(pkg, db, report);
+      const lines = explainResult(result);
+      $("outcome").innerHTML = `<div class="ok"><p class="head"></p>${lines.slice(1).map(() => "<p></p>").join("")}</div>`;
+      const ps = $("outcome").querySelectorAll("p");
+      lines.forEach((t, i) => { ps[i].textContent = t; });
+      show("preview", false);
+    } catch (err) {
+      const box = document.createElement("div");
+      box.className = "bad";
+      const a = document.createElement("p"); a.textContent = friendlyError(err);
+      const b = document.createElement("p");
+      b.textContent = err.saved
+        ? "The work order itself was saved, but not all of its pages arrived. Drop the same file again — any counts already entered will carry over."
+        : "Nothing was saved, so it's safe to fix the problem and try again.";
+      box.append(a, b);
+      $("outcome").replaceChildren(box);
+      $("uploadBtn").disabled = false;
+    }
+  });
+})();
+
+/* lets the core be tested outside a browser */
+if (typeof module !== "undefined") module.exports = { keyProblem, readPackage, b64ToBlob, runUpload, explainResult, friendlyError, sheetList };
+</script>
+</body>
+</html>
