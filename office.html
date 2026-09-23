@@ -154,6 +154,24 @@
   .typ span{flex:1}
   .typ.off span{color:var(--ink2); text-decoration:line-through}
 
+  /* photos */
+  .phs{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
+  .ph{position:relative; width:112px; height:112px; padding:0; border:1px solid var(--line); border-radius:9px; overflow:hidden; background:var(--paper); flex-shrink:0}
+  .ph img{display:block; width:100%; height:100%; object-fit:cover}
+  .ph .cap{position:absolute; left:0; right:0; bottom:0; background:rgba(24,29,46,.78); color:var(--sawdust); font-size:12px; font-weight:600; padding:2px 5px; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .ph.nofile{display:flex; align-items:center; justify-content:center; text-align:center; font-size:12px; color:var(--ink2); padding:6px}
+  .ovl{position:fixed; inset:0; background:rgba(24,29,46,.6); display:flex; align-items:center; justify-content:center; padding:16px; z-index:40}
+  .viewer{background:var(--midnight); border-radius:14px; width:100%; max-width:960px; max-height:94vh; overflow:auto; padding:14px; color:var(--sawdust)}
+  .viewer img{display:block; max-width:100%; max-height:72vh; margin:0 auto; border-radius:6px}
+  .viewer .vcap{margin:10px 2px 0}
+  .viewer .vcap small{display:block; color:#CFC9B8; font-size:14px}
+  .viewer .btns button{background:#2C3348; color:var(--sawdust); border:none}
+  .meter{height:12px; background:var(--paper); border-radius:99px; overflow:hidden; margin:8px 0 4px; max-width:520px}
+  .meter i{display:block; height:100%; background:var(--gray); border-radius:99px}
+  .batch{display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; padding:9px 0; border-bottom:1px solid var(--line)}
+  .batch:last-child{border-bottom:none}
+  .batch b{min-width:90px}
+
   /* sign in and PIN */
   .card{max-width:440px; margin:8vh auto 0; background:#fff; border:1px solid var(--line); border-radius:14px; padding:26px}
   .card label{display:block; font-weight:600; margin:14px 0 4px}
@@ -383,6 +401,68 @@ function taskWhen(t) {
   return `Due in ${n} day${n === 1 ? "" : "s"} · ${fmtDate(t.next_due)}`;
 }
 
+/* ---- photos: the archive zip, built in the browser (nothing to install) ---- */
+
+const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(bytes) { let c = 0xFFFFFFFF; for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+const utf8 = (text) => new TextEncoder().encode(text);
+
+/** A zip of the given files, stored as they are (photos don't shrink further). files: [{ name, data: Uint8Array, date }] */
+function makeZip(files) {
+  const parts = [], central = [];
+  let offset = 0;
+  for (const f of files) {
+    const name = utf8(f.name), d = f.date instanceof Date && !isNaN(f.date) ? f.date : new Date();
+    const time = (d.getHours() << 11) | (d.getMinutes() << 5) | Math.floor(d.getSeconds() / 2);
+    const date = ((Math.max(d.getFullYear(), 1980) - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    const crc = crc32(f.data), size = f.data.length;
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
+    h.setUint16(10, time, true); h.setUint16(12, date, true); h.setUint32(14, crc, true); h.setUint32(18, size, true); h.setUint32(22, size, true);
+    h.setUint16(26, name.length, true); h.setUint16(28, 0, true);
+    parts.push(new Uint8Array(h.buffer), name, f.data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true);
+    c.setUint16(12, time, true); c.setUint16(14, date, true); c.setUint32(16, crc, true); c.setUint32(20, size, true); c.setUint32(24, size, true);
+    c.setUint16(28, name.length, true); c.setUint32(42, offset, true);
+    central.push(new Uint8Array(c.buffer), name);
+    offset += 30 + name.length + size;
+  }
+  const cdSize = central.reduce((a, x) => a + x.length, 0);
+  const e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true);
+  e.setUint32(12, cdSize, true); e.setUint32(16, offset, true);
+  const all = [...parts, ...central, new Uint8Array(e.buffer)];
+  const out = new Uint8Array(all.reduce((a, x) => a + x.length, 0));
+  let at = 0;
+  for (const x of all) { out.set(x, at); at += x.length; }
+  return out;
+}
+
+function csvCell(v) { const t = v === null || v === undefined ? "" : String(v); return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; }
+/** The spreadsheet inside the zip: every photo, so the archive can be searched without the app. */
+function photoCsv(list, batch) {
+  const head = ["File", "Project", "Job", "Sheet", "Department", "Kind", "What", "Note", "Taken by", "Taken at", "Entered by mistake", "Test job", "Batch"];
+  const rows = (list || []).map(p => [p.name, p.project_id, p.job_name, p.sheet ?? "", p.department, p.kind, p.what, p.note, p.by, p.at,
+                                      p.mistake ? "yes" : "", p.test ? "yes" : "", batch]);
+  return "\uFEFF" + [head, ...rows].map(r => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
+}
+function fmtBytes(n) {
+  n = Number(n) || 0;
+  if (n >= 1073741824) return (n / 1073741824).toFixed(2).replace(/\.?0+$/, "") + " GB";
+  if (n >= 1048576) return Math.round(n / 1048576) + " MB";
+  if (n >= 1024) return Math.round(n / 1024) + " KB";
+  return n + " bytes";
+}
+const BATCH_STATE = { building: "Being made — not downloaded yet", saved: "Saved — its files are still in Supabase too",
+                      released: "Kept for a month — its files can come off Supabase", removed: "Off Supabase — in the zip only" };
+/** "418", "proj 418", "PROJ-00418" → "PROJ-00418". Anything else as typed. */
+function normProject(text) {
+  const t = String(text || "").trim().toUpperCase().replace(/\s+/g, "");
+  const m = /^(?:PROJ-?)?(\d{1,5})$/.exec(t);
+  return m ? "PROJ-" + m[1].padStart(5, "0") : t;
+}
+
 /* ---- end core ---- */
 
 
@@ -414,9 +494,11 @@ if (typeof document !== "undefined") (function () {
     drafts: {}, flagForm: { jobId: "", department: "", level: "priority", note: "" },
     taskForm: { name: "", department: "sanding", assigned_to: "", schedule_type: "weekly", week_interval: 1, monthly_occurrence: 1, weekday: 1, start_date: "", is_test: false },
     msg: null, missing: false,
+    // photos
+    photos: [], photoStatus: null, photoMissing: false, phText: "", phJob: null, viewer: null, arch: null,
   };
   const TABS = [["tasks", "Your tasks"], ["problems", "Problems"], ["flags", "Flags"], ["ordering", "Ordering"],
-                ["arrow", "Arrow"], ["routine", "Routine tasks"], ["departments", "Departments"], ["setup", "Setup"]];
+                ["arrow", "Arrow"], ["routine", "Routine tasks"], ["departments", "Departments"], ["photos", "Photos"], ["setup", "Setup"]];
 
   // ---------- data ----------
   const q = async (p) => { const { data, error } = await p; if (error) throw error; return data; };
@@ -437,13 +519,34 @@ if (typeof document !== "undefined") (function () {
     if (arr) S.arrow = arr.concat((S.arrow || []).filter(a => !a.at_vendor));
     if (set) { const a = set.find(s => s.key === "arrow_alert_days"); if (a) S.arrowDays = Number(a.value);
                const t = set.find(s => s.key === "tv_link_made"); S.tvMade = t ? t : null; }
+    await loadPhotoStatus();
+  }
+  // the archive reminder. Quiet if photos.sql hasn't been run: nothing else on the page depends on it.
+  async function loadPhotoStatus() {
+    let r; try { r = await db.rpc("photo_archive_status"); } catch (e) { r = { error: e }; }
+    if (r.error) { S.photoMissing = /does not exist|schema cache|could not find/i.test(String(r.error.message)); return; }
+    S.photoMissing = false; S.photoStatus = r.data;
+  }
+  async function loadPhotosWhere(field, values) {
+    if (!values.length) return;
+    let r; try { r = await db.from("v_photos").select("*").in(field, values); } catch (e) { return; }
+    if (r.error || !r.data) return;
+    const byId = new Map(S.photos.map(p => [p.id, p]));
+    for (const x of r.data) byId.set(x.id, x);
+    S.photos = [...byId.values()];
   }
 
   async function loadTab() {
     S.notice = null; S.missing = false;
     try {
+      if (S.tab === "photos") {
+        await loadPhotoStatus();
+        if (S.phJob) await findJobPhotos(S.phJob.project);
+        return;
+      }
       if (S.tab === "problems") {
         await loadCounts();
+        await loadPhotosWhere("problem_id", (S.problems || []).map(p => p.id));
         const d = await soft(db.from("v_defects").select("*").eq("voided", false));
         if (d) S.defects = d;
         return;
@@ -511,6 +614,7 @@ if (typeof document !== "undefined") (function () {
       flags: staleFlags(S.flags).length,
       ordering: needToOrder(S.supplies).reduce((a, g) => a + g.lines.length, 0),
       arrow: (S.arrow || []).filter(a => a.at_vendor && a.days_out > S.arrowDays).length,
+      photos: S.photoStatus && S.photoStatus.due ? 1 : 0,
     };
   }
   function topBar() {
@@ -531,6 +635,10 @@ if (typeof document !== "undefined") (function () {
     if (c.flags) cards.push(card("flags", c.flags, `flag${c.flags === 1 ? "" : "s"} older than 14 days — still right?`));
     if (c.ordering) cards.push(card("ordering", c.ordering, `supply request${c.ordering === 1 ? "" : "s"} to order`));
     if (c.arrow) cards.push(card("arrow", c.arrow, `item${c.arrow === 1 ? "" : "s"} at Arrow over ${S.arrowDays} days`));
+    const ps = S.photoStatus;
+    if (c.photos) cards.push(ps.to_remove > 0 ? card("photos", ps.to_remove, `photo file${ps.to_remove === 1 ? "" : "s"} ready to come off Supabase`)
+      : ps.building ? card("photos", 1, `photo archive ${ps.building} started but not saved yet`)
+      : card("photos", ps.eligible, `photo${ps.eligible === 1 ? "" : "s"} ready to archive${ps.last_batch ? ` — last archive ${ps.days_since_last} days ago` : ""}`));
     return cards.length ? `<div class="sumrow">${cards.join("")}</div>` : "";
   }
   const testTag = (x) => x && x.is_test ? `<span class="tag">TEST</span> ` : "";
@@ -550,6 +658,7 @@ if (typeof document !== "undefined") (function () {
           <span class="st${st.done ? " ok" : ""}">${esc(st.label)}</span></div>
         <div class="msg"><div>${esc(p.body)}</div><div class="msg-meta">${esc(p.raised_by_name)} · ${esc(fmtDay(p.raised_at))} (${esc(ago(p.raised_at))})</div></div>
         ${(p.thread || []).map(m => `<div class="msg ${esc(m.kind)}"><div>${esc(m.body)}</div><div class="msg-meta">${esc(m.by)} · ${esc(fmtDay(m.at))}${m.kind === "answer" ? " · answered" : ""}</div></div>`).join("")}
+        ${photoStrip(S.photos.filter(x => x.problem_id === p.id))}
         ${p.status === "open" ? `<textarea class="in" style="margin-top:10px" data-draft="${esc(p.id)}" placeholder="Your answer — what did you decide, or what should they do?">${esc(d)}</textarea>
           <div class="btns"><button class="go" data-answer="${esc(p.id)}" data-close="1" ${d.trim() ? "" : "disabled"}>Answer and close</button>
             <button class="plain" data-answer="${esc(p.id)}" data-close="0" ${d.trim() ? "" : "disabled"}>Reply, keep it open</button></div>` : ""}
@@ -846,15 +955,170 @@ if (typeof document !== "undefined") (function () {
       </section>`;
   }
 
+  // ---------- Photos ----------
+  const photoUrls = new Map();
+  async function photoUrl(path) {
+    const hit = photoUrls.get(path);
+    if (hit && hit.until > Date.now()) return hit.url;
+    const { data, error } = await db.storage.from("photos").createSignedUrl(path, 3600);
+    if (error || !data) throw error || new Error("no link");
+    photoUrls.set(path, { url: data.signedUrl, until: Date.now() + 50 * 60000 });
+    return data.signedUrl;
+  }
+  function fillPhotos() {
+    app.querySelectorAll("img[data-photopath]:not([src])").forEach(async (img) => {
+      try { img.src = await photoUrl(img.dataset.photopath); }
+      catch (e) { const b = img.closest(".ph"); if (b) { b.classList.add("nofile"); b.textContent = "Photo not available"; } }
+    });
+  }
+  const photoWhat = (p) => p.kind === "loadout" ? (p.sheet_number !== null ? `Sheet ${p.sheet_number}` : p.note || "")
+                                                : `${p.department_name}${p.sheet_number !== null ? " · sheet " + p.sheet_number : ""}`;
+  /** Thumbnails; an archived photo says which batch holds it. */
+  function photoStrip(list, caption = false) {
+    const shown = (list || []).filter(p => !p.voided);
+    if (!shown.length) return "";
+    return `<div class="phs">${shown.map(p => p.in_cloud === false
+      ? `<span class="ph nofile" title="${esc(p.archive_name || "")}">Archived in batch ${esc(p.archive_batch)}</span>`
+      : `<button class="ph" data-viewphoto="${esc(p.id)}" aria-label="Photo by ${esc(p.taken_by_name)}"><img alt="" data-photopath="${esc(p.storage_path)}">${caption ? `<span class="cap">${esc(photoWhat(p))}</span>` : ""}</button>`).join("")}</div>`;
+  }
+  function viewerHtml() {
+    const p = S.viewer; if (!p) return "";
+    const what = p.kind === "loadout" ? `Load-out · ${photoWhat(p)}` : p.kind === "defect" ? `Defect: ${p.defect_type || ""}` : `Problem: ${p.problem_body || ""}`;
+    return `<div class="ovl" data-closeviewer="1"><div class="viewer" role="dialog" aria-modal="true" aria-label="Photo">
+      <img alt="Photo by ${esc(p.taken_by_name)}" data-photopath="${esc(p.storage_path)}">
+      <div class="vcap"><b>${p.is_test ? "TEST " : ""}${esc(p.project_id)}${p.sheet_number !== null ? ` · sheet ${p.sheet_number}` : ""}</b> · ${esc(p.department_name)}
+        <div>${esc(what)}</div>${p.note && p.kind !== "loadout" ? `<div>${esc(p.note)}</div>` : ""}
+        <small>Taken by ${esc(p.taken_by_name)}, ${esc(fmtDay(p.taken_at))} ${esc(new Date(p.taken_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}</small></div>
+      <div class="btns"><button data-voidphoto="${esc(p.id)}">Entered by mistake</button><button data-closeviewer="1">Close</button></div></div></div>`;
+  }
+
+  async function findJobPhotos(project) {
+    const [ph, lo] = await Promise.all([soft(db.from("v_photos").select("*").eq("project_id", project)),
+                                        soft(db.from("v_loadouts").select("*").eq("project_id", project))]);
+    S.phJob = { project, photos: ph || [], loadouts: (lo || []).sort((a, b) => String(b.started_at).localeCompare(String(a.started_at))) };
+    const byId = new Map(S.photos.map(p => [p.id, p])); for (const x of S.phJob.photos) byId.set(x.id, x); S.photos = [...byId.values()];
+  }
+
+  function photosScreen() {
+    const st = S.photoStatus;
+    const j = S.phJob;
+    let jobHtml = "";
+    if (j) {
+      const live = j.photos.filter(p => !p.voided);
+      const onEntries = live.filter(p => p.kind !== "loadout");
+      const archived = [...new Set(j.photos.filter(p => p.in_cloud === false).map(p => p.archive_batch))];
+      const mistakes = j.photos.length - live.length;
+      const time = (ts) => `${fmtDay(ts)} ${new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+      jobHtml = !j.photos.length && !j.loadouts.length ? `<div class="empty" style="margin-top:12px"><b>No photos on ${esc(j.project)}</b>Nothing has been photographed on this job, or the number isn't right.</div>`
+        : `<h2 style="margin-top:18px">${esc(j.project)} <span class="meta2">${esc((j.photos[0] || j.loadouts[0] || {}).job_name || "")}</span></h2>
+        ${j.loadouts.length ? `<div class="deptname">What left the building</div>` + j.loadouts.map(l => { const mine = live.filter(p => p.loadout_id === l.id);
+            const done = new Set([...(l.sheets_here || []), ...(l.sheets_earlier || [])]).size;
+            return `<div class="li"><div class="li-top"><b>${l.is_test ? `<span class="tag">TEST</span> ` : ""}${l.finished_at ? `Left ${esc(time(l.finished_at))}` : "Load-out still open"}</b>
+              <span class="meta2">started ${esc(time(l.started_at))} by ${esc(l.started_by_name)}</span></div>
+              <div class="meta2">On this truck: ${(l.sheets_here || []).length ? `sheet${l.sheets_here.length === 1 ? "" : "s"} ${esc(l.sheets_here.join(", "))}` : "no sheets"}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}${l.sheets_total ? ` · ${done} of ${l.sheets_total} sheets photographed so far` : ""}</div>
+              ${photoStrip(mine, true)}</div>`; }).join("") : ""}
+        ${onEntries.length ? `<div class="deptname">On defects and problems</div>${photoStrip(onEntries, true)}` : ""}
+        ${archived.length ? `<p class="sub" style="margin-top:12px">Some of this job's photos have been archived: ${archived.map(b => `photo-archive-${esc(b)}.zip, folder ${esc(j.project)}`).join("; ")}.</p>` : ""}
+        ${mistakes ? `<p class="sub">${mistakes} photo${mistakes === 1 ? " was" : "s were"} marked entered by mistake and ${mistakes === 1 ? "isn't" : "aren't"} shown.</p>` : ""}`;
+    }
+    let arch;
+    if (S.photoMissing) arch = `<div class="banner warn">The photos part isn't in the database yet. Run photos.sql (Walkthrough 7), then reload this page.</div>`;
+    else if (!st) arch = `<p class="sub">Loading…</p>`;
+    else {
+      const pct = Math.min(100, Math.round(st.bytes_all / st.free_plan_bytes * 100));
+      const a = S.arch;
+      const progress = a && a.stage === "downloading" ? `<div class="banner ok">Downloading photo ${a.done} of ${a.total} for batch ${esc(a.batch)}… keep this page open.</div>`
+        : a && a.stage === "ready" ? `<div class="banner ok"><b>photo-archive-${esc(a.batch)}.zip</b> has downloaded: ${a.total} photos, ${esc(fmtBytes(a.bytes))}.
+            Check it's in your Downloads folder and opens, then keep a second copy somewhere else (OneDrive, say).
+            Its files stay in Supabase for another month either way.
+            <div class="btns"><button class="go" data-archsaved="${esc(a.batch)}" ${S.busy ? "disabled" : ""}>Yes — it's saved</button>
+              <button class="plain" data-archagain="${esc(a.batch)}">Download it again</button></div></div>`
+        : a && a.stage === "failed" ? `<div class="banner warn">${esc(a.text)}</div>` : "";
+      const batches = (st.batches || []).filter(b => b.state !== "building");
+      arch = `<p class="sub" style="margin:0">Storage used: <b>${esc(fmtBytes(st.bytes_all))}</b> of about 1 GB on Supabase's free plan — photos ${esc(fmtBytes(st.bytes_photos))}, work orders ${esc(fmtBytes(st.bytes_work_orders))}.</p>
+        <div class="meter" aria-hidden="true"><i style="width:${pct}%"></i></div>
+        <p class="sub">${st.photos_in_cloud} photo${st.photos_in_cloud === 1 ? "" : "s"} in Supabase. ${st.last_batch ? `Last archive: batch ${esc(st.last_batch)}, ${st.days_since_last === 0 ? "today" : st.days_since_last + " day" + (st.days_since_last === 1 ? "" : "s") + " ago"}.` : "No archive made yet."}</p>
+        ${progress}
+        ${st.to_remove > 0 ? `<div class="banner warn">${st.to_remove} file${st.to_remove === 1 ? " has" : "s have"} been kept in both places for a month and can come off Supabase now.
+            <div class="btns"><button class="go" data-archremove="1" ${S.busy ? "disabled" : ""}>Remove ${st.to_remove === 1 ? "it" : "them"} from Supabase</button></div></div>` : ""}
+        ${a && (a.stage === "downloading" || a.stage === "ready") ? ""
+          : st.eligible > 0 || st.building ? `<p><b>${st.eligible} photo${st.eligible === 1 ? "" : "s"}</b> (${esc(fmtBytes(st.eligible_bytes))}) ${st.eligible === 1 ? "is" : "are"} ready to move off: ${st.eligible === 1 ? "its job" : "their jobs"} left the floor more than 60 days ago.</p>
+              <div class="btns"><button class="go" data-archstart="1" ${S.busy ? "disabled" : ""}>Download archive</button>
+              <span class="meta2">Builds one zip: a folder per job, and a spreadsheet listing every photo.</span></div>`
+          : `<p class="sub">Nothing is old enough to archive yet. A photo moves once its job has been past Delivery for 60 days.</p>`}
+        ${batches.length ? `<details class="more" style="margin-top:12px"><summary>Batches (${batches.length})</summary>${batches.map(b => `<div class="batch">
+            <b>${esc(b.id)}</b> <span>${esc(BATCH_STATE[b.state])}</span> <span class="meta2">${b.photos} photos · ${esc(fmtBytes(b.bytes))} · made ${esc(fmtDay(b.made_at))} by ${esc(b.made_by || "")}</span>
+            ${b.files_left > 0 ? `<button class="link" data-archagain="${esc(b.id)}">Download again</button>` : ""}</div>`).join("")}</details>` : ""}`;
+    }
+    return `<h1>Photos</h1>
+      <p class="sub">Photos taken on the floor: on defects and problems, and Delivery's load-outs. Look a job up to see everything photographed on it, and what left the building when.</p>
+      ${msgBanner()}
+      <section class="panel"><h2>Look up a job</h2>
+        <div class="btns" style="margin-top:4px"><input class="in" id="phJob" style="flex:1 1 220px; max-width:320px" value="${esc(S.phText)}" placeholder="PROJ number, e.g. 418">
+          <button class="go" data-phfind="1">Show</button></div>
+        ${jobHtml}</section>
+      <section class="panel"><h2>Photo archive</h2>
+        <p class="sub">Supabase's free plan holds about 1 GB. Once a month, old photos move to your own storage as a zip. Each batch stays in Supabase for one more month after it's downloaded, then its files come off. Every photo's record stays for good, saying which zip holds it.</p>
+        ${arch}</section>`;
+  }
+
+  // ---------- the archive, step by step ----------
+  function saveBlob(blob, name) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  }
+  async function buildZip(info) {
+    const list = info.photos || [];
+    S.arch = { batch: info.batch, stage: "downloading", done: 0, total: list.length }; render();
+    const files = [], missing = [];
+    let bytes = 0;
+    for (const p of list) {
+      if (!p.in_cloud) { missing.push(p.name); continue; }
+      let r; try { r = await db.storage.from("photos").download(p.path); } catch (e) { r = { error: e }; }
+      if (r.error || !r.data) { missing.push(p.name); continue; }
+      const data = new Uint8Array(await r.data.arrayBuffer());
+      bytes += data.length;
+      const [d, t] = String(p.at).split(" ");
+      files.push({ name: p.name, data, date: new Date(`${d}T${t || "00:00"}:00`) });
+      S.arch.done += 1;
+      if (S.arch.done % 5 === 0 || S.arch.done === list.length) render();
+    }
+    if (missing.length) {
+      S.arch = { batch: info.batch, stage: "failed", text: `${missing.length} photo${missing.length === 1 ? "" : "s"} couldn't be downloaded (${missing.slice(0, 3).join(", ")}${missing.length > 3 ? "…" : ""}), so no zip was made and nothing is marked saved. Check the connection and press Download archive again.` };
+      return render();
+    }
+    files.push({ name: "photos.csv", data: utf8(photoCsv(list, info.batch)), date: new Date() });
+    saveBlob(new Blob([makeZip(files)], { type: "application/zip" }), `photo-archive-${info.batch}.zip`);
+    S.arch = { batch: info.batch, stage: "ready", total: list.length, bytes };
+    render();
+  }
+  async function removeReleased(list) {
+    const byBatch = {};
+    for (const x of list || []) (byBatch[x.batch] = byBatch[x.batch] || []).push(x.path);
+    const said = [];
+    for (const [batch, paths] of Object.entries(byBatch)) {
+      for (let i = 0; i < paths.length; i += 100) {
+        const r = await db.storage.from("photos").remove(paths.slice(i, i + 100));
+        if (r.error) { said.push(`Batch ${batch}: ${friendlyError(r.error)}`); break; }
+      }
+      const { data, error } = await db.rpc("mark_photo_files_removed", { p_batch: batch });
+      said.push(error ? friendlyError(error) : data.summary);
+    }
+    return said;
+  }
+
   function render() {
     if (!S.me) return;
     if (S.locked) return pinScreen("unlock");
-    const screens = { departments: departmentsScreen, setup: setupScreen, problems: problemsScreen, flags: flagsScreen,
+    const screens = { departments: departmentsScreen, setup: setupScreen, problems: problemsScreen, flags: flagsScreen, photos: photosScreen,
                       ordering: orderingScreen, arrow: arrowScreen, routine: routineScreen };
     const body = (screens[S.tab] || tasksScreen)();
     app.innerHTML = topBar() + `<main>${S.notice ? `<div class="banner warn">${esc(S.notice)}</div>` : ""}${body}
-      <p style="text-align:center; margin-top:30px"><button class="link" data-signout="1">Sign out</button></p></main>`;
+      <p style="text-align:center; margin-top:30px"><button class="link" data-signout="1">Sign out</button></p></main>` + viewerHtml();
     wire();
+    fillPhotos();
   }
 
   function wire() {
@@ -972,6 +1236,46 @@ if (typeof document !== "undefined") (function () {
     });
     on("[data-tvcopy]", async () => { try { await navigator.clipboard.writeText(tvLink(location.href, S.tvKey)); S.msg = { ok: true, text: "Copied." }; } catch (e) { S.msg = { ok: false, text: "Couldn't copy — select the link and copy it by hand." }; } render(); });
     on("[data-typeset]", (b) => act("set_defect_type", { p_department: b.dataset.typeset, p_label: b.dataset.label, p_active: b.dataset.active === "1" }));
+    // ---- photos ----
+    on("[data-viewphoto]", (b) => { S.viewer = S.photos.find(x => x.id === b.dataset.viewphoto) || null; render(); });
+    app.querySelectorAll("[data-closeviewer]").forEach(el => el.onclick = (e) => { if (e.target !== el) return; S.viewer = null; render(); });
+    on("[data-voidphoto]", (b) => {
+      if (!confirm("Mark this photo entered by mistake? It's hidden everywhere, and kept in history.")) return;
+      S.viewer = null;
+      act("void_photo", { p_photo: b.dataset.voidphoto, p_reason: null }, () => { const x = S.photos.find(p => p.id === b.dataset.voidphoto); if (x) x.voided = true; });
+    });
+    const phFind = async () => { const i = app.querySelector("#phJob"); S.phText = i ? i.value : ""; if (!S.phText.trim()) return;
+      S.msg = null; await findJobPhotos(normProject(S.phText)); render(); };
+    on("[data-phfind]", phFind);
+    app.querySelectorAll("#phJob").forEach(i => i.onkeydown = (e) => { if (e.key === "Enter") phFind(); });
+    on("[data-archstart]", async () => {
+      S.busy = true; S.msg = null; render();
+      const { data, error } = await db.rpc("prepare_photo_archive");
+      S.busy = false;
+      if (error) { S.msg = { ok: false, text: friendlyError(error) }; await loadPhotoStatus(); return render(); }
+      await buildZip(data); await loadPhotoStatus(); render();
+    });
+    on("[data-archagain]", async (b) => {
+      const { data, error } = await db.rpc("photo_archive_files", { p_batch: b.dataset.archagain });
+      if (error) { S.msg = { ok: false, text: friendlyError(error) }; return render(); }
+      await buildZip(data);
+    });
+    on("[data-archsaved]", async (b) => {
+      S.busy = true; render();
+      const { data, error } = await db.rpc("confirm_photo_archive", { p_batch: b.dataset.archsaved });
+      if (error) { S.busy = false; S.msg = { ok: false, text: friendlyError(error) }; return render(); }
+      const said = [data.summary, ...(await removeReleased(data.remove))];
+      S.busy = false; S.arch = null; S.msg = { ok: true, text: said.join(" ") };
+      await loadPhotoStatus(); render();
+    });
+    on("[data-archremove]", async () => {
+      S.busy = true; render();
+      const { data, error } = await db.rpc("photo_files_to_remove");
+      const said = error ? [friendlyError(error)] : await removeReleased(data);
+      S.busy = false; S.msg = { ok: !error, text: said.join(" ") };
+      await loadPhotoStatus(); render();
+    });
+
     on("[data-typeadd]", (b) => { const i = app.querySelector(`[data-newtype="${b.dataset.typeadd}"]`);
       if (i && i.value.trim()) act("set_defect_type", { p_department: b.dataset.typeadd, p_label: i.value.trim(), p_active: true }); });
   }
@@ -1069,7 +1373,8 @@ if (typeof document !== "undefined") (function () {
 
 /* lets the core be tested outside a browser */
 if (typeof module !== "undefined") module.exports = { keyProblem, isManager, daysLeft, fmtDate, daysText, ago, buildTasks, lastChanges, groupRules, ruleDepartments, catchUpTotals, pinHash, validPin, isNetworkError, friendlyError,
-  localISO, daysSince, problemState, officeProblems, staleFlags, openFlags, needToOrder, orderedNotReceived, defectSummary, tvLink, taskWhen };
+  localISO, daysSince, problemState, officeProblems, staleFlags, openFlags, needToOrder, orderedNotReceived, defectSummary, tvLink, taskWhen,
+  crc32, makeZip, photoCsv, csvCell, fmtBytes, normProject, BATCH_STATE };
 </script>
 </body>
 </html>
