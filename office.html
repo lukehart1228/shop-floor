@@ -108,6 +108,52 @@
   .tj .nm{flex:1}
   .tj .nm span{color:var(--ink2)}
 
+  /* the floor log: problems, flags, ordering, Arrow, routine tasks */
+  .sumrow{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; margin-bottom:18px}
+  .sum{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; text-align:left}
+  .sum .n{font-size:34px; font-weight:700; line-height:1}
+  .sum .l{color:var(--ink2); font-size:15px}
+  .li{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:12px}
+  .li.open{border-left:6px solid var(--midnight)}
+  .li.stop{border-left:6px solid var(--warn)}
+  .li-top{display:flex; gap:10px; align-items:baseline; flex-wrap:wrap}
+  .meta2{font-size:15px; color:var(--ink2)}
+  .st{font-size:13px; font-weight:700; padding:2px 8px; border-radius:5px; border:1.5px solid var(--midnight)}
+  .st.ok{background:var(--teal-bg); color:var(--teal-ink); border-color:transparent}
+  .stoptag{font-size:13px; font-weight:700; padding:2px 8px; border-radius:5px; background:var(--sawdust); color:var(--warn); border:1.5px solid var(--warn)}
+  .msg{background:var(--paper); border-radius:9px; padding:10px 12px; margin-top:8px}
+  .msg.answer,.msg.office_note{background:#fff; border:1.5px solid var(--midnight)}
+  .msg-meta{font-size:13px; color:var(--ink2); margin-top:3px; font-weight:600}
+  textarea.in,input.in,select.in{width:100%; font:inherit; padding:11px 12px; border:1px solid var(--gray); border-radius:9px; background:#fff; color:var(--midnight); min-width:0}
+  textarea.in{min-height:78px; resize:vertical}
+  .btns{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; align-items:center}
+  .flagtag{display:inline-block; font-size:14px; font-weight:700; padding:3px 10px; border-radius:6px}
+  .flagtag.critical{background:var(--orange); color:#fff}
+  .flagtag.priority{background:var(--bright); color:var(--midnight)}
+  .flagtag.watch{border:1.5px solid var(--midnight)}
+  .grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px 16px}
+  .grid2 label{display:block; font-weight:600; margin:10px 0 4px}
+  .seg{display:flex; gap:8px; flex-wrap:wrap}
+  .seg button{background:#fff; border:1.5px solid var(--gray); border-radius:9px; padding:9px 14px; font-weight:700}
+  .seg button[aria-pressed="true"]{background:var(--midnight); color:var(--sawdust); border-color:var(--midnight)}
+  .line{display:flex; gap:12px; align-items:flex-start; padding:11px 0; border-bottom:1px solid var(--line)}
+  .line:last-child{border-bottom:none}
+  .line input[type=checkbox]{width:24px; height:24px; margin-top:2px; accent-color:var(--orange); flex-shrink:0}
+  .line .body{flex:1; min-width:0}
+  .line .qty{font-family:'Barlow Condensed',sans-serif; font-size:26px; font-weight:700; min-width:44px; text-align:right}
+  .deptname{font-weight:700; margin:14px 0 2px; color:var(--ink2); font-size:15px}
+  .deptname:first-child{margin-top:0}
+  .countline{display:flex; gap:10px; padding:7px 0; border-bottom:1px solid var(--line)}
+  .countline:last-child{border-bottom:none}
+  .countline .n{margin-left:auto; font-weight:700}
+  details.more > summary{cursor:pointer; font-weight:600; color:var(--ink2); padding:6px 0}
+  .tvlink{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px}
+  .tvlink code{background:var(--paper); padding:8px 10px; border-radius:8px; word-break:break-all; flex:1 1 300px; font-size:14px}
+  .typ{display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--line)}
+  .typ:last-child{border-bottom:none}
+  .typ span{flex:1}
+  .typ.off span{color:var(--ink2); text-decoration:line-through}
+
   /* sign in and PIN */
   .card{max-width:440px; margin:8vh auto 0; background:#fff; border:1px solid var(--line); border-radius:14px; padding:26px}
   .card label{display:block; font-weight:600; margin:14px 0 4px}
@@ -144,7 +190,11 @@ const LOCK_AFTER_MINUTES = 15;
 
 const DEPT_ORDER = ["milling", "cnc", "sanding", "finishing", "full_custom", "metal", "assembly_qc"];
 const DEPT_NAME = { milling: "Milling", cnc: "CNC", sanding: "Sanding", finishing: "Finishing",
-                    full_custom: "Full Custom", metal: "Metal", assembly_qc: "Assembly / QC" };
+                    full_custom: "Full Custom", metal: "Metal", assembly_qc: "Assembly / QC", delivery: "Delivery" };
+/* every department that logs, counted or not (Delivery is log-only) */
+const LOG_DEPTS = [...DEPT_ORDER, "delivery"];
+const LEVEL_NAME = { critical: "Critical", priority: "Priority", watch: "Watch" };
+const WEEKDAYS = { 1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday" };
 
 function keyProblem(url, key) {
   if (!url || !key || url.includes("PASTE-") || key.includes("PASTE-"))
@@ -254,6 +304,85 @@ function friendlyError(err) {
   return m || "Something went wrong. Try again, and if it keeps happening, take a screenshot.";
 }
 
+/** A timestamp as the local date, "YYYY-MM-DD", and whole days since it. */
+function localISO(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function daysSince(ts, today = new Date()) {
+  if (!ts) return null;
+  return -daysLeft(String(ts).length > 10 ? localISO(ts) : ts, today);
+}
+const fmtDay = (ts) => ts ? fmtDate(String(ts).length > 10 ? localISO(ts) : ts) : "";
+
+/** Where a problem stands, in words (the same words the tablet uses). */
+function problemState(p) {
+  if (p.status === "answered") return { label: "Answered", done: true };
+  if (p.came_back) return { label: "Came back", done: false };
+  if ((p.thread || []).some(m => m.kind === "office_note")) return { label: "You replied — still open", done: false };
+  return { label: "Waiting for you", done: false };
+}
+/** The office queue: work stopped first, then came back, then oldest. Answered: the last 30 days. */
+function officeProblems(list, today = new Date()) {
+  const open = (list || []).filter(p => p.status === "open")
+    .sort((a, b) => (b.work_stopped - a.work_stopped) || (b.came_back - a.came_back) || String(a.raised_at).localeCompare(String(b.raised_at)));
+  const answered = (list || []).filter(p => p.status === "answered" && daysSince(p.answered_at, today) <= 30)
+    .sort((a, b) => String(b.answered_at).localeCompare(String(a.answered_at)));
+  return { open, answered };
+}
+
+/** Flags older than two weeks are surfaced for review — stale flags stop meaning anything. */
+function staleFlags(flags, days = 14) {
+  return (flags || []).filter(f => f.is_open && f.age_days > days).sort((a, b) => b.age_days - a.age_days);
+}
+function openFlags(flags) {
+  return (flags || []).filter(f => f.is_open)
+    .sort((a, b) => ({ critical: 0, priority: 1, watch: 2 }[a.level] - { critical: 0, priority: 1, watch: 2 }[b.level])
+                 || String(a.project_id).localeCompare(String(b.project_id)));
+}
+
+/** Ordering: one line per request, grouped by department, oldest first. No grouping by item. */
+function needToOrder(reqs) {
+  const groups = [];
+  for (const d of LOG_DEPTS) {
+    const lines = (reqs || []).filter(r => r.state === "requested" && r.department === d)
+      .sort((a, b) => String(a.requested_at).localeCompare(String(b.requested_at)));
+    if (lines.length) groups.push({ department: d, name: DEPT_NAME[d], lines });
+  }
+  return groups;
+}
+function orderedNotReceived(reqs) {
+  return (reqs || []).filter(r => r.state === "ordered").sort((a, b) => String(a.ordered_at).localeCompare(String(b.ordered_at)));
+}
+
+/** Defects per department (and per type) since a date. */
+function defectSummary(defects, fromISO = "0000") {
+  const out = [];
+  for (const d of LOG_DEPTS) {
+    const mine = (defects || []).filter(x => !x.voided && x.department === d && localISO(x.logged_at) >= fromISO);
+    if (!mine.length) continue;
+    const by = {};
+    for (const x of mine) by[x.defect_type] = (by[x.defect_type] || 0) + 1;
+    out.push({ department: d, name: DEPT_NAME[d], n: mine.length,
+               types: Object.entries(by).map(([type, n]) => ({ type, n })).sort((a, b) => b.n - a.n || a.type.localeCompare(b.type)) });
+  }
+  return out.sort((a, b) => b.n - a.n);
+}
+
+/** The TV's address: tv.html next to this page, with the secret after the # (never sent to GitHub). */
+function tvLink(pageUrl, key) {
+  const u = new URL("tv.html", pageUrl);
+  return u.origin + u.pathname + "#k=" + key;
+}
+
+function taskWhen(t) {
+  if (t.done_today) return `Done today${t.last_done_by ? " by " + t.last_done_by : ""}`;
+  const n = t.days_until;
+  if (n === 0) return "Due today";
+  if (n < 0) return `Overdue by ${-n} day${n === -1 ? "" : "s"}`;
+  return `Due in ${n} day${n === 1 ? "" : "s"} · ${fmtDate(t.next_due)}`;
+}
+
 /* ---- end core ---- */
 
 
@@ -279,23 +408,83 @@ if (typeof document !== "undefined") (function () {
     columns: [], lastSync: null, rules: [], preview: null, ticked: new Set(), cuResult: null,
     uploaded: [], testMsg: null, busy: false,
     locked: false, pinEntry: "", pinBad: 0,
+    // the floor log
+    problems: [], defects: [], defFrom: "month", flags: [], activeJobs: [], supplies: [], ticked: new Set(), notOrdering: null,
+    arrow: [], arrowDays: 14, tasks: [], people: [], types: [], tvMade: null, tvKey: null,
+    drafts: {}, flagForm: { jobId: "", department: "", level: "priority", note: "" },
+    taskForm: { name: "", department: "sanding", assigned_to: "", schedule_type: "weekly", week_interval: 1, monthly_occurrence: 1, weekday: 1, start_date: "", is_test: false },
+    msg: null, missing: false,
   };
+  const TABS = [["tasks", "Your tasks"], ["problems", "Problems"], ["flags", "Flags"], ["ordering", "Ordering"],
+                ["arrow", "Arrow"], ["routine", "Routine tasks"], ["departments", "Departments"], ["setup", "Setup"]];
 
   // ---------- data ----------
   const q = async (p) => { const { data, error } = await p; if (error) throw error; return data; };
 
+  // the floor-log lists; each can fail on its own ("not set up yet") without taking the page down
+  async function soft(p) {
+    try { return await q(p); }
+    catch (e) { if (/does not exist|schema cache|could not find/i.test(String(e.message))) S.missing = true; else S.notice = friendlyError(e); return null; }
+  }
+  async function loadCounts() {
+    const [probs, flags, sup, arr, set] = await Promise.all([
+      soft(db.from("v_problems").select("*")), soft(db.from("v_flags").select("*").eq("is_open", true)),
+      soft(db.from("v_supply_requests").select("*").eq("is_open", true)), soft(db.from("v_outside_jobs").select("*").eq("at_vendor", true)),
+      soft(db.from("app_settings").select("*"))]);
+    if (probs) S.problems = probs;
+    if (flags) S.flags = flags.concat((S.flags || []).filter(f => !f.is_open));
+    if (sup) S.supplies = sup.concat((S.supplies || []).filter(r => !r.is_open));
+    if (arr) S.arrow = arr.concat((S.arrow || []).filter(a => !a.at_vendor));
+    if (set) { const a = set.find(s => s.key === "arrow_alert_days"); if (a) S.arrowDays = Number(a.value);
+               const t = set.find(s => s.key === "tv_link_made"); S.tvMade = t ? t : null; }
+  }
+
   async function loadTab() {
-    S.notice = null;
+    S.notice = null; S.missing = false;
     try {
+      if (S.tab === "problems") {
+        await loadCounts();
+        const d = await soft(db.from("v_defects").select("*").eq("voided", false));
+        if (d) S.defects = d;
+        return;
+      }
+      if (S.tab === "flags") {
+        const [f, j] = await Promise.all([soft(db.from("v_flags").select("*")),
+          soft(db.from("jobs").select("id, project_id, name, delivery_date, is_test, is_active").eq("is_active", true))]);
+        if (f) S.flags = f.filter(x => x.is_open || daysSince(x.cleared_at) <= 30);
+        if (j) S.activeJobs = j.sort((a, b) => (a.is_test - b.is_test) || String(a.project_id).localeCompare(String(b.project_id)));
+        return;
+      }
+      if (S.tab === "ordering") {
+        const r = await soft(db.from("v_supply_requests").select("*"));
+        if (r) S.supplies = r.filter(x => x.is_open || daysSince(x.updated_at) <= 60);
+        return;
+      }
+      if (S.tab === "arrow") {
+        const [a, set] = await Promise.all([soft(db.from("v_outside_jobs").select("*").eq("voided", false)), soft(db.from("app_settings").select("*"))]);
+        if (a) S.arrow = a.filter(x => x.at_vendor || daysSince(x.returned_on) <= 92);
+        if (set) { const s = set.find(x => x.key === "arrow_alert_days"); if (s) S.arrowDays = Number(s.value); }
+        return;
+      }
+      if (S.tab === "routine") {
+        const [t, p] = await Promise.all([soft(db.from("v_routine_tasks").select("*")), soft(db.from("profiles").select("id, full_name, role, departments, is_test, active"))]);
+        if (t) S.routine = t;
+        if (p) S.people = p.filter(x => x.active).sort((a, b) => a.full_name.localeCompare(b.full_name));
+        return;
+      }
       if (S.tab === "tasks") {
         S.tasks = await q(db.from("v_handoff_tasks").select("*"));
         S.columns = await q(db.from("monday_columns").select("*"));
+        await loadCounts();
       } else if (S.tab === "departments") {
-        S.depts = await q(db.from("departments").select("key, name, sort_order, is_live").order("sort_order"));
+        S.depts = await q(db.from("departments").select("*").order("sort_order"));
         S.liveLog = await q(db.from("department_live_log").select("*").order("changed_at", { ascending: false }).limit(50));
         const people = await q(db.from("profiles").select("id, full_name"));
         S.names = Object.fromEntries((people || []).map(p => [p.id, p.full_name]));
       } else if (S.tab === "setup") {
+        const [ty, set] = await Promise.all([soft(db.from("defect_types").select("*")), soft(db.from("app_settings").select("*"))]);
+        if (ty) S.types = ty;
+        if (set) { const t = set.find(s => s.key === "tv_link_made"); S.tvMade = t || null; }
         S.columns = await q(db.from("monday_columns").select("*"));
         const log = await q(db.from("monday_sync_log").select("run_at, ok, summary, problems").order("run_at", { ascending: false }).limit(1));
         S.lastSync = (log || [])[0] || null;
@@ -315,15 +504,201 @@ if (typeof document !== "undefined") (function () {
   }
 
   // ---------- screens ----------
+  function counts() {
+    return {
+      tasks: S.tasks.length,
+      problems: officeProblems(S.problems).open.length,
+      flags: staleFlags(S.flags).length,
+      ordering: needToOrder(S.supplies).reduce((a, g) => a + g.lines.length, 0),
+      arrow: (S.arrow || []).filter(a => a.at_vendor && a.days_out > S.arrowDays).length,
+    };
+  }
   function topBar() {
-    const n = S.tasks.length;
-    const tabs = [["tasks", "Your tasks", n ? `<span class="n">${n}</span>` : ""], ["departments", "Departments", ""], ["setup", "Setup", ""]];
+    const c = counts();
     return `<header class="top"><div class="top-row">
         <span class="brand">SHOP FLOOR</span><span class="place">Office</span>
         <span class="who"><b>${esc(S.me.name)}</b></span>
         ${(store.get("pin", null) || {}).hash ? `<button class="lockbtn" data-lock="1">Lock</button>` : ""}
-      </div><nav class="tabs">${tabs.map(([k, label, extra]) =>
-        `<button class="tab" data-tab="${k}" aria-current="${S.tab === k}">${label}${extra}</button>`).join("")}</nav></header>`;
+      </div><nav class="tabs">${TABS.map(([k, label]) =>
+        `<button class="tab" data-tab="${k}" aria-current="${S.tab === k}">${label}${c[k] ? `<span class="n">${c[k]}</span>` : ""}</button>`).join("")}</nav></header>`;
+  }
+
+  function summaryCards() {
+    const c = counts();
+    const card = (tab, n, label) => `<button class="sum" data-tab="${tab}"><div class="n num">${n}</div><div class="l">${label}</div></button>`;
+    const cards = [];
+    if (c.problems) cards.push(card("problems", c.problems, `problem${c.problems === 1 ? "" : "s"} from the floor waiting for an answer`));
+    if (c.flags) cards.push(card("flags", c.flags, `flag${c.flags === 1 ? "" : "s"} older than 14 days — still right?`));
+    if (c.ordering) cards.push(card("ordering", c.ordering, `supply request${c.ordering === 1 ? "" : "s"} to order`));
+    if (c.arrow) cards.push(card("arrow", c.arrow, `item${c.arrow === 1 ? "" : "s"} at Arrow over ${S.arrowDays} days`));
+    return cards.length ? `<div class="sumrow">${cards.join("")}</div>` : "";
+  }
+  const testTag = (x) => x && x.is_test ? `<span class="tag">TEST</span> ` : "";
+  const missingNote = () => S.missing ? `<div class="banner warn">This part isn't in the database yet. Run the SQL files from the latest walkthrough, then reload this page.</div>` : "";
+  const msgBanner = () => S.msg ? `<div class="banner ${S.msg.ok ? "ok" : "warn"}">${esc(S.msg.text)}</div>` : "";
+
+  // ---------- Problems ----------
+  function problemsScreen() {
+    const { open, answered } = officeProblems(S.problems);
+    const card = (p) => {
+      const st = problemState(p);
+      const d = S.drafts[p.id] || "";
+      return `<div class="li ${p.status === "open" ? (p.work_stopped ? "stop" : "open") : ""}">
+        <div class="li-top"><b>${testTag(p)}${esc(p.project_id)}${p.sheet_number !== null ? ` · sheet ${p.sheet_number}` : " · whole job"}</b>
+          <span class="meta2">${esc(p.department_name)} · ${esc(p.job_name)}</span>
+          ${p.status === "open" && p.work_stopped ? `<span class="stoptag">Work stopped</span>` : ""}
+          <span class="st${st.done ? " ok" : ""}">${esc(st.label)}</span></div>
+        <div class="msg"><div>${esc(p.body)}</div><div class="msg-meta">${esc(p.raised_by_name)} · ${esc(fmtDay(p.raised_at))} (${esc(ago(p.raised_at))})</div></div>
+        ${(p.thread || []).map(m => `<div class="msg ${esc(m.kind)}"><div>${esc(m.body)}</div><div class="msg-meta">${esc(m.by)} · ${esc(fmtDay(m.at))}${m.kind === "answer" ? " · answered" : ""}</div></div>`).join("")}
+        ${p.status === "open" ? `<textarea class="in" style="margin-top:10px" data-draft="${esc(p.id)}" placeholder="Your answer — what did you decide, or what should they do?">${esc(d)}</textarea>
+          <div class="btns"><button class="go" data-answer="${esc(p.id)}" data-close="1" ${d.trim() ? "" : "disabled"}>Answer and close</button>
+            <button class="plain" data-answer="${esc(p.id)}" data-close="0" ${d.trim() ? "" : "disabled"}>Reply, keep it open</button></div>` : ""}
+      </div>`;
+    };
+    const month = localISO(new Date()).slice(0, 7) + "-01";
+    const sum = defectSummary(S.defects, S.defFrom === "month" ? month : "0000");
+    return `<h1>Problems</h1>
+      <p class="sub">Problems flagged on the floor stay here until they're answered. Work stopped comes first, then anything that came back. A supervisor's reply to an answered problem brings it back here.</p>
+      ${missingNote()}${msgBanner()}
+      ${open.length ? open.map(card).join("") : `<div class="empty"><b>Nothing waiting</b>No department is waiting on the office.</div>`}
+      <details class="more" ${answered.length && !open.length ? "" : ""}><summary>Answered in the last 30 days (${answered.length})</summary>${answered.map(card).join("") || `<p class="sub">None.</p>`}</details>
+      <section class="panel" style="margin-top:22px">
+        <h2>Defects logged</h2>
+        <p class="sub">Counted, never discussed — logging a defect interrupts nobody. Entries marked "entered by mistake" aren't counted.</p>
+        <div class="seg"><button data-deffrom="month" aria-pressed="${S.defFrom === "month"}">This month</button><button data-deffrom="all" aria-pressed="${S.defFrom === "all"}">All time</button></div>
+        <div style="margin-top:10px">${sum.length ? sum.map(g => `<details class="more"><summary>${esc(g.name)} — ${g.n}</summary>
+            ${g.types.map(t => `<div class="countline"><span>${esc(t.type)}</span><span class="n num">${t.n}</span></div>`).join("")}</details>`).join("")
+          : `<p class="sub" style="margin:0">No defects logged ${S.defFrom === "month" ? "this month" : "yet"}.</p>`}</div>
+      </section>`;
+  }
+
+  // ---------- Flags ----------
+  function flagsScreen() {
+    const open = openFlags(S.flags);
+    const cleared = (S.flags || []).filter(f => !f.is_open).sort((a, b) => String(b.cleared_at).localeCompare(String(a.cleared_at)));
+    const f = S.flagForm;
+    const scope = (x) => x.department_name ? `${x.department_name} only` : "whole job";
+    return `<h1>Flags</h1>
+      <p class="sub">Put something in front of the floor. <b>Watch</b> is a marker on the job card. <b>Priority</b> pins the job to the top of the queue, in colour. <b>Critical</b> puts it at the top of every affected queue and gives it its own band on the TV. The note is the important part — say what has to happen by when.</p>
+      ${missingNote()}${msgBanner()}
+      <section class="panel"><h2>Set a flag</h2>
+        <div class="grid2">
+          <div><label for="ffJob">Job</label><select class="in" id="ffJob" data-ff="jobId"><option value="">Pick a job…</option>
+            ${S.activeJobs.map(j => `<option value="${esc(j.id)}" ${f.jobId === j.id ? "selected" : ""}>${j.is_test ? "TEST · " : ""}${esc(j.project_id)} · ${esc(j.name)}</option>`).join("")}</select></div>
+          <div><label for="ffDept">For</label><select class="in" id="ffDept" data-ff="department"><option value="">The whole job — every department</option>
+            ${DEPT_ORDER.map(d => `<option value="${d}" ${f.department === d ? "selected" : ""}>${esc(DEPT_NAME[d])} only</option>`).join("")}</select></div>
+        </div>
+        <label style="display:block; font-weight:600; margin:12px 0 6px">Level</label>
+        <div class="seg">${["watch", "priority", "critical"].map(l => `<button data-fflevel="${l}" aria-pressed="${f.level === l}">${LEVEL_NAME[l]}</button>`).join("")}</div>
+        <label style="display:block; font-weight:600; margin:12px 0 4px" for="ffNote">Note</label>
+        <textarea class="in" id="ffNote" data-ff="note" placeholder="e.g. Customer on site Thursday — tops must be through finishing Wednesday">${esc(f.note)}</textarea>
+        <div class="btns"><button class="go" data-setflag="1" ${f.jobId && f.note.trim() && !S.busy ? "" : "disabled"}>Set the flag</button>
+          <span class="meta2">A job has one flag at a time (per department): a new one replaces the old, and both stay in history.</span></div>
+      </section>
+      <h2 style="margin-top:8px">Open flags</h2>
+      ${open.length ? open.map(x => `<div class="li"><div class="li-top"><span class="flagtag ${x.level}">${LEVEL_NAME[x.level]}</span>
+          <b>${testTag(x)}${esc(x.project_id)}</b><span class="meta2">${esc(x.job_name)} · ${esc(scope(x))}</span></div>
+          <div style="margin-top:6px">${esc(x.note)}</div>
+          <div class="meta2">Set by ${esc(x.set_by_name)}, ${esc(fmtDay(x.set_at))}${x.age_days ? ` — ${x.age_days} day${x.age_days === 1 ? "" : "s"} ago` : ", today"}${x.age_days > 14 ? " · <b>over two weeks: still right?</b>" : ""}${x.job_active ? "" : " · the job has left production"}</div>
+          <div class="btns"><button class="plain" data-clearflag="${esc(x.id)}">Clear it</button></div></div>`).join("")
+        : `<div class="empty"><b>No open flags</b>The floor is working in delivery-date order.</div>`}
+      <details class="more"><summary>Cleared in the last 30 days (${cleared.length})</summary>
+        ${cleared.map(x => `<div class="li"><div class="li-top"><span class="flagtag ${x.level}">${LEVEL_NAME[x.level]}</span><b>${testTag(x)}${esc(x.project_id)}</b>
+          <span class="meta2">${esc(scope(x))}</span></div><div>${esc(x.note)}</div>
+          <div class="meta2">Set by ${esc(x.set_by_name)} ${esc(fmtDay(x.set_at))} · cleared by ${esc(x.cleared_by_name)} ${esc(fmtDay(x.cleared_at))}${x.clear_note ? " — " + esc(x.clear_note) : ""}</div></div>`).join("") || `<p class="sub">None.</p>`}
+      </details>`;
+  }
+
+  // ---------- Ordering ----------
+  function orderingScreen() {
+    const groups = needToOrder(S.supplies);
+    const ordered = orderedNotReceived(S.supplies);
+    const closed = (S.supplies || []).filter(r => !r.is_open).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+    const nTicked = groups.reduce((a, g) => a + g.lines.filter(l => S.ticked.has(l.id)).length, 0);
+    const who = (r) => `${esc(r.requested_by_name)} · ${esc(fmtDay(r.requested_at))}`;
+    return `<h1>Ordering</h1>
+      <p class="sub">Supply requests typed on the floor. Tick lines to mark them ordered; the department taps Received when it's in hand (you can too). A line leaves only when it's received.</p>
+      ${missingNote()}${msgBanner()}
+      <section class="panel"><h2>Need to order</h2>
+        ${groups.length ? groups.map(g => `<div class="deptname">${esc(g.name)}</div>${g.lines.map(r => `<div class="line">
+            <input type="checkbox" data-otick="${esc(r.id)}" ${S.ticked.has(r.id) ? "checked" : ""} aria-label="Ordered: ${esc(r.item)}">
+            <span class="qty">${r.qty}</span>
+            <span class="body"><b>${testTag(r)}${esc(r.item)}</b>${r.note ? `<div class="meta2">${esc(r.note)}</div>` : ""}<div class="meta2">${who(r)}</div>
+              ${S.notOrdering === r.id ? `<div class="btns"><input class="in" style="flex:1 1 260px" data-noreason placeholder="Why not? The department sees this.">
+                  <button class="plain" data-nosave="${esc(r.id)}">Not ordering</button><button class="link" data-nocancel="1">Cancel</button></div>`
+                : `<button class="link" data-noopen="${esc(r.id)}">Not ordering…</button>`}</span></div>`).join("")}`).join("")
+          : `<div class="empty"><b>Nothing to order</b>New requests from the floor appear here.</div>`}
+        ${groups.length ? `<div class="btns"><button class="go" data-order="1" ${nTicked && !S.busy ? "" : "disabled"}>Mark ${nTicked || ""} ticked as ordered</button></div>` : ""}
+      </section>
+      <section class="panel"><h2>Ordered, not received</h2>
+        ${ordered.length ? ordered.map(r => { const n = daysSince(r.ordered_at); return `<div class="line"><span class="qty">${r.qty}</span>
+            <span class="body"><b>${testTag(r)}${esc(r.item)}</b> <span class="meta2">· ${esc(DEPT_NAME[r.department] || r.department)}</span>
+              <div class="meta2">Ordered ${n === 0 ? "today" : n + " day" + (n === 1 ? "" : "s") + " ago"} by ${esc(r.ordered_by_name)} · asked by ${who(r)}</div></span>
+            <button class="plain" data-oreceive="${esc(r.id)}">Mark received</button></div>`; }).join("")
+          : `<p class="sub" style="margin:0">Nothing on order.</p>`}
+      </section>
+      <details class="more"><summary>Closed in the last 60 days (${closed.length})</summary>
+        ${closed.map(r => `<div class="line"><span class="qty">${r.qty}</span><span class="body"><b>${testTag(r)}${esc(r.item)}</b> <span class="meta2">· ${esc(DEPT_NAME[r.department] || r.department)}</span>
+          <div class="meta2">${r.state === "received" ? `Received ${esc(fmtDay(r.received_at))} by ${esc(r.received_by_name)}` : r.state === "cancelled" ? `Cancelled ${esc(fmtDay(r.closed_at))} by ${esc(r.closed_by_name)}` : `Not ordering — ${esc(r.not_ordering_reason)} (${esc(r.closed_by_name)})`} · asked by ${who(r)}</div></span></div>`).join("") || `<p class="sub">None.</p>`}
+      </details>`;
+  }
+
+  // ---------- Arrow ----------
+  function arrowScreen() {
+    const out = (S.arrow || []).filter(a => a.at_vendor).sort((a, b) => b.days_out - a.days_out);
+    const back = (S.arrow || []).filter(a => !a.at_vendor).sort((a, b) => String(b.returned_on).localeCompare(String(a.returned_on)));
+    const what = (a) => [a.sheet_numbers && a.sheet_numbers.length ? `sheet${a.sheet_numbers.length === 1 ? "" : "s"} ${a.sheet_numbers.join(", ")}` : "", a.description].filter(Boolean).join(" — ");
+    return `<h1>Arrow</h1>
+      <p class="sub">Everything at Arrow now, from every department. Anything out longer than the number below shows on the TV's attention strip.</p>
+      ${missingNote()}${msgBanner()}
+      <div class="btns" style="margin:0 0 16px"><label for="arDays" style="font-weight:600">Show on the TV after</label>
+        <input class="in" id="arDays" type="number" min="1" max="90" value="${esc(S.arrowDays)}" style="width:90px"> <span>days</span>
+        <button class="plain" data-ardays="1">Save</button></div>
+      <section class="panel"><h2>At Arrow now</h2>
+        ${out.length ? out.map(a => `<div class="line"><span class="qty">${a.days_out}</span>
+          <span class="body"><b>${testTag(a)}${esc(a.project_id)}</b> <span class="meta2">· ${esc(a.job_name)}</span>
+            <div>${esc(what(a))}</div>
+            <div class="meta2">${a.service === "paint" ? "Paint" : "Powdercoat"} · sent ${esc(fmtDay(a.sent_on))} by ${esc(a.sent_by_name)} (${esc(a.department_name)}) · ${a.days_out} day${a.days_out === 1 ? "" : "s"} out${a.days_out > S.arrowDays ? " — <b>over " + S.arrowDays + " days</b>" : ""}</div></span>
+          <span class="btns" style="margin:0"><button class="plain" data-arret="${esc(a.id)}">Mark returned</button><button class="link" data-arvoid="${esc(a.id)}">Entered by mistake</button></span></div>`).join("")
+          : `<p class="sub" style="margin:0">Nothing at Arrow.</p>`}
+      </section>
+      <details class="more"><summary>Returned in the last three months (${back.length})</summary>
+        ${back.map(a => `<div class="line"><span class="qty">${a.days_out}</span><span class="body"><b>${testTag(a)}${esc(a.project_id)}</b> <span class="meta2">· ${esc(what(a))}</span>
+          <div class="meta2">${esc(fmtDay(a.sent_on))} → ${esc(fmtDay(a.returned_on))} · ${a.days_out}-day turnaround · back by ${esc(a.returned_by_name)}</div></span></div>`).join("") || `<p class="sub">None.</p>`}
+      </details>`;
+  }
+
+  // ---------- Routine tasks ----------
+  function routineScreen() {
+    const f = S.taskForm;
+    const byDept = LOG_DEPTS.map(d => ({ d, list: (S.routine || []).filter(t => t.department === d).sort((a, b) => a.days_until - b.days_until) })).filter(g => g.list.length);
+    const people = S.people.filter(p => f.is_test ? p.is_test : !p.is_test);
+    return `<h1>Routine tasks</h1>
+      <p class="sub">Recurring jobs on the floor, Monday to Thursday. Each sits in its department's Log tab; a person's due tasks are pinned to the top of their tablet. Only managers add or remove them. Removing one keeps its history.</p>
+      ${missingNote()}${msgBanner()}
+      <section class="panel"><h2>Add a routine task</h2>
+        <div class="grid2">
+          <div><label for="tfName">Task</label><input class="in" id="tfName" data-tf="name" value="${esc(f.name)}" placeholder="e.g. Change dust collector filter"></div>
+          <div><label for="tfDept">Department</label><select class="in" id="tfDept" data-tf="department">${LOG_DEPTS.map(d => `<option value="${d}" ${f.department === d ? "selected" : ""}>${esc(DEPT_NAME[d])}</option>`).join("")}</select></div>
+          <div><label for="tfWho">Assigned to</label><select class="in" id="tfWho" data-tf="assigned_to"><option value="">Anyone in the department</option>
+            ${people.map(p => `<option value="${esc(p.id)}" ${f.assigned_to === p.id ? "selected" : ""}>${esc(p.full_name)}</option>`).join("")}</select></div>
+          <div><label for="tfType">How often</label><select class="in" id="tfType" data-tf="schedule_type">
+            <option value="weekly" ${f.schedule_type === "weekly" ? "selected" : ""}>Weekly</option><option value="monthly" ${f.schedule_type === "monthly" ? "selected" : ""}>Monthly</option></select></div>
+          ${f.schedule_type === "weekly"
+            ? `<div><label for="tfEvery">Every how many weeks</label><input class="in" id="tfEvery" type="number" min="1" max="12" data-tf="week_interval" value="${esc(f.week_interval)}"></div>`
+            : `<div><label for="tfOcc">Which one in the month</label><select class="in" id="tfOcc" data-tf="monthly_occurrence">${[[1, "1st"], [2, "2nd"], [3, "3rd"], [4, "4th"], [-1, "Last"]].map(([v, l]) => `<option value="${v}" ${Number(f.monthly_occurrence) === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>`}
+          <div><label for="tfDay">Day</label><select class="in" id="tfDay" data-tf="weekday">${Object.entries(WEEKDAYS).map(([v, l]) => `<option value="${v}" ${Number(f.weekday) === Number(v) ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+          <div><label for="tfStart">Starting from</label><input class="in" id="tfStart" type="date" data-tf="start_date" value="${esc(f.start_date || localISO(new Date()))}"></div>
+        </div>
+        <label class="meta2" style="display:flex; gap:8px; align-items:center; margin-top:12px"><input type="checkbox" data-tftest ${f.is_test ? "checked" : ""}> Test task — only the Test Supervisor sees it (for the bench run)</label>
+        <div class="btns"><button class="go" data-addtask="1" ${f.name.trim() && !S.busy ? "" : "disabled"}>Add the task</button></div>
+      </section>
+      ${byDept.length ? byDept.map(g => `<section class="panel"><h2>${esc(DEPT_NAME[g.d])}</h2>${g.list.map(t => `<div class="line">
+          <span class="body"><b>${testTag(t)}${esc(t.name)}</b>
+            <div class="meta2">${esc(t.schedule_text)} · ${esc(t.assigned_to_name || "anyone in " + DEPT_NAME[g.d])}</div>
+            <div class="meta2">${esc(taskWhen(t))}${t.last_done_on && !t.done_today ? ` · last done ${esc(fmtDay(t.last_done_on))} by ${esc(t.last_done_by)}` : ""}</div></span>
+          <button class="link" data-retiretask="${esc(t.id)}">Remove</button></div>`).join("")}</section>`).join("")
+        : `<div class="empty"><b>No routine tasks yet</b>Add them above. Export the old app's backup first, for the record.</div>`}`;
   }
 
   function tasksScreen() {
@@ -345,6 +720,8 @@ if (typeof document !== "undefined") (function () {
         </div>`).join("")}</div>`;
     }
     return `<h1>Your tasks</h1>
+      ${summaryCards()}
+      <h2>Handoffs</h2>
       <p class="sub">Jobs in Pre-Production or In Production that Monday doesn't show as Handed Off, soonest delivery first. A task clears by itself within 15 minutes of Handed Off being set to Yes in Monday.</p>
       ${body}`;
   }
@@ -356,6 +733,8 @@ if (typeof document !== "undefined") (function () {
       <p class="sub">Which departments are live on the floor. The TV shows live departments only — right now: <b>${esc(live.join(", ") || "none")}</b>. Every department's tablet queue works whether it's live or not. Going live is flipping the switch, creating the supervisor's login, and handing over a tablet.</p>
       <div class="panel">${S.depts.map(d => {
         const l = last[d.key];
+        if (d.log_only) return `<div class="dept"><span class="nm">${esc(d.name)}</span>
+          <span class="hist">Log-only: problems, defects, Arrow and routine tasks — no work orders, so no queue and nothing on the TV.</span></div>`;
         return `<div class="dept">
           <span class="nm">${esc(d.name)}</span>
           <button class="switch" role="switch" aria-checked="${d.is_live}" aria-label="${esc(d.name)} live" data-live="${esc(d.key)}" ${S.busy ? "disabled" : ""}></button>
@@ -432,6 +811,27 @@ if (typeof document !== "undefined") (function () {
       </section>
 
       <section class="panel">
+        <h2>TV link</h2>
+        <p class="sub">The floor TV opens <b>tv.html</b> with a secret link instead of a login, so nobody else can read the numbers. Make a link, open it on the TV's computer, and bookmark it there. Making a new link switches the old one off — do that if a link ever ends up somewhere it shouldn't.</p>
+        <p class="sub" style="margin:0">${S.tvMade ? `Last link made ${esc(ago(S.tvMade.updated_at))} by ${esc(S.tvMade.updated_by_name || "someone")}.` : "No TV link has been made yet."}</p>
+        <div class="btns"><button class="go" data-tvnew="1" ${S.busy ? "disabled" : ""}>${S.tvMade ? "Make a new TV link" : "Make the TV link"}</button></div>
+        ${S.tvKey ? `<div class="tvlink"><code id="tvUrl">${esc(tvLink(location.href, S.tvKey))}</code>
+            <button class="plain" data-tvcopy="1">Copy</button><a class="plain" href="${esc(tvLink(location.href, S.tvKey))}" target="_blank" rel="noopener">Open it</a></div>
+          <p class="sub" style="margin:8px 0 0">This is the only time the link is shown. If it's lost, make a new one.</p>` : ""}
+      </section>
+
+      <section class="panel">
+        <h2>Defect lists</h2>
+        <p class="sub">What each department picks from when it logs a defect. Retiring one takes it off the tablets; defects already logged keep it.</p>
+        ${LOG_DEPTS.map(d => { const list = (S.types || []).filter(t => t.department === d).sort((a, b) => a.sort_order - b.sort_order);
+          return `<details class="more"><summary>${esc(DEPT_NAME[d])} — ${list.filter(t => t.active).length}</summary>
+            ${list.map(t => `<div class="typ${t.active ? "" : " off"}"><span>${esc(t.label)}</span>
+              <button class="link" data-typeset="${esc(d)}" data-label="${esc(t.label)}" data-active="${t.active ? "0" : "1"}">${t.active ? "Retire" : "Bring back"}</button></div>`).join("")}
+            <div class="btns"><input class="in" style="flex:1 1 260px" data-newtype="${esc(d)}" placeholder="Add to ${esc(DEPT_NAME[d])}'s list">
+              <button class="plain" data-typeadd="${esc(d)}">Add</button></div></details>`; }).join("")}
+      </section>
+
+      <section class="panel">
         <h2>Test jobs</h2>
         <p class="sub">A copy of a real job with every count at zero, for trying things on a tablet signed in as the Test Supervisor. Test jobs are invisible to real supervisors, stay off the TV and out of Monday, and are labelled TEST.</p>
         <div class="row">
@@ -449,7 +849,9 @@ if (typeof document !== "undefined") (function () {
   function render() {
     if (!S.me) return;
     if (S.locked) return pinScreen("unlock");
-    const body = S.tab === "departments" ? departmentsScreen() : S.tab === "setup" ? setupScreen() : tasksScreen();
+    const screens = { departments: departmentsScreen, setup: setupScreen, problems: problemsScreen, flags: flagsScreen,
+                      ordering: orderingScreen, arrow: arrowScreen, routine: routineScreen };
+    const body = (screens[S.tab] || tasksScreen)();
     app.innerHTML = topBar() + `<main>${S.notice ? `<div class="banner warn">${esc(S.notice)}</div>` : ""}${body}
       <p style="text-align:center; margin-top:30px"><button class="link" data-signout="1">Sign out</button></p></main>`;
     wire();
@@ -457,7 +859,7 @@ if (typeof document !== "undefined") (function () {
 
   function wire() {
     app.querySelectorAll("[data-tab]").forEach(b => b.onclick = async () => {
-      S.tab = b.dataset.tab; store.set("tab", S.tab); render(); await loadTab(); render();
+      S.tab = b.dataset.tab; store.set("tab", S.tab); S.msg = null; render(); await loadTab(); render();
     });
     app.querySelectorAll("[data-lock]").forEach(b => b.onclick = () => { S.locked = true; S.pinEntry = ""; render(); });
     app.querySelectorAll("[data-live]").forEach(b => b.onclick = async () => {
@@ -509,6 +911,69 @@ if (typeof document !== "undefined") (function () {
     app.querySelectorAll("[data-signout]").forEach(b => b.onclick = async () => {
       await db.auth.signOut(); S.me = null; store.set("pin", null); signIn();
     });
+
+    // ---- the floor log ----
+    const on = (sel, fn) => app.querySelectorAll(sel).forEach(el => el.onclick = () => fn(el));
+    const act = async (fn, args, after) => {      // one database call, its plain answer shown at the top
+      S.busy = true; S.msg = null; render();
+      const { data, error } = await db.rpc(fn, args);
+      S.busy = false;
+      S.msg = error ? { ok: false, text: friendlyError(error) } : { ok: true, text: typeof data === "string" ? data : (data && data.summary) || "Done." };
+      if (!error && after) after(data);
+      await loadTab(); render();
+      return !error;
+    };
+    app.querySelectorAll("[data-draft]").forEach(t => t.oninput = () => {
+      S.drafts[t.dataset.draft] = t.value;
+      app.querySelectorAll(`[data-answer="${t.dataset.draft}"]`).forEach(b => b.disabled = !t.value.trim());
+    });
+    on("[data-answer]", (b) => act("answer_problem", { p_problem: b.dataset.answer, p_body: (S.drafts[b.dataset.answer] || "").trim(), p_close: b.dataset.close === "1" },
+                                   () => { delete S.drafts[b.dataset.answer]; }));
+    on("[data-deffrom]", (b) => { S.defFrom = b.dataset.deffrom; render(); });
+
+    app.querySelectorAll("[data-ff]").forEach(el => el.oninput = el.onchange = () => {
+      S.flagForm[el.dataset.ff] = el.value;
+      const go = app.querySelector("[data-setflag]"); if (go) go.disabled = !(S.flagForm.jobId && S.flagForm.note.trim());
+    });
+    on("[data-fflevel]", (b) => { S.flagForm.level = b.dataset.fflevel; render(); });
+    on("[data-setflag]", () => { const f = S.flagForm;
+      act("set_flag", { p_job: f.jobId, p_level: f.level, p_note: f.note.trim(), p_department: f.department || null },
+          () => { S.flagForm = { jobId: "", department: "", level: "priority", note: "" }; }); });
+    on("[data-clearflag]", (b) => { if (confirm("Clear this flag? It stays in the history.")) act("clear_flag", { p_flag: b.dataset.clearflag, p_note: null }); });
+
+    app.querySelectorAll("[data-otick]").forEach(box => box.onchange = () => { box.checked ? S.ticked.add(box.dataset.otick) : S.ticked.delete(box.dataset.otick); render(); });
+    on("[data-order]", () => act("order_supplies", { p_requests: [...S.ticked] }, () => { S.ticked = new Set(); }));
+    on("[data-noopen]", (b) => { S.notOrdering = b.dataset.noopen; render(); const i = app.querySelector("[data-noreason]"); if (i) i.focus(); });
+    on("[data-nocancel]", () => { S.notOrdering = null; render(); });
+    on("[data-nosave]", (b) => { const reason = (app.querySelector("[data-noreason]") || {}).value || "";
+      act("not_ordering_supply", { p_request: b.dataset.nosave, p_reason: reason }, () => { S.notOrdering = null; S.ticked.delete(b.dataset.nosave); }); });
+    on("[data-oreceive]", (b) => { if (confirm("Mark this received? It leaves every list.")) act("receive_supply", { p_request: b.dataset.oreceive }); });
+
+    on("[data-ardays]", () => act("set_arrow_alert_days", { p_days: Number((app.querySelector("#arDays") || {}).value) }));
+    on("[data-arret]", (b) => { if (confirm("Mark this back from Arrow today?")) act("return_from_arrow", { p_item: b.dataset.arret, p_returned_on: null }); });
+    on("[data-arvoid]", (b) => { if (confirm("Mark this entered by mistake? It comes off the lists and stays in history.")) act("void_arrow", { p_item: b.dataset.arvoid, p_reason: null }); });
+
+    app.querySelectorAll("[data-tf]").forEach(el => el.oninput = el.onchange = () => {
+      S.taskForm[el.dataset.tf] = el.value;
+      if (el.dataset.tf === "schedule_type") return render();
+      const go = app.querySelector("[data-addtask]"); if (go) go.disabled = !S.taskForm.name.trim();
+    });
+    app.querySelectorAll("[data-tftest]").forEach(el => el.onchange = () => { S.taskForm.is_test = el.checked; S.taskForm.assigned_to = ""; render(); });
+    on("[data-addtask]", () => { const f = S.taskForm;
+      act("add_routine_task", { p_name: f.name.trim(), p_department: f.department, p_schedule_type: f.schedule_type, p_weekday: Number(f.weekday),
+          p_week_interval: Number(f.week_interval) || 1, p_monthly_occurrence: f.schedule_type === "monthly" ? Number(f.monthly_occurrence) : null,
+          p_start_date: f.start_date || localISO(new Date()), p_assigned_to: f.assigned_to || null, p_is_test: !!f.is_test },
+          () => { S.taskForm = { ...S.taskForm, name: "", assigned_to: "" }; }); });
+    on("[data-retiretask]", (b) => { if (confirm("Remove this routine task? Its history is kept.")) act("retire_routine_task", { p_task: b.dataset.retiretask }); });
+
+    on("[data-tvnew]", () => {
+      if (S.tvMade && !confirm("Make a new TV link? The TV using the old one will stop showing numbers until you open the new link on it.")) return;
+      act("new_tv_link", {}, (data) => { S.tvKey = data.key; });
+    });
+    on("[data-tvcopy]", async () => { try { await navigator.clipboard.writeText(tvLink(location.href, S.tvKey)); S.msg = { ok: true, text: "Copied." }; } catch (e) { S.msg = { ok: false, text: "Couldn't copy — select the link and copy it by hand." }; } render(); });
+    on("[data-typeset]", (b) => act("set_defect_type", { p_department: b.dataset.typeset, p_label: b.dataset.label, p_active: b.dataset.active === "1" }));
+    on("[data-typeadd]", (b) => { const i = app.querySelector(`[data-newtype="${b.dataset.typeadd}"]`);
+      if (i && i.value.trim()) act("set_defect_type", { p_department: b.dataset.typeadd, p_label: i.value.trim(), p_active: true }); });
   }
 
   // ---------- PIN ----------
@@ -593,7 +1058,7 @@ if (typeof document !== "undefined") (function () {
     touch();
     render();
     await loadTab();
-    if (S.tab !== "tasks") { try { S.tasks = await q(db.from("v_handoff_tasks").select("*")); } catch (e) {} }
+    if (S.tab !== "tasks") { try { S.tasks = await q(db.from("v_handoff_tasks").select("*")); } catch (e) {} await loadCounts(); }
     render();
   }
 
@@ -603,7 +1068,8 @@ if (typeof document !== "undefined") (function () {
 })();
 
 /* lets the core be tested outside a browser */
-if (typeof module !== "undefined") module.exports = { keyProblem, isManager, daysLeft, fmtDate, daysText, ago, buildTasks, lastChanges, groupRules, ruleDepartments, catchUpTotals, pinHash, validPin, isNetworkError, friendlyError };
+if (typeof module !== "undefined") module.exports = { keyProblem, isManager, daysLeft, fmtDate, daysText, ago, buildTasks, lastChanges, groupRules, ruleDepartments, catchUpTotals, pinHash, validPin, isNetworkError, friendlyError,
+  localISO, daysSince, problemState, officeProblems, staleFlags, openFlags, needToOrder, orderedNotReceived, defectSummary, tvLink, taskWhen };
 </script>
 </body>
 </html>

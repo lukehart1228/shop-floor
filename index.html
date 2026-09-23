@@ -22,6 +22,7 @@
   body{font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:18px; line-height:1.4;
        padding-bottom:env(safe-area-inset-bottom,0px); -webkit-tap-highlight-color:transparent}
   button{font:inherit; color:inherit; cursor:pointer}
+  button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--bright); outline-offset:2px}
   .num{font-family:'Barlow Condensed',sans-serif; font-variant-numeric:tabular-nums}
   [hidden]{display:none!important}
 
@@ -46,10 +47,19 @@
   h1{font-size:26px; margin:2px 2px 4px}
   .sub{color:var(--ink2); margin:0 2px 16px; font-size:16px}
   .back{background:none; border:none; color:var(--orange); font-weight:700; padding:10px 2px; font-size:18px}
+  h2.sec{font-size:16px; color:var(--ink2); font-weight:700; margin:26px 2px 10px; letter-spacing:.01em}
+
+  /* the four areas */
+  .subtabs{display:flex; gap:8px; margin:0 0 16px; flex-wrap:wrap}
+  .subtab{background:#fff; border:1px solid var(--gray); border-radius:10px; padding:12px 18px; font-weight:700; color:var(--ink2); min-height:52px}
+  .subtab[aria-current="true"]{background:var(--midnight); color:var(--sawdust); border-color:var(--midnight)}
+  .subtab .c{margin-left:8px; color:var(--bright); font-family:'Barlow Condensed',sans-serif}
 
   /* queue */
   .job{display:block; width:100%; text-align:left; background:#fff; border:1px solid var(--line);
        border-radius:12px; padding:16px 18px; margin-bottom:12px}
+  .job.f-critical{border-left:8px solid var(--orange)}
+  .job.f-priority{border-left:8px solid var(--bright)}
   .job-top{display:flex; gap:12px; align-items:baseline; flex-wrap:wrap}
   .pid{font-weight:700; letter-spacing:.02em}
   .jname{color:var(--ink2); flex:1 1 220px; min-width:0}
@@ -64,6 +74,19 @@
        letter-spacing:.06em; padding:0 5px; margin-right:8px; vertical-align:2px}
   .chip{display:inline-block; margin-top:10px; font-size:14px; font-weight:600; padding:4px 10px; border-radius:6px;
         background:var(--warn-bg); color:var(--warn)}
+  .marks{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
+  .marks .chip{margin-top:0}
+  .flagtag{display:inline-block; font-size:14px; font-weight:700; padding:4px 10px; border-radius:6px; max-width:100%}
+  .flagtag.critical{background:var(--orange); color:#fff}
+  .flagtag.priority{background:var(--bright); color:var(--midnight)}
+  .flagtag.watch{border:1.5px solid var(--midnight); color:var(--midnight); padding:3px 9px}
+  .stoptag{display:inline-block; font-size:14px; font-weight:700; padding:4px 10px; border-radius:6px; background:var(--warn-bg); color:var(--warn); border:1.5px solid var(--warn)}
+  .band{border-radius:10px; padding:12px 16px; margin-bottom:14px; font-weight:600}
+  .band.critical{background:var(--orange); color:#fff}
+  .band.priority{background:var(--bright); color:var(--midnight)}
+  .band.watch{background:#fff; border:1.5px solid var(--midnight)}
+  .band.stop{background:var(--warn-bg); color:var(--warn); border:1.5px solid var(--warn)}
+  .band small{display:block; font-weight:500; opacity:.85; font-size:14px}
   .empty{background:#fff; border:1px dashed var(--gray); border-radius:12px; padding:36px 20px; text-align:center; color:var(--ink2)}
   .empty b{display:block; color:var(--midnight); font-size:20px; margin-bottom:6px}
 
@@ -103,7 +126,83 @@
   .page img{display:block; width:100%; min-width:720px; height:auto}
   .page .missing{padding:60px 20px; text-align:center; color:var(--ink2)}
   .actions{display:flex; gap:10px; flex-wrap:wrap; margin:6px 0 14px}
-  .actions button{flex:1 1 200px; background:#fff; border:1px solid var(--gray); border-radius:12px; padding:14px; font-weight:700}
+  .actions button{flex:1 1 200px; background:#fff; border:1px solid var(--gray); border-radius:12px; padding:14px; font-weight:700; min-height:56px}
+
+  /* log entries and lists */
+  .li{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:10px}
+  .li.open{border-left:6px solid var(--midnight)}
+  .li.stop{border-left:6px solid var(--warn)}
+  .li-top{display:flex; gap:10px; align-items:baseline; flex-wrap:wrap}
+  .li-top b{font-weight:700}
+  .meta2{font-size:15px; color:var(--ink2); margin-top:3px}
+  .st{font-size:13px; font-weight:700; padding:2px 8px; border-radius:5px; border:1.5px solid var(--midnight)}
+  .st.ok{background:var(--teal-bg); color:var(--teal-ink); border-color:transparent}
+  .msg{background:var(--paper); border-radius:9px; padding:10px 12px; margin-top:8px}
+  .msg.answer,.msg.office_note{background:#fff; border:1.5px solid var(--midnight)}
+  .msg-meta{font-size:13px; color:var(--ink2); margin-top:3px; font-weight:600}
+  .rowbtns{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px}
+  .rowbtns button,.btn{background:#fff; border:1px solid var(--gray); border-radius:10px; padding:12px 16px; font-weight:700; min-height:52px}
+  .go,.rowbtns .go{background:var(--orange); color:#fff; border:none; border-radius:10px; padding:14px 20px; font-weight:700; min-height:54px}
+  .rowbtns .step{border-radius:50%; padding:0; min-height:0; border:2px solid var(--gray); background:var(--paper)}
+  .go:disabled{opacity:.4}
+  .wide{display:block; width:100%}
+  .taskrow{display:flex; align-items:center; gap:12px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:8px}
+  .taskrow .t{flex:1 1 auto; min-width:0}
+  .taskrow .when{font-size:15px; color:var(--ink2)}
+  .taskrow .when b{color:var(--midnight)}
+  .taskrow.ok{background:var(--teal-bg); border-color:transparent}
+  .taskrow.ok .when{color:var(--teal-ink)}
+  .taskrow .go{padding:12px 22px}
+  .pinned{background:#fff; border:2px solid var(--midnight); border-radius:12px; padding:10px 14px 4px; margin-bottom:16px}
+  .pinned h2{font-size:15px; margin:2px 0 6px; color:var(--ink2)}
+  .pinned .taskrow{border:none; border-top:1px solid var(--line); border-radius:0; padding:10px 0; margin:0}
+  .countline{display:flex; align-items:baseline; gap:10px; padding:8px 0; border-bottom:1px solid var(--line)}
+  .countline:last-child{border-bottom:none}
+  .countline .n{margin-left:auto; font-weight:700; font-size:22px}
+  .card{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:12px}
+  .hist{font-size:15px; color:var(--ink2); margin-top:8px}
+  .hist div{padding:3px 0}
+  .linkish{background:none; border:none; color:var(--ink2); text-decoration:underline; padding:6px 0; font-size:15px}
+
+  /* forms */
+  label.f{display:block; font-weight:700; margin:14px 0 6px}
+  .in,textarea.in{width:100%; font:inherit; padding:14px; border:1px solid var(--gray); border-radius:10px; background:#fff; color:var(--midnight)}
+  textarea.in{min-height:96px; resize:vertical}
+  .picklist{max-height:320px; overflow:auto; border:1px solid var(--line); border-radius:10px; margin-top:8px; background:#fff}
+  .pj{display:flex; gap:10px; align-items:baseline; width:100%; text-align:left; background:#fff; border:none; border-bottom:1px solid var(--line); padding:13px 14px; min-height:54px}
+  .pj:last-child{border-bottom:none}
+  .pj span{color:var(--ink2); font-size:15px}
+  .pj[aria-pressed="true"]{background:var(--midnight); color:var(--sawdust)}
+  .pj[aria-pressed="true"] span{color:#CFC9B8}
+  .chosen{display:flex; align-items:center; gap:10px; background:var(--paper); border-radius:10px; padding:10px 14px}
+  .chosen b{flex:1}
+  .schips{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px}
+  .schip{background:#fff; border:1.5px solid var(--gray); border-radius:9px; padding:10px 14px; font-weight:700; min-width:64px; min-height:50px}
+  .schip small{display:block; font-weight:500; font-size:13px; color:var(--ink2)}
+  .schip[aria-pressed="true"]{background:var(--midnight); color:var(--sawdust); border-color:var(--midnight)}
+  .schip[aria-pressed="true"] small{color:#CFC9B8}
+  .pick{display:block; width:100%; text-align:left; background:#fff; border:1.5px solid var(--line); border-radius:10px; padding:14px; margin-bottom:8px; font-weight:700; min-height:54px}
+  .pick[aria-pressed="true"]{background:var(--orange); color:#fff; border-color:var(--orange)}
+  .chk{display:flex; gap:12px; align-items:flex-start; background:#fff; border:1.5px solid var(--line); border-radius:10px; padding:14px; margin-top:12px; font-weight:700}
+  .chk input{width:26px; height:26px; margin:0; flex-shrink:0; accent-color:var(--orange)}
+  .chk small{display:block; font-weight:500; color:var(--ink2); font-size:14px}
+  .seg{display:flex; gap:8px}
+  .seg button{flex:1; background:#fff; border:1.5px solid var(--gray); border-radius:10px; padding:12px; font-weight:700; min-height:52px}
+  .seg button[aria-pressed="true"]{background:var(--midnight); color:var(--sawdust); border-color:var(--midnight)}
+  .qty{display:flex; align-items:center; gap:14px}
+  .qty .step{width:64px; height:64px; font-size:32px}
+  .qty .n{font-size:44px; font-weight:700; min-width:60px; text-align:center}
+  .qty.small .step{width:48px; height:48px; font-size:26px}
+  .qty.small .n{font-size:30px; min-width:44px}
+
+  /* modal */
+  .ovl{position:fixed; inset:0; background:rgba(24,29,46,.55); display:flex; align-items:center; justify-content:center; padding:16px; z-index:40}
+  .mdl{background:var(--paper); border-radius:14px; width:100%; max-width:620px; max-height:92vh; overflow:auto; padding:20px}
+  .mdl h3{margin:0 0 4px; font-size:22px}
+  .mdl .sub{margin-bottom:10px}
+  .mdl-btns{display:flex; gap:10px; margin-top:18px}
+  .mdl-btns button{flex:1; min-height:56px}
+  .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--midnight); color:var(--sawdust); padding:12px 20px; border-radius:99px; font-weight:600; z-index:50; max-width:90%; text-align:center}
 
   /* sign in */
   .signin{max-width:440px; margin:8vh auto 0; background:#fff; border:1px solid var(--line); border-radius:14px; padding:24px}
@@ -135,7 +234,6 @@
 <script>
 /* =====================================================================
    THE TWO SETTINGS — the same two lines as upload.html.
-   Copy them straight across (walkthrough 4, step 2).
    Publishable key only. NEVER the secret key — this file is public.
    ===================================================================== */
 const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
@@ -146,9 +244,13 @@ const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 
 const DEPTS = [
   ["milling", "Milling"], ["cnc", "CNC"], ["sanding", "Sanding"], ["finishing", "Finishing"],
-  ["full_custom", "Full Custom"], ["metal", "Metal"], ["assembly_qc", "Assembly / QC"],
+  ["full_custom", "Full Custom"], ["metal", "Metal"], ["assembly_qc", "Assembly / QC"], ["delivery", "Delivery"],
 ];
 const DEPT_NAME = Object.fromEntries(DEPTS);
+/* Delivery is log-only for now: no work orders to count, no supplies tab. */
+const LOG_ONLY = ["delivery"];
+const ARROW_DEPTS = ["metal", "assembly_qc", "delivery"];
+const TAB_NAME = { work: "Work orders", problems: "Problems", log: "Log", supplies: "Supplies" };
 
 function keyProblem(url, key) {
   if (!url || !key || url.includes("PASTE-") || key.includes("PASTE-"))
@@ -170,14 +272,29 @@ function departmentsFor(me) {
   if (me.role === "manager" || me.role === "admin") return DEPTS.map(d => d[0]);
   return DEPTS.map(d => d[0]).filter(k => (me.departments || []).includes(k));
 }
+const isLogOnly = (dept) => LOG_ONLY.includes(dept);
+/** The areas a department's tablet has. */
+function tabsFor(dept) { return isLogOnly(dept) ? ["problems", "log"] : ["work", "problems", "log", "supplies"]; }
 
 /** Put any counts still waiting to send on top of what the database last said. */
 function withPending(rows, outbox) {
   return rows.map(r => outbox[r.progress_id] ? { ...r, qty_done: outbox[r.progress_id].qty } : r);
 }
 
-/** One card per job that still has pieces left for this department, soonest delivery first. */
-function buildQueue(rows) {
+const FLAG_RANK = { critical: 3, priority: 2, watch: 1 };
+/** The strongest open flag on a job that applies to this department (whole-job flags apply everywhere). */
+function flagFor(flags, jobId, dept) {
+  let best = null;
+  for (const f of flags || []) {
+    if (f.job_id !== jobId || (f.department && f.department !== dept)) continue;
+    if (!best || FLAG_RANK[f.level] > FLAG_RANK[best.level]) best = f;
+  }
+  return best;
+}
+
+/** One card per job that still has pieces left for this department.
+ *  Critical and priority flags first, then soonest delivery. */
+function buildQueue(rows, flags = [], dept = null) {
   const jobs = new Map();
   for (const r of rows) {
     if (!jobs.has(r.job_id)) jobs.set(r.job_id, {
@@ -190,9 +307,12 @@ function buildQueue(rows) {
     j.sheets += 1;
     if (r.qty_done >= r.qty_required) j.sheetsDone += 1;
   }
+  const pin = (j) => (j.flag && j.flag.level !== "watch") ? FLAG_RANK[j.flag.level] : 0;
   return [...jobs.values()]
+    .map(j => ({ ...j, flag: flagFor(flags, j.job_id, dept) }))
     .filter(j => j.done < j.total)
-    .sort((a, b) => (a.delivery_date || "9999").localeCompare(b.delivery_date || "9999")
+    .sort((a, b) => pin(b) - pin(a)
+                 || (a.delivery_date || "9999").localeCompare(b.delivery_date || "9999")
                  || String(a.project_id).localeCompare(String(b.project_id)));
 }
 
@@ -214,7 +334,7 @@ function daysLeft(iso, today = new Date()) {
 }
 function fmtDate(iso) {
   if (!iso) return "no date";
-  const [y, m, d] = iso.split("-").map(Number);
+  const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number);
   return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m - 1] + " " + d;
 }
 function daysText(n) {
@@ -222,6 +342,21 @@ function daysText(n) {
   if (n < 0) return `${-n} day${n === -1 ? "" : "s"} late`;
   if (n === 0) return "due today";
   return `${n} day${n === 1 ? "" : "s"}`;
+}
+/** A timestamp as the local date, "YYYY-MM-DD". */
+function localISO(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+/** Whole days since a timestamp or date, on the tablet's calendar. */
+function daysSince(ts, today = new Date()) {
+  if (!ts) return null;
+  return -daysLeft(String(ts).length > 10 ? localISO(ts) : ts, today);
+}
+function agoText(ts, today = new Date()) {
+  const n = daysSince(ts, today);
+  if (n === null) return "";
+  return n <= 0 ? "today" : n === 1 ? "yesterday" : `${n} days ago`;
 }
 
 /** Record a count to send. Only the latest count per sheet matters. */
@@ -272,12 +407,113 @@ async function flushOutbox(box, db) {
   return { saved, refused, offline };
 }
 
+function newId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
+    (c ^ (Math.random() * 16) >> (c / 4)).toString(16));
+}
+
+/**
+ * Log entries (defects, problems, replies, Arrow, QC, supplies, tasks done)
+ * wait in their own box when Wi-Fi drops, in the order they were made.
+ * Each carries its own id, so sending one twice can never log it twice.
+ */
+function queueEntry(box, fn, args, label) {
+  const id = newId();
+  const withId = "p_client_id" in args ? { ...args, p_client_id: args.p_client_id || id } : args;
+  return { box: { ...box, [id]: { fn, args: withId, label, at: new Date().toISOString() } }, id };
+}
+
+async function flushLogbox(box, db) {
+  const sent = [], refused = [];
+  let offline = false;
+  const ids = Object.keys(box.get()).sort((a, b) => String(box.get()[a].at).localeCompare(String(box.get()[b].at)));
+  for (const id of ids) {
+    const e = box.get()[id];
+    if (!e) continue;
+    let res;
+    try { res = await db.rpc(e.fn, e.args); } catch (err) { res = { error: err }; }
+    if (res && res.error) {
+      if (isNetworkError(res.error)) { offline = true; break; }
+      refused.push({ id, label: e.label, reason: friendlyError(res.error) });
+    } else {
+      sent.push({ id, label: e.label, fn: e.fn, data: res ? res.data : null });
+    }
+    const cur = { ...box.get() }; delete cur[id]; box.set(cur);
+  }
+  return { sent, refused, offline };
+}
+
+/** Routine tasks pinned to the top of a person's tablet: theirs, or nobody's in their departments, due now. */
+function dueForMe(tasks, me, depts) {
+  if (!me) return [];
+  return (tasks || []).filter(t => !t.done_today && t.days_until <= 0 && !!t.is_test === !!me.is_test &&
+      (t.assigned_to === me.id || (!t.assigned_to && (depts || []).includes(t.department))))
+    .sort((a, b) => a.days_until - b.days_until || a.name.localeCompare(b.name));
+}
+function taskWhen(t) {
+  if (t.done_today) return `Done today${t.last_done_by ? " by " + t.last_done_by : ""}`;
+  const n = t.days_until;
+  if (n === 0) return "Due today";
+  if (n < 0) return `Overdue by ${-n} day${n === -1 ? "" : "s"}`;
+  return `Due in ${n} day${n === 1 ? "" : "s"} · ${fmtDate(t.next_due)}`;
+}
+
+/** Where a problem stands, in words. */
+function problemState(p) {
+  if (p.status === "answered") return { label: "Answered", done: true };
+  if (p.came_back) return { label: "Came back", done: false };
+  if ((p.thread || []).some(m => m.kind === "office_note")) return { label: "Office replied — still open", done: false };
+  return { label: "Waiting on the office", done: false };
+}
+/** Open ones first (work stopped, then oldest); answered ones while the job is still in production. */
+function splitProblems(list) {
+  const open = (list || []).filter(p => p.status === "open")
+    .sort((a, b) => (b.work_stopped - a.work_stopped) || String(a.raised_at).localeCompare(String(b.raised_at)));
+  const answered = (list || []).filter(p => p.status === "answered" && p.job_active !== false)
+    .sort((a, b) => String(b.answered_at).localeCompare(String(a.answered_at)));
+  return { open, answered };
+}
+
+/** Defect counts by type, most first. */
+function defectCounts(defects) {
+  const by = {};
+  for (const d of defects || []) if (!d.voided) by[d.defect_type] = (by[d.defect_type] || 0) + 1;
+  return Object.entries(by).map(([type, n]) => ({ type, n })).sort((a, b) => b.n - a.n || a.type.localeCompare(b.type));
+}
+
+/** A supply request's state, in words. */
+function supplyLine(r, today = new Date()) {
+  const who = (n) => n ? ` by ${n}` : "";
+  switch (r.state) {
+    case "requested": return `Waiting on the office · asked ${fmtDate(localISO(r.requested_at))}${who(r.requested_by_name)}`;
+    case "ordered": return `Ordered ${agoText(r.ordered_at, today)}${who(r.ordered_by_name)} — tap Received when it's in hand`;
+    case "received": return `Received ${agoText(r.received_at, today)}${who(r.received_by_name)}`;
+    case "cancelled": return `Cancelled ${agoText(r.closed_at, today)}${who(r.closed_by_name)}`;
+    case "not_ordering": return `Not ordering: ${r.not_ordering_reason || ""}${who(r.closed_by_name)}`;
+  }
+  return r.state;
+}
+
+/** The job picker: type part of the PROJ number or name. In production first, soonest delivery first. */
+function filterJobs(jobs, text) {
+  const t = String(text || "").trim().toLowerCase().replace(/^proj-?/, "");
+  return (jobs || []).filter(j => !t || String(j.project_id).toLowerCase().includes(t) || String(j.job_name || "").toLowerCase().includes(t))
+    .sort((a, b) => (b.is_active - a.is_active) || (a.delivery_date || "9999").localeCompare(b.delivery_date || "9999")
+                 || String(a.project_id).localeCompare(String(b.project_id)));
+}
+function sheetsText(nums) {
+  const n = (nums || []).slice().sort((a, b) => a - b);
+  return n.length ? `sheet${n.length === 1 ? "" : "s"} ${n.join(", ")}` : "";
+}
+
 function friendlyError(err) {
   const m = String((err && (err.message || err.error_description || err.error)) || err || "");
   if (isNetworkError(err)) return "Can't reach the database right now. Counts are kept on this tablet and will send when the connection is back.";
   if (/invalid login credentials/i.test(m)) return "That email and password didn't match. Check them and try again.";
   if (/email not confirmed/i.test(m)) return "This login hasn't been confirmed. In Supabase → Authentication → Users, check it was created with Auto Confirm ticked.";
   if (/jwt expired|refresh token/i.test(m)) return "The sign-in has expired. Sign out and back in.";
+  if (/could not find the function|schema cache|does not exist/i.test(m)) return "This part isn't set up in the database yet. Tell Luke (the SQL file for it needs running).";
   return m || "Something went wrong. Try again, and if it keeps happening, take a screenshot.";
 }
 
@@ -301,15 +537,23 @@ if (typeof document !== "undefined") (function () {
 
   const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const S = {
-    me: null, depts: [], dept: store.get("dept", null),
+    me: null, depts: [], dept: store.get("dept", null), tab: store.get("tab", "work"),
     rows: [], rowsAt: null, fromCache: false,
-    outbox: store.get("outbox", {}),
+    outbox: store.get("outbox", {}), logbox: store.get("logbox", {}),
     view: { screen: "queue", jobId: null, progressId: null },
     online: navigator.onLine, notice: null, loading: false,
+    // the log side
+    flags: store.get("flags", []), tasks: store.get("tasks", []), types: store.get("types", []),
+    problems: [], probScope: "mine", defects: [], supplies: [], arrow: [], pickJobs: store.get("pickjobs", []),
+    pickSheets: {}, piece: {}, qcJob: null, qcEntries: [], arrowForm: null, supplyForm: { item: "", qty: 1, note: "" },
+    openTask: null, modal: null, toast: null, missing: {},
   };
   const pageUrls = new Map();
 
   function rowsNow() { return withPending(S.rows, S.outbox); }
+  function tabs() { return tabsFor(S.dept); }
+  function myDepts() { return S.depts; }
+  const owns = (d) => S.me && (S.me.role === "manager" || S.me.role === "admin" || (S.me.departments || []).includes(d));
 
   // ---------- data ----------
   async function loadMe(user) {
@@ -322,11 +566,12 @@ if (typeof document !== "undefined") (function () {
     S.me = me;
     S.depts = departmentsFor(me);
     if (!S.depts.includes(S.dept)) S.dept = S.depts[0] || null;
+    if (!tabs().includes(S.tab)) S.tab = tabs()[0];
     return me;
   }
 
   async function loadRows() {
-    if (!S.dept) return;
+    if (!S.dept || isLogOnly(S.dept)) return;
     S.loading = true;
     const { data, error } = await db.from("v_floor_sheets").select("*").eq("department", S.dept);
     S.loading = false;
@@ -339,6 +584,96 @@ if (typeof document !== "undefined") (function () {
     S.rows = data || []; S.rowsAt = new Date().toISOString(); S.fromCache = false;
     store.set("rows_" + S.dept, { rows: S.rows, at: S.rowsAt });
     prefetchPages();
+  }
+
+  /* Everything beyond counting is read defensively: if a part isn't in the
+     database yet, or the Wi-Fi is down, counting carries on regardless. */
+  async function read(name, query, cacheKey) {
+    let res;
+    try { res = await query; } catch (e) { res = { error: e }; }
+    if (!res || res.error || !Array.isArray(res.data)) {
+      const err = res && res.error;
+      if (err && !isNetworkError(err) && /does not exist|schema cache|could not find/i.test(String(err.message))) S.missing[name] = true;
+      return cacheKey ? store.get(cacheKey, null) : null;
+    }
+    delete S.missing[name];
+    if (cacheKey) store.set(cacheKey, res.data);
+    return res.data;
+  }
+  async function loadFlags() {
+    const d = await read("flags", db.from("v_flags").select("*").eq("is_open", true), "flags");
+    if (d) S.flags = d;
+  }
+  async function loadTasks() {
+    const d = await read("tasks", db.from("v_routine_tasks").select("*"), "tasks");
+    if (d) S.tasks = d;
+  }
+  async function loadTypes() {
+    const d = await read("types", db.from("defect_types").select("*").eq("active", true), "types");
+    if (d) S.types = d;
+  }
+  async function loadPickJobs() {
+    const d = await read("pickjobs", db.from("v_pick_jobs").select("*"), "pickjobs");
+    if (d) S.pickJobs = d;
+  }
+  async function loadPickSheets(jobId) {
+    let d = await read("picksheets", db.from("v_pick_sheets").select("*").eq("job_id", jobId), "picksheets_" + jobId);
+    if (!d) {        // no connection and never listed here: use this department's own queue, if the job is on it
+      const mine = S.rows.filter(r => r.job_id === jobId);
+      d = mine.length ? mine.map(r => ({ job_id: jobId, sheet_number: r.sheet_number, item_code: r.item_code, departments: [S.dept] })) : null;
+    }
+    if (d) { S.pickSheets[jobId] = d.slice().sort((a, b) => a.sheet_number - b.sheet_number); if (S.sheetsUnavailable === jobId) S.sheetsUnavailable = null; }
+    else { S.pickSheets[jobId] = []; S.sheetsUnavailable = jobId; }
+  }
+  async function loadProblems() {
+    const q = S.probScope === "all" ? db.from("v_problems").select("*") : db.from("v_problems").select("*").eq("department", S.dept);
+    const d = await read("problems", q, "problems_" + S.probScope + "_" + S.dept);
+    if (d) S.problems = d;
+  }
+  async function loadDefects() {
+    const d = await read("defects", db.from("v_defects").select("*").eq("department", S.dept), "defects_" + S.dept);
+    if (d) S.defects = d.filter(x => !x.voided).sort((a, b) => String(b.logged_at).localeCompare(String(a.logged_at)));
+  }
+  async function loadSupplies() {
+    const d = await read("supplies", db.from("v_supply_requests").select("*").eq("department", S.dept), "supplies_" + S.dept);
+    if (d) S.supplies = d;
+  }
+  async function loadArrow() {
+    const d = await read("arrow", db.from("v_outside_jobs").select("*").eq("voided", false), "arrow");
+    if (d) S.arrow = d;
+  }
+  async function loadQc(jobId) {
+    const d = await read("qc", db.from("v_qc_entries").select("*").eq("job_id", jobId), null);
+    S.qcEntries = (d || []).filter(x => !x.voided);
+  }
+  async function loadPiece(r) {
+    const key = r.job_id + "|" + r.sheet_number;
+    const [defs, probs, qc] = await Promise.all([
+      read("defects", db.from("v_defects").select("*").eq("job_id", r.job_id), null),
+      read("problems", db.from("v_problems").select("*").eq("job_id", r.job_id), null),
+      read("qc", db.from("v_qc_entries").select("*").eq("job_id", r.job_id), null),
+    ]);
+    S.piece[key] = {
+      defects: (defs || []).filter(d => !d.voided && d.sheet_number === r.sheet_number),
+      problems: (probs || []).filter(p => p.sheet_number === r.sheet_number || p.sheet_number === null),
+      qc: (qc || []).filter(q => !q.voided && q.sheet_number === r.sheet_number),
+    };
+  }
+
+  async function loadTab() {
+    if (S.tab === "work") return loadRows();
+    if (S.tab === "problems") return loadProblems();
+    if (S.tab === "log") {
+      const jobs = [loadDefects(), loadTasks()];
+      if (ARROW_DEPTS.includes(S.dept)) jobs.push(loadArrow());
+      if (S.dept === "assembly_qc" && S.qcJob) jobs.push(loadQc(S.qcJob));
+      return Promise.all(jobs);
+    }
+    if (S.tab === "supplies") return loadSupplies();
+  }
+  async function refreshAll() {
+    await Promise.all([loadFlags(), loadTasks(), loadTypes(), S.tab === "problems" ? null : loadProblems()]);
+    await loadTab();
   }
 
   let flushing = false;
@@ -356,6 +691,35 @@ if (typeof document !== "undefined") (function () {
     flushing = false;
     render();
     if (!r.offline && Object.keys(S.outbox).length) flush();   // taps made while that was sending
+  }
+
+  let logFlushing = false;
+  async function flushLog() {
+    if (logFlushing || !Object.keys(S.logbox).length) return;
+    logFlushing = true;
+    const r = await flushLogbox({ get: () => S.logbox, set: (b) => { S.logbox = b; store.set("logbox", b); } }, db);
+    logFlushing = false;
+    if (r.offline) S.online = false;
+    if (r.refused.length) S.notice = `${r.refused[0].label}: ${r.refused[0].reason}`;
+    if (r.sent.length) {
+      const last = r.sent[r.sent.length - 1];
+      const said = typeof last.data === "string" ? last.data : last.data && last.data.summary;
+      if (said) showToast(said);
+      await refreshAll();
+      if (S.view.screen === "sheet") { const cur = rowsNow().find(x => x.progress_id === S.view.progressId); if (cur) await loadPiece(cur); }
+    }
+    render();
+  }
+
+  /** Every log write goes through here: queued, then sent straight away if it can be. */
+  async function send(fn, args, label, after) {
+    const q = queueEntry(S.logbox, fn, args, label);
+    S.logbox = q.box; store.set("logbox", S.logbox);
+    S.modal = null; S.notice = null;
+    if (after) after();
+    render();
+    await flushLog();
+    if (S.logbox[q.id]) showToast("Saved on this tablet — it will send when the connection is back.");
   }
 
   // ---------- sheet pages: kept on the tablet so they show without Wi-Fi ----------
@@ -394,10 +758,22 @@ if (typeof document !== "undefined") (function () {
     prefetching = false;
   }
 
-  // ---------- screens ----------
+  // ---------- pieces used on several screens ----------
+  let toastTimer = null;
+  function showToast(text) {
+    S.toast = text; render();
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { S.toast = null; render(); }, 3200);
+  }
+
   function syncBadge() {
-    const n = Object.keys(S.outbox).length;
-    if (n) return `<span class="sync waiting">${n} count${n === 1 ? "" : "s"} waiting to send</span>`;
+    const n = Object.keys(S.outbox).length, m = Object.keys(S.logbox).length;
+    if (n || m) {
+      const parts = [];
+      if (n) parts.push(`${n} count${n === 1 ? "" : "s"}`);
+      if (m) parts.push(`${m} entr${m === 1 ? "y" : "ies"}`);
+      return `<span class="sync waiting">${parts.join(" and ")} waiting to send</span>`;
+    }
     if (!S.online || S.fromCache) return `<span class="sync offline">Offline</span>`;
     return `<span class="sync">All saved</span>`;
   }
@@ -422,8 +798,44 @@ if (typeof document !== "undefined") (function () {
     return out;
   }
 
+  function pinnedTasks() {
+    const mine = dueForMe(S.tasks, S.me, S.depts);
+    if (!mine.length) return "";
+    return `<section class="pinned"><h2>Your routine tasks</h2>${mine.map(t => `
+      <div class="taskrow"><span class="t"><b>${esc(t.name)}</b>
+        <div class="when"><b>${esc(taskWhen(t))}</b> · ${esc(t.department_name)}</div></span>
+        <button class="go" data-taskdone="${esc(t.id)}">Done</button></div>`).join("")}</section>`;
+  }
+
+  function subTabs() {
+    const openHere = (S.problems || []).filter(p => p.status === "open" && p.department === S.dept).length;
+    const dueHere = (S.tasks || []).filter(t => t.department === S.dept && !t.done_today && t.days_until <= 0 && !!t.is_test === !!(S.me && S.me.is_test)).length;
+    const toReceive = (S.supplies || []).filter(r => r.state === "ordered").length;
+    const count = { problems: openHere, log: dueHere, supplies: toReceive };
+    return `<nav class="subtabs" aria-label="${esc(DEPT_NAME[S.dept])}">${tabs().map(t =>
+      `<button class="subtab" data-tab="${t}" aria-current="${S.tab === t}">${TAB_NAME[t]}${count[t] ? `<span class="c">${count[t]}</span>` : ""}</button>`).join("")}</nav>`;
+  }
+
+  function flagTag(f) {
+    if (!f) return "";
+    const word = { critical: "Critical", priority: "Priority", watch: "Watch" }[f.level];
+    return `<span class="flagtag ${f.level}">${word} — ${esc(f.note)}</span>`;
+  }
+  function flagBand(f) {
+    if (!f) return "";
+    const word = { critical: "Critical", priority: "Priority", watch: "Watch" }[f.level];
+    return `<div class="band ${f.level}">${word}: ${esc(f.note)}<small>Set by ${esc(f.set_by_name || "the office")}, ${esc(agoText(f.set_at))}${f.department_name ? ` · ${esc(f.department_name)} only` : ""}</small></div>`;
+  }
+  const stoppedOn = (jobId, sheet) => (S.piece[jobId + "|" + sheet] || { problems: [] }).problems
+    .filter(p => p.status === "open" && p.work_stopped && p.department === S.dept);
+
+  function missingNote(part) {
+    return S.missing[part] ? `<div class="banner warn">This part isn't set up in the database yet. Tell Luke — its SQL file needs running.</div>` : "";
+  }
+
+  // ---------- Work orders ----------
   function queueScreen() {
-    const q = buildQueue(rowsNow());
+    const q = buildQueue(rowsNow(), S.flags, S.dept);
     const pieces = q.reduce((a, j) => a + (j.total - j.done), 0);
     const head = `<h1>${esc(DEPT_NAME[S.dept])}</h1>
       <p class="sub">${q.length} job${q.length === 1 ? "" : "s"} · ${pieces} piece${pieces === 1 ? "" : "s"} left</p>`;
@@ -432,12 +844,13 @@ if (typeof document !== "undefined") (function () {
     return head + q.map(j => {
       const pct = j.total ? Math.round(j.done / j.total * 100) : 0;
       const dl = daysLeft(j.delivery_date);
-      return `<button class="job" data-job="${esc(j.job_id)}">
+      const marks = [flagTag(j.flag), j.materials_ordered ? "" : `<span class="chip">Materials not ordered yet</span>`].filter(Boolean);
+      return `<button class="job${j.flag && j.flag.level !== "watch" ? " f-" + j.flag.level : ""}" data-job="${esc(j.job_id)}">
         <div class="job-top"><span class="pid">${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</span><span class="jname">${esc(j.name)}</span>
           <span class="due">Due ${esc(fmtDate(j.delivery_date))}${dl === null ? "" : ` · <b>${esc(daysText(dl))}</b>`}</span></div>
         <div class="tally"><span class="big num">${j.done}</span><span class="of num">/ ${j.total} pieces</span>
           <span class="bar"><i style="width:${pct}%"></i></span></div>
-        ${j.materials_ordered ? "" : `<span class="chip">Materials not ordered yet</span>`}
+        ${marks.length ? `<div class="marks">${marks.join("")}</div>` : ""}
       </button>`;
     }).join("");
   }
@@ -451,6 +864,7 @@ if (typeof document !== "undefined") (function () {
     return `<button class="back" data-back="queue">← ${esc(DEPT_NAME[S.dept])}</button>
       <h1>${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</h1>
       <p class="sub">${esc(j.job_name)} · due ${esc(fmtDate(j.delivery_date))} · ${done} of ${total} pieces done</p>
+      ${flagBand(flagFor(S.flags, j.job_id, S.dept))}
       ${j.materials_ordered ? "" : `<div class="banner warn">Materials for this job haven't been marked as ordered in Monday yet.</div>`}
       ${list.map(r => {
         const full = r.qty_done >= r.qty_required;
@@ -474,10 +888,13 @@ if (typeof document !== "undefined") (function () {
       <span class="pos num">${p.at + 1} / ${p.count}</span>
       <button data-goto="${p.next ? esc(p.next.progress_id) : ""}" ${p.next ? "" : "disabled"}><small>Next →</small>${p.next ? `Sheet ${p.next.sheet_number} · ${esc(p.next.item_code || "")}` : "—"}</button>
     </div>`;
+    const stopped = stoppedOn(r.job_id, r.sheet_number);
     return `<button class="back" data-back="job">← ${esc(r.project_id)}</button>
       <h1>Sheet ${r.sheet_number} · ${esc(r.item_code || "")}</h1>
       <p class="sub">${r.is_test ? `<span class="tag">TEST</span>` : ""}${esc(r.project_id)} · ${esc(r.job_name)}</p>
       ${pager}
+      ${flagBand(flagFor(S.flags, r.job_id, S.dept))}
+      ${stopped.length ? `<div class="band stop">Work is stopped on this sheet — ${esc(stopped[0].body)}<small>Raised by ${esc(stopped[0].raised_by_name)}, ${esc(agoText(stopped[0].raised_at))}. It clears when the office answers.</small></div>` : ""}
       <div class="counter">
         <div class="count-row">
           <button class="step" data-step="-1" ${r.qty_done <= 0 ? "disabled" : ""} aria-label="One fewer">−</button>
@@ -491,16 +908,280 @@ if (typeof document !== "undefined") (function () {
         <button data-print="1" ${r.png_path && r.pages_ready ? "" : "disabled"}>Print this sheet</button>
         <button data-pdf="1" ${r.pdf_path && r.pages_ready ? "" : "disabled"}>Open the PDF</button>
       </div>
-      ${pager}`;
+      <div class="actions">
+        <button data-defect="here">Log a defect</button>
+        <button data-problem="here">Flag a problem</button>
+        ${S.dept === "assembly_qc" ? `<button data-qcsheet="${r.sheet_number}" data-qcjob="${esc(r.job_id)}">Record QC</button>` : ""}
+      </div>
+      ${pager}
+      ${pieceSection(r)}`;
+  }
+
+  function pieceSection(r) {
+    const k = S.piece[r.job_id + "|" + r.sheet_number];
+    if (!k) return "";
+    const items = [
+      ...k.problems.map(x => ({ at: x.raised_at, html: `<div class="li ${x.status === "open" ? (x.work_stopped ? "stop" : "open") : ""}">
+          <div class="li-top"><b>${esc(x.department_name)}</b><span class="meta2">${x.sheet_number === null ? "whole job · " : ""}${esc(problemState(x).label)} · ${esc(fmtDate(localISO(x.raised_at)))}</span></div>
+          <div>${esc(x.body)}</div><div class="meta2">Raised by ${esc(x.raised_by_name)}</div></div>` })),
+      ...k.defects.map(x => ({ at: x.logged_at, html: `<div class="li"><div class="li-top"><b>${esc(x.department_name)}</b><span class="meta2">Defect · ${esc(fmtDate(localISO(x.logged_at)))}</span></div>
+          <div>${esc(x.defect_type)}</div>${x.note ? `<div class="meta2">${esc(x.note)}</div>` : ""}<div class="meta2">Logged by ${esc(x.logged_by_name)}</div></div>` })),
+      ...k.qc.map(x => ({ at: x.checked_at, html: `<div class="li"><div class="li-top"><b>QC ${x.result === "pass" ? "passed" : "failed"}</b><span class="meta2">${esc(fmtDate(localISO(x.checked_at)))} · ${esc(x.checked_by_name)}</span></div>${x.note ? `<div>${esc(x.note)}</div>` : ""}</div>` })),
+    ].sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    if (!items.length) return "";
+    return `<h2 class="sec">On this piece</h2>${items.map(i => i.html).join("")}
+      <p class="sub">Everything logged against this sheet, by any department. It follows the piece down the line.</p>`;
+  }
+
+  // ---------- Problems ----------
+  function problemCard(p, canAct) {
+    const st = problemState(p);
+    const thread = (p.thread || []).map(m => `<div class="msg ${esc(m.kind)}"><div>${esc(m.body)}</div>
+        <div class="msg-meta">${esc(m.by)} · ${esc(fmtDate(localISO(m.at)))}${m.kind === "answer" ? " · answered" : ""}</div></div>`).join("");
+    return `<div class="li ${p.status === "open" ? (p.work_stopped ? "stop" : "open") : ""}">
+      <div class="li-top"><b>${p.is_test ? `<span class="tag">TEST</span>` : ""}${esc(p.project_id)}${p.sheet_number !== null ? ` · sheet ${p.sheet_number}` : " · whole job"}</b>
+        <span class="meta2">${esc(p.department_name)}</span>
+        ${p.status === "open" && p.work_stopped ? `<span class="stoptag">Work stopped</span>` : ""}
+        <span class="st${st.done ? " ok" : ""}">${esc(st.label)}</span></div>
+      <div class="msg"><div>${esc(p.body)}</div><div class="msg-meta">${esc(p.raised_by_name)} · ${esc(fmtDate(localISO(p.raised_at)))}</div></div>
+      ${thread}
+      ${canAct ? `<div class="rowbtns"><button data-reply="${esc(p.id)}">${p.status === "answered" ? "Reply — this isn't settled" : "Add something"}</button></div>` : ""}
+    </div>`;
+  }
+  function problemsScreen() {
+    const all = S.probScope === "all";
+    const { open, answered } = splitProblems(S.problems);
+    const can = (p) => owns(p.department) && !!p.is_test === !!S.me.is_test && S.me.role === "supervisor";
+    return `${missingNote("problems")}
+      <div class="seg" style="margin-bottom:14px">
+        <button data-scope="mine" aria-pressed="${!all}">${esc(DEPT_NAME[S.dept])}</button>
+        <button data-scope="all" aria-pressed="${all}">Every department</button></div>
+      <button class="go wide" data-problem="pick">Flag a problem</button>
+      <h2 class="sec">Waiting on an answer</h2>
+      ${open.length ? open.map(p => problemCard(p, can(p))).join("")
+        : `<div class="empty"><b>Nothing open</b>Problems you flag stay here until the office answers them.</div>`}
+      <h2 class="sec">Answered — kept while the job is in production</h2>
+      ${answered.length ? answered.map(p => problemCard(p, can(p))).join("") : `<div class="empty">No answered problems yet.</div>`}`;
+  }
+
+  // ---------- Log ----------
+  function tasksSection() {
+    const mine = (S.tasks || []).filter(t => t.department === S.dept && !!t.is_test === !!S.me.is_test)
+      .sort((a, b) => (a.done_today - b.done_today) || a.days_until - b.days_until || a.name.localeCompare(b.name));
+    return `<h2 class="sec">Routine tasks</h2>${missingNote("tasks")}
+      ${mine.length ? mine.map(t => {
+        const open = S.openTask === t.id;
+        return `<div class="taskrow${t.done_today ? " ok" : ""}"><span class="t"><b>${esc(t.name)}</b>
+            <div class="when"><b>${esc(taskWhen(t))}</b> · ${esc(t.schedule_text)}${t.assigned_to_name ? ` · ${esc(t.assigned_to_name)}` : ""}</div>
+            <button class="linkish" data-taskhist="${esc(t.id)}">${open ? "Hide history" : "History"}</button>
+            ${open ? `<div class="hist">${(t.history || []).length ? t.history.map(h => `<div>${esc(fmtDate(h.on))} — ${esc(h.by)}${h.by_id === S.me.id && h.on === localISO(new Date()) ? ` <button class="linkish" data-taskundo="${esc(h.id)}">entered by mistake</button>` : ""}</div>`).join("") : "<div>Never done yet</div>"}</div>` : ""}
+          </span>${t.done_today ? "" : `<button class="go" data-taskdone="${esc(t.id)}">Done</button>`}</div>`;
+      }).join("") : `<div class="empty">No routine tasks for ${esc(DEPT_NAME[S.dept])}. The office adds them.</div>`}`;
+  }
+
+  function defectsSection() {
+    const month = localISO(new Date()).slice(0, 7);
+    const thisMonth = S.defects.filter(d => localISO(d.logged_at).slice(0, 7) === month).length;
+    const counts = defectCounts(S.defects);
+    const recent = S.defects.slice(0, 6);
+    return `<h2 class="sec">Defects</h2>${missingNote("defects")}
+      <button class="btn wide" data-defect="pick">Log a defect</button>
+      <div class="card" style="margin-top:12px">
+        <div class="countline"><b>Logged this month</b><span class="n num">${thisMonth}</span></div>
+        ${counts.map(c => `<div class="countline"><span>${esc(c.type)}</span><span class="n num">${c.n}</span></div>`).join("")}
+        ${counts.length ? `<p class="meta2" style="margin:8px 0 0">Counts by type are for all time.</p>` : `<p class="meta2">No defects logged for ${esc(DEPT_NAME[S.dept])} yet.</p>`}
+      </div>
+      ${recent.length ? `<h2 class="sec">Most recent</h2>` + recent.map(d => `<div class="li">
+        <div class="li-top"><b>${d.is_test ? `<span class="tag">TEST</span>` : ""}${esc(d.project_id)}${d.sheet_number !== null ? ` · sheet ${d.sheet_number}` : " · whole job"}</b>
+          <span class="meta2">${esc(fmtDate(localISO(d.logged_at)))}</span></div>
+        <div>${esc(d.defect_type)}</div>${d.note ? `<div class="meta2">${esc(d.note)}</div>` : ""}
+        <div class="meta2">Logged by ${esc(d.logged_by_name)}${d.logged_by === S.me.id ? ` · <button class="linkish" data-voiddefect="${esc(d.id)}">entered by mistake</button>` : ""}</div></div>`).join("") : ""}`;
+  }
+
+  function jobPicker(sel, filterText, opts = {}) {
+    const jobs = filterJobs(S.pickJobs, filterText).filter(j => !opts.withWorkOrder || j.has_work_order);
+    if (sel) {
+      const j = S.pickJobs.find(x => x.job_id === sel) || { project_id: "…", job_name: "" };
+      return `<div class="chosen"><b>${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)} <span class="meta2">${esc(j.job_name)}</span></b>
+        <button class="btn" data-pickjob="">Change</button></div>`;
+    }
+    return `<input class="in" data-jobfilter placeholder="Type part of the PROJ number or name" value="${esc(filterText || "")}" inputmode="search" autocomplete="off">
+      <div class="picklist">${jobs.length ? jobs.slice(0, 60).map(j => `<button class="pj" data-pickjob="${esc(j.job_id)}"><b>${j.is_test ? "TEST " : ""}${esc(j.project_id)}</b>
+          <span>${esc(j.job_name)} · ${j.is_active ? "due " + esc(fmtDate(j.delivery_date)) : esc(j.phase)}</span></button>`).join("")
+        : `<div class="meta2" style="padding:14px">${S.pickJobs.length ? "No job matches that." : "Loading the jobs…"}</div>`}</div>`;
+  }
+  function sheetChips(jobId, chosen, multi, opts = {}) {
+    const sheets = (S.pickSheets[jobId] || []).filter(s => !opts.dept || (s.departments || []).includes(opts.dept));
+    if (!S.pickSheets[jobId]) return `<div class="meta2">Loading the sheets…</div>`;
+    const isOn = (n) => multi ? chosen.includes(n) : chosen === n;
+    return `<div class="schips">${opts.allowNone ? `<button class="schip" data-picksheet="" aria-pressed="${chosen === null}">Whole job<small>no sheet</small></button>` : ""}
+      ${sheets.map(s => `<button class="schip" data-picksheet="${s.sheet_number}" aria-pressed="${isOn(s.sheet_number)}">${s.sheet_number}<small>${esc(s.item_code || "")}</small></button>`).join("")}
+      ${!sheets.length ? `<span class="meta2">${S.sheetsUnavailable === jobId
+          ? "No connection, so the sheets can't be listed right now." + (opts.allowNone ? " Log it against the whole job, or wait for the Wi-Fi." : "")
+          : opts.allowNone ? "No work order uploaded — this logs against the whole job." : "No sheets."}</span>` : ""}</div>`;
+  }
+
+  function arrowSection() {
+    const f = S.arrowForm;
+    const out = S.arrow.filter(a => a.at_vendor).sort((a, b) => b.days_out - a.days_out);
+    const back = S.arrow.filter(a => !a.at_vendor && a.returned_on && daysSince(a.returned_on) <= 92)
+      .sort((a, b) => String(b.returned_on).localeCompare(String(a.returned_on)));
+    const what = (a) => [sheetsText(a.sheet_numbers), a.description].filter(Boolean).join(" — ");
+    const form = f ? `<div class="card">
+        <h3 style="margin:0 0 6px">Send to Arrow</h3>
+        <label class="f">Job</label>${jobPicker(f.jobId, f.filter)}
+        ${f.jobId ? `<label class="f">Sheets that went <span class="meta2">(tick any — or none, for hardware)</span></label>${sheetChips(f.jobId, f.sheets, true)}` : ""}
+        <label class="f" for="arDesc">What went</label>
+        <input class="in" id="arDesc" data-arfield="description" value="${esc(f.description)}" placeholder="e.g. bases and 8 brackets, black">
+        <label class="f">Service</label>
+        <div class="seg"><button data-arservice="powdercoat" aria-pressed="${f.service === "powdercoat"}">Powdercoat</button>
+          <button data-arservice="paint" aria-pressed="${f.service === "paint"}">Paint</button></div>
+        <label class="f" for="arDate">Date sent</label>
+        <input class="in" type="date" id="arDate" data-arfield="sentOn" value="${esc(f.sentOn)}" max="${localISO(new Date())}">
+        <div class="mdl-btns"><button class="btn" data-arcancel="1">Cancel</button>
+          <button class="go" data-arsend="1" ${f.jobId && (f.sheets.length || f.description.trim()) ? "" : "disabled"}>Send to Arrow</button></div>
+      </div>` : `<button class="btn wide" data-aropen="1">Send something to Arrow</button>`;
+    return `<h2 class="sec">At Arrow</h2>${missingNote("arrow")}${form}
+      <h2 class="sec">At Arrow now</h2>
+      ${out.length ? out.map(a => `<div class="li"><div class="li-top"><b>${a.is_test ? `<span class="tag">TEST</span>` : ""}${esc(a.project_id)}</b>
+          <span class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent ${esc(fmtDate(a.sent_on))} by ${esc(a.sent_by_name)}</span>
+          <span class="st">${a.days_out} day${a.days_out === 1 ? "" : "s"} out</span></div>
+        <div>${esc(what(a))}</div>
+        <div class="rowbtns"><button data-arreturn="${esc(a.id)}">Mark returned</button>
+          ${owns(a.department) ? `<button data-arvoid="${esc(a.id)}">Entered by mistake</button>` : ""}</div></div>`).join("")
+        : `<div class="empty">Nothing at Arrow right now.</div>`}
+      ${back.length ? `<h2 class="sec">Returned — last three months</h2>` + back.map(a => `<div class="li">
+          <div class="li-top"><b>${esc(a.project_id)}</b><span class="meta2">${esc(fmtDate(a.sent_on))} → ${esc(fmtDate(a.returned_on))} · ${a.days_out} day${a.days_out === 1 ? "" : "s"}${a.returned_by_name ? ` · back by ${esc(a.returned_by_name)}` : ""}</span></div>
+          <div>${esc(what(a))}</div></div>`).join("") : ""}`;
+  }
+
+  function qcSection() {
+    const jobId = S.qcJob;
+    let body = "";
+    if (jobId) {
+      const sheets = (S.pickSheets[jobId] || []).filter(s => (s.departments || []).includes("assembly_qc"));
+      const latest = (n) => S.qcEntries.filter(q => q.sheet_number === n).sort((a, b) => String(b.checked_at).localeCompare(String(a.checked_at)))[0];
+      body = !S.pickSheets[jobId] ? `<div class="meta2">Loading the sheets…</div>` : sheets.length ? sheets.map(s => {
+        const l = latest(s.sheet_number);
+        return `<div class="taskrow${l && l.result === "pass" ? " ok" : ""}"><span class="t"><b>Sheet ${s.sheet_number} · ${esc(s.item_code || "")}</b>
+          <div class="when">${l ? `${l.result === "pass" ? "Passed" : "Failed"} ${esc(fmtDate(localISO(l.checked_at)))} · ${esc(l.checked_by_name)}${l.note ? " — " + esc(l.note) : ""}` : "Not checked yet"}</div></span>
+          <button class="btn" data-qcpass="${s.sheet_number}">Passed</button><button class="btn" data-qcfail="${s.sheet_number}">Failed…</button></div>`;
+      }).join("") : `<div class="empty">No sheets on this job come to Assembly / QC.</div>`;
+    }
+    return `<h2 class="sec">QC</h2>${missingNote("qc")}
+      <div class="card"><label class="f" style="margin-top:0">Look up a job</label>${jobPicker(jobId, S.qcFilter, { withWorkOrder: true })}</div>
+      ${body}`;
+  }
+
+  function logScreen() {
+    let out = "";
+    if (ARROW_DEPTS.includes(S.dept)) out += arrowSection();
+    if (S.dept === "assembly_qc") out += qcSection();
+    return tasksSection() + out + defectsSection();
+  }
+
+  // ---------- Supplies ----------
+  function suppliesScreen() {
+    const open = S.supplies.filter(r => r.is_open).sort((a, b) => String(a.requested_at).localeCompare(String(b.requested_at)));
+    const closed = S.supplies.filter(r => !r.is_open && daysSince(r.updated_at) <= 14)
+      .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+    const f = S.supplyForm;
+    return `${missingNote("supplies")}<h2 class="sec" style="margin-top:4px">Open for ${esc(DEPT_NAME[S.dept])}</h2>
+      ${open.length ? open.map(r => `<div class="li"><div class="li-top"><b>${r.is_test ? `<span class="tag">TEST</span>` : ""}${esc(r.item)}</b></div>
+          ${r.note ? `<div class="meta2">${esc(r.note)}</div>` : ""}
+          <div class="meta2">${esc(supplyLine(r))}</div>
+          <div class="rowbtns" style="align-items:center">
+            ${r.state === "requested" ? `<div class="qty small"><button class="step" data-sqty="${esc(r.id)}" data-d="-1" ${r.qty <= 1 ? "disabled" : ""} aria-label="One fewer">−</button>
+              <span class="n num">${r.qty}</span><button class="step" data-sqty="${esc(r.id)}" data-d="1" aria-label="One more">+</button></div>
+              <button data-scancel="${esc(r.id)}">Cancel</button>` : `<span class="num" style="font-size:26px;font-weight:700">${r.qty}</span>
+              <button class="go" data-sreceive="${esc(r.id)}">Received</button>`}
+          </div></div>`).join("")
+        : `<div class="empty">Nothing on order for ${esc(DEPT_NAME[S.dept])}.</div>`}
+      <div class="card" style="margin-top:18px">
+        <label class="f" style="margin-top:0" for="supItem">What do you need?</label>
+        <textarea class="in" id="supItem" data-sfield="item" placeholder="e.g. 120 grit discs, 6 inch, hook and loop">${esc(f.item)}</textarea>
+        <label class="f">How many?</label>
+        <div class="qty"><button class="step" data-snew="-1" ${f.qty <= 1 ? "disabled" : ""} aria-label="One fewer">−</button>
+          <span class="n num">${f.qty}</span><button class="step" data-snew="1" aria-label="One more">+</button></div>
+        <label class="f" for="supNote">Note <span class="meta2">(optional)</span></label>
+        <input class="in" id="supNote" data-sfield="note" value="${esc(f.note)}" placeholder="e.g. the red box, not the blue one">
+        <button class="go wide" style="margin-top:16px" data-ssend="1" ${f.item.trim() ? "" : "disabled"}>Send to the office</button>
+      </div>
+      ${closed.length ? `<h2 class="sec">Closed in the last two weeks</h2>` + closed.map(r => `<div class="li">
+          <div class="li-top"><b>${esc(r.qty)} × ${esc(r.item)}</b></div><div class="meta2">${esc(supplyLine(r))}</div></div>`).join("") : ""}`;
+  }
+
+  // ---------- modals ----------
+  function modalHtml() {
+    const m = S.modal;
+    if (!m) return "";
+    const jobLine = () => {
+      const j = S.pickJobs.find(x => x.job_id === m.jobId) || rowsNow().find(x => x.job_id === m.jobId) || {};
+      return `${esc(j.project_id || "")}${m.sheet !== null && m.sheet !== undefined ? ` · sheet ${m.sheet}` : " · whole job"} · ${esc(DEPT_NAME[S.dept])}`;
+    };
+    const picker = m.pick ? `<label class="f" style="margin-top:0">Job</label>${jobPicker(m.jobId, m.filter)}
+        ${m.jobId ? `<label class="f">Sheet</label>${sheetChips(m.jobId, m.sheet, false, { allowNone: true })}` : ""}` : "";
+    let inner = "";
+    if (m.kind === "defect") {
+      const types = S.types.filter(t => t.department === S.dept).sort((a, b) => a.sort_order - b.sort_order);
+      inner = `<h3>Log a defect</h3>
+        <div class="sub">${m.pick ? "" : jobLine() + ". "}Counted in the numbers. Nobody is interrupted.</div>
+        ${picker}${!m.pick || m.jobId ? `<label class="f">What happened</label>
+        ${types.map(t => `<button class="pick" data-picktype="${esc(t.id)}" aria-pressed="${m.type === t.id}">${esc(t.label)}</button>`).join("") || `<div class="meta2">No defect list for ${esc(DEPT_NAME[S.dept])} yet.</div>`}
+        <textarea class="in" data-mfield="note" placeholder="Anything worth adding (optional)">${esc(m.note || "")}</textarea>` : ""}
+        <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button>
+          <button class="go" data-savedefect="1" ${m.type && m.jobId ? "" : "disabled"}>Log it</button></div>`;
+    } else if (m.kind === "problem") {
+      inner = `<h3>Flag a problem</h3>
+        <div class="sub">${m.pick ? "" : jobLine() + ". "}Goes to the office and stays open until someone answers it.</div>
+        ${picker}${!m.pick || m.jobId ? `<label class="f">What's wrong, and what do you need?</label>
+        <textarea class="in" data-mfield="text">${esc(m.text || "")}</textarea>
+        <label class="chk"><input type="checkbox" data-mstops ${m.stops ? "checked" : ""}>
+          <span>Work is stopped on this${m.sheet === null || m.sheet === undefined ? " job" : " sheet"}<small>Shows on the TV and puts it at the top of the office's list.</small></span></label>` : ""}
+        <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button>
+          <button class="go" data-saveproblem="1" ${m.jobId && (m.text || "").trim() ? "" : "disabled"}>Send it</button></div>`;
+    } else if (m.kind === "reply") {
+      inner = `<h3>Add to this problem</h3>
+        <div class="sub">It goes back to the office with everything said so far.</div>
+        <textarea class="in" data-mfield="text" placeholder="What still needs sorting?">${esc(m.text || "")}</textarea>
+        ${m.stops !== undefined ? `<label class="chk"><input type="checkbox" data-mstops ${m.stops ? "checked" : ""}><span>Work is stopped<small>Untick when work has started again.</small></span></label>` : ""}
+        <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button>
+          <button class="go" data-savereply="1" ${(m.text || "").trim() ? "" : "disabled"}>Send it back</button></div>`;
+    } else if (m.kind === "qcfail") {
+      inner = `<h3>QC failed — sheet ${m.sheet}</h3>
+        <div class="sub">It's logged as a "Failed QC" defect on the sheet, so every department sees it on the piece.</div>
+        <textarea class="in" data-mfield="text" placeholder="What failed?">${esc(m.text || "")}</textarea>
+        <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button>
+          <button class="go" data-saveqcfail="1" ${(m.text || "").trim() ? "" : "disabled"}>Record it</button></div>`;
+    } else if (m.kind === "qcpick") {
+      inner = `<h3>Record QC — sheet ${m.sheet}</h3><div class="sub">${esc(m.label || "")}</div>
+        <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button>
+          <button class="btn" data-qcfail="${m.sheet}" data-qcjob="${esc(m.jobId)}">Failed…</button>
+          <button class="go" data-qcpass="${m.sheet}" data-qcjob="${esc(m.jobId)}">Passed</button></div>`;
+    } else if (m.kind === "confirm") {
+      inner = `<h3>${esc(m.title)}</h3><div class="sub">${esc(m.text)}</div>
+        <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button><button class="go" data-confirm="1">${esc(m.yes)}</button></div>`;
+    }
+    return `<div class="ovl" data-close="1"><div class="mdl" role="dialog" aria-modal="true">${inner}</div></div>`;
   }
 
   function render() {
     if (!S.me) return;
-    const body = S.view.screen === "sheet" ? sheetScreen() : S.view.screen === "job" ? jobScreen() : queueScreen();
-    const foot = S.view.screen === "queue" ? `<div class="foot"><button class="link" data-signout="1">Sign out</button></div>` : "";
-    app.innerHTML = topBar() + `<main>${banners()}${body}${foot}</main>`;
+    let body;
+    if (S.tab === "work" && S.view.screen === "sheet") body = sheetScreen();
+    else if (S.tab === "work" && S.view.screen === "job") body = jobScreen();
+    else {
+      const top = S.tab === "problems" ? problemsScreen() : S.tab === "log" ? logScreen() : S.tab === "supplies" ? suppliesScreen() : queueScreen();
+      body = subTabs() + top;
+    }
+    const topLevel = !(S.tab === "work" && S.view.screen !== "queue");
+    const foot = topLevel ? `<div class="foot"><button class="link" data-signout="1">Sign out</button></div>` : "";
+    const scroll = S.modal ? (document.querySelector(".mdl") || {}).scrollTop : null;
+    app.innerHTML = topBar() + `<main>${banners()}${pinnedTasks()}${body}${foot}</main>` + modalHtml()
+      + (S.toast ? `<div class="toast" role="status">${esc(S.toast)}</div>` : "");
+    if (scroll) { const m = document.querySelector(".mdl"); if (m) m.scrollTop = scroll; }
     wire();
-    if (S.view.screen === "sheet") showPage();
+    if (S.tab === "work" && S.view.screen === "sheet") showPage();
   }
 
   async function showPage() {
@@ -510,7 +1191,9 @@ if (typeof document !== "undefined") (function () {
     try {
       const url = await pageImage(r.png_path);
       if (S.view.progressId !== r.progress_id) return;       // moved on while it loaded
-      el.innerHTML = `<img alt="Work order ${esc(r.project_id)} sheet ${r.sheet_number}" src="${url}">`;
+      const now = document.getElementById("page");
+      if (!now) return;
+      now.innerHTML = `<img alt="Work order ${esc(r.project_id)} sheet ${r.sheet_number}" src="${url}">`;
       document.getElementById("printArea").innerHTML = `<img alt="" src="${url}">`;
     } catch (e) {
       el.innerHTML = `<div class="missing">${esc(isNetworkError(e) ? "No connection, and this page hasn't been opened on this tablet before. It will show once the connection is back." : friendlyError(e))}</div>`;
@@ -526,36 +1209,207 @@ if (typeof document !== "undefined") (function () {
     flush();
   }
 
+  async function openSheet(progressId) {
+    S.view = { screen: "sheet", jobId: S.view.jobId, progressId };
+    render(); scrollTo(0, 0);
+    const r = rowsNow().find(x => x.progress_id === progressId);
+    if (r) { await loadPiece(r); if (S.view.progressId === progressId) render(); }
+  }
+
+  async function pickJobFor(target, jobId) {
+    target.jobId = jobId || null;
+    if (target.sheets) target.sheets = [];
+    if ("sheet" in target) target.sheet = null;
+    render();
+    if (jobId && !S.pickSheets[jobId]) { await loadPickSheets(jobId); render(); }
+  }
+
   function wire() {
-    app.querySelectorAll("[data-dept]").forEach(b => b.onclick = async () => {
+    const on = (sel, fn) => app.querySelectorAll(sel).forEach(el => el.onclick = (ev) => fn(el, ev));
+    on("[data-dept]", async (b) => {
       S.dept = b.dataset.dept; store.set("dept", S.dept);
-      S.view = { screen: "queue" }; S.rows = (store.get("rows_" + S.dept, { rows: [] })).rows; render();
-      await loadRows(); render();
+      if (!tabs().includes(S.tab)) S.tab = tabs()[0];
+      S.view = { screen: "queue" }; S.rows = (store.get("rows_" + S.dept, { rows: [] })).rows; S.problems = []; S.defects = []; S.supplies = []; S.qcJob = null;
+      render();
+      await loadTab(); render();
     });
-    app.querySelectorAll("[data-job]").forEach(b => b.onclick = () => { S.view = { screen: "job", jobId: b.dataset.job }; render(); scrollTo(0, 0); });
-    app.querySelectorAll("[data-sheet]").forEach(b => b.onclick = () => { S.view = { screen: "sheet", jobId: S.view.jobId, progressId: b.dataset.sheet }; render(); scrollTo(0, 0); });
-    app.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => { if (b.dataset.goto) { S.view.progressId = b.dataset.goto; render(); scrollTo(0, 0); } });
-    app.querySelectorAll("[data-back]").forEach(b => b.onclick = async () => {
+    on("[data-tab]", async (b) => {
+      S.tab = b.dataset.tab; store.set("tab", S.tab); S.view = { screen: "queue" }; S.notice = null; render(); scrollTo(0, 0);
+      if (S.tab !== "work" && !S.pickJobs.length) loadPickJobs();
+      await loadTab(); render();
+    });
+    on("[data-job]", (b) => { S.view = { screen: "job", jobId: b.dataset.job }; render(); scrollTo(0, 0); });
+    on("[data-sheet]", (b) => openSheet(b.dataset.sheet));
+    on("[data-goto]", (b) => { if (b.dataset.goto) openSheet(b.dataset.goto); });
+    on("[data-back]", async (b) => {
       S.view = b.dataset.back === "queue" ? { screen: "queue" } : { screen: "job", jobId: S.view.jobId };
       render();
       if (b.dataset.back === "queue") { await loadRows(); render(); }
     });
     const current = () => rowsNow().find(x => x.progress_id === S.view.progressId);
-    app.querySelectorAll("[data-step]").forEach(b => b.onclick = () => { const r = current(); if (r) setCount(r, r.qty_done + Number(b.dataset.step)); });
-    app.querySelectorAll("[data-all]").forEach(b => b.onclick = () => { const r = current(); if (r) setCount(r, r.qty_required); });
-    app.querySelectorAll("[data-print]").forEach(b => b.onclick = () => window.print());
-    app.querySelectorAll("[data-pdf]").forEach(b => b.onclick = async () => {
+    on("[data-step]", (b) => { const r = current(); if (r) setCount(r, r.qty_done + Number(b.dataset.step)); });
+    on("[data-all]", () => { const r = current(); if (r) setCount(r, r.qty_required); });
+    on("[data-print]", () => window.print());
+    on("[data-pdf]", async () => {
       const r = current(); if (!r) return;
       const { data, error } = await db.storage.from("work-orders").createSignedUrl(r.pdf_path, 600);
       if (error) { S.notice = friendlyError(error); render(); return; }
       window.open(data.signedUrl, "_blank");
     });
-    app.querySelectorAll("[data-signout]").forEach(b => b.onclick = async () => {
-      if (Object.keys(S.outbox).length && !confirm("Some counts haven't sent yet. Signing out will throw them away. Sign out anyway?")) return;
+    on("[data-signout]", async () => {
+      const waiting = Object.keys(S.outbox).length + Object.keys(S.logbox).length;
+      if (waiting && !confirm("Some counts or entries haven't sent yet. Signing out will throw them away. Sign out anyway?")) return;
       await db.auth.signOut();
-      S.me = null; S.outbox = {}; store.set("outbox", {}); store.set("me", null);
+      S.me = null; S.outbox = {}; S.logbox = {}; store.set("outbox", {}); store.set("logbox", {}); store.set("me", null);
       signIn();
     });
+
+    // ---- routine tasks ----
+    on("[data-taskdone]", (b) => {
+      const t = S.tasks.find(x => x.id === b.dataset.taskdone);
+      send("complete_routine_task", { p_task: b.dataset.taskdone, p_client_id: null }, t ? `"${t.name}"` : "Routine task");
+    });
+    on("[data-taskhist]", (b) => { S.openTask = S.openTask === b.dataset.taskhist ? null : b.dataset.taskhist; render(); });
+    on("[data-taskundo]", (b) => {
+      S.modal = { kind: "confirm", title: "Undo this?", text: "It's kept in history as entered by mistake, and the task is due again.", yes: "Undo it",
+                  run: () => send("void_task_completion", { p_log: b.dataset.taskundo }, "Undo") };
+      render();
+    });
+
+    // ---- defects and problems ----
+    const fromSheet = () => { const r = current(); return r ? { jobId: r.job_id, sheet: r.sheet_number, pick: false } : null; };
+    on("[data-defect]", (b) => {
+      const at = b.dataset.defect === "here" ? fromSheet() : { jobId: null, sheet: null, pick: true, filter: "" };
+      S.modal = { kind: "defect", type: null, note: "", ...at }; render();
+      if (at.pick && !S.pickJobs.length) loadPickJobs().then(render);
+    });
+    on("[data-problem]", (b) => {
+      const at = b.dataset.problem === "here" ? fromSheet() : { jobId: null, sheet: null, pick: true, filter: "" };
+      S.modal = { kind: "problem", text: "", stops: false, ...at }; render();
+      if (at.pick && !S.pickJobs.length) loadPickJobs().then(render);
+    });
+    on("[data-picktype]", (b) => { S.modal.type = b.dataset.picktype; render(); });
+    on("[data-savedefect]", () => {
+      const m = S.modal, t = S.types.find(x => x.id === m.type);
+      send("log_defect", { p_job: m.jobId, p_department: S.dept, p_type: m.type, p_sheet: m.sheet ?? null, p_note: (m.note || "").trim() || null, p_client_id: null },
+           t ? t.label : "Defect");
+    });
+    on("[data-saveproblem]", () => {
+      const m = S.modal;
+      send("flag_problem", { p_job: m.jobId, p_department: S.dept, p_body: m.text.trim(), p_sheet: m.sheet ?? null, p_work_stopped: !!m.stops, p_client_id: null },
+           "Problem");
+    });
+    on("[data-reply]", (b) => {
+      const p = S.problems.find(x => x.id === b.dataset.reply);
+      S.modal = { kind: "reply", id: b.dataset.reply, text: "", stops: p && p.work_stopped ? true : undefined }; render();
+    });
+    on("[data-savereply]", () => {
+      const m = S.modal;
+      send("reply_problem", { p_problem: m.id, p_body: m.text.trim(), p_work_stopped: m.stops === undefined ? null : !!m.stops, p_client_id: null }, "Reply");
+    });
+    on("[data-scope]", async (b) => { S.probScope = b.dataset.scope; S.problems = []; render(); await loadProblems(); render(); });
+    on("[data-voiddefect]", (b) => {
+      S.modal = { kind: "confirm", title: "Entered by mistake?", text: "It stays in history but stops being counted.", yes: "Yes, a mistake",
+                  run: () => send("void_defect", { p_defect: b.dataset.voiddefect }, "Entered by mistake") };
+      render();
+    });
+
+    // ---- the job and sheet pickers (in a modal, the Arrow form or QC) ----
+    app.querySelectorAll("[data-jobfilter]").forEach(inp => inp.oninput = () => {
+      const tgt = S.modal || (inp.closest(".card") && inp.closest(".card").querySelector("#arDesc") ? S.arrowForm : null);
+      if (tgt) tgt.filter = inp.value; else S.qcFilter = inp.value;
+      const pos = inp.selectionStart; render();
+      const again = app.querySelector("[data-jobfilter]"); if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) {} }
+    });
+    app.querySelectorAll("[data-pickjob]").forEach(b => b.onclick = async () => {
+      const inArrow = !S.modal && b.closest(".card") && b.closest(".card").querySelector("#arDesc");
+      if (S.modal) return pickJobFor(S.modal, b.dataset.pickjob);
+      if (inArrow) return pickJobFor(S.arrowForm, b.dataset.pickjob);
+      S.qcJob = b.dataset.pickjob || null; S.qcEntries = []; render();
+      if (S.qcJob) { await Promise.all([loadPickSheets(S.qcJob), loadQc(S.qcJob)]); render(); }
+    });
+    on("[data-picksheet]", (b) => {
+      const n = b.dataset.picksheet === "" ? null : Number(b.dataset.picksheet);
+      if (S.modal) S.modal.sheet = n;
+      else if (S.arrowForm) {
+        const i = S.arrowForm.sheets.indexOf(n);
+        if (i >= 0) S.arrowForm.sheets.splice(i, 1); else S.arrowForm.sheets.push(n);
+      }
+      render();
+    });
+
+    // ---- modal typing (no re-render while typing, so the keyboard stays up) ----
+    app.querySelectorAll("[data-mfield]").forEach(el => el.oninput = () => {
+      S.modal[el.dataset.mfield] = el.value;
+      const ready = { savedefect: !!(S.modal.type && S.modal.jobId), saveproblem: !!(S.modal.jobId && (S.modal.text || "").trim()),
+                      savereply: !!(S.modal.text || "").trim(), saveqcfail: !!(S.modal.text || "").trim() };
+      for (const [k, v] of Object.entries(ready)) { const btn = app.querySelector(`[data-${k}]`); if (btn) btn.disabled = !v; }
+    });
+    app.querySelectorAll("[data-mstops]").forEach(el => el.onchange = () => { S.modal.stops = el.checked; });
+    app.querySelectorAll("[data-close]").forEach(el => el.onclick = (e) => { if (e.target !== el) return; S.modal = null; render(); });
+    on("[data-confirm]", () => { const run = S.modal && S.modal.run; S.modal = null; render(); if (run) run(); });
+
+    // ---- Arrow ----
+    on("[data-aropen]", () => { S.arrowForm = { jobId: null, filter: "", sheets: [], description: "", service: "powdercoat", sentOn: localISO(new Date()) }; render();
+                                if (!S.pickJobs.length) loadPickJobs().then(render); });
+    on("[data-arcancel]", () => { S.arrowForm = null; render(); });
+    on("[data-arservice]", (b) => { S.arrowForm.service = b.dataset.arservice; render(); });
+    app.querySelectorAll("[data-arfield]").forEach(el => el.oninput = () => {
+      S.arrowForm[el.dataset.arfield] = el.value;
+      const btn = app.querySelector("[data-arsend]"); if (btn) btn.disabled = !(S.arrowForm.jobId && (S.arrowForm.sheets.length || S.arrowForm.description.trim()));
+    });
+    on("[data-arsend]", () => {
+      const f = S.arrowForm;
+      send("send_to_arrow", { p_job: f.jobId, p_department: S.dept, p_service: f.service, p_sheets: f.sheets, p_description: f.description.trim() || null,
+                              p_sent_on: f.sentOn || null, p_client_id: null }, "Arrow", () => { S.arrowForm = null; render(); });
+    });
+    on("[data-arreturn]", (b) => {
+      const a = S.arrow.find(x => x.id === b.dataset.arreturn);
+      S.modal = { kind: "confirm", title: "Back from Arrow?", text: `${a ? a.project_id + " — " + [sheetsText(a.sheet_numbers), a.description].filter(Boolean).join(" — ") : ""}. Marks it returned today, under your name.`,
+                  yes: "Mark returned", run: () => send("return_from_arrow", { p_item: b.dataset.arreturn }, "Arrow return") };
+      render();
+    });
+    on("[data-arvoid]", (b) => {
+      S.modal = { kind: "confirm", title: "Entered by mistake?", text: "It comes off the Arrow lists and stays in history.", yes: "Yes, a mistake",
+                  run: () => send("void_arrow", { p_item: b.dataset.arvoid }, "Arrow") };
+      render();
+    });
+
+    // ---- QC ----
+    on("[data-qcsheet]", (b) => { S.modal = { kind: "qcpick", sheet: Number(b.dataset.qcsheet), jobId: b.dataset.qcjob, label: (current() || {}).project_id }; render(); });
+    on("[data-qcpass]", (b) => {
+      const jobId = b.dataset.qcjob || S.qcJob;
+      send("record_qc", { p_job: jobId, p_sheet: Number(b.dataset.qcpass), p_result: "pass", p_note: null, p_client_id: null }, "QC");
+    });
+    on("[data-qcfail]", (b) => { S.modal = { kind: "qcfail", sheet: Number(b.dataset.qcfail), jobId: b.dataset.qcjob || S.qcJob, text: "" }; render(); });
+    on("[data-saveqcfail]", () => {
+      const m = S.modal;
+      send("record_qc", { p_job: m.jobId, p_sheet: m.sheet, p_result: "fail", p_note: m.text.trim(), p_client_id: null }, "QC");
+    });
+
+    // ---- Supplies ----
+    app.querySelectorAll("[data-sfield]").forEach(el => el.oninput = () => {
+      S.supplyForm[el.dataset.sfield] = el.value;
+      const btn = app.querySelector("[data-ssend]"); if (btn) btn.disabled = !S.supplyForm.item.trim();
+    });
+    on("[data-snew]", (b) => { S.supplyForm.qty = Math.max(1, S.supplyForm.qty + Number(b.dataset.snew)); render(); });
+    on("[data-ssend]", () => {
+      const f = S.supplyForm;
+      send("request_supply", { p_department: S.dept, p_item: f.item.trim(), p_qty: f.qty, p_note: f.note.trim() || null, p_client_id: null }, "Supply request",
+           () => { S.supplyForm = { item: "", qty: 1, note: "" }; render(); });
+    });
+    on("[data-sqty]", (b) => {
+      const r = S.supplies.find(x => x.id === b.dataset.sqty); if (!r) return;
+      const qty = Math.max(1, r.qty + Number(b.dataset.d));
+      r.qty = qty; render();                                              // shown straight away; the number itself is sent
+      send("set_supply_qty", { p_request: r.id, p_qty: qty }, "Quantity");
+    });
+    on("[data-scancel]", (b) => {
+      S.modal = { kind: "confirm", title: "Cancel this request?", text: "The office won't order it. It stays in history.", yes: "Cancel it",
+                  run: () => send("cancel_supply", { p_request: b.dataset.scancel }, "Cancel") };
+      render();
+    });
+    on("[data-sreceive]", (b) => send("receive_supply", { p_request: b.dataset.sreceive }, "Received"));
   }
 
   function signIn(message) {
@@ -586,13 +1440,18 @@ if (typeof document !== "undefined") (function () {
     render();
     await loadRows(); render();
     flush();
+    await Promise.all([loadFlags(), loadTasks(), loadTypes(), S.tab === "problems" ? null : loadProblems()]);
+    if (S.tab !== "work") await loadTab();
+    render();
+    flushLog();
+    loadPickJobs();
   }
 
   // ---------- keep things current ----------
-  window.addEventListener("online", () => { S.online = true; flush(); loadRows().then(render); });
+  window.addEventListener("online", () => { S.online = true; flush(); flushLog(); loadRows().then(render); });
   window.addEventListener("offline", () => { S.online = false; render(); });
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && S.me) { flush(); if (S.view.screen === "queue") loadRows().then(render); } });
-  setInterval(() => { if (S.me && !document.hidden) { flush(); if (S.view.screen === "queue") loadRows().then(render); } }, 60000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && S.me) { flush(); flushLog(); if (S.view.screen === "queue" && !S.modal) refreshAll().then(render); } });
+  setInterval(() => { if (S.me && !document.hidden) { flush(); flushLog(); if (S.view.screen === "queue" && !S.modal) refreshAll().then(render); } }, 60000);
 
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 
@@ -605,7 +1464,9 @@ if (typeof document !== "undefined") (function () {
 })();
 
 /* lets the core be tested outside a browser */
-if (typeof module !== "undefined") module.exports = { keyProblem, departmentsFor, withPending, buildQueue, jobSheets, pagerFor, daysLeft, daysText, fmtDate, setPending, flushOutbox, isNetworkError, friendlyError };
+if (typeof module !== "undefined") module.exports = { keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
+  daysLeft, daysText, fmtDate, localISO, daysSince, agoText, setPending, flushOutbox, newId, queueEntry, flushLogbox, dueForMe, taskWhen,
+  problemState, splitProblems, defectCounts, supplyLine, filterJobs, sheetsText, isNetworkError, friendlyError, DEPTS };
 </script>
 </body>
 </html>

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#181D2E">
+<meta name="robots" content="noindex">
+<title>Floor · Shop Floor</title>
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --midnight:#181D2E; --panel:#222941; --line:#39415C; --line2:#2C3348; --orange:#ED5E0F; --bright:#F0A721;
+         --teal:#00B4B2; --sawdust:#FFF4D5; --gray:#C2BAA0; --ink2:#9AA0B4; --soft:#CFC9B8; }
+  *{box-sizing:border-box}
+  html,body{margin:0; background:var(--midnight); color:var(--sawdust); height:100%; overflow:hidden}
+  body{font-family:'Barlow',system-ui,sans-serif; font-size:clamp(15px,1.25vw,26px); line-height:1.3; cursor:none}
+  .num{font-family:'Barlow Condensed',sans-serif; font-variant-numeric:tabular-nums}
+  #app{padding:1.6vh 1.8vw; height:100vh; display:flex; flex-direction:column; gap:1.4vh; transition:transform 2s}
+  .head{display:flex; align-items:baseline; gap:1.2em; border-bottom:2px solid var(--line); padding-bottom:.8vh}
+  .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.18em; color:var(--orange); font-size:1.1em}
+  .brand span{color:var(--sawdust)}
+  .head h1{margin:0; font-size:1.6em; font-weight:600}
+  .showing{color:var(--ink2); font-size:1.05em}
+  .showing b{color:var(--sawdust); font-weight:600}
+  .clock{margin-left:auto; color:var(--ink2); font-size:1.1em}
+  .state{font-size:.8em; color:var(--bright)}
+  .crit{background:var(--orange); color:#fff; border-radius:12px; padding:1vh 1.4vw; display:flex; gap:1em; align-items:baseline; font-size:1.25em; font-weight:600}
+  .crit b{letter-spacing:.08em; font-size:.8em; white-space:nowrap}
+  .crit .t{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:1vw}
+  .kpi{background:var(--panel); border-radius:12px; padding:1.2vh 1.2vw; border-left:6px solid var(--orange)}
+  .kpi:nth-child(2){border-left-color:var(--bright)} .kpi:nth-child(3){border-left-color:var(--teal)} .kpi:nth-child(4){border-left-color:var(--gray)}
+  .kv{font-family:'Barlow Condensed',sans-serif; font-size:3.2em; font-weight:700; line-height:.95}
+  .kl{color:var(--ink2); font-size:.95em}
+  .mid{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr); gap:1vw; min-height:0}
+  .panel{background:var(--panel); border-radius:12px; padding:1.2vh 1.3vw; min-height:0}
+  .panel h3{margin:0 0 .8vh; font-size:.95em; color:var(--ink2); font-weight:600}
+  .donutwrap{display:flex; align-items:center; gap:1.4vw}
+  .donut{position:relative; width:min(15vw,24vh); aspect-ratio:1; flex-shrink:0}
+  .donut svg{width:100%; height:100%; display:block}
+  .dc{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center}
+  .dn{font-family:'Barlow Condensed',sans-serif; font-size:3.2em; font-weight:700; line-height:1}
+  .dn small{font-size:.45em}
+  .dl{color:var(--ink2); font-size:.85em}
+  .legend{display:flex; flex-direction:column; gap:.6vh; color:var(--soft); font-size:.95em}
+  .legend i{display:inline-block; width:.8em; height:.8em; border-radius:3px; margin-right:.5em; vertical-align:-1px}
+  .rbar{display:flex; align-items:center; gap:1vw; padding:.5vh 0}
+  .rn{flex:0 0 9em; font-size:1.05em}
+  .rt{display:block; flex:1 1 auto; background:var(--line); height:1.1em; border-radius:99px; overflow:hidden}
+  .rt i{display:block; height:100%; background:var(--bright); border-radius:99px}
+  .rv{flex:0 0 2.6em; text-align:right; font-size:1.9em; font-weight:700}
+  .rs{flex:0 0 9em; color:var(--ink2); font-size:.9em}
+  .tablep{flex:1 1 auto; min-height:0; overflow:hidden}
+  table{width:100%; border-collapse:collapse; font-size:1.05em}
+  th{text-align:left; color:var(--ink2); font-size:.75em; font-weight:600; letter-spacing:.04em; padding:0 .6em .5vh; border-bottom:1px solid var(--line)}
+  td{padding:.55vh .6em; border-bottom:1px solid var(--line2); white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  .pid{color:var(--bright); font-weight:700}
+  .jn{overflow:hidden; text-overflow:ellipsis; max-width:26vw}
+  .dd{display:flex; align-items:center; gap:.6em}
+  .dd .rt{height:.7em; width:5.5em; flex:0 0 5.5em}
+  .dd .rt i{background:var(--orange)}
+  .dd.done .rt i{background:var(--teal)}
+  .fl{font-size:.7em; font-weight:700; padding:.1em .5em; border-radius:5px; margin-left:.6em; vertical-align:.15em}
+  .fl.critical{background:var(--orange); color:#fff} .fl.priority{background:var(--bright); color:var(--midnight)} .fl.watch{border:1.5px solid var(--soft); color:var(--soft)}
+  .attn{display:flex; align-items:center; gap:1.4em; background:#2C2018; border-left:6px solid var(--bright); border-radius:10px; padding:1vh 1.3vw; color:#FFE3B8; overflow:hidden}
+  .attn b{color:var(--bright); flex-shrink:0}
+  .attn span{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .msgscreen{margin:18vh auto 0; max-width:52em; text-align:center}
+  .msgscreen h1{font-size:2.2em; color:var(--bright); margin:0 0 .6em}
+  .msgscreen p{font-size:1.25em; color:var(--soft)}
+  .full{position:fixed; right:1vw; bottom:1vh; background:none; border:1px solid var(--line); color:var(--ink2); border-radius:8px; padding:.4em .8em; font:inherit; font-size:.8em; cursor:pointer; opacity:.7}
+  body.idle .full{opacity:0}
+  @media (max-width:900px){ body{overflow:auto; cursor:auto} #app{height:auto} .kpis{grid-template-columns:repeat(2,1fr)} .mid{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<button class="full" id="full" hidden>Full screen</button>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* =====================================================================
+   THE TWO SETTINGS — the same two lines as upload.html.
+   Publishable key only. NEVER the secret key — this file is public.
+   The TV needs no login: it's opened with the TV link from the office
+   page (Setup → TV link). Without that link it shows nothing.
+   ===================================================================== */
+const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
+const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
+
+const REFRESH_SECONDS = 30;     // how often the numbers are fetched
+const HIDE_AFTER_SECONDS = 90;  // with no connection this long, the numbers are hidden rather than shown stale
+
+
+/* ---- core: no screen code in here, so it can be tested on its own ---- */
+
+function keyProblem(url, key) {
+  if (!url || !key || url.includes("PASTE-") || key.includes("PASTE-"))
+    return { secret: false, text: "The project address and key haven't been filled in yet. Copy the two SUPABASE lines from upload.html into this file." };
+  const secret = { secret: true, text: "This is the SECRET key, not the publishable one. Take it out of the file now and use the publishable key. If this file was already put on GitHub with it, create a new secret key in Supabase so the old one stops working." };
+  if (key.startsWith("sb_secret_")) return secret;
+  const parts = key.split(".");
+  if (parts.length === 3) {
+    try { if (JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))).role === "service_role") return secret; }
+    catch (e) { /* not a readable token */ }
+  }
+  return null;
+}
+
+/** The TV link's secret, from "#k=…" (kept on this screen so a plain reload still works). */
+function tvKey(hash, stored) {
+  const m = /[#&]k=([A-Za-z0-9]+)/.exec(hash || "");
+  return m ? m[1] : (stored || null);
+}
+
+/** What the screen shows, worked out from the database's snapshot. */
+function tvModel(s) {
+  const live = s.live || [];
+  const names = live.map(l => l.name);
+  const one = live.length === 1;
+  const d = s.donut || { finished: 0, ready: 0, total: 0 };
+  const waiting = Math.max(d.total - d.finished - d.ready, 0);
+  return {
+    showing: names.length ? names.join(" · ") : "nothing yet",
+    kpis: [
+      { v: s.kpis.jobs, l: "Jobs on the floor" },
+      { v: s.kpis.left, l: one ? `Pieces left in ${names[0]}` : "Pieces left, across live departments" },
+      { v: s.kpis.ready, l: "Ready to work on now" },
+      { v: s.kpis.due14, l: "Due inside 14 days" },
+    ],
+    donut: { finished: d.finished, ready: d.ready, waiting, total: d.total,
+             pct: d.total ? Math.round(d.finished / d.total * 100) : 0 },
+    bars: live.map(l => ({ name: l.name, ready: l.ready, left: l.left, jobs: l.jobs })),
+    maxReady: Math.max(1, ...live.map(l => l.ready)),
+    rows: (s.table || []).map(r => ({ ...r, depts: (r.depts || []).map(x => ({ ...x, name: (live.find(l => l.key === x.key) || {}).name,
+                                                                                  pct: x.total ? Math.round(x.done / x.total * 100) : 0,
+                                                                                  done_all: x.total > 0 && x.done >= x.total })) })),
+    columns: live.map(l => l.name),
+    critical: s.critical || [],
+    attention: s.attention || [],
+  };
+}
+
+/** Numbers are hidden once the last good snapshot is too old — a stale TV is worse than a blank one. */
+function freshness(lastOkAt, now, failing, hideAfter = 90) {
+  if (!lastOkAt) return failing ? "lost" : "loading";
+  const age = (now - lastOkAt) / 1000;
+  if (age > hideAfter) return "lost";
+  return failing ? "reconnecting" : "ok";
+}
+
+function fmtDate(iso) {
+  if (!iso) return "no date";
+  const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number);
+  return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m - 1] + " " + d;
+}
+
+/* ---- end core ---- */
+
+
+/* ---- the screen ---- */
+if (typeof document !== "undefined") (function () {
+  const app = document.getElementById("app");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const store = {
+    get(k) { try { return localStorage.getItem("sftv_" + k); } catch (e) { return null; } },
+    set(k, v) { try { v === null ? localStorage.removeItem("sftv_" + k) : localStorage.setItem("sftv_" + k, v); } catch (e) {} },
+  };
+  const msg = (title, text) => { app.innerHTML = `<div class="msgscreen"><h1>${esc(title)}</h1><p>${esc(text)}</p></div>`; };
+
+  const problem = keyProblem(SUPABASE_URL, SUPABASE_KEY);
+  if (problem) return msg(problem.secret ? "Stop — wrong key in this file" : "This page isn't set up yet", problem.text);
+
+  const key = tvKey(location.hash, store.get("key"));
+  if (!key) return msg("This screen needs the TV link", "On the office page, go to Setup → TV link, and open that link here. Then bookmark it.");
+  store.set("key", key);
+  if (location.hash) history.replaceState(null, "", location.pathname);   // keep the secret out of sight on screen
+
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  let snap = null, lastOkAt = null, failing = false, attnAt = 0;
+
+  function clock() {
+    const d = new Date();
+    return d.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" }) + " · " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  function draw() {
+    const f = freshness(lastOkAt, Date.now(), failing, HIDE_AFTER_SECONDS);
+    if (f === "loading") return msg("Loading the floor…", "");
+    if (f === "lost") return msg("Lost connection", `The numbers are hidden until the connection is back${lastOkAt ? " (last update " + new Date(lastOkAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + ")" : ""}. It reconnects by itself.`);
+    const m = tvModel(snap);
+    const C = 2 * Math.PI * 86, tot = Math.max(m.donut.total, 1);
+    const seg = (v, off, col) => `<circle cx="110" cy="110" r="86" fill="none" stroke="${col}" stroke-width="30" stroke-dasharray="${(v / tot) * C} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 110 110)"/>`;
+    const att = m.attention;
+    if (att.length > 3 && Date.now() - attnAt > 10000) attnAt = Date.now();
+    const start = att.length > 3 ? Math.floor(Date.now() / 10000) % att.length : 0;
+    const shown = att.length > 3 ? [0, 1, 2].map(i => att[(start + i) % att.length]) : att;
+    const lvl = { critical: "Critical", priority: "Priority", watch: "Watch" };
+    app.innerHTML = `
+      <div class="head"><span class="brand">PURPOSEFUL <span>DESIGN</span></span><h1>Production Floor</h1>
+        <span class="showing">Showing: <b>${esc(m.showing)}</b></span>
+        ${f === "reconnecting" ? `<span class="state">Reconnecting…</span>` : ""}
+        <span class="clock">${esc(clock())}</span></div>
+      ${m.critical.map(c => `<div class="crit"><b>CRITICAL</b><span class="t">${esc(c.project_id)} — ${esc(c.note)}${c.department ? ` (${esc(c.department)})` : ""}</span></div>`).join("")}
+      <div class="kpis">${m.kpis.map(k => `<div class="kpi"><div class="kv num">${k.v}</div><div class="kl">${esc(k.l)}</div></div>`).join("")}</div>
+      <div class="mid">
+        <div class="panel"><h3>All work on the floor · ${esc(m.showing)}</h3>
+          <div class="donutwrap"><div class="donut"><svg viewBox="0 0 220 220" role="img" aria-label="${m.donut.pct} percent finished">
+              <circle cx="110" cy="110" r="86" fill="none" stroke="#39415C" stroke-width="30"/>
+              ${seg(m.donut.ready, (m.donut.finished / tot) * C, "#ED5E0F")}${seg(m.donut.finished, 0, "#00B4B2")}</svg>
+            <div class="dc"><div class="dn num">${m.donut.pct}<small>%</small></div><div class="dl">finished</div></div></div>
+          <div class="legend"><span><i style="background:#00B4B2"></i>Finished ${m.donut.finished}</span>
+            <span><i style="background:#ED5E0F"></i>Ready now ${m.donut.ready}</span>
+            <span><i style="background:#39415C"></i>Not ready yet ${m.donut.waiting}</span></div></div></div>
+        <div class="panel"><h3>Ready to work on, by department</h3>
+          ${m.bars.map(b => `<div class="rbar"><span class="rn">${esc(b.name)}</span>
+            <span class="rt"><i style="width:${Math.round(b.ready / m.maxReady * 100)}%"></i></span>
+            <span class="rv num">${b.ready}</span><span class="rs">${b.left} left · ${b.jobs} job${b.jobs === 1 ? "" : "s"}</span></div>`).join("")
+            || `<p class="dl">No department is live yet.</p>`}</div>
+      </div>
+      <div class="panel tablep"><h3>Next ${m.rows.length || 15} by delivery date</h3>
+        ${m.rows.length ? `<table><thead><tr><th>Due</th><th>Days</th><th>Project</th><th>Job</th>${m.columns.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead>
+          <tbody>${m.rows.map(r => `<tr><td class="num">${esc(fmtDate(r.delivery_date))}</td><td class="num">${r.days === null || r.days === undefined ? "" : r.days}</td>
+            <td class="num pid">${esc(String(r.project_id).replace(/^PROJ-/, ""))}</td>
+            <td class="jn">${esc(r.job_name)}${r.flag ? `<span class="fl ${r.flag}">${lvl[r.flag]}</span>` : ""}</td>
+            ${r.depts.map(x => x.total ? `<td><span class="dd${x.done_all ? " done" : ""}"><span class="num">${x.done} / ${x.total}</span><span class="rt"><i style="width:${x.pct}%"></i></span></span></td>` : `<td></td>`).join("")}</tr>`).join("")}</tbody></table>`
+          : `<p class="dl">Nothing waiting in ${esc(m.showing)}.</p>`}
+      </div>
+      ${shown.length ? `<div class="attn"><b>Needs attention</b>${shown.map(a => `<span>${esc(a.text)}</span>`).join("")}</div>` : ""}`;
+  }
+
+  async function refresh() {
+    let res;
+    try { res = await db.rpc("tv_snapshot", { p_key: key }); } catch (e) { res = { error: e }; }
+    if (res.error || !res.data) { failing = true; return draw(); }
+    if (res.data.ok === false) { store.set("key", null); return msg("This TV link doesn't work any more", res.data.reason); }
+    snap = res.data; lastOkAt = Date.now(); failing = false;
+    draw();
+  }
+
+  // burn-in: shift everything a few pixels every few minutes
+  let shift = 0;
+  setInterval(() => { shift = (shift + 1) % 4; app.style.transform = `translate(${[0, 3, 3, 0][shift]}px, ${[0, 0, 3, 3][shift]}px)`; }, 180000);
+  setInterval(refresh, REFRESH_SECONDS * 1000);
+  setInterval(() => { if (snap) draw(); }, 10000);     // the clock, the attention strip, and hiding stale numbers
+
+  const full = document.getElementById("full");
+  if (document.documentElement.requestFullscreen) {
+    full.hidden = false;
+    full.onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  }
+  let idle; document.addEventListener("mousemove", () => { document.body.classList.remove("idle"); clearTimeout(idle); idle = setTimeout(() => document.body.classList.add("idle"), 5000); });
+  refresh();
+})();
+
+/* lets the core be tested outside a browser */
+if (typeof module !== "undefined") module.exports = { keyProblem, tvKey, tvModel, freshness, fmtDate };
+</script>
+</body>
+</html>
