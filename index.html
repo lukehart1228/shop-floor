@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#181D2E">
+<title>Shop Floor</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --midnight:#181D2E; --orange:#ED5E0F; --bright:#F0A721; --teal:#00B4B2;
+    --teal-ink:#00807E; --teal-bg:#DDF2F1; --sawdust:#FFF4D5; --gray:#C2BAA0;
+    --paper:#EFEDE6; --line:#E4DFCF; --ink2:#6B7082; --warn:#8A4B00; --warn-bg:#FFF4D5;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0; background:var(--paper); color:var(--midnight)}
+  body{font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:18px; line-height:1.4;
+       padding-bottom:env(safe-area-inset-bottom,0px); -webkit-tap-highlight-color:transparent}
+  button{font:inherit; color:inherit; cursor:pointer}
+  .num{font-family:'Barlow Condensed',sans-serif; font-variant-numeric:tabular-nums}
+  [hidden]{display:none!important}
+
+  /* top bar */
+  .top{position:sticky; top:0; z-index:10; background:var(--midnight); color:var(--sawdust);
+       padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 0}
+  .top-row{display:flex; align-items:center; gap:12px; padding-bottom:10px}
+  .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.14em; color:var(--orange); font-size:17px}
+  .who{margin-left:auto; text-align:right; font-size:15px; line-height:1.2}
+  .who b{display:block; font-size:17px}
+  .sync{font-size:13px; padding:3px 9px; border-radius:99px; background:#2C3348; color:#CFC9B8; white-space:nowrap}
+  .sync.waiting{background:var(--bright); color:var(--midnight); font-weight:700}
+  .sync.offline{background:#5A3A1A; color:var(--sawdust)}
+  .tabs{display:flex; gap:4px; overflow-x:auto}
+  .tab{background:none; border:none; color:#9AA0B4; padding:10px 16px 12px; font-weight:600; border-bottom:4px solid transparent; white-space:nowrap}
+  .tab[aria-current="true"]{color:var(--sawdust); border-bottom-color:var(--orange)}
+
+  main{max-width:1100px; margin:0 auto; padding:16px 14px 80px}
+  .banner{border-radius:10px; padding:12px 16px; margin-bottom:14px; font-weight:600}
+  .banner.warn{background:var(--warn-bg); color:var(--warn); border-left:5px solid var(--bright)}
+  .banner.info{background:#fff; color:var(--ink2); border:1px solid var(--line)}
+  h1{font-size:26px; margin:2px 2px 4px}
+  .sub{color:var(--ink2); margin:0 2px 16px; font-size:16px}
+  .back{background:none; border:none; color:var(--orange); font-weight:700; padding:10px 2px; font-size:18px}
+
+  /* queue */
+  .job{display:block; width:100%; text-align:left; background:#fff; border:1px solid var(--line);
+       border-radius:12px; padding:16px 18px; margin-bottom:12px}
+  .job-top{display:flex; gap:12px; align-items:baseline; flex-wrap:wrap}
+  .pid{font-weight:700; letter-spacing:.02em}
+  .jname{color:var(--ink2); flex:1 1 220px; min-width:0}
+  .due{color:var(--ink2); font-size:16px; white-space:nowrap}
+  .due b{color:var(--midnight)}
+  .tally{display:flex; align-items:center; gap:12px; margin-top:10px}
+  .tally .big{font-size:40px; font-weight:700; line-height:.9}
+  .tally .of{color:var(--ink2); white-space:nowrap}
+  .bar{flex:1 1 auto; height:10px; background:var(--paper); border-radius:99px; overflow:hidden}
+  .bar i{display:block; height:100%; background:var(--orange); border-radius:99px}
+  .tag{display:inline-block; border:1.5px solid var(--midnight); border-radius:4px; font-size:13px; font-weight:700;
+       letter-spacing:.06em; padding:0 5px; margin-right:8px; vertical-align:2px}
+  .chip{display:inline-block; margin-top:10px; font-size:14px; font-weight:600; padding:4px 10px; border-radius:6px;
+        background:var(--warn-bg); color:var(--warn)}
+  .empty{background:#fff; border:1px dashed var(--gray); border-radius:12px; padding:36px 20px; text-align:center; color:var(--ink2)}
+  .empty b{display:block; color:var(--midnight); font-size:20px; margin-bottom:6px}
+
+  /* job */
+  .sheet{display:flex; align-items:center; gap:16px; width:100%; text-align:left; background:#fff;
+         border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin-bottom:10px; min-height:72px}
+  .sheet .no{font-size:26px; font-weight:700; width:2.2em}
+  .sheet .meta{flex:1 1 auto; min-width:0}
+  .sheet .code{font-weight:700}
+  .sheet .desc{color:var(--ink2); font-size:15px}
+  .sheet .cnt{font-size:28px; font-weight:700; white-space:nowrap}
+  .sheet.done{background:var(--teal-bg); border-color:transparent}
+  .sheet.done .no,.sheet.done .cnt{color:var(--teal-ink)}
+
+  /* sheet */
+  .pager{display:flex; gap:10px; margin:0 0 14px}
+  .pager button{flex:1 1 0; min-width:0; background:#fff; border:1px solid var(--gray); border-radius:12px;
+                padding:12px 16px; text-align:left; font-weight:700; min-height:64px}
+  .pager button:last-child{text-align:right}
+  .pager button:disabled{opacity:.35}
+  .pager small{display:block; font-weight:500; color:var(--ink2); font-size:14px}
+  .pager .pos{flex:0 0 auto; align-self:center; color:var(--ink2); font-weight:700; padding:0 6px}
+  .counter{background:#fff; border:1px solid var(--line); border-radius:14px; padding:18px; margin-bottom:14px}
+  .count-row{display:flex; align-items:center; justify-content:center; gap:26px}
+  .step{width:92px; height:92px; border-radius:50%; border:2px solid var(--gray); background:var(--paper);
+        font-size:44px; font-weight:600; line-height:1}
+  .step:disabled{opacity:.3}
+  .readout{text-align:center; min-width:170px}
+  .readout .n{font-size:84px; font-weight:700; line-height:.85}
+  .readout .l{color:var(--ink2); font-size:16px}
+  .all{display:block; width:100%; margin-top:16px; background:var(--orange); color:#fff; border:none;
+       border-radius:12px; padding:18px; font-weight:700; font-size:20px}
+  .complete{margin-top:16px; background:var(--teal-bg); color:var(--teal-ink); text-align:center; font-weight:700;
+            font-size:20px; border-radius:12px; padding:16px}
+  .page{background:#fff; border:1px solid var(--midnight); border-radius:6px; overflow:auto; margin-bottom:10px;
+        -webkit-overflow-scrolling:touch; touch-action:pan-x pan-y pinch-zoom}
+  .page img{display:block; width:100%; min-width:720px; height:auto}
+  .page .missing{padding:60px 20px; text-align:center; color:var(--ink2)}
+  .actions{display:flex; gap:10px; flex-wrap:wrap; margin:6px 0 14px}
+  .actions button{flex:1 1 200px; background:#fff; border:1px solid var(--gray); border-radius:12px; padding:14px; font-weight:700}
+
+  /* sign in */
+  .signin{max-width:440px; margin:8vh auto 0; background:#fff; border:1px solid var(--line); border-radius:14px; padding:24px}
+  .signin label{display:block; font-weight:600; margin:14px 0 4px}
+  .signin input{width:100%; font:inherit; padding:14px; border:1px solid var(--gray); border-radius:10px}
+  .signin .go{width:100%; margin-top:18px; background:var(--orange); color:#fff; border:none; border-radius:10px; padding:16px; font-weight:700}
+  .signin .go:disabled{opacity:.45}
+  .alarm{max-width:560px; margin:8vh auto 0; background:var(--midnight); color:var(--sawdust); border-radius:14px; padding:24px}
+  .alarm h1{color:var(--bright)}
+  .foot{text-align:center; margin-top:30px}
+  .link{background:none; border:none; color:var(--ink2); text-decoration:underline; padding:10px}
+
+  /* printing: only the sheet page */
+  #printArea{display:none}
+  @media print{
+    @page{size:landscape; margin:.25in}
+    body{background:#fff}
+    body > *:not(#printArea){display:none!important}
+    #printArea{display:block!important}
+    #printArea img{width:100%; height:auto}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="printArea"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* =====================================================================
+   THE TWO SETTINGS — the same two lines as upload.html.
+   Copy them straight across (walkthrough 4, step 2).
+   Publishable key only. NEVER the secret key — this file is public.
+   ===================================================================== */
+const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
+const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
+
+
+/* ---- core: no screen code in here, so it can be tested on its own ---- */
+
+const DEPTS = [
+  ["milling", "Milling"], ["cnc", "CNC"], ["sanding", "Sanding"], ["finishing", "Finishing"],
+  ["full_custom", "Full Custom"], ["metal", "Metal"], ["assembly_qc", "Assembly / QC"],
+];
+const DEPT_NAME = Object.fromEntries(DEPTS);
+
+function keyProblem(url, key) {
+  if (!url || !key || url.includes("PASTE-") || key.includes("PASTE-"))
+    return { secret: false, text: "The project address and key haven't been filled in yet. Copy the two SUPABASE lines from upload.html into this file (walkthrough 4, step 2)." };
+  const secret = { secret: true, text: "This is the SECRET key, not the publishable one. It bypasses every security rule, and this file is public. Take it out of the file now and use the publishable key — the same one upload.html has. If this file was already put on GitHub with it, create a new secret key in Supabase so the old one stops working." };
+  if (key.startsWith("sb_secret_")) return secret;
+  const parts = key.split(".");
+  if (parts.length === 3) {
+    try { if (JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))).role === "service_role") return secret; }
+    catch (e) { /* not a readable token */ }
+  }
+  if (!/^https:\/\//.test(url)) return { secret: false, text: "The project address should start with https:// — copy it from upload.html." };
+  return null;
+}
+
+/** Which departments this person can open. Managers can open all of them. */
+function departmentsFor(me) {
+  if (!me) return [];
+  if (me.role === "manager" || me.role === "admin") return DEPTS.map(d => d[0]);
+  return DEPTS.map(d => d[0]).filter(k => (me.departments || []).includes(k));
+}
+
+/** Put any counts still waiting to send on top of what the database last said. */
+function withPending(rows, outbox) {
+  return rows.map(r => outbox[r.progress_id] ? { ...r, qty_done: outbox[r.progress_id].qty } : r);
+}
+
+/** One card per job that still has pieces left for this department, soonest delivery first. */
+function buildQueue(rows) {
+  const jobs = new Map();
+  for (const r of rows) {
+    if (!jobs.has(r.job_id)) jobs.set(r.job_id, {
+      job_id: r.job_id, project_id: r.project_id, name: r.job_name,
+      delivery_date: r.delivery_date, materials_ordered: r.materials_ordered, is_test: !!r.is_test,
+      done: 0, total: 0, sheets: 0, sheetsDone: 0 });
+    const j = jobs.get(r.job_id);
+    j.done += Math.min(r.qty_done, r.qty_required);
+    j.total += r.qty_required;
+    j.sheets += 1;
+    if (r.qty_done >= r.qty_required) j.sheetsDone += 1;
+  }
+  return [...jobs.values()]
+    .filter(j => j.done < j.total)
+    .sort((a, b) => (a.delivery_date || "9999").localeCompare(b.delivery_date || "9999")
+                 || String(a.project_id).localeCompare(String(b.project_id)));
+}
+
+function jobSheets(rows, jobId) {
+  return rows.filter(r => r.job_id === jobId).sort((a, b) => a.sheet_number - b.sheet_number);
+}
+
+function pagerFor(rows, jobId, progressId) {
+  const list = jobSheets(rows, jobId);
+  const at = list.findIndex(r => r.progress_id === progressId);
+  return { at, count: list.length, prev: at > 0 ? list[at - 1] : null, next: at >= 0 && at < list.length - 1 ? list[at + 1] : null };
+}
+
+function daysLeft(iso, today = new Date()) {
+  if (!iso) return null;
+  const [y, m, d] = iso.split("-").map(Number);
+  const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((new Date(y, m - 1, d) - t) / 86400000);
+}
+function fmtDate(iso) {
+  if (!iso) return "no date";
+  const [y, m, d] = iso.split("-").map(Number);
+  return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m - 1] + " " + d;
+}
+function daysText(n) {
+  if (n === null) return "";
+  if (n < 0) return `${-n} day${n === -1 ? "" : "s"} late`;
+  if (n === 0) return "due today";
+  return `${n} day${n === 1 ? "" : "s"}`;
+}
+
+/** Record a count to send. Only the latest count per sheet matters. */
+function setPending(outbox, progressId, qty) {
+  return { ...outbox, [progressId]: { qty, at: new Date().toISOString() } };
+}
+
+function isNetworkError(err) {
+  const m = String((err && (err.message || err.details)) || err || "");
+  return /failed to fetch|networkerror|load failed|network request failed|fetch failed|timeout|aborted/i.test(m);
+}
+
+/**
+ * Send every waiting count. Returns { saved, refused, offline }.
+ *
+ * A count is sent as the number itself ("4 done"), so sending one twice
+ * can never double it. `box` is { get(), set(next) } and is re-read after
+ * every send, so a tap made while a count is still sending is never lost.
+ */
+async function flushOutbox(box, db) {
+  const saved = [], refused = [];
+  let offline = false;
+  for (const id of Object.keys(box.get())) {
+    const pending = box.get()[id];
+    if (!pending) continue;
+    let res;
+    try {
+      res = await db.from("sheet_progress").update({ qty_done: pending.qty }).eq("id", id).select("id, qty_done, state");
+    } catch (e) { res = { error: e }; }
+
+    const forget = (always) => {
+      const cur = { ...box.get() };
+      // keep it if it was tapped again while this one was on its way
+      if (cur[id] && (always || cur[id].qty === pending.qty)) { delete cur[id]; box.set(cur); }
+    };
+    if (res.error) {
+      if (isNetworkError(res.error)) { offline = true; break; }
+      refused.push({ id, reason: res.error.message || String(res.error) });
+      forget(true);
+    } else if (!res.data || res.data.length === 0) {
+      refused.push({ id, reason: "This login isn't allowed to change that department's counts." });
+      forget(true);
+    } else {
+      saved.push(res.data[0]);
+      forget(false);
+    }
+  }
+  return { saved, refused, offline };
+}
+
+function friendlyError(err) {
+  const m = String((err && (err.message || err.error_description || err.error)) || err || "");
+  if (isNetworkError(err)) return "Can't reach the database right now. Counts are kept on this tablet and will send when the connection is back.";
+  if (/invalid login credentials/i.test(m)) return "That email and password didn't match. Check them and try again.";
+  if (/email not confirmed/i.test(m)) return "This login hasn't been confirmed. In Supabase → Authentication → Users, check it was created with Auto Confirm ticked.";
+  if (/jwt expired|refresh token/i.test(m)) return "The sign-in has expired. Sign out and back in.";
+  return m || "Something went wrong. Try again, and if it keeps happening, take a screenshot.";
+}
+
+/* ---- end core ---- */
+
+
+/* ---- the screen ---- */
+if (typeof document !== "undefined") (function () {
+  const app = document.getElementById("app");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("sf_" + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem("sf_" + k, JSON.stringify(v)); } catch (e) {} },
+  };
+
+  const problem = keyProblem(SUPABASE_URL, SUPABASE_KEY);
+  if (problem) {
+    app.innerHTML = `<div class="alarm"><h1>${problem.secret ? "Stop — wrong key in this file" : "This app isn't set up yet"}</h1><p>${esc(problem.text)}</p></div>`;
+    return;
+  }
+
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const S = {
+    me: null, depts: [], dept: store.get("dept", null),
+    rows: [], rowsAt: null, fromCache: false,
+    outbox: store.get("outbox", {}),
+    view: { screen: "queue", jobId: null, progressId: null },
+    online: navigator.onLine, notice: null, loading: false,
+  };
+  const pageUrls = new Map();
+
+  function rowsNow() { return withPending(S.rows, S.outbox); }
+
+  // ---------- data ----------
+  async function loadMe(user) {
+    const { data, error } = await db.from("profiles").select("*").eq("id", user.id).maybeSingle();
+    if (error && !isNetworkError(error)) throw error;
+    const me = data ? { id: user.id, email: user.email, name: data.full_name, role: data.role, departments: data.departments || [], is_test: !!data.is_test }
+                    : store.get("me", null);
+    if (!me) return null;
+    store.set("me", me);
+    S.me = me;
+    S.depts = departmentsFor(me);
+    if (!S.depts.includes(S.dept)) S.dept = S.depts[0] || null;
+    return me;
+  }
+
+  async function loadRows() {
+    if (!S.dept) return;
+    S.loading = true;
+    const { data, error } = await db.from("v_floor_sheets").select("*").eq("department", S.dept);
+    S.loading = false;
+    if (error) {
+      const cached = store.get("rows_" + S.dept, null);
+      if (cached) { S.rows = cached.rows; S.rowsAt = cached.at; S.fromCache = true; }
+      if (!isNetworkError(error)) S.notice = friendlyError(error);
+      return;
+    }
+    S.rows = data || []; S.rowsAt = new Date().toISOString(); S.fromCache = false;
+    store.set("rows_" + S.dept, { rows: S.rows, at: S.rowsAt });
+    prefetchPages();
+  }
+
+  let flushing = false;
+  async function flush() {
+    if (flushing || !Object.keys(S.outbox).length) return;
+    flushing = true;
+    const r = await flushOutbox({ get: () => S.outbox, set: (b) => { S.outbox = b; store.set("outbox", b); } }, db);
+    S.online = !r.offline;
+    for (const row of r.saved) {
+      const i = S.rows.findIndex(x => x.progress_id === row.id);
+      if (i >= 0) S.rows[i] = { ...S.rows[i], qty_done: row.qty_done, state: row.state };
+    }
+    store.set("rows_" + S.dept, { rows: S.rows, at: S.rowsAt });
+    if (r.refused.length) S.notice = r.refused[0].reason;
+    flushing = false;
+    render();
+    if (!r.offline && Object.keys(S.outbox).length) flush();   // taps made while that was sending
+  }
+
+  // ---------- sheet pages: kept on the tablet so they show without Wi-Fi ----------
+  async function pageImage(path) {
+    if (pageUrls.has(path)) return pageUrls.get(path);
+    let blob = null;
+    if ("caches" in window) {
+      const key = new Request(location.origin + "/__sheet-pages__/" + encodeURIComponent(path));
+      const cache = await caches.open("sheet-pages-v1");
+      const hit = await cache.match(key);
+      if (hit) blob = await hit.blob();
+      if (!blob) {
+        const { data, error } = await db.storage.from("work-orders").download(path);
+        if (error) throw error;
+        await cache.put(key, new Response(data, { headers: { "Content-Type": "image/png" } }));
+        blob = data;
+      }
+    } else {
+      const { data, error } = await db.storage.from("work-orders").download(path);
+      if (error) throw error;
+      blob = data;
+    }
+    const url = URL.createObjectURL(blob);
+    pageUrls.set(path, url);
+    return url;
+  }
+
+  let prefetching = false;
+  async function prefetchPages() {
+    if (prefetching) return; prefetching = true;
+    const open = new Set(buildQueue(rowsNow()).map(j => j.job_id));
+    for (const r of S.rows) {
+      if (!open.has(r.job_id) || !r.png_path || !r.pages_ready || pageUrls.has(r.png_path)) continue;
+      try { await pageImage(r.png_path); } catch (e) { break; }
+    }
+    prefetching = false;
+  }
+
+  // ---------- screens ----------
+  function syncBadge() {
+    const n = Object.keys(S.outbox).length;
+    if (n) return `<span class="sync waiting">${n} count${n === 1 ? "" : "s"} waiting to send</span>`;
+    if (!S.online || S.fromCache) return `<span class="sync offline">Offline</span>`;
+    return `<span class="sync">All saved</span>`;
+  }
+
+  function topBar() {
+    const tabs = S.depts.length > 1
+      ? `<nav class="tabs">${S.depts.map(k => `<button class="tab" data-dept="${k}" aria-current="${k === S.dept}">${esc(DEPT_NAME[k])}</button>`).join("")}</nav>` : "";
+    return `<header class="top"><div class="top-row">
+        <span class="brand">SHOP FLOOR</span>${syncBadge()}
+        <span class="who"><b>${esc(S.me.name)}</b>${esc(S.depts.length === 1 ? DEPT_NAME[S.dept] : S.me.role)}</span>
+      </div>${tabs}</header>`;
+  }
+
+  function banners() {
+    let out = "";
+    if (S.me && S.me.is_test) out += `<div class="banner info"><b>Test login.</b> You're seeing test jobs only. Nothing done here touches real work.</div>`;
+    if (S.notice) out += `<div class="banner warn">${esc(S.notice)}</div>`;
+    if (S.fromCache && S.rowsAt) {
+      const t = new Date(S.rowsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      out += `<div class="banner info">No connection — showing the list from ${esc(t)}. Counts you enter are kept and will send when the connection is back.</div>`;
+    }
+    return out;
+  }
+
+  function queueScreen() {
+    const q = buildQueue(rowsNow());
+    const pieces = q.reduce((a, j) => a + (j.total - j.done), 0);
+    const head = `<h1>${esc(DEPT_NAME[S.dept])}</h1>
+      <p class="sub">${q.length} job${q.length === 1 ? "" : "s"} · ${pieces} piece${pieces === 1 ? "" : "s"} left</p>`;
+    if (!S.rows.length && S.loading) return head + `<div class="empty">Loading…</div>`;
+    if (!q.length) return head + `<div class="empty"><b>Nothing waiting</b>Every sheet for ${esc(DEPT_NAME[S.dept])} is finished. New work appears here by itself.</div>`;
+    return head + q.map(j => {
+      const pct = j.total ? Math.round(j.done / j.total * 100) : 0;
+      const dl = daysLeft(j.delivery_date);
+      return `<button class="job" data-job="${esc(j.job_id)}">
+        <div class="job-top"><span class="pid">${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</span><span class="jname">${esc(j.name)}</span>
+          <span class="due">Due ${esc(fmtDate(j.delivery_date))}${dl === null ? "" : ` · <b>${esc(daysText(dl))}</b>`}</span></div>
+        <div class="tally"><span class="big num">${j.done}</span><span class="of num">/ ${j.total} pieces</span>
+          <span class="bar"><i style="width:${pct}%"></i></span></div>
+        ${j.materials_ordered ? "" : `<span class="chip">Materials not ordered yet</span>`}
+      </button>`;
+    }).join("");
+  }
+
+  function jobScreen() {
+    const list = jobSheets(rowsNow(), S.view.jobId);
+    if (!list.length) { S.view = { screen: "queue" }; return queueScreen(); }
+    const j = list[0];
+    const done = list.reduce((a, r) => a + Math.min(r.qty_done, r.qty_required), 0);
+    const total = list.reduce((a, r) => a + r.qty_required, 0);
+    return `<button class="back" data-back="queue">← ${esc(DEPT_NAME[S.dept])}</button>
+      <h1>${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</h1>
+      <p class="sub">${esc(j.job_name)} · due ${esc(fmtDate(j.delivery_date))} · ${done} of ${total} pieces done</p>
+      ${j.materials_ordered ? "" : `<div class="banner warn">Materials for this job haven't been marked as ordered in Monday yet.</div>`}
+      ${list.map(r => {
+        const full = r.qty_done >= r.qty_required;
+        const size = [r.width, r.length, r.thickness].filter(Boolean).join(" × ");
+        return `<button class="sheet${full ? " done" : ""}" data-sheet="${esc(r.progress_id)}">
+          <span class="no num">${r.sheet_number}</span>
+          <span class="meta"><span class="code">${esc(r.item_code || "Sheet " + r.sheet_number)}</span>
+            <span class="desc">${esc([r.species, r.shape, size].filter(Boolean).join(" · "))}</span></span>
+          <span class="cnt num">${r.qty_done} / ${r.qty_required}</span></button>`;
+      }).join("")}`;
+  }
+
+  function sheetScreen() {
+    const rows = rowsNow();
+    const r = rows.find(x => x.progress_id === S.view.progressId);
+    if (!r) { S.view = { screen: "job", jobId: S.view.jobId }; return jobScreen(); }
+    const p = pagerFor(rows, r.job_id, r.progress_id);
+    const full = r.qty_done >= r.qty_required;
+    const pager = `<div class="pager">
+      <button data-goto="${p.prev ? esc(p.prev.progress_id) : ""}" ${p.prev ? "" : "disabled"}><small>← Previous</small>${p.prev ? `Sheet ${p.prev.sheet_number} · ${esc(p.prev.item_code || "")}` : "—"}</button>
+      <span class="pos num">${p.at + 1} / ${p.count}</span>
+      <button data-goto="${p.next ? esc(p.next.progress_id) : ""}" ${p.next ? "" : "disabled"}><small>Next →</small>${p.next ? `Sheet ${p.next.sheet_number} · ${esc(p.next.item_code || "")}` : "—"}</button>
+    </div>`;
+    return `<button class="back" data-back="job">← ${esc(r.project_id)}</button>
+      <h1>Sheet ${r.sheet_number} · ${esc(r.item_code || "")}</h1>
+      <p class="sub">${r.is_test ? `<span class="tag">TEST</span>` : ""}${esc(r.project_id)} · ${esc(r.job_name)}</p>
+      ${pager}
+      <div class="counter">
+        <div class="count-row">
+          <button class="step" data-step="-1" ${r.qty_done <= 0 ? "disabled" : ""} aria-label="One fewer">−</button>
+          <div class="readout"><div class="n num">${r.qty_done}</div><div class="l">of ${r.qty_required} done · ${esc(DEPT_NAME[S.dept])}</div></div>
+          <button class="step" data-step="1" ${full ? "disabled" : ""} aria-label="One more">+</button>
+        </div>
+        ${full ? `<div class="complete">Sheet complete</div>` : `<button class="all" data-all="${r.qty_required}">Mark all ${r.qty_required} done</button>`}
+      </div>
+      <div class="page" id="page">${r.png_path && r.pages_ready ? `<div class="missing">Loading the page…</div>` : `<div class="missing">This sheet's page hasn't been uploaded yet.</div>`}</div>
+      <div class="actions">
+        <button data-print="1" ${r.png_path && r.pages_ready ? "" : "disabled"}>Print this sheet</button>
+        <button data-pdf="1" ${r.pdf_path && r.pages_ready ? "" : "disabled"}>Open the PDF</button>
+      </div>
+      ${pager}`;
+  }
+
+  function render() {
+    if (!S.me) return;
+    const body = S.view.screen === "sheet" ? sheetScreen() : S.view.screen === "job" ? jobScreen() : queueScreen();
+    const foot = S.view.screen === "queue" ? `<div class="foot"><button class="link" data-signout="1">Sign out</button></div>` : "";
+    app.innerHTML = topBar() + `<main>${banners()}${body}${foot}</main>`;
+    wire();
+    if (S.view.screen === "sheet") showPage();
+  }
+
+  async function showPage() {
+    const r = rowsNow().find(x => x.progress_id === S.view.progressId);
+    const el = document.getElementById("page");
+    if (!r || !el || !r.png_path || !r.pages_ready) return;
+    try {
+      const url = await pageImage(r.png_path);
+      if (S.view.progressId !== r.progress_id) return;       // moved on while it loaded
+      el.innerHTML = `<img alt="Work order ${esc(r.project_id)} sheet ${r.sheet_number}" src="${url}">`;
+      document.getElementById("printArea").innerHTML = `<img alt="" src="${url}">`;
+    } catch (e) {
+      el.innerHTML = `<div class="missing">${esc(isNetworkError(e) ? "No connection, and this page hasn't been opened on this tablet before. It will show once the connection is back." : friendlyError(e))}</div>`;
+    }
+  }
+
+  function setCount(r, qty) {
+    qty = Math.max(0, Math.min(r.qty_required, qty));
+    S.outbox = setPending(S.outbox, r.progress_id, qty);
+    store.set("outbox", S.outbox);
+    S.notice = null;
+    render();
+    flush();
+  }
+
+  function wire() {
+    app.querySelectorAll("[data-dept]").forEach(b => b.onclick = async () => {
+      S.dept = b.dataset.dept; store.set("dept", S.dept);
+      S.view = { screen: "queue" }; S.rows = (store.get("rows_" + S.dept, { rows: [] })).rows; render();
+      await loadRows(); render();
+    });
+    app.querySelectorAll("[data-job]").forEach(b => b.onclick = () => { S.view = { screen: "job", jobId: b.dataset.job }; render(); scrollTo(0, 0); });
+    app.querySelectorAll("[data-sheet]").forEach(b => b.onclick = () => { S.view = { screen: "sheet", jobId: S.view.jobId, progressId: b.dataset.sheet }; render(); scrollTo(0, 0); });
+    app.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => { if (b.dataset.goto) { S.view.progressId = b.dataset.goto; render(); scrollTo(0, 0); } });
+    app.querySelectorAll("[data-back]").forEach(b => b.onclick = async () => {
+      S.view = b.dataset.back === "queue" ? { screen: "queue" } : { screen: "job", jobId: S.view.jobId };
+      render();
+      if (b.dataset.back === "queue") { await loadRows(); render(); }
+    });
+    const current = () => rowsNow().find(x => x.progress_id === S.view.progressId);
+    app.querySelectorAll("[data-step]").forEach(b => b.onclick = () => { const r = current(); if (r) setCount(r, r.qty_done + Number(b.dataset.step)); });
+    app.querySelectorAll("[data-all]").forEach(b => b.onclick = () => { const r = current(); if (r) setCount(r, r.qty_required); });
+    app.querySelectorAll("[data-print]").forEach(b => b.onclick = () => window.print());
+    app.querySelectorAll("[data-pdf]").forEach(b => b.onclick = async () => {
+      const r = current(); if (!r) return;
+      const { data, error } = await db.storage.from("work-orders").createSignedUrl(r.pdf_path, 600);
+      if (error) { S.notice = friendlyError(error); render(); return; }
+      window.open(data.signedUrl, "_blank");
+    });
+    app.querySelectorAll("[data-signout]").forEach(b => b.onclick = async () => {
+      if (Object.keys(S.outbox).length && !confirm("Some counts haven't sent yet. Signing out will throw them away. Sign out anyway?")) return;
+      await db.auth.signOut();
+      S.me = null; S.outbox = {}; store.set("outbox", {}); store.set("me", null);
+      signIn();
+    });
+  }
+
+  function signIn(message) {
+    app.innerHTML = `<form class="signin" id="f">
+        <h1>Shop Floor</h1><p class="sub" style="margin:0">Sign in once — this tablet remembers you.</p>
+        <label for="e">Email</label><input id="e" type="email" autocomplete="username" required>
+        <label for="p">Password</label><input id="p" type="password" autocomplete="current-password" required>
+        <button class="go" id="g">Sign in</button>
+        <div class="banner warn" id="err" style="margin:14px 0 0" ${message ? "" : "hidden"}>${esc(message || "")}</div>
+      </form>`;
+    document.getElementById("f").onsubmit = async (ev) => {
+      ev.preventDefault();
+      const g = document.getElementById("g"); g.disabled = true;
+      const { data, error } = await db.auth.signInWithPassword({ email: document.getElementById("e").value.trim(), password: document.getElementById("p").value });
+      g.disabled = false;
+      if (error) { const e = document.getElementById("err"); e.textContent = friendlyError(error); e.hidden = false; return; }
+      start(data.user);
+    };
+  }
+
+  async function start(user) {
+    let me;
+    try { me = await loadMe(user); } catch (e) { return signIn(friendlyError(e)); }
+    if (!me) return signIn("This login has no role yet. In Supabase, give it one (walkthrough 1, step 8).");
+    if (!S.depts.length) return signIn("This login isn't assigned to a department yet. In Supabase, add one to its profile.");
+    const cached = store.get("rows_" + S.dept, null);
+    if (cached) { S.rows = cached.rows; S.rowsAt = cached.at; }
+    render();
+    await loadRows(); render();
+    flush();
+  }
+
+  // ---------- keep things current ----------
+  window.addEventListener("online", () => { S.online = true; flush(); loadRows().then(render); });
+  window.addEventListener("offline", () => { S.online = false; render(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && S.me) { flush(); if (S.view.screen === "queue") loadRows().then(render); } });
+  setInterval(() => { if (S.me && !document.hidden) { flush(); if (S.view.screen === "queue") loadRows().then(render); } }, 60000);
+
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+
+  db.auth.getSession().then(({ data }) => {
+    if (data.session) return start(data.session.user);
+    const me = store.get("me", null);             // offline, but signed in before
+    if (me && !navigator.onLine) { S.me = me; S.depts = departmentsFor(me); if (!S.depts.includes(S.dept)) S.dept = S.depts[0]; start({ id: me.id, email: me.email }); return; }
+    signIn();
+  });
+})();
+
+/* lets the core be tested outside a browser */
+if (typeof module !== "undefined") module.exports = { keyProblem, departmentsFor, withPending, buildQueue, jobSheets, pagerFor, daysLeft, daysText, fmtDate, setPending, flushOutbox, isNetworkError, friendlyError };
+</script>
+</body>
+</html>

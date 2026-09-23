@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#181D2E">
+<title>Office · Shop Floor</title>
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --midnight:#181D2E; --orange:#ED5E0F; --bright:#F0A721; --teal:#00B4B2;
+    --teal-ink:#00807E; --teal-bg:#DDF2F1; --sawdust:#FFF4D5; --gray:#C2BAA0;
+    --paper:#EFEDE6; --line:#E4DFCF; --ink2:#6B7082; --warn:#8A4B00;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0; background:var(--paper); color:var(--midnight)}
+  body{font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:17px; line-height:1.45}
+  button{font:inherit; color:inherit; cursor:pointer}
+  button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--bright); outline-offset:2px}
+  .num{font-family:'Barlow Condensed',sans-serif; font-variant-numeric:tabular-nums}
+  [hidden]{display:none!important}
+
+  .top{position:sticky; top:0; z-index:10; background:var(--midnight); color:var(--sawdust); padding:12px 24px 0}
+  .top-row{display:flex; align-items:center; gap:14px; padding-bottom:10px; flex-wrap:wrap}
+  .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.14em; color:var(--orange); font-size:17px}
+  .place{font-weight:600; font-size:18px}
+  .who{margin-left:auto; font-size:15px; color:#CFC9B8}
+  .who b{color:var(--sawdust)}
+  .lockbtn{background:#2C3348; border:none; color:var(--sawdust); border-radius:8px; padding:7px 14px; font-weight:600; font-size:15px}
+  .tabs{display:flex; gap:4px; overflow-x:auto}
+  .tab{background:none; border:none; color:#9AA0B4; padding:10px 16px 12px; font-weight:600; border-bottom:4px solid transparent; white-space:nowrap}
+  .tab[aria-current="true"]{color:var(--sawdust); border-bottom-color:var(--orange)}
+  .tab .n{font-family:'Barlow Condensed',sans-serif; margin-left:6px; color:var(--bright)}
+  @media (max-width: 520px){ .top{padding:10px 12px 0} .tab{padding:10px 11px 12px} main{padding:18px 14px 60px} }
+
+  main{max-width:1040px; margin:0 auto; padding:24px 20px 80px}
+  h1{font-size:28px; margin:0 0 4px}
+  h2{font-size:21px; margin:0 0 4px}
+  .sub{color:var(--ink2); margin:0 0 18px; max-width:70ch}
+  .banner{border-radius:10px; padding:12px 16px; margin-bottom:16px; font-weight:600}
+  .banner.warn{background:var(--sawdust); color:var(--warn); border-left:5px solid var(--bright)}
+  .banner.ok{background:var(--teal-bg); color:var(--teal-ink)}
+  .panel{background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px 22px; margin-bottom:18px}
+  .panel > .sub:last-child{margin-bottom:0}
+  .empty{border:1px dashed var(--gray); border-radius:12px; padding:28px 20px; text-align:center; color:var(--ink2); background:#fff}
+  .empty b{display:block; color:var(--midnight); font-size:19px; margin-bottom:4px}
+  .go{background:var(--orange); color:#fff; border:none; border-radius:9px; padding:12px 20px; font-weight:700}
+  .go:disabled{opacity:.45; cursor:default}
+  .plain{background:#fff; border:1px solid var(--gray); border-radius:9px; padding:10px 16px; font-weight:600}
+  .link{background:none; border:none; color:var(--ink2); text-decoration:underline; padding:6px}
+
+  /* your tasks */
+  .task{display:grid; grid-template-columns:1fr auto; gap:4px 18px; padding:14px 0; border-bottom:1px solid var(--line)}
+  .task:last-child{border-bottom:none}
+  .task .what{font-weight:700}
+  .task .what .pid{letter-spacing:.02em}
+  .task .detail{color:var(--ink2); font-size:15px; grid-column:1}
+  .task .when{grid-row:1 / span 2; grid-column:2; text-align:right; align-self:center}
+  .task .when .d{font-size:30px; font-weight:700; line-height:1}
+  .task .when .l{font-size:14px; color:var(--ink2)}
+
+  /* live switches */
+  .dept{display:flex; align-items:center; gap:16px; padding:14px 0; border-bottom:1px solid var(--line)}
+  .dept:last-child{border-bottom:none}
+  .dept .nm{font-weight:700; font-size:19px; min-width:150px}
+  .dept .hist{color:var(--ink2); font-size:14px; flex:1}
+  .switch{position:relative; width:64px; height:34px; border-radius:99px; border:2px solid var(--gray); background:var(--paper); flex-shrink:0; padding:0}
+  .switch::after{content:""; position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%; background:#fff; border:1px solid var(--gray); transition:left .15s}
+  .switch[aria-checked="true"]{background:var(--orange); border-color:var(--orange)}
+  .switch[aria-checked="true"]::after{left:33px; border-color:var(--orange)}
+  .switch:disabled{opacity:.5}
+  .state{width:44px; font-weight:700; font-size:15px}
+  @media (prefers-reduced-motion: reduce){ .switch::after{transition:none} }
+
+  /* setup */
+  .facts{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px 18px; margin:10px 0 0}
+  .fact{border-top:1px solid var(--line); padding-top:8px}
+  .fact .k{font-size:14px; color:var(--ink2)}
+  .fact .v{font-weight:600}
+  .fact .v.missing{color:var(--warn)}
+  table.rules{border-collapse:collapse; width:100%; margin:6px 0 18px; font-size:15px}
+  .rules caption{text-align:left; font-weight:700; font-size:17px; padding:8px 0 6px}
+  .rules th,.rules td{border-bottom:1px solid var(--line); padding:7px 8px; text-align:center}
+  .rules th{font-weight:600; color:var(--ink2); font-size:14px}
+  .rules td:first-child,.rules th:first-child{text-align:left}
+  .rules input{width:22px; height:22px; accent-color:var(--orange)}
+  .rules .changed{color:var(--ink2); font-size:13px}
+  .scroll{overflow-x:auto}
+  .cu{display:flex; gap:14px; align-items:flex-start; padding:12px 0; border-bottom:1px solid var(--line)}
+  .cu:last-child{border-bottom:none}
+  .cu input{width:24px; height:24px; margin-top:2px; accent-color:var(--orange); flex-shrink:0}
+  .cu .body{flex:1}
+  .cu .t{font-weight:700}
+  .cu .m{color:var(--ink2); font-size:15px}
+  .cu .l{font-size:15px}
+  .cu.none .t,.cu.none .l{color:var(--ink2); font-weight:500}
+  .bar-actions{display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:14px}
+  .result{margin-top:14px}
+  .result ul{margin:6px 0 0 18px; padding:0}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  select{font:inherit; padding:10px 12px; border:1px solid var(--gray); border-radius:9px; background:#fff; min-width:280px}
+  .tj{display:flex; align-items:center; gap:14px; padding:10px 0; border-bottom:1px solid var(--line)}
+  .tj:last-child{border-bottom:none}
+  .tag{border:1.5px solid var(--midnight); border-radius:4px; font-size:12px; font-weight:700; letter-spacing:.06em; padding:1px 5px}
+  .tj .nm{flex:1}
+  .tj .nm span{color:var(--ink2)}
+
+  /* sign in and PIN */
+  .card{max-width:440px; margin:8vh auto 0; background:#fff; border:1px solid var(--line); border-radius:14px; padding:26px}
+  .card label{display:block; font-weight:600; margin:14px 0 4px}
+  .card input{width:100%; font:inherit; padding:13px; border:1px solid var(--gray); border-radius:10px}
+  .card .go{width:100%; margin-top:18px; padding:15px}
+  .pinwrap{max-width:340px; margin:8vh auto 0; text-align:center}
+  .dots{display:flex; justify-content:center; gap:16px; margin:18px 0 22px}
+  .dot{width:18px; height:18px; border-radius:50%; border:2px solid var(--midnight)}
+  .dot.on{background:var(--midnight)}
+  .pad{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+  .key{background:#fff; border:1px solid var(--gray); border-radius:12px; padding:16px 0; font-size:26px; font-weight:700}
+  .key.small{font-size:16px}
+  .alarm{max-width:560px; margin:8vh auto 0; background:var(--midnight); color:var(--sawdust); border-radius:14px; padding:24px}
+  .alarm h1{color:var(--bright)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* =====================================================================
+   THE TWO SETTINGS — the same two lines as upload.html and index.html.
+   Publishable key only. NEVER the secret key — this file is public.
+   ===================================================================== */
+const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
+const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
+
+/* How long the office view waits, untouched, before asking for the PIN again. */
+const LOCK_AFTER_MINUTES = 15;
+
+
+/* ---- core: no screen code in here, so it can be tested on its own ---- */
+
+const DEPT_ORDER = ["milling", "cnc", "sanding", "finishing", "full_custom", "metal", "assembly_qc"];
+const DEPT_NAME = { milling: "Milling", cnc: "CNC", sanding: "Sanding", finishing: "Finishing",
+                    full_custom: "Full Custom", metal: "Metal", assembly_qc: "Assembly / QC" };
+
+function keyProblem(url, key) {
+  if (!url || !key || url.includes("PASTE-") || key.includes("PASTE-"))
+    return { secret: false, text: "The project address and key haven't been filled in yet. Copy the two SUPABASE lines from upload.html into this file." };
+  const secret = { secret: true, text: "This is the SECRET key, not the publishable one. It bypasses every security rule, and this file is public. Take it out of the file now and use the publishable key — the same one upload.html has. If this file was already put on GitHub with it, create a new secret key in Supabase so the old one stops working." };
+  if (key.startsWith("sb_secret_")) return secret;
+  const parts = key.split(".");
+  if (parts.length === 3) {
+    try { if (JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))).role === "service_role") return secret; }
+    catch (e) { /* not a readable token */ }
+  }
+  if (!/^https:\/\//.test(url)) return { secret: false, text: "The project address should start with https:// — copy it from upload.html." };
+  return null;
+}
+
+function isManager(me) { return !!me && (me.role === "manager" || me.role === "admin"); }
+
+function daysLeft(iso, today = new Date()) {
+  if (!iso) return null;
+  const [y, m, d] = iso.split("-").map(Number);
+  const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((new Date(y, m - 1, d) - t) / 86400000);
+}
+function fmtDate(iso) {
+  if (!iso) return "no date";
+  const [y, m, d] = iso.split("-").map(Number);
+  return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m - 1] + " " + d;
+}
+function daysText(n) {
+  if (n === null) return "";
+  if (n < 0) return `${-n} day${n === -1 ? "" : "s"} late`;
+  if (n === 0) return "due today";
+  return `${n} day${n === 1 ? "" : "s"} left`;
+}
+function ago(ts, now = new Date()) {
+  if (!ts) return "never";
+  const mins = Math.round((now - new Date(ts)) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const h = Math.round(mins / 60);
+  if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
+  const d = Math.round(h / 24);
+  return `${d} day${d === 1 ? "" : "s"} ago`;
+}
+
+/** Handoff tasks, soonest delivery first; jobs with no date go last. */
+function buildTasks(rows, today = new Date()) {
+  return [...(rows || [])]
+    .map(r => ({ ...r, days: daysLeft(r.delivery_date, today) }))
+    .sort((a, b) => (a.delivery_date || "9999").localeCompare(b.delivery_date || "9999")
+                 || String(a.project_id).localeCompare(String(b.project_id)));
+}
+
+/** The latest change per department, from the switch history. */
+function lastChanges(log) {
+  const out = {};
+  for (const r of [...(log || [])].sort((a, b) => String(b.changed_at).localeCompare(String(a.changed_at))))
+    if (!out[r.department]) out[r.department] = r;
+  return out;
+}
+
+/** Catch-up rules, grouped by Monday column in the board's own order. */
+function groupRules(rules, columns) {
+  const cols = (columns || []).filter(c => c.key !== "handed_off" && c.column_id).sort((a, b) => a.sort_order - b.sort_order);
+  return cols.map(c => {
+    const order = (c.labels || []);
+    const rows = (rules || []).filter(r => r.column_key === c.key)
+      .sort((a, b) => (order.indexOf(a.label) + 1 || 999) - (order.indexOf(b.label) + 1 || 999) || a.label.localeCompare(b.label));
+    return { key: c.key, what: c.what, title: c.title, rows };
+  });
+}
+
+/** Which departments a catch-up rule column offers as tick boxes. */
+function ruleDepartments(columnKey) {
+  if (columnKey === "wood") return ["milling", "cnc", "sanding", "finishing"];
+  if (columnKey === "assembly_qc") return ["milling", "cnc", "sanding", "finishing", "full_custom", "metal", "assembly_qc"];
+  return [columnKey];
+}
+
+/** What "Apply ticked" would do, for the confirm message. */
+function catchUpTotals(preview, ticked) {
+  const chosen = (preview || []).filter(p => p.pieces_to_fill > 0 && ticked.has(p.job_id));
+  return { jobs: chosen.length, pieces: chosen.reduce((a, p) => a + p.pieces_to_fill, 0), ids: chosen.map(p => p.job_id) };
+}
+
+/* A device PIN: a speed bump on a shared computer, NOT security — the
+   database decides what a login can do. It's stored on this device only. */
+function pinHash(pin, salt) {
+  let h = 2166136261;
+  for (const c of String(salt) + ":" + String(pin)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(16);
+}
+function validPin(pin) { return /^\d{4}$/.test(String(pin)); }
+
+function isNetworkError(err) {
+  const m = String((err && (err.message || err.details)) || err || "");
+  return /failed to fetch|networkerror|load failed|network request failed|fetch failed|timeout|aborted/i.test(m);
+}
+
+function friendlyError(err) {
+  const m = String((err && (err.message || err.error_description || err.error)) || err || "");
+  if (isNetworkError(err)) return "Can't reach the database right now. Check the connection and try again.";
+  if (/invalid login credentials/i.test(m)) return "That email and password didn't match. Check them and try again.";
+  if (/email not confirmed/i.test(m)) return "This login hasn't been confirmed. In Supabase → Authentication → Users, check it was created with Auto Confirm ticked.";
+  if (/jwt expired|refresh token/i.test(m)) return "The sign-in has expired. Sign out and back in.";
+  if (/could not find the function|does not exist|schema cache/i.test(m)) return "The database doesn't have this part yet. Run the SQL file for it in Supabase (see the walkthrough), then reload this page.";
+  return m || "Something went wrong. Try again, and if it keeps happening, take a screenshot.";
+}
+
+/* ---- end core ---- */
+
+
+/* ---- the screen ---- */
+if (typeof document !== "undefined") (function () {
+  const app = document.getElementById("app");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("sfo_" + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem("sfo_" + k, JSON.stringify(v)); } catch (e) {} },
+  };
+
+  const problem = keyProblem(SUPABASE_URL, SUPABASE_KEY);
+  if (problem) {
+    app.innerHTML = `<div class="alarm"><h1>${problem.secret ? "Stop — wrong key in this file" : "This page isn't set up yet"}</h1><p>${esc(problem.text)}</p></div>`;
+    return;
+  }
+
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const S = {
+    me: null, tab: store.get("tab", "tasks"), notice: null,
+    tasks: [], depts: [], liveLog: [], names: {},
+    columns: [], lastSync: null, rules: [], preview: null, ticked: new Set(), cuResult: null,
+    uploaded: [], testMsg: null, busy: false,
+    locked: false, pinEntry: "", pinBad: 0,
+  };
+
+  // ---------- data ----------
+  const q = async (p) => { const { data, error } = await p; if (error) throw error; return data; };
+
+  async function loadTab() {
+    S.notice = null;
+    try {
+      if (S.tab === "tasks") {
+        S.tasks = await q(db.from("v_handoff_tasks").select("*"));
+        S.columns = await q(db.from("monday_columns").select("*"));
+      } else if (S.tab === "departments") {
+        S.depts = await q(db.from("departments").select("key, name, sort_order, is_live").order("sort_order"));
+        S.liveLog = await q(db.from("department_live_log").select("*").order("changed_at", { ascending: false }).limit(50));
+        const people = await q(db.from("profiles").select("id, full_name"));
+        S.names = Object.fromEntries((people || []).map(p => [p.id, p.full_name]));
+      } else if (S.tab === "setup") {
+        S.columns = await q(db.from("monday_columns").select("*"));
+        const log = await q(db.from("monday_sync_log").select("run_at, ok, summary, problems").order("run_at", { ascending: false }).limit(1));
+        S.lastSync = (log || [])[0] || null;
+        S.uploaded = await q(db.from("v_uploaded_jobs").select("*"));
+        if (S.preview === null) await loadPreview();
+        else S.rules = await q(db.from("monday_stage_map").select("*"));
+      }
+    } catch (e) { S.notice = friendlyError(e); }
+  }
+
+  async function loadPreview() {
+    const { data, error } = await db.rpc("catch_up_preview");
+    if (error) { S.notice = friendlyError(error); S.preview = []; return; }
+    S.preview = data || [];
+    S.ticked = new Set(S.preview.filter(p => p.pieces_to_fill > 0).map(p => p.job_id));   // every job ticked by default
+    S.rules = await q(db.from("monday_stage_map").select("*"));
+  }
+
+  // ---------- screens ----------
+  function topBar() {
+    const n = S.tasks.length;
+    const tabs = [["tasks", "Your tasks", n ? `<span class="n">${n}</span>` : ""], ["departments", "Departments", ""], ["setup", "Setup", ""]];
+    return `<header class="top"><div class="top-row">
+        <span class="brand">SHOP FLOOR</span><span class="place">Office</span>
+        <span class="who"><b>${esc(S.me.name)}</b></span>
+        ${(store.get("pin", null) || {}).hash ? `<button class="lockbtn" data-lock="1">Lock</button>` : ""}
+      </div><nav class="tabs">${tabs.map(([k, label, extra]) =>
+        `<button class="tab" data-tab="${k}" aria-current="${S.tab === k}">${label}${extra}</button>`).join("")}</nav></header>`;
+  }
+
+  function tasksScreen() {
+    const ho = S.columns.find(c => c.key === "handed_off");
+    const connected = ho && ho.column_id && (ho.col_type === "checkbox" || ho.yes_label);
+    const list = buildTasks(S.tasks);
+    let body;
+    if (!connected) {
+      body = `<div class="banner warn">The Handed Off column hasn't been found on the Monday board yet, so this list can't be worked out. In the Supabase SQL Editor, run <b>select * from setup_monday_columns();</b> and then <b>select run_monday_sync();</b></div>`;
+    } else if (!list.length) {
+      body = `<div class="empty"><b>Nothing to hand off</b>Every Pre-Production and In Production job is marked Handed Off in Monday.</div>`;
+    } else {
+      body = `<div class="panel">${list.map(t => `
+        <div class="task">
+          <div class="what">Prepare <span class="pid">${esc(t.project_id)}</span> for handoff</div>
+          <div class="when">${t.days === null ? `<div class="l">no delivery date</div>`
+              : `<div class="d num">${Math.abs(t.days)}</div><div class="l">${t.days < 0 ? "days late" : t.days === 1 ? "day left" : "days left"}</div>`}</div>
+          <div class="detail">${esc(t.job_name)} · ${esc(t.phase)} · due ${esc(fmtDate(t.delivery_date))}${t.handed_off_text ? ` · Monday says “${esc(t.handed_off_text)}”` : ""}</div>
+        </div>`).join("")}</div>`;
+    }
+    return `<h1>Your tasks</h1>
+      <p class="sub">Jobs in Pre-Production or In Production that Monday doesn't show as Handed Off, soonest delivery first. A task clears by itself within 15 minutes of Handed Off being set to Yes in Monday.</p>
+      ${body}`;
+  }
+
+  function departmentsScreen() {
+    const last = lastChanges(S.liveLog);
+    const live = S.depts.filter(d => d.is_live).map(d => d.name);
+    return `<h1>Departments</h1>
+      <p class="sub">Which departments are live on the floor. The TV shows live departments only — right now: <b>${esc(live.join(", ") || "none")}</b>. Every department's tablet queue works whether it's live or not. Going live is flipping the switch, creating the supervisor's login, and handing over a tablet.</p>
+      <div class="panel">${S.depts.map(d => {
+        const l = last[d.key];
+        return `<div class="dept">
+          <span class="nm">${esc(d.name)}</span>
+          <button class="switch" role="switch" aria-checked="${d.is_live}" aria-label="${esc(d.name)} live" data-live="${esc(d.key)}" ${S.busy ? "disabled" : ""}></button>
+          <span class="state">${d.is_live ? "Live" : "Off"}</span>
+          <span class="hist">${l ? `Switched ${l.is_live ? "on" : "off"} by ${esc(S.names[l.changed_by] || "someone")}, ${esc(ago(l.changed_at))}` : ""}</span>
+        </div>`;
+      }).join("")}</div>`;
+  }
+
+  function setupScreen() {
+    const cols = [...S.columns].sort((a, b) => a.sort_order - b.sort_order);
+    const colFacts = cols.map(c => `<div class="fact"><div class="k">${esc(c.what)}</div>
+      <div class="v${c.column_id ? "" : " missing"}">${c.column_id ? `“${esc(c.title)}”` : "Not found yet"}</div></div>`).join("");
+    const sync = S.lastSync
+      ? `<p class="sub" style="margin:0">Last sync ${esc(ago(S.lastSync.run_at))}: ${esc(S.lastSync.summary)}</p>`
+      : `<p class="sub" style="margin:0">The sync hasn't run yet.</p>`;
+
+    // catch-up rules
+    const groups = groupRules(S.rules, S.columns);
+    const rulesHtml = groups.length ? groups.map(g => {
+      const depts = ruleDepartments(g.key);
+      return `<div class="scroll"><table class="rules"><caption>When Monday's ${esc(g.title || g.what)} says…</caption>
+        <tr><th>Label</th>${depts.map(d => `<th>${esc(DEPT_NAME[d])}</th>`).join("")}<th></th></tr>
+        ${g.rows.map(r => `<tr><td>${esc(r.label)}</td>${depts.map(d =>
+          `<td><input type="checkbox" aria-label="${esc(r.label)}: ${esc(DEPT_NAME[d])} done" data-rule="${esc(g.key)}" data-label="${esc(r.label)}" data-dept="${d}" ${(r.departments || []).includes(d) ? "checked" : ""}></td>`).join("")}
+          <td class="changed">${r.set_by ? "changed" : "suggested"}</td></tr>`).join("")}
+      </table></div>`;
+    }).join("") : `<div class="banner warn">No stage columns found yet. Run <b>select * from setup_monday_columns();</b> in the SQL Editor, then <b>select run_monday_sync();</b></div>`;
+
+    // catch-up preview
+    const pv = S.preview || [];
+    const t = catchUpTotals(pv, S.ticked);
+    const previewHtml = !pv.length ? `<div class="empty"><b>No uploaded jobs in production</b>Upload work orders first; they'll appear here.</div>`
+      : pv.map(p => {
+          const can = p.pieces_to_fill > 0;
+          return `<label class="cu${can ? "" : " none"}">
+            <input type="checkbox" data-tick="${esc(p.job_id)}" ${can ? "" : "disabled"} ${can && S.ticked.has(p.job_id) ? "checked" : ""}>
+            <span class="body"><span class="t">${esc(p.project_id)}</span> <span class="m">${esc(p.job_name)}</span><br>
+              <span class="m">Monday: ${esc(p.monday_says)}</span><br><span class="l">${esc(p.line)}</span></span>
+          </label>`;
+        }).join("");
+    const result = S.cuResult ? `<div class="result banner ${S.cuResult.ok ? "ok" : "warn"}">${esc(S.cuResult.summary)}
+        ${(S.cuResult.lines || []).length ? `<ul>${S.cuResult.lines.map(l => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}</div>` : "";
+
+    // test jobs
+    const real = S.uploaded.filter(u => !u.is_test && u.is_active).sort((a, b) => a.project_id.localeCompare(b.project_id));
+    const tests = S.uploaded.filter(u => u.is_test && u.is_active).sort((a, b) => a.project_id.localeCompare(b.project_id));
+
+    return `<h1>Setup</h1>
+      <p class="sub">Things done once, or now and then: the Monday connection, catching the floor up with Monday, and test jobs for trying things safely.</p>
+
+      <section class="panel">
+        <h2>Monday connection</h2>
+        ${sync}
+        <div class="facts">${colFacts}</div>
+      </section>
+
+      <section class="panel">
+        <h2>Catch up from Monday</h2>
+        <p class="sub">For jobs already partway through the shop when their work order was uploaded. It reads the stage Monday shows and marks the departments <b>before</b> that stage as complete. It only fills counts that are still at zero, never lowers one, and skips anything a supervisor has counted. The stage Monday names is left for the supervisor to enter.</p>
+        <details ${groups.length && !groups.some(g => g.rows.some(r => r.set_by)) ? "open" : ""}>
+          <summary style="cursor:pointer; font-weight:600; margin-bottom:8px">The rules: which departments count as done for each Monday label</summary>
+          <p class="sub">Ticks save as you make them. They start as suggestions; nothing is applied until you press Apply below.</p>
+          ${rulesHtml}
+        </details>
+        <h2 style="margin-top:18px">Preview</h2>
+        <p class="sub">Every job with work to fill is ticked. Untick any that look wrong.</p>
+        <div>${previewHtml}</div>
+        <div class="bar-actions">
+          <button class="go" data-apply="1" ${t.jobs && !S.busy ? "" : "disabled"}>Apply ticked — ${t.jobs} job${t.jobs === 1 ? "" : "s"}, ${t.pieces} pieces</button>
+          <button class="plain" data-refresh="1">Refresh the preview</button>
+        </div>
+        ${result}
+      </section>
+
+      <section class="panel">
+        <h2>Test jobs</h2>
+        <p class="sub">A copy of a real job with every count at zero, for trying things on a tablet signed in as the Test Supervisor. Test jobs are invisible to real supervisors, stay off the TV and out of Monday, and are labelled TEST.</p>
+        <div class="row">
+          <select id="copyFrom" aria-label="Job to copy">${real.length ? real.map(u => `<option value="${esc(u.project_id)}">${esc(u.project_id)} · ${esc(u.job_name)}</option>`).join("") : `<option value="">No uploaded jobs yet</option>`}</select>
+          <button class="go" data-maketest="1" ${real.length && !S.busy ? "" : "disabled"}>Make a test copy</button>
+        </div>
+        ${S.testMsg ? `<div class="banner ${S.testMsg.ok ? "ok" : "warn"}" style="margin:12px 0 0">${esc(S.testMsg.text)}</div>` : ""}
+        <div style="margin-top:12px">${tests.length ? tests.map(u => `<div class="tj">
+            <span class="tag">TEST</span><span class="nm"><b>${esc(u.project_id)}</b> <span>${esc(u.job_name)} · ${u.sheets} sheets, ${u.pieces} pieces</span></span>
+            <button class="plain" data-retire="${esc(u.project_id)}">Retire</button></div>`).join("")
+          : `<p class="sub" style="margin:0">No test jobs at the moment.</p>`}</div>
+      </section>`;
+  }
+
+  function render() {
+    if (!S.me) return;
+    if (S.locked) return pinScreen("unlock");
+    const body = S.tab === "departments" ? departmentsScreen() : S.tab === "setup" ? setupScreen() : tasksScreen();
+    app.innerHTML = topBar() + `<main>${S.notice ? `<div class="banner warn">${esc(S.notice)}</div>` : ""}${body}
+      <p style="text-align:center; margin-top:30px"><button class="link" data-signout="1">Sign out</button></p></main>`;
+    wire();
+  }
+
+  function wire() {
+    app.querySelectorAll("[data-tab]").forEach(b => b.onclick = async () => {
+      S.tab = b.dataset.tab; store.set("tab", S.tab); render(); await loadTab(); render();
+    });
+    app.querySelectorAll("[data-lock]").forEach(b => b.onclick = () => { S.locked = true; S.pinEntry = ""; render(); });
+    app.querySelectorAll("[data-live]").forEach(b => b.onclick = async () => {
+      const d = S.depts.find(x => x.key === b.dataset.live); if (!d) return;
+      const turnOn = !d.is_live;
+      if (!confirm(`${turnOn ? "Switch" : "Take"} ${d.name} ${turnOn ? "live" : "off"}? ${turnOn ? "The TV will start showing it." : "The TV will stop showing it."}`)) return;
+      S.busy = true; render();
+      const { error } = await db.rpc("set_department_live", { p_department: d.key, p_live: turnOn });
+      S.busy = false;
+      if (error) S.notice = friendlyError(error);
+      await loadTab(); render();
+    });
+    app.querySelectorAll("[data-rule]").forEach(box => box.onchange = async () => {
+      const key = box.dataset.rule, label = box.dataset.label;
+      const depts = [...app.querySelectorAll("[data-rule]")].filter(x => x.dataset.rule === key && x.dataset.label === label && x.checked).map(x => x.dataset.dept);
+      const { error } = await db.rpc("set_stage_map", { p_column: key, p_label: label, p_departments: depts });
+      if (error) { S.notice = friendlyError(error); render(); return; }
+      S.cuResult = null;
+      await loadPreview(); render();
+    });
+    app.querySelectorAll("[data-tick]").forEach(box => box.onchange = () => {
+      box.checked ? S.ticked.add(box.dataset.tick) : S.ticked.delete(box.dataset.tick);
+      render();
+    });
+    app.querySelectorAll("[data-refresh]").forEach(b => b.onclick = async () => { S.cuResult = null; await loadPreview(); render(); });
+    app.querySelectorAll("[data-apply]").forEach(b => b.onclick = async () => {
+      const t = catchUpTotals(S.preview, S.ticked);
+      if (!t.jobs || !confirm(`Mark ${t.pieces} pieces complete across ${t.jobs} job${t.jobs === 1 ? "" : "s"}? Each one is recorded as "Catch-up from Monday" under your name. Counts can be corrected afterwards on a tablet, but the record stays.`)) return;
+      S.busy = true; render();
+      const { data, error } = await db.rpc("catch_up_apply", { p_jobs: t.ids });
+      S.busy = false;
+      S.cuResult = error ? { ok: false, summary: friendlyError(error) } : data;
+      await loadPreview(); render();
+    });
+    app.querySelectorAll("[data-maketest]").forEach(b => b.onclick = async () => {
+      const from = document.getElementById("copyFrom").value; if (!from) return;
+      S.busy = true; render();
+      const { data, error } = await db.rpc("make_test_job", { p_project: from });
+      S.busy = false;
+      S.testMsg = error ? { ok: false, text: friendlyError(error) } : { ok: true, text: data.summary + " Sign in on a tablet as the Test Supervisor to see it." };
+      await loadTab(); render();
+    });
+    app.querySelectorAll("[data-retire]").forEach(b => b.onclick = async () => {
+      if (!confirm(`Retire ${b.dataset.retire}? It leaves the test tablet; its history is kept.`)) return;
+      const { data, error } = await db.rpc("retire_test_job", { p_project: b.dataset.retire });
+      S.testMsg = error ? { ok: false, text: friendlyError(error) } : { ok: true, text: data };
+      await loadTab(); render();
+    });
+    app.querySelectorAll("[data-signout]").forEach(b => b.onclick = async () => {
+      await db.auth.signOut(); S.me = null; store.set("pin", null); signIn();
+    });
+  }
+
+  // ---------- PIN ----------
+  function pinScreen(mode) {   // mode: "set" | "unlock"
+    const title = mode === "set" ? "Set a PIN for this computer" : "Office";
+    const sub = mode === "set"
+      ? (S.pinFirst ? "Enter the same four digits again." : "Four digits. The office view locks after " + LOCK_AFTER_MINUTES + " minutes untouched, and asks for it.")
+      : (S.pinBad ? "That PIN was wrong. Try again." : "Enter your PIN.");
+    const keys = [1, 2, 3, 4, 5, 6, 7, 8, 9, "clear", 0, "back"];
+    app.innerHTML = `<div class="pinwrap"><h1>${esc(title)}</h1><p class="sub" id="pinsub" style="margin:0">${esc(sub)}</p>
+      <div class="dots">${[0, 1, 2, 3].map(i => `<span class="dot${S.pinEntry.length > i ? " on" : ""}"></span>`).join("")}</div>
+      <div class="pad">${keys.map(k => k === "clear" ? `<button class="key small" data-k="clear">Clear</button>`
+          : k === "back" ? `<button class="key small" data-k="back">⌫</button>` : `<button class="key num" data-k="${k}">${k}</button>`).join("")}</div>
+      <p>${mode === "set" ? `<button class="link" data-nopin="1">This is my own computer — no PIN</button>`
+          : `<button class="link" data-forgot="1">Forgot the PIN? Sign in again</button>`}</p></div>`;
+    app.querySelectorAll("[data-k]").forEach(b => b.onclick = () => pinKey(mode, b.dataset.k));
+    app.querySelectorAll("[data-nopin]").forEach(b => b.onclick = () => { store.set("pin", { none: true }); S.locked = false; openOffice(); });
+    app.querySelectorAll("[data-forgot]").forEach(b => b.onclick = async () => { await db.auth.signOut(); S.me = null; store.set("pin", null); S.locked = false; signIn(); });
+  }
+  function pinKey(mode, k) {
+    if (k === "clear") S.pinEntry = "";
+    else if (k === "back") S.pinEntry = S.pinEntry.slice(0, -1);
+    else if (S.pinEntry.length < 4) S.pinEntry += k;
+    if (S.pinEntry.length < 4) return pinScreen(mode);
+    const entered = S.pinEntry; S.pinEntry = "";
+    if (mode === "set") {
+      if (!S.pinFirst) { S.pinFirst = entered; return pinScreen("set"); }
+      if (S.pinFirst !== entered) { S.pinFirst = null; pinScreen("set"); document.getElementById("pinsub").textContent = "Those didn't match. Start again."; return; }
+      const salt = Math.random().toString(36).slice(2);
+      store.set("pin", { salt, hash: pinHash(entered, salt) }); S.pinFirst = null; S.locked = false;
+      return openOffice();
+    }
+    const saved = store.get("pin", null);
+    if (saved && saved.hash === pinHash(entered, saved.salt)) { S.locked = false; S.pinBad = 0; touch(); render(); return; }
+    S.pinBad += 1;
+    if (S.pinBad >= 5) { db.auth.signOut(); S.me = null; store.set("pin", null); S.locked = false; S.pinBad = 0; return signIn("Five wrong PINs, so this computer was signed out. Sign in again."); }
+    pinScreen("unlock");
+  }
+  let lastTouch = Date.now();
+  function touch() { lastTouch = Date.now(); }
+  ["click", "keydown", "pointerdown"].forEach(ev => document.addEventListener(ev, touch, true));
+  setInterval(() => {
+    const p = store.get("pin", null);
+    if (S.me && p && p.hash && !S.locked && Date.now() - lastTouch > LOCK_AFTER_MINUTES * 60000) { S.locked = true; S.pinEntry = ""; render(); }
+  }, 20000);
+
+  // ---------- sign in ----------
+  function signIn(message) {
+    app.innerHTML = `<form class="card" id="f">
+        <h1>Office</h1><p class="sub" style="margin:0">Sign in with your manager login.</p>
+        <label for="e">Email</label><input id="e" type="email" autocomplete="username" required>
+        <label for="p">Password</label><input id="p" type="password" autocomplete="current-password" required>
+        <button class="go" id="g">Sign in</button>
+        <div class="banner warn" id="err" style="margin:14px 0 0" ${message ? "" : "hidden"}>${esc(message || "")}</div>
+      </form>`;
+    document.getElementById("f").onsubmit = async (ev) => {
+      ev.preventDefault();
+      const g = document.getElementById("g"); g.disabled = true;
+      const { data, error } = await db.auth.signInWithPassword({ email: document.getElementById("e").value.trim(), password: document.getElementById("p").value });
+      g.disabled = false;
+      if (error) { const e = document.getElementById("err"); e.textContent = friendlyError(error); e.hidden = false; return; }
+      start(data.user, true);
+    };
+  }
+
+  async function start(user, justSignedIn) {
+    const { data, error } = await db.from("profiles").select("*").eq("id", user.id).maybeSingle();
+    if (error) return signIn(friendlyError(error));
+    if (!data) return signIn("This login has no profile yet. In Supabase, give it one.");
+    if (!isManager({ role: data.role })) {
+      await db.auth.signOut();
+      return signIn(`${data.full_name} is a ${data.role} login. The office view is for managers — supervisors use the tablet app.`);
+    }
+    S.me = { id: user.id, name: data.full_name, role: data.role };
+    const pin = store.get("pin", null);
+    if (!pin) return pinScreen("set");
+    if (pin.hash && !justSignedIn) { S.locked = true; return pinScreen("unlock"); }
+    openOffice();
+  }
+
+  async function openOffice() {
+    touch();
+    render();
+    await loadTab();
+    if (S.tab !== "tasks") { try { S.tasks = await q(db.from("v_handoff_tasks").select("*")); } catch (e) {} }
+    render();
+  }
+
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && S.me && !S.locked && S.tab === "tasks") loadTab().then(render); });
+
+  db.auth.getSession().then(({ data }) => data.session ? start(data.session.user, false) : signIn());
+})();
+
+/* lets the core be tested outside a browser */
+if (typeof module !== "undefined") module.exports = { keyProblem, isManager, daysLeft, fmtDate, daysText, ago, buildTasks, lastChanges, groupRules, ruleDepartments, catchUpTotals, pinHash, validPin, isNetworkError, friendlyError };
+</script>
+</body>
+</html>
