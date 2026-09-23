@@ -2,7 +2,7 @@
    Pages: fetched fresh when there's a connection (so updates arrive), the
    saved copy when there isn't. Library, fonts and icons: saved copy first.
    Database requests are never touched — the app handles those itself. */
-const SHELL = "shop-floor-shell-v1";
+const SHELL = "shop-floor-shell-v2";   // v2: the manifest no longer overrides the tablet's rotation lock
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
