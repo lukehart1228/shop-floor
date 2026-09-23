@@ -164,6 +164,33 @@
   .hist div{padding:3px 0}
   .linkish{background:none; border:none; color:var(--ink2); text-decoration:underline; padding:6px 0; font-size:15px}
 
+  /* photos */
+  .phs{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
+  .ph{position:relative; width:96px; height:96px; padding:0; border:1px solid var(--line); border-radius:9px; overflow:hidden; background:var(--paper); flex-shrink:0}
+  .ph img{display:block; width:100%; height:100%; object-fit:cover}
+  .ph .cap{position:absolute; left:0; right:0; bottom:0; background:rgba(24,29,46,.78); color:var(--sawdust); font-size:12px; font-weight:600; padding:2px 5px; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .ph .x{position:absolute; top:3px; right:3px; width:30px; height:30px; border-radius:50%; border:none; background:rgba(24,29,46,.8); color:#fff; font-weight:700; line-height:30px; padding:0}
+  .ph.nofile{display:flex; align-items:center; justify-content:center; text-align:center; font-size:12px; color:var(--ink2); padding:4px}
+  .addph{display:flex; align-items:center; gap:10px; background:#fff; border:1.5px dashed var(--gray); border-radius:10px; padding:12px 16px; font-weight:700; min-height:52px; margin-top:12px; width:100%; text-align:left}
+  .addph small{font-weight:500; color:var(--ink2)}
+  .viewer{background:var(--midnight); border-radius:14px; width:100%; max-width:900px; max-height:94vh; overflow:auto; padding:14px; color:var(--sawdust)}
+  .viewer img{display:block; max-width:100%; max-height:72vh; margin:0 auto; border-radius:6px}
+  .viewer .vcap{margin:10px 2px 0; font-size:16px}
+  .viewer .vcap small{display:block; color:#CFC9B8; font-size:14px}
+  .viewer .mdl-btns button{background:#2C3348; color:var(--sawdust); border:none}
+
+  /* load-out */
+  .lohead{background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:14px}
+  .lohead .big{font-size:44px; font-weight:700; line-height:.9}
+  .lohead .of{color:var(--ink2)}
+  .losheets{display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:10px; margin-bottom:14px}
+  .losheet{background:#fff; border:1.5px solid var(--gray); border-radius:12px; padding:12px; text-align:left; min-height:84px}
+  .losheet .no{font-size:28px; font-weight:700; line-height:1}
+  .losheet small{display:block; color:var(--ink2); font-size:13px; font-weight:600; margin-top:4px}
+  .losheet.here{background:var(--teal-bg); border-color:transparent}
+  .losheet.here .no, .losheet.here small{color:var(--teal-ink)}
+  .losheet.earlier{background:var(--paper); border-style:dashed}
+
   /* forms */
   label.f{display:block; font-weight:700; margin:14px 0 6px}
   .in,textarea.in{width:100%; font:inherit; padding:14px; border:1px solid var(--gray); border-radius:10px; background:#fff; color:var(--midnight)}
@@ -229,6 +256,8 @@
 <body>
 <div id="app"></div>
 <div id="printArea"></div>
+<!-- the camera: a plain file input that opens the tablet's rear camera -->
+<input type="file" id="camera" accept="image/*" capture="environment" hidden>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
@@ -250,7 +279,8 @@ const DEPT_NAME = Object.fromEntries(DEPTS);
 /* Delivery is log-only for now: no work orders to count, no supplies tab. */
 const LOG_ONLY = ["delivery"];
 const ARROW_DEPTS = ["metal", "assembly_qc", "delivery"];
-const TAB_NAME = { work: "Work orders", problems: "Problems", log: "Log", supplies: "Supplies" };
+const TAB_NAME = { work: "Work orders", problems: "Problems", log: "Log", supplies: "Supplies", loadout: "Load-out" };
+const PHOTO_MAX_EACH = 3;          // photos on one defect, problem or reply, from the tablet
 
 function keyProblem(url, key) {
   if (!url || !key || url.includes("PASTE-") || key.includes("PASTE-"))
@@ -274,7 +304,10 @@ function departmentsFor(me) {
 }
 const isLogOnly = (dept) => LOG_ONLY.includes(dept);
 /** The areas a department's tablet has. */
-function tabsFor(dept) { return isLogOnly(dept) ? ["problems", "log"] : ["work", "problems", "log", "supplies"]; }
+function tabsFor(dept) {
+  if (dept === "delivery") return ["loadout", "problems", "log"];
+  return isLogOnly(dept) ? ["problems", "log"] : ["work", "problems", "log", "supplies"];
+}
 
 /** Put any counts still waiting to send on top of what the database last said. */
 function withPending(rows, outbox) {
@@ -517,6 +550,89 @@ function friendlyError(err) {
   return m || "Something went wrong. Try again, and if it keeps happening, take a screenshot.";
 }
 
+/* ---- photos ---- */
+
+/** Fit a photo inside max × max pixels, keeping its shape. Never enlarges. */
+function fitSize(w, h, max = 1600) {
+  const s = Math.min(1, max / Math.max(w, h));
+  return { w: Math.max(1, Math.round(w * s)), h: Math.max(1, Math.round(h * s)) };
+}
+/** Where a photo's file lives: the job's folder, the tablet's own id. The database insists on exactly this. */
+function photoPath(projectId, clientId) { return `${projectId}/${clientId}.jpg`; }
+
+function photoError(err) {
+  const m = String((err && (err.message || err.error)) || err || "");
+  if (/exceeded the maximum|413|too large/i.test(m)) return "The photo is too large, even after shrinking. Take it again a little further back.";
+  if (/mime|415/i.test(m)) return "That isn't a photo the system can keep. Use the camera button.";
+  if (/row-level security|403|unauthorized/i.test(m)) return "This login can't add photos there.";
+  return friendlyError(err);
+}
+
+/**
+ * Send every photo waiting on the tablet, oldest first. Returns { sent, refused, waiting, offline }.
+ *
+ * Each photo goes in two steps: the file into storage, then add_photo() records it
+ * against its defect, problem or load-out. A photo carries its own id, and the file's
+ * name is made from it, so a resend can never add it twice. If the entry it belongs to
+ * hasn't reached the database yet, it waits and tries again; if that entry was never
+ * going to arrive, it's dropped after three tries, with a plain message.
+ * `store` is { list(), put(rec), remove(id) }; isPending(id) says whether that entry is still waiting to send.
+ */
+async function flushPhotobox(store, db, isPending = () => false) {
+  const sent = [], refused = [], waiting = [];
+  let offline = false;
+  const list = (await store.list()).sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  for (const rec of list) {
+    let up;
+    try {
+      up = await db.storage.from("photos").upload(photoPath(rec.projectId, rec.id), rec.blob, { contentType: "image/jpeg", upsert: false });
+    } catch (e) { up = { error: e }; }
+    if (up && up.error) {
+      if (isNetworkError(up.error)) { offline = true; break; }
+      const already = /already exists|duplicate|409/i.test(String(up.error.message) + " " + String(up.error.statusCode || "") + " " + String(up.error.error || ""));
+      if (!already) { refused.push({ id: rec.id, label: rec.label, reason: photoError(up.error) }); await store.remove(rec.id); continue; }
+    }
+    let res;
+    try {
+      res = await db.rpc("add_photo", { p_client_id: rec.id, p_kind: rec.kind, p_parent: rec.parent, p_sheet: rec.sheet ?? null,
+                                        p_note: rec.note || null, p_width: rec.width || null, p_height: rec.height || null });
+    } catch (e) { res = { error: e }; }
+    if (res.error) {
+      if (isNetworkError(res.error)) { offline = true; break; }
+      refused.push({ id: rec.id, label: rec.label, reason: photoError(res.error) }); await store.remove(rec.id); continue;
+    }
+    if (res.data && res.data.waiting) {
+      const tries = (rec.tries || 0) + 1;
+      if (!isPending(rec.parent) && tries >= 3) {
+        refused.push({ id: rec.id, label: rec.label, reason: "The entry this photo belonged to wasn't saved, so the photo couldn't be kept." });
+        await store.remove(rec.id);
+      } else { await store.put({ ...rec, tries }); waiting.push(rec.id); }
+      continue;
+    }
+    sent.push({ id: rec.id, label: rec.label, kind: rec.kind, parent: rec.parent, data: res.data });
+    await store.remove(rec.id);
+  }
+  return { sent, refused, waiting, offline };
+}
+
+/** A load-out's sheets: photographed on this truck (or waiting on the tablet), on an earlier truck, or not yet. */
+function loadoutSheets(sheets, lo, pending = []) {
+  const here = new Set((lo && lo.sheets_here) || []), earlier = new Set((lo && lo.sheets_earlier) || []);
+  const hasSheet = (p) => p.sheet !== null && p.sheet !== undefined;
+  const waiting = new Set(pending.filter(hasSheet).map(p => p.sheet));
+  const list = (sheets || []).map(s => ({ ...s,
+    here: here.has(s.sheet_number) || waiting.has(s.sheet_number),
+    waiting: waiting.has(s.sheet_number) && !here.has(s.sheet_number),
+    earlier: earlier.has(s.sheet_number) }));
+  return {
+    list, total: list.length,
+    done: list.filter(s => s.here || s.earlier).length,
+    onTruck: list.filter(s => s.here).map(s => s.sheet_number),
+    missing: list.filter(s => !s.here && !s.earlier).map(s => s.sheet_number),
+    other: ((lo && lo.other_items) || 0) + pending.filter(p => !hasSheet(p)).length,
+  };
+}
+
 /* ---- end core ---- */
 
 
@@ -547,8 +663,130 @@ if (typeof document !== "undefined") (function () {
     problems: [], probScope: "mine", defects: [], supplies: [], arrow: [], pickJobs: store.get("pickjobs", []),
     pickSheets: {}, piece: {}, qcJob: null, qcEntries: [], arrowForm: null, supplyForm: { item: "", qty: 1, note: "" },
     openTask: null, modal: null, toast: null, missing: {},
+    // photos and load-outs
+    photos: [],                 // photos on what's on screen (the piece, the problems list), from the database
+    pending: [],                // photos still on this tablet, waiting to send (no image bytes kept here)
+    loadouts: [], localLoadouts: store.get("loadouts_local", []), loView: null,
+    loForm: { jobId: null, filter: "" }, loItem: "", loPhotos: [], viewer: null,
   };
   const pageUrls = new Map();
+
+  // ---------- photos kept on the tablet until they've sent ----------
+  // IndexedDB, because a handful of photos is more than the small browser store holds.
+  // Each photo waits here, like counts and entries do, and sends when it can.
+  const photoStore = (() => {
+    const mem = new Map();                                    // if IndexedDB isn't available: kept until the page closes
+    let dbp = null;
+    const open = () => dbp || (dbp = new Promise((res, rej) => {
+      if (!window.indexedDB) return rej(new Error("no IndexedDB"));
+      const r = window.indexedDB.open("shop-floor-photos", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("photos", { keyPath: "id" });
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    }));
+    const tx = async (mode, fn) => {
+      const d = await open();
+      return new Promise((res, rej) => {
+        const t = d.transaction("photos", mode), st = t.objectStore("photos");
+        const out = fn(st);
+        t.oncomplete = () => res(out && "result" in out ? out.result : undefined); t.onerror = () => rej(t.error);
+      });
+    };
+    const toRec = (r) => r && ({ ...r, blob: new Blob([r.bytes], { type: "image/jpeg" }) });
+    return {
+      async list() { try { return ((await tx("readonly", st => st.getAll())) || []).map(toRec); } catch (e) { return [...mem.values()].map(toRec); } },
+      async put(rec) {
+        const { blob, ...rest } = rec;
+        const row = { ...rest, bytes: rec.bytes || (blob ? await blob.arrayBuffer() : null) };
+        try { await tx("readwrite", st => st.put(row)); } catch (e) { mem.set(row.id, row); }
+      },
+      async remove(id) { try { await tx("readwrite", st => st.delete(id)); } catch (e) {} mem.delete(id); },
+    };
+  })();
+  const pendingUrls = new Map();       // local previews of photos still waiting to send
+  async function refreshPending() {
+    const list = await photoStore.list();
+    for (const r of list) if (!pendingUrls.has(r.id)) pendingUrls.set(r.id, URL.createObjectURL(r.blob));
+    S.pending = list.map(({ blob, bytes, ...m }) => ({ ...m, url: pendingUrls.get(m.id) }));
+  }
+
+  /** Shrink a camera photo to about 300–500 KB: 1600 pixels on the long side, JPEG. Turned the right way up. */
+  async function shrinkPhoto(file) {
+    let src, w, h;
+    if (window.createImageBitmap) {
+      try { src = await createImageBitmap(file, { imageOrientation: "from-image" }); } catch (e) { src = await createImageBitmap(file); }
+      w = src.width; h = src.height;
+    } else {
+      src = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("That photo couldn't be read.")); i.src = URL.createObjectURL(file); });
+      w = src.naturalWidth; h = src.naturalHeight;
+    }
+    const encode = (max, quality) => new Promise((res) => {
+      const s = fitSize(w, h, max), c = document.createElement("canvas");
+      c.width = s.w; c.height = s.h;
+      c.getContext("2d").drawImage(src, 0, 0, s.w, s.h);
+      c.toBlob(b => res({ blob: b, width: s.w, height: s.h }), "image/jpeg", quality);
+    });
+    let out = await encode(1600, 0.72);
+    if (out.blob && out.blob.size > 560000) out = await encode(1600, 0.6);
+    if (out.blob && out.blob.size > 560000) out = await encode(1280, 0.6);
+    if (!out.blob) throw new Error("That photo couldn't be read. Take it again.");
+    return out;
+  }
+
+  /** Open the rear camera; `done` gets { blob, width, height } once the photo is taken and shrunk. */
+  function takePhoto(done) {
+    const cam = document.getElementById("camera");
+    cam.value = "";
+    cam.onchange = async () => {
+      const file = cam.files && cam.files[0];
+      if (!file) return;
+      try { done(await (window.sfShrinkPhoto || shrinkPhoto)(file)); }      // sfShrinkPhoto: lets the tests stand in for a camera
+      catch (e) { S.notice = e.message || "That photo couldn't be read. Take it again."; render(); }
+    };
+    cam.click();
+  }
+
+  /** Add photos to the tablet's waiting list: [{ blob, width, height }] for one defect, problem, reply or load-out. */
+  async function queuePhotos(shots, meta) {
+    for (const p of shots) {
+      const id = p.id || newId();
+      await photoStore.put({ id, blob: p.blob, width: p.width, height: p.height, at: new Date().toISOString(), tries: 0,
+                             label: p.label || meta.label || "Photo", ...meta, sheet: "sheet" in p ? p.sheet : meta.sheet, note: p.note ?? meta.note ?? null });
+    }
+    await refreshPending();
+  }
+
+  // photos from the database are shown through short-lived private links, fetched as they're needed
+  const photoUrls = new Map();
+  async function photoUrl(path) {
+    const hit = photoUrls.get(path);
+    if (hit && hit.until > Date.now()) return hit.url;
+    const { data, error } = await db.storage.from("photos").createSignedUrl(path, 3600);
+    if (error || !data) throw error || new Error("no link");
+    photoUrls.set(path, { url: data.signedUrl, until: Date.now() + 50 * 60000 });
+    return data.signedUrl;
+  }
+  function fillPhotos() {
+    app.querySelectorAll("img[data-photopath]:not([src])").forEach(async (img) => {
+      try { img.src = await photoUrl(img.dataset.photopath); }
+      catch (e) { const b = img.closest(".ph"); if (b) { b.classList.add("nofile"); b.textContent = S.online ? "Photo not available" : "Shows when online"; } }
+    });
+  }
+  /** Thumbnails. `list` are rows from v_photos, `local` are photos still on this tablet. */
+  function photoStrip(list, local = []) {
+    const shown = (list || []).filter(p => !p.voided);
+    if (!shown.length && !local.length) return "";
+    return `<div class="phs">${shown.map(p => p.in_cloud === false
+        ? `<span class="ph nofile">Archived · batch ${esc(p.archive_batch)}</span>`
+        : `<button class="ph" data-viewphoto="${esc(p.id)}" aria-label="Photo by ${esc(p.taken_by_name)}"><img alt="" data-photopath="${esc(p.storage_path)}"></button>`).join("")}
+      ${local.map(p => `<span class="ph"><img alt="" src="${esc(p.url)}"><span class="cap">Waiting to send</span></span>`).join("")}</div>`;
+  }
+  const photosOn = (field, id) => S.photos.filter(p => p[field] === id);
+  const pendingOn = (parent) => S.pending.filter(p => p.parent === parent);
+  function mergePhotos(rows) {
+    const byId = new Map(S.photos.map(p => [p.id, p]));
+    for (const r of rows || []) byId.set(r.id, r);
+    S.photos = [...byId.values()];
+  }
 
   function rowsNow() { return withPending(S.rows, S.outbox); }
   function tabs() { return tabsFor(S.dept); }
@@ -629,6 +867,28 @@ if (typeof document !== "undefined") (function () {
     const q = S.probScope === "all" ? db.from("v_problems").select("*") : db.from("v_problems").select("*").eq("department", S.dept);
     const d = await read("problems", q, "problems_" + S.probScope + "_" + S.dept);
     if (d) S.problems = d;
+    const ids = (S.problems || []).map(p => p.id);
+    if (ids.length) mergePhotos(await read("photos", db.from("v_photos").select("*").in("problem_id", ids), null));
+  }
+  // ---------- load-outs (Delivery) ----------
+  async function loadLoadouts() {
+    const d = await read("loadouts", db.from("v_loadouts").select("*"), "loadouts");
+    if (d) {
+      S.loadouts = d.filter(l => l.is_open || daysSince(l.finished_at) <= 14);
+      const onServer = new Set(d.map(l => l.client_id));
+      S.localLoadouts = S.localLoadouts.filter(l => !onServer.has(l.client_id));
+      store.set("loadouts_local", S.localLoadouts);
+    }
+    const lo = currentLoadout();
+    if (lo) {
+      const jobs = [loadPickSheets(lo.job_id)];
+      if (lo.id) jobs.push(read("photos", db.from("v_photos").select("*").eq("loadout_id", lo.id), null).then(p => { if (p) S.loPhotos = p.filter(x => !x.voided); }));
+      await Promise.all(jobs);
+    }
+  }
+  function currentLoadout() {
+    if (!S.loView) return null;
+    return S.loadouts.find(l => l.client_id === S.loView) || S.localLoadouts.find(l => l.client_id === S.loView) || null;
   }
   async function loadDefects() {
     const d = await read("defects", db.from("v_defects").select("*").eq("department", S.dept), "defects_" + S.dept);
@@ -658,6 +918,7 @@ if (typeof document !== "undefined") (function () {
       problems: (probs || []).filter(p => p.sheet_number === r.sheet_number || p.sheet_number === null),
       qc: (qc || []).filter(q => !q.voided && q.sheet_number === r.sheet_number),
     };
+    mergePhotos(await read("photos", db.from("v_photos").select("*").eq("job_id", r.job_id), null));
   }
 
   async function loadTab() {
@@ -670,6 +931,7 @@ if (typeof document !== "undefined") (function () {
       return Promise.all(jobs);
     }
     if (S.tab === "supplies") return loadSupplies();
+    if (S.tab === "loadout") { if (!S.pickJobs.length) loadPickJobs().then(render); return loadLoadouts(); }
   }
   async function refreshAll() {
     await Promise.all([loadFlags(), loadTasks(), loadTypes(), S.tab === "problems" ? null : loadProblems()]);
@@ -695,7 +957,8 @@ if (typeof document !== "undefined") (function () {
 
   let logFlushing = false;
   async function flushLog() {
-    if (logFlushing || !Object.keys(S.logbox).length) return;
+    if (logFlushing) return;
+    if (!Object.keys(S.logbox).length) return flushPhotos();
     logFlushing = true;
     const r = await flushLogbox({ get: () => S.logbox, set: (b) => { S.logbox = b; store.set("logbox", b); } }, db);
     logFlushing = false;
@@ -709,13 +972,39 @@ if (typeof document !== "undefined") (function () {
       if (S.view.screen === "sheet") { const cur = rowsNow().find(x => x.progress_id === S.view.progressId); if (cur) await loadPiece(cur); }
     }
     render();
+    await flushPhotos();
   }
 
-  /** Every log write goes through here: queued, then sent straight away if it can be. */
-  async function send(fn, args, label, after) {
+  // photos send after the entries they belong to
+  let photoFlushing = false;
+  async function flushPhotos() {
+    if (photoFlushing) return;
+    if (!S.pending.length) { await refreshPending(); if (!S.pending.length) return; }
+    photoFlushing = true;
+    const pendingIds = new Set(Object.values(S.logbox).map(e => e.args && e.args.p_client_id).filter(Boolean));
+    let r;
+    try { r = await flushPhotobox(photoStore, db, (id) => pendingIds.has(id)); }
+    finally { photoFlushing = false; }
+    if (r.offline) S.online = false;
+    for (const x of r.sent.concat(r.refused)) { const u = pendingUrls.get(x.id); if (u) { URL.revokeObjectURL(u); pendingUrls.delete(x.id); } }
+    await refreshPending();
+    if (r.refused.length) S.notice = `${r.refused[0].label}: ${r.refused[0].reason}`;
+    if (r.sent.length) {
+      showToast(r.sent.length === 1 ? (r.sent[0].data && r.sent[0].data.summary) || "Photo saved." : `${r.sent.length} photos saved.`);
+      if (S.tab === "loadout") await loadLoadouts();
+      else if (S.tab === "problems") await loadProblems();
+      if (S.view.screen === "sheet") { const cur = rowsNow().find(x => x.progress_id === S.view.progressId); if (cur) await loadPiece(cur); }
+    }
+    render();
+  }
+
+  /** Every log write goes through here: queued, then sent straight away if it can be.
+   *  `shots` are photos that belong to this entry: they wait with it and send after it. */
+  async function send(fn, args, label, after, shots, photoMeta) {
     const q = queueEntry(S.logbox, fn, args, label);
     S.logbox = q.box; store.set("logbox", S.logbox);
     S.modal = null; S.notice = null;
+    if (shots && shots.length) await queuePhotos(shots, { label: "Photo", ...photoMeta, parent: photoMeta.parent || q.box[q.id].args.p_client_id });
     if (after) after();
     render();
     await flushLog();
@@ -767,11 +1056,12 @@ if (typeof document !== "undefined") (function () {
   }
 
   function syncBadge() {
-    const n = Object.keys(S.outbox).length, m = Object.keys(S.logbox).length;
-    if (n || m) {
+    const n = Object.keys(S.outbox).length, m = Object.keys(S.logbox).length, k = S.pending.length;
+    if (n || m || k) {
       const parts = [];
       if (n) parts.push(`${n} count${n === 1 ? "" : "s"}`);
       if (m) parts.push(`${m} entr${m === 1 ? "y" : "ies"}`);
+      if (k) parts.push(`${k} photo${k === 1 ? "" : "s"}`);
       return `<span class="sync waiting">${parts.join(" and ")} waiting to send</span>`;
     }
     if (!S.online || S.fromCache) return `<span class="sync offline">Offline</span>`;
@@ -811,7 +1101,8 @@ if (typeof document !== "undefined") (function () {
     const openHere = (S.problems || []).filter(p => p.status === "open" && p.department === S.dept).length;
     const dueHere = (S.tasks || []).filter(t => t.department === S.dept && !t.done_today && t.days_until <= 0 && !!t.is_test === !!(S.me && S.me.is_test)).length;
     const toReceive = (S.supplies || []).filter(r => r.state === "ordered").length;
-    const count = { problems: openHere, log: dueHere, supplies: toReceive };
+    const openLo = (S.loadouts || []).filter(l => l.is_open).length + (S.localLoadouts || []).length;
+    const count = { problems: openHere, log: dueHere, supplies: toReceive, loadout: openLo };
     return `<nav class="subtabs" aria-label="${esc(DEPT_NAME[S.dept])}">${tabs().map(t =>
       `<button class="subtab" data-tab="${t}" aria-current="${S.tab === t}">${TAB_NAME[t]}${count[t] ? `<span class="c">${count[t]}</span>` : ""}</button>`).join("")}</nav>`;
   }
@@ -923,9 +1214,9 @@ if (typeof document !== "undefined") (function () {
     const items = [
       ...k.problems.map(x => ({ at: x.raised_at, html: `<div class="li ${x.status === "open" ? (x.work_stopped ? "stop" : "open") : ""}">
           <div class="li-top"><b>${esc(x.department_name)}</b><span class="meta2">${x.sheet_number === null ? "whole job · " : ""}${esc(problemState(x).label)} · ${esc(fmtDate(localISO(x.raised_at)))}</span></div>
-          <div>${esc(x.body)}</div><div class="meta2">Raised by ${esc(x.raised_by_name)}</div></div>` })),
+          <div>${esc(x.body)}</div><div class="meta2">Raised by ${esc(x.raised_by_name)}</div>${photoStrip(photosOn("problem_id", x.id))}</div>` })),
       ...k.defects.map(x => ({ at: x.logged_at, html: `<div class="li"><div class="li-top"><b>${esc(x.department_name)}</b><span class="meta2">Defect · ${esc(fmtDate(localISO(x.logged_at)))}</span></div>
-          <div>${esc(x.defect_type)}</div>${x.note ? `<div class="meta2">${esc(x.note)}</div>` : ""}<div class="meta2">Logged by ${esc(x.logged_by_name)}</div></div>` })),
+          <div>${esc(x.defect_type)}</div>${x.note ? `<div class="meta2">${esc(x.note)}</div>` : ""}<div class="meta2">Logged by ${esc(x.logged_by_name)}</div>${photoStrip(photosOn("defect_id", x.id))}</div>` })),
       ...k.qc.map(x => ({ at: x.checked_at, html: `<div class="li"><div class="li-top"><b>QC ${x.result === "pass" ? "passed" : "failed"}</b><span class="meta2">${esc(fmtDate(localISO(x.checked_at)))} · ${esc(x.checked_by_name)}</span></div>${x.note ? `<div>${esc(x.note)}</div>` : ""}</div>` })),
     ].sort((a, b) => String(b.at).localeCompare(String(a.at)));
     if (!items.length) return "";
@@ -945,6 +1236,7 @@ if (typeof document !== "undefined") (function () {
         <span class="st${st.done ? " ok" : ""}">${esc(st.label)}</span></div>
       <div class="msg"><div>${esc(p.body)}</div><div class="msg-meta">${esc(p.raised_by_name)} · ${esc(fmtDate(localISO(p.raised_at)))}</div></div>
       ${thread}
+      ${photoStrip(photosOn("problem_id", p.id), pendingOn(p.id))}
       ${canAct ? `<div class="rowbtns"><button data-reply="${esc(p.id)}">${p.status === "answered" ? "Reply — this isn't settled" : "Add something"}</button></div>` : ""}
     </div>`;
   }
@@ -1111,7 +1403,80 @@ if (typeof document !== "undefined") (function () {
           <div class="li-top"><b>${esc(r.qty)} × ${esc(r.item)}</b></div><div class="meta2">${esc(supplyLine(r))}</div></div>`).join("") : ""}`;
   }
 
+  // ---------- Load-out (Delivery) ----------
+  // Every item or pallet is photographed against its sheet before the truck leaves,
+  // so the photos double as a check that everything's on board.
+  function loadoutLine(lo) {
+    const pend = S.pending.filter(x => x.parent === lo.client_id), has = (x) => x.sheet !== null && x.sheet !== undefined;
+    const done = new Set([...(lo.sheets_here || []), ...(lo.sheets_earlier || []), ...pend.filter(has).map(x => x.sheet)]).size;
+    const other = (lo.other_items || 0) + pend.filter(x => !has(x)).length;
+    const total = lo.sheets_total ?? (S.pickSheets[lo.job_id] || []).length;
+    const count = total ? `${done} of ${total} sheets photographed` : `${done} sheet${done === 1 ? "" : "s"} photographed`;
+    return count + (other ? ` · ${other} other item${other === 1 ? "" : "s"}` : "");
+  }
+  function loadoutScreen() {
+    const lo = currentLoadout();
+    if (lo) return loadoutDetail(lo);
+    const open = [...S.localLoadouts.map(l => ({ ...l, local: true, is_open: true })), ...S.loadouts.filter(l => l.is_open)];
+    const done = S.loadouts.filter(l => !l.is_open).sort((a, b) => String(b.finished_at).localeCompare(String(a.finished_at)));
+    const f = S.loForm;
+    const already = f.jobId && open.find(l => l.job_id === f.jobId);
+    return `${missingNote("loadouts")}
+      <div class="card"><h3 style="margin:0 0 4px">Start a load-out</h3>
+        <p class="sub" style="margin:0 0 6px">Pick the job going on the truck. Then photograph each item or pallet against its sheet.</p>
+        ${jobPicker(f.jobId, f.filter)}
+        ${already ? `<div class="banner info" style="margin:12px 0 0">${esc(already.project_id)} already has a load-out open, started ${esc(agoText(already.started_at))}. Carry on with it, or start another for a second truck.
+            <div class="rowbtns"><button data-loopen="${esc(already.client_id)}">Carry on with it</button></div></div>` : ""}
+        <button class="go wide" style="margin-top:14px" data-lostart="1" ${f.jobId ? "" : "disabled"}>Start load-out</button></div>
+      <h2 class="sec">Open load-outs</h2>
+      ${open.length ? open.map(l => `<button class="job" data-loopen="${esc(l.client_id)}">
+          <div class="job-top"><span class="pid">${l.is_test ? `<span class="tag">TEST</span>` : ""}${esc(l.project_id)}</span><span class="jname">${esc(l.job_name)}</span>
+            <span class="due">started ${esc(agoText(l.started_at))}${l.started_by_name ? ` by ${esc(l.started_by_name)}` : ""}</span></div>
+          <div class="meta2" style="margin-top:6px">${l.local ? "Waiting to send · " : ""}${esc(loadoutLine(l))}</div></button>`).join("")
+        : `<div class="empty"><b>No load-out open</b>Start one above when a truck is being loaded.</div>`}
+      ${done.length ? `<h2 class="sec">Left in the last two weeks</h2>` + done.map(l => `<div class="li">
+          <div class="li-top"><b>${l.is_test ? `<span class="tag">TEST</span>` : ""}${esc(l.project_id)}</b><span class="meta2">${esc(l.job_name)}</span></div>
+          <div class="meta2">Left ${esc(fmtDate(localISO(l.finished_at)))}${l.finished_by_name ? ` · ${esc(l.finished_by_name)}` : ""} · ${esc(loadoutLine(l))}</div></div>`).join("") : ""}`;
+  }
+  function loadoutDetail(lo) {
+    const sheets = S.pickSheets[lo.job_id];
+    const mine = S.pending.filter(x => x.parent === lo.client_id);
+    const p = loadoutSheets(sheets || [], lo, mine);
+    const canFinish = !lo.finished_at;
+    const photos = S.loPhotos.filter(x => x.loadout_id === lo.id);
+    const cap = (x) => x.sheet !== undefined ? (x.sheet !== null ? `Sheet ${x.sheet}` : x.note) : (x.sheet_number !== null ? `Sheet ${x.sheet_number}` : x.note);
+    return `<button class="back" data-loback="1">← Load-outs</button>
+      <h1>${lo.is_test ? `<span class="tag">TEST</span>` : ""}${esc(lo.project_id)}</h1>
+      <p class="sub">${esc(lo.job_name)} · load-out started ${esc(agoText(lo.started_at))}${lo.started_by_name ? ` by ${esc(lo.started_by_name)}` : ""}${lo.id ? "" : " · waiting to send"}</p>
+      <div class="lohead">
+        ${p.total ? `<div class="tally"><span class="big num">${p.done}</span> <span class="of num">of ${p.total} sheets photographed</span></div>`
+                  : `<div><b>No work order uploaded.</b> Photograph each item and say what it is.</div>`}
+        <div class="meta2" style="margin-top:6px">On this truck: ${p.onTruck.length ? esc(sheetsText(p.onTruck)) : "no sheets yet"}${p.other ? ` · ${p.other} other item${p.other === 1 ? "" : "s"}` : ""}${
+          p.list.some(s => s.earlier) ? ` · went earlier: ${esc(sheetsText(p.list.filter(s => s.earlier).map(s => s.sheet_number)))}` : ""}</div>
+      </div>
+      ${sheets === undefined ? `<div class="meta2">Loading the sheets…</div>` : ""}
+      ${p.list.length ? `<p class="sub" style="margin:0 0 8px">Tap a sheet to photograph it. Tap again for another photo of the same sheet.</p>
+        <div class="losheets">${p.list.map(s => `<button class="losheet${s.here ? " here" : s.earlier ? " earlier" : ""}" data-loshoot="${s.sheet_number}">
+          <span class="no num">${s.sheet_number}</span><small>${esc(s.item_code || "")}</small>
+          <small>${s.waiting ? "Photographed · waiting to send" : s.here ? "Photographed" : s.earlier ? "Went on an earlier truck" : "Not photographed"}</small></button>`).join("")}</div>` : ""}
+      <div class="card"><label class="f" style="margin-top:0" for="loItem">Something with no sheet</label>
+        <input class="in" id="loItem" data-loitem="1" value="${esc(S.loItem)}" placeholder="e.g. hardware box, 2 of 2">
+        <button class="addph" data-loshootitem="1" ${S.loItem.trim() ? "" : "disabled"}>Photograph it</button></div>
+      ${photos.length || mine.length ? `<h2 class="sec">Photos on this load-out</h2>
+        <div class="phs">${photos.map(x => `<button class="ph" data-viewphoto="${esc(x.id)}"><img alt="" data-photopath="${esc(x.storage_path)}"><span class="cap">${esc(cap(x))}</span></button>`).join("")}
+          ${mine.map(x => `<span class="ph"><img alt="" src="${esc(x.url)}"><span class="cap">${esc(cap(x))} · waiting</span></span>`).join("")}</div>` : ""}
+      ${canFinish ? `<button class="go wide" style="margin-top:18px" data-lofinish="1">The truck is leaving — finish this load-out</button>` : `<div class="complete">Finished</div>`}
+      ${lo.started_by === S.me.id || !lo.id ? `<p style="text-align:center"><button class="linkish" data-lovoid="1">This load-out was started by mistake</button></p>` : ""}`;
+  }
+
   // ---------- modals ----------
+  /** Optional photos on a defect, problem or reply: a second tap, never required. */
+  function modalPhotos(m) {
+    const shots = m.shots || [];
+    return `${shots.length ? `<div class="phs">${shots.map((p, i) => `<span class="ph"><img alt="Photo ${i + 1}" src="${esc(p.url)}">
+        <button class="x" data-dropshot="${i}" aria-label="Remove photo ${i + 1}">×</button></span>`).join("")}</div>` : ""}
+      ${shots.length < PHOTO_MAX_EACH ? `<button class="addph" data-addshot="1">Add a photo <small>optional${shots.length ? ` · ${shots.length} of ${PHOTO_MAX_EACH}` : ""}</small></button>` : ""}`;
+  }
   function modalHtml() {
     const m = S.modal;
     if (!m) return "";
@@ -1128,7 +1493,8 @@ if (typeof document !== "undefined") (function () {
         <div class="sub">${m.pick ? "" : jobLine() + ". "}Counted in the numbers. Nobody is interrupted.</div>
         ${picker}${!m.pick || m.jobId ? `<label class="f">What happened</label>
         ${types.map(t => `<button class="pick" data-picktype="${esc(t.id)}" aria-pressed="${m.type === t.id}">${esc(t.label)}</button>`).join("") || `<div class="meta2">No defect list for ${esc(DEPT_NAME[S.dept])} yet.</div>`}
-        <textarea class="in" data-mfield="note" placeholder="Anything worth adding (optional)">${esc(m.note || "")}</textarea>` : ""}
+        <textarea class="in" data-mfield="note" placeholder="Anything worth adding (optional)">${esc(m.note || "")}</textarea>
+        ${modalPhotos(m)}` : ""}
         <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button>
           <button class="go" data-savedefect="1" ${m.type && m.jobId ? "" : "disabled"}>Log it</button></div>`;
     } else if (m.kind === "problem") {
@@ -1137,7 +1503,8 @@ if (typeof document !== "undefined") (function () {
         ${picker}${!m.pick || m.jobId ? `<label class="f">What's wrong, and what do you need?</label>
         <textarea class="in" data-mfield="text">${esc(m.text || "")}</textarea>
         <label class="chk"><input type="checkbox" data-mstops ${m.stops ? "checked" : ""}>
-          <span>Work is stopped on this${m.sheet === null || m.sheet === undefined ? " job" : " sheet"}<small>Shows on the TV and puts it at the top of the office's list.</small></span></label>` : ""}
+          <span>Work is stopped on this${m.sheet === null || m.sheet === undefined ? " job" : " sheet"}<small>Shows on the TV and puts it at the top of the office's list.</small></span></label>
+        ${modalPhotos(m)}` : ""}
         <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button>
           <button class="go" data-saveproblem="1" ${m.jobId && (m.text || "").trim() ? "" : "disabled"}>Send it</button></div>`;
     } else if (m.kind === "reply") {
@@ -1145,6 +1512,7 @@ if (typeof document !== "undefined") (function () {
         <div class="sub">It goes back to the office with everything said so far.</div>
         <textarea class="in" data-mfield="text" placeholder="What still needs sorting?">${esc(m.text || "")}</textarea>
         ${m.stops !== undefined ? `<label class="chk"><input type="checkbox" data-mstops ${m.stops ? "checked" : ""}><span>Work is stopped<small>Untick when work has started again.</small></span></label>` : ""}
+        ${modalPhotos(m)}
         <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button>
           <button class="go" data-savereply="1" ${(m.text || "").trim() ? "" : "disabled"}>Send it back</button></div>`;
     } else if (m.kind === "qcfail") {
@@ -1158,6 +1526,15 @@ if (typeof document !== "undefined") (function () {
         <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button>
           <button class="btn" data-qcfail="${m.sheet}" data-qcjob="${esc(m.jobId)}">Failed…</button>
           <button class="go" data-qcpass="${m.sheet}" data-qcjob="${esc(m.jobId)}">Passed</button></div>`;
+    } else if (m.kind === "photo") {
+      const p = m.photo, what = p.kind === "loadout" ? (p.sheet_number !== null ? `Sheet ${p.sheet_number}` : p.note) : (p.defect_type || p.problem_body || "");
+      return `<div class="ovl" data-close="1"><div class="viewer" role="dialog" aria-modal="true" aria-label="Photo">
+        <img alt="Photo by ${esc(p.taken_by_name)}" data-photopath="${esc(p.storage_path)}">
+        <div class="vcap"><b>${p.is_test ? "TEST " : ""}${esc(p.project_id)}${p.sheet_number !== null ? ` · sheet ${p.sheet_number}` : ""}</b> · ${esc(p.department_name)}
+          ${what ? `<div>${esc(what)}</div>` : ""}${p.note && p.kind !== "loadout" ? `<div>${esc(p.note)}</div>` : ""}
+          <small>Taken by ${esc(p.taken_by_name)}, ${esc(fmtDate(localISO(p.taken_at)))} ${esc(new Date(p.taken_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}</small></div>
+        <div class="mdl-btns">${p.taken_by === S.me.id && !p.voided ? `<button data-voidphoto="${esc(p.id)}">Entered by mistake</button>` : ""}
+          <button data-close="1">Close</button></div></div></div>`;
     } else if (m.kind === "confirm") {
       inner = `<h3>${esc(m.title)}</h3><div class="sub">${esc(m.text)}</div>
         <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button><button class="go" data-confirm="1">${esc(m.yes)}</button></div>`;
@@ -1171,7 +1548,8 @@ if (typeof document !== "undefined") (function () {
     if (S.tab === "work" && S.view.screen === "sheet") body = sheetScreen();
     else if (S.tab === "work" && S.view.screen === "job") body = jobScreen();
     else {
-      const top = S.tab === "problems" ? problemsScreen() : S.tab === "log" ? logScreen() : S.tab === "supplies" ? suppliesScreen() : queueScreen();
+      const top = S.tab === "problems" ? problemsScreen() : S.tab === "log" ? logScreen() : S.tab === "supplies" ? suppliesScreen()
+                : S.tab === "loadout" ? loadoutScreen() : queueScreen();
       body = subTabs() + top;
     }
     const topLevel = !(S.tab === "work" && S.view.screen !== "queue");
@@ -1181,6 +1559,7 @@ if (typeof document !== "undefined") (function () {
       + (S.toast ? `<div class="toast" role="status">${esc(S.toast)}</div>` : "");
     if (scroll) { const m = document.querySelector(".mdl"); if (m) m.scrollTop = scroll; }
     wire();
+    fillPhotos();
     if (S.tab === "work" && S.view.screen === "sheet") showPage();
   }
 
@@ -1224,6 +1603,7 @@ if (typeof document !== "undefined") (function () {
     if (jobId && !S.pickSheets[jobId]) { await loadPickSheets(jobId); render(); }
   }
 
+  const projectOf = (jobId) => (S.pickJobs.find(x => x.job_id === jobId) || rowsNow().find(x => x.job_id === jobId) || {}).project_id;
   function wire() {
     const on = (sel, fn) => app.querySelectorAll(sel).forEach(el => el.onclick = (ev) => fn(el, ev));
     on("[data-dept]", async (b) => {
@@ -1257,10 +1637,12 @@ if (typeof document !== "undefined") (function () {
       window.open(data.signedUrl, "_blank");
     });
     on("[data-signout]", async () => {
-      const waiting = Object.keys(S.outbox).length + Object.keys(S.logbox).length;
-      if (waiting && !confirm("Some counts or entries haven't sent yet. Signing out will throw them away. Sign out anyway?")) return;
+      const waiting = Object.keys(S.outbox).length + Object.keys(S.logbox).length + S.pending.length;
+      if (waiting && !confirm("Some counts, entries or photos haven't sent yet. Signing out will throw them away. Sign out anyway?")) return;
       await db.auth.signOut();
       S.me = null; S.outbox = {}; S.logbox = {}; store.set("outbox", {}); store.set("logbox", {}); store.set("me", null);
+      for (const x of await photoStore.list()) await photoStore.remove(x.id);
+      S.pending = []; S.localLoadouts = []; store.set("loadouts_local", []);
       signIn();
     });
 
@@ -1291,13 +1673,13 @@ if (typeof document !== "undefined") (function () {
     on("[data-picktype]", (b) => { S.modal.type = b.dataset.picktype; render(); });
     on("[data-savedefect]", () => {
       const m = S.modal, t = S.types.find(x => x.id === m.type);
-      send("log_defect", { p_job: m.jobId, p_department: S.dept, p_type: m.type, p_sheet: m.sheet ?? null, p_note: (m.note || "").trim() || null, p_client_id: null },
-           t ? t.label : "Defect");
+      send("log_defect", { p_job: m.jobId, p_department: S.dept, p_type: m.type, p_sheet: m.sheet ?? null, p_note: (m.note || "").trim() || null, p_client_id: newId() },
+           t ? t.label : "Defect", null, m.shots, { kind: "defect", projectId: projectOf(m.jobId), label: "Defect photo" });
     });
     on("[data-saveproblem]", () => {
       const m = S.modal;
-      send("flag_problem", { p_job: m.jobId, p_department: S.dept, p_body: m.text.trim(), p_sheet: m.sheet ?? null, p_work_stopped: !!m.stops, p_client_id: null },
-           "Problem");
+      send("flag_problem", { p_job: m.jobId, p_department: S.dept, p_body: m.text.trim(), p_sheet: m.sheet ?? null, p_work_stopped: !!m.stops, p_client_id: newId() },
+           "Problem", null, m.shots, { kind: "problem", projectId: projectOf(m.jobId), label: "Problem photo" });
     });
     on("[data-reply]", (b) => {
       const p = S.problems.find(x => x.id === b.dataset.reply);
@@ -1305,7 +1687,9 @@ if (typeof document !== "undefined") (function () {
     });
     on("[data-savereply]", () => {
       const m = S.modal;
-      send("reply_problem", { p_problem: m.id, p_body: m.text.trim(), p_work_stopped: m.stops === undefined ? null : !!m.stops, p_client_id: null }, "Reply");
+      const pr = S.problems.find(x => x.id === m.id) || {};
+      send("reply_problem", { p_problem: m.id, p_body: m.text.trim(), p_work_stopped: m.stops === undefined ? null : !!m.stops, p_client_id: null }, "Reply",
+           null, m.shots, { kind: "problem", parent: m.id, projectId: pr.project_id, label: "Problem photo" });
     });
     on("[data-scope]", async (b) => { S.probScope = b.dataset.scope; S.problems = []; render(); await loadProblems(); render(); });
     on("[data-voiddefect]", (b) => {
@@ -1316,7 +1700,7 @@ if (typeof document !== "undefined") (function () {
 
     // ---- the job and sheet pickers (in a modal, the Arrow form or QC) ----
     app.querySelectorAll("[data-jobfilter]").forEach(inp => inp.oninput = () => {
-      const tgt = S.modal || (inp.closest(".card") && inp.closest(".card").querySelector("#arDesc") ? S.arrowForm : null);
+      const tgt = S.modal || (inp.closest(".card") && inp.closest(".card").querySelector("#arDesc") ? S.arrowForm : null) || (S.tab === "loadout" ? S.loForm : null);
       if (tgt) tgt.filter = inp.value; else S.qcFilter = inp.value;
       const pos = inp.selectionStart; render();
       const again = app.querySelector("[data-jobfilter]"); if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) {} }
@@ -1325,6 +1709,7 @@ if (typeof document !== "undefined") (function () {
       const inArrow = !S.modal && b.closest(".card") && b.closest(".card").querySelector("#arDesc");
       if (S.modal) return pickJobFor(S.modal, b.dataset.pickjob);
       if (inArrow) return pickJobFor(S.arrowForm, b.dataset.pickjob);
+      if (S.tab === "loadout") { S.loForm.jobId = b.dataset.pickjob || null; render(); return; }
       S.qcJob = b.dataset.pickjob || null; S.qcEntries = []; render();
       if (S.qcJob) { await Promise.all([loadPickSheets(S.qcJob), loadQc(S.qcJob)]); render(); }
     });
@@ -1348,6 +1733,66 @@ if (typeof document !== "undefined") (function () {
     app.querySelectorAll("[data-mstops]").forEach(el => el.onchange = () => { S.modal.stops = el.checked; });
     app.querySelectorAll("[data-close]").forEach(el => el.onclick = (e) => { if (e.target !== el) return; S.modal = null; render(); });
     on("[data-confirm]", () => { const run = S.modal && S.modal.run; S.modal = null; render(); if (run) run(); });
+
+    // ---- photos ----
+    on("[data-addshot]", () => takePhoto((shot) => {
+      if (!S.modal) return;
+      S.modal.shots = [...(S.modal.shots || []), { ...shot, url: URL.createObjectURL(shot.blob) }].slice(0, PHOTO_MAX_EACH);
+      render();
+    }));
+    on("[data-dropshot]", (b) => { const i = Number(b.dataset.dropshot), x = S.modal.shots[i]; if (x) URL.revokeObjectURL(x.url); S.modal.shots.splice(i, 1); render(); });
+    on("[data-viewphoto]", (b) => {
+      const p = S.photos.concat(S.loPhotos).find(x => x.id === b.dataset.viewphoto); if (!p) return;
+      S.modal = { kind: "photo", photo: p }; render();
+    });
+    on("[data-voidphoto]", (b) => {
+      const id = b.dataset.voidphoto;
+      for (const x of S.photos.concat(S.loPhotos)) if (x.id === id) x.voided = true;
+      send("void_photo", { p_photo: id }, "Photo");
+    });
+
+    // ---- load-outs ----
+    const lo = currentLoadout();
+    on("[data-lostart]", () => {
+      const j = S.pickJobs.find(x => x.job_id === S.loForm.jobId); if (!j) return;
+      const cid = newId();
+      S.localLoadouts.push({ client_id: cid, job_id: j.job_id, project_id: j.project_id, job_name: j.job_name, is_test: !!j.is_test,
+                             started_at: new Date().toISOString(), started_by: S.me.id, started_by_name: S.me.name });
+      store.set("loadouts_local", S.localLoadouts);
+      S.loView = cid; S.loPhotos = []; S.loForm = { jobId: null, filter: "" };
+      if (!S.pickSheets[j.job_id]) loadPickSheets(j.job_id).then(render);
+      send("start_loadout", { p_job: j.job_id, p_client_id: cid }, "Load-out");
+    });
+    on("[data-loopen]", async (b) => { S.loView = b.dataset.loopen; S.loPhotos = []; S.loItem = ""; render(); scrollTo(0, 0); await loadLoadouts(); render(); });
+    on("[data-loback]", async () => { S.loView = null; render(); await loadLoadouts(); render(); });
+    const shootFor = (sheet, note, label) => takePhoto(async (shot) => {
+      if (!lo) return;
+      await queuePhotos([shot], { kind: "loadout", parent: lo.client_id, projectId: lo.project_id, sheet, note, label });
+      render(); flushPhotos();
+    });
+    on("[data-loshoot]", (b) => shootFor(Number(b.dataset.loshoot), null, `Sheet ${b.dataset.loshoot}`));
+    app.querySelectorAll("[data-loitem]").forEach(el => el.oninput = () => {
+      S.loItem = el.value; const btn = app.querySelector("[data-loshootitem]"); if (btn) btn.disabled = !S.loItem.trim();
+    });
+    on("[data-loshootitem]", () => { const note = S.loItem.trim(); if (!note) return; S.loItem = ""; shootFor(null, note, note); });
+    on("[data-lofinish]", () => {
+      if (!lo) return;
+      const p = loadoutSheets(S.pickSheets[lo.job_id] || [], lo, S.pending.filter(x => x.parent === lo.client_id));
+      S.modal = { kind: "confirm", title: "The truck is leaving?",
+        text: p.missing.length ? `${sheetsText(p.missing)} ${p.missing.length === 1 ? "isn't" : "aren't"} photographed. Finish anyway? That's fine if ${p.missing.length === 1 ? "it's" : "they're"} going on another truck.`
+                               : p.total ? `All ${p.total} sheets are photographed. This records that the truck left now.` : "This records that the truck left now.",
+        yes: "Finish load-out",
+        run: () => send("finish_loadout", { p_loadout: lo.client_id, p_note: null }, "Load-out", () => { S.loView = null; }) };
+      render();
+    });
+    on("[data-lovoid]", () => {
+      if (!lo) return;
+      S.modal = { kind: "confirm", title: "Started by mistake?", text: "It comes off the list and stays in history, with any photos.", yes: "Yes, a mistake",
+        run: () => send("void_loadout", { p_loadout: lo.client_id }, "Load-out", () => {
+          S.localLoadouts = S.localLoadouts.filter(l => l.client_id !== lo.client_id); store.set("loadouts_local", S.localLoadouts);
+          S.loadouts = S.loadouts.filter(l => l.client_id !== lo.client_id); S.loView = null; }) };
+      render();
+    });
 
     // ---- Arrow ----
     on("[data-aropen]", () => { S.arrowForm = { jobId: null, filter: "", sheets: [], description: "", service: "powdercoat", sentOn: localISO(new Date()) }; render();
@@ -1437,6 +1882,7 @@ if (typeof document !== "undefined") (function () {
     if (!S.depts.length) return signIn("This login isn't assigned to a department yet. In Supabase, add one to its profile.");
     const cached = store.get("rows_" + S.dept, null);
     if (cached) { S.rows = cached.rows; S.rowsAt = cached.at; }
+    await refreshPending();
     render();
     await loadRows(); render();
     flush();
@@ -1466,7 +1912,8 @@ if (typeof document !== "undefined") (function () {
 /* lets the core be tested outside a browser */
 if (typeof module !== "undefined") module.exports = { keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
   daysLeft, daysText, fmtDate, localISO, daysSince, agoText, setPending, flushOutbox, newId, queueEntry, flushLogbox, dueForMe, taskWhen,
-  problemState, splitProblems, defectCounts, supplyLine, filterJobs, sheetsText, isNetworkError, friendlyError, DEPTS };
+  problemState, splitProblems, defectCounts, supplyLine, filterJobs, sheetsText, isNetworkError, friendlyError, DEPTS,
+  fitSize, photoPath, photoError, flushPhotobox, loadoutSheets };
 </script>
 </body>
 </html>
