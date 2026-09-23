@@ -26,21 +26,23 @@
   .num{font-family:'Barlow Condensed',sans-serif; font-variant-numeric:tabular-nums}
   [hidden]{display:none!important}
 
-  /* top bar */
+  /* top bar: one row — brand, department tabs, save status, who */
   .top{position:sticky; top:0; z-index:10; background:var(--midnight); color:var(--sawdust);
-       padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 0}
-  .top-row{display:flex; align-items:center; gap:12px; padding-bottom:10px}
-  .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.14em; color:var(--orange); font-size:17px}
-  .who{margin-left:auto; text-align:right; font-size:15px; line-height:1.2}
-  .who b{display:block; font-size:17px}
-  .sync{font-size:13px; padding:3px 9px; border-radius:99px; background:#2C3348; color:#CFC9B8; white-space:nowrap}
+       padding:env(safe-area-inset-top,0px) 16px 0}
+  .top-row{display:flex; align-items:center; gap:12px; min-height:52px}
+  .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.14em; color:var(--orange); font-size:16px; white-space:nowrap}
+  .who{text-align:right; font-size:14px; line-height:1.2; white-space:nowrap; color:#CFC9B8}
+  .who b{font-size:16px; color:var(--sawdust)}
+  .sync{margin-left:auto; font-size:13px; padding:3px 9px; border-radius:99px; background:#2C3348; color:#CFC9B8; white-space:nowrap}
   .sync.waiting{background:var(--bright); color:var(--midnight); font-weight:700}
   .sync.offline{background:#5A3A1A; color:var(--sawdust)}
-  .tabs{display:flex; gap:4px; overflow-x:auto}
-  .tab{background:none; border:none; color:#9AA0B4; padding:10px 16px 12px; font-weight:600; border-bottom:4px solid transparent; white-space:nowrap}
+  .tabs{display:flex; gap:2px; overflow-x:auto; align-self:stretch; min-width:0; flex:0 1 auto; scrollbar-width:none}
+  .tab{background:none; border:none; color:#9AA0B4; padding:0 14px; min-height:52px; font-weight:600;
+       border-top:4px solid transparent; border-bottom:4px solid transparent; white-space:nowrap}
   .tab[aria-current="true"]{color:var(--sawdust); border-bottom-color:var(--orange)}
+  @media (max-width: 700px){ .brand{display:none} }
 
-  main{max-width:1100px; margin:0 auto; padding:16px 14px 80px}
+  main{max-width:1100px; margin:0 auto; padding:12px 14px 80px}
   .banner{border-radius:10px; padding:12px 16px; margin-bottom:14px; font-weight:600}
   .banner.warn{background:var(--warn-bg); color:var(--warn); border-left:5px solid var(--bright)}
   .banner.info{background:#fff; color:var(--ink2); border:1px solid var(--line)}
@@ -48,6 +50,11 @@
   .sub{color:var(--ink2); margin:0 2px 16px; font-size:16px}
   .back{background:none; border:none; color:var(--orange); font-weight:700; padding:10px 2px; font-size:18px}
   h2.sec{font-size:16px; color:var(--ink2); font-weight:700; margin:26px 2px 10px; letter-spacing:.01em}
+  /* job and sheet screens: back link, title and job line share one line */
+  .head{display:flex; align-items:baseline; flex-wrap:wrap; gap:0 14px; margin:0 0 10px}
+  .head .back{padding:8px 2px}
+  .head h1{margin:0; font-size:24px; white-space:nowrap}
+  .head .hsub{flex:1 1 220px; min-width:0; color:var(--ink2); font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 
   /* the four areas */
   .subtabs{display:flex; gap:8px; margin:0 0 16px; flex-wrap:wrap}
@@ -102,25 +109,29 @@
   .sheet.done .no,.sheet.done .cnt{color:var(--teal-ink)}
 
   /* sheet */
-  .pager{display:flex; gap:10px; margin:0 0 14px}
-  .pager button{flex:1 1 0; min-width:0; background:#fff; border:1px solid var(--gray); border-radius:12px;
-                padding:12px 16px; text-align:left; font-weight:700; min-height:64px}
+  .pager{display:flex; gap:10px; margin:0 0 10px}
+  .pager button{flex:1 1 0; min-width:0; background:#fff; border:1px solid var(--gray); border-radius:10px;
+                padding:6px 14px; text-align:left; font-weight:700; min-height:40px;
+                white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .pager button:last-child{text-align:right}
   .pager button:disabled{opacity:.35}
-  .pager small{display:block; font-weight:500; color:var(--ink2); font-size:14px}
   .pager .pos{flex:0 0 auto; align-self:center; color:var(--ink2); font-weight:700; padding:0 6px}
-  .counter{background:#fff; border:1px solid var(--line); border-radius:14px; padding:18px; margin-bottom:14px}
-  .count-row{display:flex; align-items:center; justify-content:center; gap:26px}
+  /* the counter: − count + and "Mark all done", on one row */
+  .counter{background:#fff; border:1px solid var(--line); border-radius:14px; padding:10px 14px; margin-bottom:10px}
+  .count-row{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:10px 18px}
   .step{width:92px; height:92px; border-radius:50%; border:2px solid var(--gray); background:var(--paper);
         font-size:44px; font-weight:600; line-height:1}
   .step:disabled{opacity:.3}
-  .readout{text-align:center; min-width:170px}
-  .readout .n{font-size:84px; font-weight:700; line-height:.85}
-  .readout .l{color:var(--ink2); font-size:16px}
-  .all{display:block; width:100%; margin-top:16px; background:var(--orange); color:#fff; border:none;
-       border-radius:12px; padding:18px; font-weight:700; font-size:20px}
+  .counter .step{width:60px; height:60px; font-size:32px; flex:0 0 auto}
+  .readout{display:flex; align-items:center; justify-content:center; gap:8px; min-width:150px}
+  .readout .n{font-size:52px; font-weight:700; line-height:1}
+  .readout .l{color:var(--ink2); font-size:16px; line-height:1.2; text-align:left}
+  .readout .l small{display:block; font-size:14px}
+  .all{flex:1 1 220px; height:60px; background:var(--orange); color:#fff; border:none;
+       border-radius:12px; padding:0 18px; font-weight:700; font-size:19px}
   .complete{margin-top:16px; background:var(--teal-bg); color:var(--teal-ink); text-align:center; font-weight:700;
             font-size:20px; border-radius:12px; padding:16px}
+  .counter .complete{flex:1 1 220px; margin:0; height:60px; padding:0 16px; display:flex; align-items:center; justify-content:center; font-size:19px}
   .page{background:#fff; border:1px solid var(--midnight); border-radius:6px; overflow:auto; margin-bottom:10px;
         -webkit-overflow-scrolling:touch; touch-action:pan-x pan-y pinch-zoom}
   .page img{display:block; width:100%; min-width:720px; height:auto}
@@ -1072,9 +1083,9 @@ if (typeof document !== "undefined") (function () {
     const tabs = S.depts.length > 1
       ? `<nav class="tabs">${S.depts.map(k => `<button class="tab" data-dept="${k}" aria-current="${k === S.dept}">${esc(DEPT_NAME[k])}</button>`).join("")}</nav>` : "";
     return `<header class="top"><div class="top-row">
-        <span class="brand">SHOP FLOOR</span>${syncBadge()}
-        <span class="who"><b>${esc(S.me.name)}</b>${esc(S.depts.length === 1 ? DEPT_NAME[S.dept] : S.me.role)}</span>
-      </div>${tabs}</header>`;
+        <span class="brand">SHOP FLOOR</span>${tabs}${syncBadge()}
+        <span class="who"><b>${esc(S.me.name)}</b>${S.depts.length === 1 ? ` · ${esc(DEPT_NAME[S.dept])}` : ""}</span>
+      </div></header>`;
   }
 
   function banners() {
@@ -1152,9 +1163,9 @@ if (typeof document !== "undefined") (function () {
     const j = list[0];
     const done = list.reduce((a, r) => a + Math.min(r.qty_done, r.qty_required), 0);
     const total = list.reduce((a, r) => a + r.qty_required, 0);
-    return `<button class="back" data-back="queue">← ${esc(DEPT_NAME[S.dept])}</button>
+    return `<div class="head"><button class="back" data-back="queue">← ${esc(DEPT_NAME[S.dept])}</button>
       <h1>${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</h1>
-      <p class="sub">${esc(j.job_name)} · due ${esc(fmtDate(j.delivery_date))} · ${done} of ${total} pieces done</p>
+      <span class="hsub">${esc(j.job_name)} · due ${esc(fmtDate(j.delivery_date))} · ${done} of ${total} pieces done</span></div>
       ${flagBand(flagFor(S.flags, j.job_id, S.dept))}
       ${j.materials_ordered ? "" : `<div class="banner warn">Materials for this job haven't been marked as ordered in Monday yet.</div>`}
       ${list.map(r => {
@@ -1175,24 +1186,24 @@ if (typeof document !== "undefined") (function () {
     const p = pagerFor(rows, r.job_id, r.progress_id);
     const full = r.qty_done >= r.qty_required;
     const pager = `<div class="pager">
-      <button data-goto="${p.prev ? esc(p.prev.progress_id) : ""}" ${p.prev ? "" : "disabled"}><small>← Previous</small>${p.prev ? `Sheet ${p.prev.sheet_number} · ${esc(p.prev.item_code || "")}` : "—"}</button>
+      <button data-goto="${p.prev ? esc(p.prev.progress_id) : ""}" ${p.prev ? "" : "disabled"}>← ${p.prev ? `Sheet ${p.prev.sheet_number} · ${esc(p.prev.item_code || "")}` : "Previous"}</button>
       <span class="pos num">${p.at + 1} / ${p.count}</span>
-      <button data-goto="${p.next ? esc(p.next.progress_id) : ""}" ${p.next ? "" : "disabled"}><small>Next →</small>${p.next ? `Sheet ${p.next.sheet_number} · ${esc(p.next.item_code || "")}` : "—"}</button>
+      <button data-goto="${p.next ? esc(p.next.progress_id) : ""}" ${p.next ? "" : "disabled"}>${p.next ? `Sheet ${p.next.sheet_number} · ${esc(p.next.item_code || "")}` : "Next"} →</button>
     </div>`;
     const stopped = stoppedOn(r.job_id, r.sheet_number);
-    return `<button class="back" data-back="job">← ${esc(r.project_id)}</button>
+    return `<div class="head"><button class="back" data-back="job">← ${r.is_test ? "TEST " : ""}${esc(r.project_id)}</button>
       <h1>Sheet ${r.sheet_number} · ${esc(r.item_code || "")}</h1>
-      <p class="sub">${r.is_test ? `<span class="tag">TEST</span>` : ""}${esc(r.project_id)} · ${esc(r.job_name)}</p>
+      <span class="hsub">${esc(r.job_name)}</span></div>
       ${pager}
       ${flagBand(flagFor(S.flags, r.job_id, S.dept))}
       ${stopped.length ? `<div class="band stop">Work is stopped on this sheet — ${esc(stopped[0].body)}<small>Raised by ${esc(stopped[0].raised_by_name)}, ${esc(agoText(stopped[0].raised_at))}. It clears when the office answers.</small></div>` : ""}
       <div class="counter">
         <div class="count-row">
           <button class="step" data-step="-1" ${r.qty_done <= 0 ? "disabled" : ""} aria-label="One fewer">−</button>
-          <div class="readout"><div class="n num">${r.qty_done}</div><div class="l">of ${r.qty_required} done · ${esc(DEPT_NAME[S.dept])}</div></div>
+          <div class="readout"><div class="n num">${r.qty_done}</div><div class="l">of ${r.qty_required} done<small>${esc(DEPT_NAME[S.dept])}</small></div></div>
           <button class="step" data-step="1" ${full ? "disabled" : ""} aria-label="One more">+</button>
+          ${full ? `<div class="complete">Sheet complete</div>` : `<button class="all" data-all="${r.qty_required}">Mark all ${r.qty_required} done</button>`}
         </div>
-        ${full ? `<div class="complete">Sheet complete</div>` : `<button class="all" data-all="${r.qty_required}">Mark all ${r.qty_required} done</button>`}
       </div>
       <div class="page" id="page">${r.png_path && r.pages_ready ? `<div class="missing">Loading the page…</div>` : `<div class="missing">This sheet's page hasn't been uploaded yet.</div>`}</div>
       <div class="actions">
