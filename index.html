@@ -233,6 +233,38 @@
   .qty.small .step{width:48px; height:48px; font-size:26px}
   .qty.small .n{font-size:30px; min-width:44px}
 
+  /* Advance (managers): pick a job, pick a sheet, set where it is */
+  .tab.adv{border-left:1px solid #2C3348; margin-left:4px}
+  .advjob{display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; width:100%; text-align:left; background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin-bottom:10px; min-height:60px}
+  .advjob.f-critical{border-left:8px solid var(--orange)}
+  .advjob.f-priority{border-left:8px solid var(--bright)}
+  .advsheet{display:block; width:100%; text-align:left; background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:10px}
+  .advsheet .top2{display:flex; gap:12px; align-items:baseline}
+  .advsheet .no{font-size:24px; font-weight:700; width:2.2em}
+  .stgs{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+  .stg{font-size:14px; font-weight:600; padding:4px 9px; border-radius:6px; border:1px solid var(--gray); background:#fff; white-space:nowrap}
+  .stg.done{background:var(--teal); border-color:var(--teal); color:#fff}
+  .stg.part{background:var(--sawdust)}
+  .lane{font-size:15px; font-weight:700; color:var(--ink2); margin:14px 2px 6px}
+  .lane small{font-weight:500}
+  .advrow{display:grid; grid-template-columns:minmax(110px,1fr) auto 280px; align-items:center; gap:10px 14px; background:#fff; border:1.5px solid var(--line); border-radius:12px; padding:10px 14px; margin-bottom:8px}
+  .advrow.done{border-color:var(--teal)}
+  .advrow.changed{border-color:var(--midnight)}
+  .advrow .nm{font-weight:700}
+  .advrow .nm small{display:block; font-weight:500; color:var(--ink2); font-size:14px}
+  .advrow .cnt{display:flex; align-items:center; gap:10px}
+  .advrow .cnt .n{font-size:30px; font-weight:700; min-width:76px; text-align:center; line-height:1}
+  .advrow .cnt .n small{font-size:18px; color:var(--ink2); font-weight:600}
+  .advrow .step{width:56px; height:56px; font-size:30px}
+  .advrow .btns{display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap}
+  .advrow .btns button{background:#fff; border:1px solid var(--gray); border-radius:10px; padding:0 14px; font-weight:700; min-height:52px; white-space:nowrap}
+  .advrow .btns .isdone{display:inline-flex; align-items:center; justify-content:center; background:var(--teal); border:1px solid var(--teal); color:#fff; border-radius:10px; padding:0 14px; font-weight:700; min-height:52px; min-width:112px}
+  @media (max-width: 760px){ .advrow{grid-template-columns:1fr auto} .advrow .btns{grid-column:1 / -1; justify-content:stretch} .advrow .btns > *{flex:1} }
+  .advsave{position:sticky; bottom:10px; z-index:5; background:var(--sawdust); border:2px solid var(--midnight); border-radius:12px; padding:12px 14px; margin:12px 0}
+  .advsave .what{font-weight:600}
+  .advsave .what b{font-family:'Barlow Condensed',sans-serif; font-size:19px}
+  .advsave .rowbtns{margin-top:10px}
+
   /* modal */
   .ovl{position:fixed; inset:0; background:rgba(24,29,46,.55); display:flex; align-items:center; justify-content:center; padding:16px; z-index:40}
   .mdl{background:var(--paper); border-radius:14px; width:100%; max-width:620px; max-height:92vh; overflow:auto; padding:20px}
@@ -561,6 +593,85 @@ function friendlyError(err) {
   return m || "Something went wrong. Try again, and if it keeps happening, take a screenshot.";
 }
 
+/* ---- Advance: managers set where a sheet is, across departments ---- */
+
+/** Wood work runs through these in order. Metal and Full Custom stand on their own. */
+const CHAIN = ["milling", "cnc", "sanding", "finishing", "assembly_qc"];
+const DEPT_ORDER = DEPTS.map(d => d[0]);
+
+/** Who gets the Advance tab: managers, and the Test Supervisor (test jobs only — the database enforces both). */
+function canAdvance(me) {
+  return !!me && (me.role === "manager" || me.role === "admin" || !!me.is_test);
+}
+
+/** Jobs to pick from: in production with a work order. Critical and priority flags first, then soonest delivery. */
+function advJobs(pickJobs, flags, text) {
+  // across every department: the strongest open flag on the job, whole-job or one department's
+  const best = (id) => (flags || []).filter(f => f.job_id === id).sort((a, b) => FLAG_RANK[b.level] - FLAG_RANK[a.level])[0] || null;
+  const pin = (j) => j.flag && j.flag.level !== "watch" ? FLAG_RANK[j.flag.level] : 0;
+  return filterJobs((pickJobs || []).filter(j => j.is_active && j.has_work_order), text)
+    .map(j => ({ ...j, flag: best(j.job_id) }))
+    .sort((a, b) => pin(b) - pin(a) || (a.delivery_date || "9999").localeCompare(b.delivery_date || "9999")
+                 || String(a.project_id).localeCompare(String(b.project_id)));
+}
+
+/** A job's rows (one per sheet per department) as sheets, each with its stages in shop order. */
+function advSheets(rows) {
+  const by = new Map();
+  for (const r of rows || []) {
+    if (!by.has(r.sheet_id)) by.set(r.sheet_id, {
+      sheet_id: r.sheet_id, sheet_number: r.sheet_number, item_code: r.item_code, species: r.species, shape: r.shape,
+      width: r.width, length: r.length, thickness: r.thickness, png_path: r.png_path, pdf_path: r.pdf_path,
+      pages_ready: r.pages_ready, job_id: r.job_id, project_id: r.project_id, job_name: r.job_name, is_test: !!r.is_test, stages: [] });
+    by.get(r.sheet_id).stages.push({ dept: r.department, progress_id: r.progress_id, qty_done: r.qty_done, qty_required: r.qty_required });
+  }
+  const list = [...by.values()];
+  for (const s of list) s.stages.sort((a, b) => DEPT_ORDER.indexOf(a.dept) - DEPT_ORDER.indexOf(b.dept));
+  return list.sort((a, b) => a.sheet_number - b.sheet_number);
+}
+
+/** The count to show for a stage: the unsaved edit if there is one, otherwise the saved count. */
+const advShown = (st, edit) => (edit && st.dept in edit) ? edit[st.dept] : st.qty_done;
+
+/** The wood stages before this one that are on this sheet. */
+function advBefore(stages, dept) {
+  const i = CHAIN.indexOf(dept);
+  if (i <= 0) return [];
+  return stages.filter(st => CHAIN.indexOf(st.dept) >= 0 && CHAIN.indexOf(st.dept) < i);
+}
+
+/** "It's here": every wood stage before this one is marked complete. It only ever fills — nothing is lowered. */
+function advHere(stages, dept, edit) {
+  const next = { ...(edit || {}) };
+  for (const st of advBefore(stages, dept)) next[st.dept] = st.qty_required;
+  return advTidy(stages, next);
+}
+
+/** Drop edits that match what's saved, so "changes" only lists real changes. */
+function advTidy(stages, edit) {
+  const out = {};
+  for (const st of stages) if (edit && st.dept in edit && edit[st.dept] !== st.qty_done) out[st.dept] = edit[st.dept];
+  return out;
+}
+
+/** What Save would change, in shop order. */
+function advChanges(stages, edit) {
+  return stages.filter(st => edit && st.dept in edit && edit[st.dept] !== st.qty_done)
+    .map(st => ({ dept: st.dept, from: st.qty_done, to: edit[st.dept], of: st.qty_required, lower: edit[st.dept] < st.qty_done }));
+}
+
+/** Advance saves still waiting to send, laid over what the database last said (oldest first, so the newest wins). */
+function withAdvPending(rows, logbox) {
+  const waiting = Object.values(logbox || {}).filter(e => e.fn === "advance_sheet")
+    .sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  if (!waiting.length) return rows;
+  return (rows || []).map(r => {
+    let q = r.qty_done;
+    for (const e of waiting) if (e.args.p_sheet === r.sheet_id && r.department in e.args.p_counts) q = e.args.p_counts[r.department];
+    return q === r.qty_done ? r : { ...r, qty_done: q };
+  });
+}
+
 /* ---- photos ---- */
 
 /** Fit a photo inside max × max pixels, keeping its shape. Never enlarges. */
@@ -679,6 +790,9 @@ if (typeof document !== "undefined") (function () {
     pending: [],                // photos still on this tablet, waiting to send (no image bytes kept here)
     loadouts: [], localLoadouts: store.get("loadouts_local", []), loView: null,
     loForm: { jobId: null, filter: "" }, loItem: "", loPhotos: [], viewer: null,
+    // Advance (managers only): a job, a sheet on it, and unsaved changes to that sheet
+    adv: store.get("adv", false), advJob: null, advSheet: null, advRows: [], advAt: null, advCached: false,
+    advEdit: {}, advFilter: "", advLoading: false,
   };
   const pageUrls = new Map();
 
@@ -816,6 +930,7 @@ if (typeof document !== "undefined") (function () {
     S.depts = departmentsFor(me);
     if (!S.depts.includes(S.dept)) S.dept = S.depts[0] || null;
     if (!tabs().includes(S.tab)) S.tab = tabs()[0];
+    if (!canAdvance(me)) S.adv = false;
     return me;
   }
 
@@ -932,6 +1047,26 @@ if (typeof document !== "undefined") (function () {
     mergePhotos(await read("photos", db.from("v_photos").select("*").eq("job_id", r.job_id), null));
   }
 
+  // ---------- Advance: every department's counts for one job ----------
+  async function loadAdvRows(jobId) {
+    if (!jobId) return;
+    S.advLoading = true;
+    let res;
+    try { res = await db.from("v_floor_sheets").select("*").eq("job_id", jobId); } catch (e) { res = { error: e }; }
+    S.advLoading = false;
+    if (S.advJob !== jobId) return;                           // moved on while it loaded
+    if (res.error || !Array.isArray(res.data)) {
+      const cached = store.get("advrows_" + jobId, null);
+      if (cached) { S.advRows = cached.rows; S.advAt = cached.at; S.advCached = true; }
+      if (res.error && !isNetworkError(res.error)) S.notice = friendlyError(res.error);
+      else S.online = false;
+      return;
+    }
+    S.advRows = res.data; S.advAt = new Date().toISOString(); S.advCached = false;
+    store.set("advrows_" + jobId, { rows: S.advRows, at: S.advAt });
+  }
+  const advNow = () => advSheets(withAdvPending(withPending(S.advRows, S.outbox), S.logbox));
+
   async function loadTab() {
     if (S.tab === "work") return loadRows();
     if (S.tab === "problems") return loadProblems();
@@ -980,6 +1115,7 @@ if (typeof document !== "undefined") (function () {
       const said = typeof last.data === "string" ? last.data : last.data && last.data.summary;
       if (said) showToast(said);
       await refreshAll();
+      if (S.adv && S.advJob) await loadAdvRows(S.advJob);
       if (S.view.screen === "sheet") { const cur = rowsNow().find(x => x.progress_id === S.view.progressId); if (cur) await loadPiece(cur); }
     }
     render();
@@ -1080,11 +1216,13 @@ if (typeof document !== "undefined") (function () {
   }
 
   function topBar() {
-    const tabs = S.depts.length > 1
-      ? `<nav class="tabs">${S.depts.map(k => `<button class="tab" data-dept="${k}" aria-current="${k === S.dept}">${esc(DEPT_NAME[k])}</button>`).join("")}</nav>` : "";
+    const adv = canAdvance(S.me);
+    const tabs = S.depts.length > 1 || adv
+      ? `<nav class="tabs">${S.depts.map(k => `<button class="tab" data-dept="${k}" aria-current="${k === S.dept && !S.adv}">${esc(DEPT_NAME[k])}</button>`).join("")}${
+          adv ? `<button class="tab adv" data-adv="1" aria-current="${!!S.adv}">Advance</button>` : ""}</nav>` : "";
     return `<header class="top"><div class="top-row">
         <span class="brand">SHOP FLOOR</span>${tabs}${syncBadge()}
-        <span class="who"><b>${esc(S.me.name)}</b>${S.depts.length === 1 ? ` · ${esc(DEPT_NAME[S.dept])}` : ""}</span>
+        <span class="who"><b>${esc(S.me.name)}</b>${S.depts.length === 1 && !adv ? ` · ${esc(DEPT_NAME[S.dept])}` : ""}</span>
       </div></header>`;
   }
 
@@ -1553,17 +1691,110 @@ if (typeof document !== "undefined") (function () {
     return `<div class="ovl" data-close="1"><div class="mdl" role="dialog" aria-modal="true">${inner}</div></div>`;
   }
 
+  // ---------- Advance (managers): job → sheet → where it is ----------
+  function advScreen() {
+    if (S.advJob && S.advSheet) return advSheetScreen();
+    if (S.advJob) return advJobScreen();
+    const list = advJobs(S.pickJobs, S.flags, S.advFilter);
+    return `<h1>Advance</h1>
+      <p class="sub">Pick a job, then a sheet, then set where it is in the shop. Every change is saved under your name as a manager adjustment.</p>
+      <input class="in" data-advfilter placeholder="Type part of the PROJ number or name" value="${esc(S.advFilter)}" inputmode="search" autocomplete="off" style="margin-bottom:12px">
+      ${list.length ? list.slice(0, 80).map(j => {
+        const dl = daysLeft(j.delivery_date);
+        return `<button class="advjob${j.flag && j.flag.level !== "watch" ? " f-" + j.flag.level : ""}" data-advjob="${esc(j.job_id)}">
+          <span class="pid">${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</span><span class="jname">${esc(j.job_name)}</span>
+          <span class="due">Due ${esc(fmtDate(j.delivery_date))}${dl === null ? "" : ` · <b>${esc(daysText(dl))}</b>`}</span>
+          ${j.flag ? `<span style="flex-basis:100%">${flagTag(j.flag)}</span>` : ""}</button>`;
+      }).join("") : `<div class="empty">${S.pickJobs.length
+          ? (S.advFilter ? "<b>No job matches that</b>Check the number, or clear the box." : "<b>No jobs to advance</b>Jobs show here once they're in production and their work order is uploaded.")
+          : "Loading the jobs…"}</div>`}`;
+  }
+
+  const advJobInfo = () => S.pickJobs.find(j => j.job_id === S.advJob) || (advNow()[0] || {});
+  function advCachedNote() {
+    if (!S.advCached || !S.advAt) return "";
+    const t = new Date(S.advAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    return `<div class="banner info">No connection — showing this job's counts from ${esc(t)}. Anything you save is kept and sends when the connection is back.</div>`;
+  }
+
+  function advJobScreen() {
+    const sheets = advNow(), j = advJobInfo();
+    const head = `<div class="head"><button class="back" data-advback="jobs">← All jobs</button>
+      <h1>${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id || "")}</h1>
+      <span class="hsub">${esc(j.job_name || "")}${j.delivery_date ? ` · due ${esc(fmtDate(j.delivery_date))}` : ""} · ${sheets.length} sheet${sheets.length === 1 ? "" : "s"}</span></div>`;
+    if (!sheets.length) return head + advCachedNote() + `<div class="empty">${S.advLoading ? "Loading the sheets…"
+      : "<b>No sheets to show</b>This job's work order has no counted sheets, or it couldn't be loaded. Try again with a connection."}</div>`;
+    return head + advCachedNote() + sheets.map(s => {
+      const size = [s.width, s.length, s.thickness].filter(Boolean).join(" × ");
+      return `<button class="advsheet" data-advsheet="${esc(s.sheet_id)}">
+        <div class="top2"><span class="no num">${s.sheet_number}</span><span class="meta"><b>${esc(s.item_code || "Sheet " + s.sheet_number)}</b>
+          <span class="meta2">${esc([s.species, s.shape, size].filter(Boolean).join(" · "))}</span></span></div>
+        <div class="stgs">${s.stages.map(st => {
+          const cls = st.qty_done >= st.qty_required ? " done" : st.qty_done > 0 ? " part" : "";
+          return `<span class="stg${cls}">${esc(DEPT_NAME[st.dept])} <span class="num">${st.qty_done}/${st.qty_required}</span></span>`;
+        }).join("")}</div></button>`;
+    }).join("");
+  }
+
+  function advSheetScreen() {
+    const sheets = advNow(), at = sheets.findIndex(x => x.sheet_id === S.advSheet), s = sheets[at];
+    if (!s) { S.advSheet = null; return advJobScreen(); }
+    const prev = sheets[at - 1], next = sheets[at + 1];
+    const pager = `<div class="pager">
+      <button data-advgo="${prev ? esc(prev.sheet_id) : ""}" ${prev ? "" : "disabled"}>← ${prev ? `Sheet ${prev.sheet_number} · ${esc(prev.item_code || "")}` : "Previous"}</button>
+      <span class="pos num">${at + 1} / ${sheets.length}</span>
+      <button data-advgo="${next ? esc(next.sheet_id) : ""}" ${next ? "" : "disabled"}>${next ? `Sheet ${next.sheet_number} · ${esc(next.item_code || "")}` : "Next"} →</button></div>`;
+    const row = (st) => {
+      const n = advShown(st, S.advEdit), full = n >= st.qty_required, changed = st.dept in S.advEdit;
+      const state = changed ? `was ${st.qty_done}` : full ? "Complete" : n > 0 ? "Part done" : "Not started";
+      return `<div class="advrow${changed ? " changed" : full ? " done" : ""}">
+        <div class="nm">${esc(DEPT_NAME[st.dept])}<small>${esc(state)}</small></div>
+        <div class="cnt"><button class="step" data-advstep="-1" data-d="${st.dept}" ${n <= 0 ? "disabled" : ""} aria-label="One fewer, ${esc(DEPT_NAME[st.dept])}">−</button>
+          <span class="n num">${n}<small> / ${st.qty_required}</small></span>
+          <button class="step" data-advstep="1" data-d="${st.dept}" ${full ? "disabled" : ""} aria-label="One more, ${esc(DEPT_NAME[st.dept])}">+</button></div>
+        <div class="btns">${advBefore(s.stages, st.dept).length ? `<button data-advhere="${st.dept}">It's here</button>` : ""}
+          ${full ? `<span class="isdone">Complete</span>` : `<button data-advall="${st.dept}">All ${st.qty_required} done</button>`}</div></div>`;
+    };
+    const wood = s.stages.filter(st => CHAIN.includes(st.dept)), own = s.stages.filter(st => !CHAIN.includes(st.dept));
+    const ch = advChanges(s.stages, S.advEdit);
+    return `<div class="head"><button class="back" data-advback="job">← ${s.is_test ? "TEST " : ""}${esc(s.project_id)}</button>
+        <h1>Sheet ${s.sheet_number} · ${esc(s.item_code || "")}</h1><span class="hsub">${esc(s.job_name)}</span></div>
+      ${pager}${advCachedNote()}
+      ${wood.length ? `<div class="lane">In order <small>— “It's here” marks every stage before it complete</small></div>${wood.map(row).join("")}` : ""}
+      ${own.length ? `<div class="lane">On their own</div>${own.map(row).join("")}` : ""}
+      ${ch.length ? `<div class="advsave"><div class="what">Will save: ${ch.map(c => `${esc(DEPT_NAME[c.dept])} ${c.from} → <b>${c.to}</b>`).join(" · ")}</div>
+        ${ch.some(c => c.lower) ? `<div class="meta2">This lowers a count — you'll be asked to confirm.</div>` : ""}
+        <div class="rowbtns"><button class="go" data-advsave="1">Save</button><button data-advundo="1">Undo changes</button></div></div>`
+        : `<p class="sub" style="margin-top:10px">Nothing changes until you press Save.</p>`}
+      <div class="page" id="advpage">${s.png_path && s.pages_ready ? `<div class="missing">Loading the page…</div>` : `<div class="missing">This sheet's page hasn't been uploaded yet.</div>`}</div>`;
+  }
+
+  async function advShowPage() {
+    const s = advNow().find(x => x.sheet_id === S.advSheet);
+    const el = document.getElementById("advpage");
+    if (!s || !el || !s.png_path || !s.pages_ready) return;
+    try {
+      const url = await pageImage(s.png_path);
+      const now = document.getElementById("advpage");
+      if (!now || S.advSheet !== s.sheet_id) return;             // moved on while it loaded
+      now.innerHTML = `<img alt="Work order ${esc(s.project_id)} sheet ${s.sheet_number}" src="${url}">`;
+    } catch (e) {
+      el.innerHTML = `<div class="missing">${esc(isNetworkError(e) ? "No connection, and this page hasn't been opened on this tablet before." : friendlyError(e))}</div>`;
+    }
+  }
+
   function render() {
     if (!S.me) return;
     let body;
-    if (S.tab === "work" && S.view.screen === "sheet") body = sheetScreen();
+    if (S.adv) body = advScreen();
+    else if (S.tab === "work" && S.view.screen === "sheet") body = sheetScreen();
     else if (S.tab === "work" && S.view.screen === "job") body = jobScreen();
     else {
       const top = S.tab === "problems" ? problemsScreen() : S.tab === "log" ? logScreen() : S.tab === "supplies" ? suppliesScreen()
                 : S.tab === "loadout" ? loadoutScreen() : queueScreen();
       body = subTabs() + top;
     }
-    const topLevel = !(S.tab === "work" && S.view.screen !== "queue");
+    const topLevel = S.adv ? !S.advJob : !(S.tab === "work" && S.view.screen !== "queue");
     const foot = topLevel ? `<div class="foot"><button class="link" data-signout="1">Sign out</button></div>` : "";
     const scroll = S.modal ? (document.querySelector(".mdl") || {}).scrollTop : null;
     app.innerHTML = topBar() + `<main>${banners()}${pinnedTasks()}${body}${foot}</main>` + modalHtml()
@@ -1571,7 +1802,8 @@ if (typeof document !== "undefined") (function () {
     if (scroll) { const m = document.querySelector(".mdl"); if (m) m.scrollTop = scroll; }
     wire();
     fillPhotos();
-    if (S.tab === "work" && S.view.screen === "sheet") showPage();
+    if (S.adv) { if (S.advJob && S.advSheet) advShowPage(); }
+    else if (S.tab === "work" && S.view.screen === "sheet") showPage();
   }
 
   async function showPage() {
@@ -1614,15 +1846,84 @@ if (typeof document !== "undefined") (function () {
     if (jobId && !S.pickSheets[jobId]) { await loadPickSheets(jobId); render(); }
   }
 
+  /** Leaving an Advance sheet with changes not yet saved asks first. */
+  function advLeave(go) {
+    const s = S.adv && S.advSheet ? advNow().find(x => x.sheet_id === S.advSheet) : null;
+    if (!s || !advChanges(s.stages, S.advEdit).length) return go();
+    S.modal = { kind: "confirm", title: "Leave without saving?", text: `Your changes to sheet ${s.sheet_number} haven't been saved.`,
+                yes: "Leave without saving", run: () => { S.advEdit = {}; go(); } };
+    render();
+  }
+
+  /** A department tab: exactly what it always did, and it leaves Advance. */
+  async function pickDept(dept) {
+    S.adv = false; store.set("adv", false);
+    S.dept = dept; store.set("dept", S.dept);
+    if (!tabs().includes(S.tab)) S.tab = tabs()[0];
+    S.view = { screen: "queue" }; S.rows = (store.get("rows_" + S.dept, { rows: [] })).rows; S.problems = []; S.defects = []; S.supplies = []; S.qcJob = null;
+    render();
+    await loadTab(); render();
+  }
+
   const projectOf = (jobId) => (S.pickJobs.find(x => x.job_id === jobId) || rowsNow().find(x => x.job_id === jobId) || {}).project_id;
   function wire() {
     const on = (sel, fn) => app.querySelectorAll(sel).forEach(el => el.onclick = (ev) => fn(el, ev));
-    on("[data-dept]", async (b) => {
-      S.dept = b.dataset.dept; store.set("dept", S.dept);
-      if (!tabs().includes(S.tab)) S.tab = tabs()[0];
-      S.view = { screen: "queue" }; S.rows = (store.get("rows_" + S.dept, { rows: [] })).rows; S.problems = []; S.defects = []; S.supplies = []; S.qcJob = null;
+    on("[data-dept]", (b) => advLeave(() => pickDept(b.dataset.dept)));
+
+    // ---- Advance ----
+    on("[data-adv]", async () => {
+      if (S.adv) { if (S.advJob) advLeave(() => { S.advJob = null; S.advSheet = null; render(); scrollTo(0, 0); }); return; }
+      S.adv = true; store.set("adv", true); S.notice = null; S.advSheet = null; render(); scrollTo(0, 0);
+      await Promise.all([loadPickJobs(), loadFlags(), S.advJob ? loadAdvRows(S.advJob) : null]); render();
+    });
+    app.querySelectorAll("[data-advfilter]").forEach(inp => inp.oninput = () => {
+      S.advFilter = inp.value;
+      const pos = inp.selectionStart; render();
+      const again = app.querySelector("[data-advfilter]"); if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) {} }
+    });
+    on("[data-advjob]", async (b) => {
+      S.advJob = b.dataset.advjob; S.advSheet = null; S.advEdit = {}; S.advCached = false;
+      const cached = store.get("advrows_" + S.advJob, null);
+      S.advRows = cached ? cached.rows : []; S.advAt = cached ? cached.at : null;
+      render(); scrollTo(0, 0);
+      await loadAdvRows(S.advJob); render();
+    });
+    on("[data-advback]", (b) => advLeave(async () => {
+      if (b.dataset.advback === "jobs") { S.advJob = null; S.advSheet = null; render(); scrollTo(0, 0); await loadPickJobs(); render(); }
+      else { S.advSheet = null; render(); scrollTo(0, 0); await loadAdvRows(S.advJob); render(); }
+    }));
+    const openAdvSheet = (id) => advLeave(() => { S.advSheet = id; S.advEdit = {}; render(); scrollTo(0, 0); });
+    on("[data-advsheet]", (b) => openAdvSheet(b.dataset.advsheet));
+    on("[data-advgo]", (b) => { if (b.dataset.advgo) openAdvSheet(b.dataset.advgo); });
+    const advCur = () => advNow().find(x => x.sheet_id === S.advSheet);
+    on("[data-advstep]", (b) => {
+      const s = advCur(); if (!s) return;
+      const st = s.stages.find(x => x.dept === b.dataset.d); if (!st) return;
+      const n = Math.max(0, Math.min(st.qty_required, advShown(st, S.advEdit) + Number(b.dataset.advstep)));
+      S.advEdit = advTidy(s.stages, { ...S.advEdit, [st.dept]: n }); render();
+    });
+    on("[data-advall]", (b) => {
+      const s = advCur(); if (!s) return;
+      const st = s.stages.find(x => x.dept === b.dataset.advall); if (!st) return;
+      S.advEdit = advTidy(s.stages, { ...S.advEdit, [st.dept]: st.qty_required }); render();
+    });
+    on("[data-advhere]", (b) => { const s = advCur(); if (s) { S.advEdit = advHere(s.stages, b.dataset.advhere, S.advEdit); render(); } });
+    on("[data-advundo]", () => { S.advEdit = {}; render(); });
+    on("[data-advsave]", () => {
+      const s = advCur(); if (!s) return;
+      const ch = advChanges(s.stages, S.advEdit);
+      if (!ch.length) return;
+      const save = () => {
+        S.advEdit = {};
+        send("advance_sheet", { p_sheet: s.sheet_id, p_counts: Object.fromEntries(ch.map(c => [c.dept, c.to])), p_client_id: null },
+             `${s.project_id} sheet ${s.sheet_number}`);
+      };
+      const lower = ch.filter(c => c.lower);
+      if (!lower.length) return save();
+      S.modal = { kind: "confirm", title: "Lower a count?",
+                  text: `${lower.map(c => `${DEPT_NAME[c.dept]} goes from ${c.from} back to ${c.to}`).join("; ")}. The old number stays in the history.`,
+                  yes: "Yes, save it", run: save };
       render();
-      await loadTab(); render();
     });
     on("[data-tab]", async (b) => {
       S.tab = b.dataset.tab; store.set("tab", S.tab); S.view = { screen: "queue" }; S.notice = null; render(); scrollTo(0, 0);
@@ -1901,7 +2202,7 @@ if (typeof document !== "undefined") (function () {
     if (S.tab !== "work") await loadTab();
     render();
     flushLog();
-    loadPickJobs();
+    loadPickJobs().then(() => { if (S.adv) render(); });
   }
 
   // ---------- keep things current ----------
@@ -1909,6 +2210,8 @@ if (typeof document !== "undefined") (function () {
   window.addEventListener("offline", () => { S.online = false; render(); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden && S.me) { flush(); flushLog(); if (S.view.screen === "queue" && !S.modal) refreshAll().then(render); } });
   setInterval(() => { if (S.me && !document.hidden) { flush(); flushLog(); if (S.view.screen === "queue" && !S.modal) refreshAll().then(render); } }, 60000);
+  // Advance: a job's counts stay current while it's open, unless there are changes not yet saved
+  setInterval(() => { if (S.me && S.adv && S.advJob && !document.hidden && !S.modal && !Object.keys(S.advEdit).length) loadAdvRows(S.advJob).then(render); }, 60000);
 
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 
@@ -1924,7 +2227,8 @@ if (typeof document !== "undefined") (function () {
 if (typeof module !== "undefined") module.exports = { keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
   daysLeft, daysText, fmtDate, localISO, daysSince, agoText, setPending, flushOutbox, newId, queueEntry, flushLogbox, dueForMe, taskWhen,
   problemState, splitProblems, defectCounts, supplyLine, filterJobs, sheetsText, isNetworkError, friendlyError, DEPTS,
-  fitSize, photoPath, photoError, flushPhotobox, loadoutSheets };
+  fitSize, photoPath, photoError, flushPhotobox, loadoutSheets,
+  CHAIN, canAdvance, advJobs, advSheets, advShown, advBefore, advHere, advTidy, advChanges, withAdvPending };
 </script>
 </body>
 </html>
