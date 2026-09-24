@@ -64,6 +64,76 @@
   .link{background:none; border:none; color:var(--ink2); text-decoration:underline; padding:6px}
   .link:disabled{opacity:.3; text-decoration:none; cursor:default}
 
+  /* ☰ menu: the other pages, Setup, sign out */
+  .menubtn{display:flex; align-items:center; justify-content:center; width:44px; height:40px; border:none; border-radius:8px; background:#2C3348; flex-shrink:0}
+  .mshade{position:fixed; inset:0; z-index:30; background:rgba(24,29,46,.35); border:none; padding:0; cursor:default}
+  .menu{position:fixed; z-index:31; top:0; left:0; bottom:0; width:min(320px, 88vw); background:#fff; box-shadow:8px 0 28px rgba(24,29,46,.25); padding:14px 12px; display:flex; flex-direction:column; gap:2px; overflow:auto}
+  .menu .mhead{display:flex; align-items:center; justify-content:space-between; padding:2px 6px 10px 12px}
+  .menu .mhead b{font-family:'Barlow Condensed',sans-serif; letter-spacing:.14em; color:var(--orange)}
+  .menu .mlabel{font-size:13px; font-weight:700; letter-spacing:.08em; color:var(--ink2); padding:6px 12px; text-transform:uppercase}
+  .menu a,.menu .mitem{display:flex; flex-direction:column; justify-content:center; min-height:56px; padding:4px 14px; border-radius:10px; color:var(--midnight); text-decoration:none; font-weight:700; background:none; border:none; text-align:left; width:100%}
+  .menu a small,.menu .mitem small{font-size:14px; font-weight:400; color:var(--ink2)}
+  .menu a:hover,.menu .mitem:hover{background:var(--paper)}
+  .menu [aria-current="page"],.menu [aria-current="true"]{background:var(--midnight); color:var(--sawdust)}
+  .menu [aria-current="page"] small,.menu [aria-current="true"] small{color:#CFC9B8}
+  .menu .mline{border-top:1px solid var(--line); margin:10px 4px}
+  .menu .ver{margin-top:auto; padding:12px 14px 4px; font-size:14px; color:var(--ink2)}
+
+  /* find a job, in the header */
+  .find{position:relative; margin-left:auto; flex:0 1 250px; min-width:150px}
+  .find input{width:100%; background:#2C3348; border:none; border-radius:8px; color:var(--sawdust); padding:8px 12px; font-size:15px}
+  .find input::placeholder{color:#9AA0B4}
+  .hits{position:absolute; right:0; top:calc(100% + 6px); width:min(420px, 92vw); background:#fff; color:var(--midnight); border:1px solid var(--gray); border-radius:12px; box-shadow:0 12px 32px rgba(24,29,46,.25); padding:6px; z-index:32}
+  .hits button{display:flex; gap:10px; align-items:baseline; width:100%; text-align:left; background:none; border:none; border-radius:8px; padding:10px 12px}
+  .hits button:hover,.hits button.first{background:var(--paper)}
+  .hits b{white-space:nowrap}
+  .hits .hn{flex:1 1 auto; min-width:0; color:var(--ink2); font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .hits .hp{margin-left:auto; font-size:13px; color:var(--ink2); white-space:nowrap}
+  .hits .none{padding:10px 12px; color:var(--ink2)}
+  .who{margin-left:0}
+  .pidlink{background:none; border:none; padding:0; font-weight:700; color:inherit; border-bottom:1.5px solid var(--orange); cursor:pointer}
+
+  /* the Monday sync alert, top of Needs you */
+  .syncalert{display:flex; gap:18px; align-items:flex-start; background:var(--sawdust); border:2px solid var(--bright); border-radius:12px; padding:16px 20px; margin-bottom:22px; color:var(--warn)}
+  .syncalert h2{margin:0 0 4px; color:var(--warn)}
+  .syncalert .reply{color:var(--ink2); font-size:15px; margin-top:8px}
+  .syncalert .go{background:var(--midnight); white-space:nowrap}
+
+  /* the job page */
+  .jobhead h1{font-size:32px}
+  .jobhead .jn{font-size:20px; font-weight:600; margin-left:10px}
+  .jobband{border-radius:10px; padding:10px 16px; font-weight:700; margin:0 0 16px}
+  .jobband.priority{background:var(--bright); color:var(--midnight)}
+  .jobband.critical{background:var(--orange); color:#fff}
+  .jobband.watch{background:#fff; border:1.5px solid var(--midnight)}
+  .jobband small{font-weight:400; margin-left:8px; font-size:15px}
+  .jobcols{display:grid; grid-template-columns:minmax(0,1fr) 330px; gap:20px; align-items:start}
+  @media (max-width: 1000px){ .jobcols{grid-template-columns:minmax(0,1fr)} }
+  .grid{display:grid; gap:6px; font-size:15px; min-width:min-content}
+  .grid .gh{font-weight:700; text-align:center; padding:4px 2px; line-height:1.15; align-self:end}
+  .grid .gs{padding:6px 0; line-height:1.15; white-space:nowrap}
+  .grid .gs small{display:block; color:var(--ink2); font-size:14px}
+  .grid .c{font-family:'Barlow Condensed',sans-serif; font-variant-numeric:tabular-nums; text-align:center; border-radius:8px; padding:9px 4px; font-weight:700; font-size:18px}
+  .grid .c.done{background:var(--teal); color:#fff}
+  .grid .c.part{background:var(--sawdust); border:1px solid var(--gray)}
+  .grid .c.zero{background:#fff; border:1px solid var(--gray); color:var(--ink2)}
+  .grid .c.no{color:var(--gray); font-weight:600}
+  .grid .tot{padding:4px 2px 8px; border-bottom:1px solid var(--line)}
+  .grid .tot .c{padding:2px; font-size:18px}
+  .grid .tbar{height:8px; background:var(--paper); border-radius:99px; overflow:hidden}
+  .grid .tbar i{display:block; height:100%; background:var(--orange); border-radius:99px}
+  .grid .tbar i.full{background:var(--teal)}
+  .gkey{display:flex; flex-wrap:wrap; gap:14px; font-size:14px; color:var(--ink2); align-items:center}
+  .gkey span{display:inline-flex; align-items:center; gap:6px}
+  .gkey i{display:inline-block; width:14px; height:14px; border-radius:3px}
+  main.wide{max-width:1300px}
+  .brand{white-space:nowrap}
+  @media (max-width: 1420px){ .place{display:none} }
+  .side .panel{padding:14px 16px; margin-bottom:14px}
+  .side h2{font-size:19px}
+  .side .row{font-size:15px; padding:6px 0; border-top:1px solid var(--line)}
+  .side .row:first-of-type{border-top:none}
+
   /* your tasks */
   .task{display:grid; grid-template-columns:1fr auto; gap:4px 18px; padding:14px 0; border-bottom:1px solid var(--line)}
   .task:last-child{border-bottom:none}
@@ -205,7 +275,8 @@
 <body>
 <div id="app"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<!-- the Supabase library, checked: the browser refuses it if even one byte differs from the published file -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
 <script>
 /* =====================================================================
    THE TWO SETTINGS — the same two lines as upload.html and index.html.
@@ -504,6 +575,7 @@ function atDate(at) {
 /* ---- the signed ticket (the same as delivery.html's): the ticket as issued, then one signature page ---- */
 const DL_TZ = "America/Indiana/Indianapolis";
 const PDF_LIB_URL = "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
+const PDF_LIB_SRI = "sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI";   // the browser refuses the file if it has been altered
 function fmtWhen(ts, withYear = false) {
   if (!ts) return "";
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: DL_TZ, weekday: "short", month: "short", day: "numeric", year: "numeric",
@@ -614,6 +686,63 @@ function normProject(text) {
 
 
 /* ---- the screen ---- */
+/* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
+const OFFICE_VERSION = "24 Sep 2026";
+const SYNC_ALERT_MINUTES = 60;
+
+// Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
+// Returns null when all is well, or what the alert should say.
+function syncHealth(last, good, now = new Date()) {
+  const mins = (ts) => (now - new Date(ts)) / 60000;
+  if (good && mins(good.run_at) <= SYNC_ALERT_MINUTES) return null;
+  if (!last) return { title: "The Monday sync hasn't run yet", since: null, reply: null, stopped: true };
+  const since = good ? good.run_at : null;
+  const running = mins(last.run_at) <= 30;          // the timer is still calling Monday, and Monday is failing
+  return { title: since ? `Monday hasn't synced for ${agoWords(since, now)}` : "The Monday sync has never worked",
+           since, reply: !last.ok ? (last.summary || null) : null, stopped: !running };
+}
+function agoWords(ts, now = new Date()) {
+  const m = Math.max(0, Math.round((now - new Date(ts)) / 60000));
+  if (m < 90) return `${m} minute${m === 1 ? "" : "s"}`;
+  const h = Math.round(m / 60);
+  if (h < 36) return `${h} hour${h === 1 ? "" : "s"}`;
+  const d = Math.round(h / 24);
+  return `${d} day${d === 1 ? "" : "s"}`;
+}
+
+// jobs matching what's typed in Find a job: "418" finds PROJ-00418; words search the name too
+function jobMatches(jobs, text, max = 8) {
+  const t = String(text || "").trim().toLowerCase();
+  if (!t) return [];
+  const digits = t.replace(/\D/g, "");
+  const hit = (j) => {
+    const pid = String(j.project_id || "").toLowerCase(), name = String(j.name || "").toLowerCase();
+    if (/^\d+$/.test(t)) return pid.replace(/\D/g, "").replace(/^0+/, "").includes(t.replace(/^0+/, "") || "0");
+    if (digits && /^proj/.test(t)) return pid.includes(t) || pid.replace(/\D/g, "").endsWith(digits);
+    return pid.includes(t) || name.includes(t);
+  };
+  return jobs.filter(hit)
+    .sort((a, b) => (b.is_active - a.is_active) || (a.is_test - b.is_test) || String(b.project_id).localeCompare(String(a.project_id)))
+    .slice(0, max);
+}
+
+// the job page's grid: a row per sheet, a column per department that touches the job
+function jobGrid(sheets, progress) {
+  const bySheet = new Map();
+  for (const p of progress) { if (!bySheet.has(p.sheet_id)) bySheet.set(p.sheet_id, {}); bySheet.get(p.sheet_id)[p.department] = p; }
+  const depts = DEPT_ORDER.filter(d => progress.some(p => p.department === d));
+  const cell = (p) => !p ? { kind: "no", text: "—" }
+    : { kind: p.qty_done >= p.qty_required ? "done" : p.qty_done > 0 ? "part" : "zero", text: `${p.qty_done}/${p.qty_required}` };
+  const rows = [...sheets].sort((a, b) => a.sheet_number - b.sheet_number)
+    .map(s => ({ n: s.sheet_number, code: s.item_code || "", cells: depts.map(d => cell((bySheet.get(s.id) || {})[d])) }));
+  const totals = depts.map(d => {
+    const ps = progress.filter(p => p.department === d);
+    const done = ps.reduce((a, p) => a + Math.min(p.qty_done, p.qty_required), 0), req = ps.reduce((a, p) => a + p.qty_required, 0);
+    return { dept: d, done, req, pct: req ? Math.round(done / req * 100) : 0 };
+  });
+  return { depts, rows, totals };
+}
+
 if (typeof document !== "undefined") (function () {
   const app = document.getElementById("app");
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -645,9 +774,12 @@ if (typeof document !== "undefined") (function () {
     supItems: [], supMissing: false, supEdit: null,
     // photos
     photos: [], photoStatus: null, photoMissing: false, phText: "", phJob: null, viewer: null, arch: null, jobZip: null,
+    // this build: the menu, the sync alert, find a job, the job page
+    menu: false, sync: null, allJobs: null, jobFind: "", jobView: null, job: null,
   };
+  // Setup lives in the ☰ menu now (it's the least-used); it still opens as a screen of its own
   const TABS = [["tasks", "Needs you"], ["flags", "Flags"], ["arrow", "Arrow"], ["routine", "Routine tasks"],
-                ["departments", "Departments"], ["photos", "Photos"], ["setup", "Setup"]];
+                ["departments", "Departments"], ["photos", "Photos"]];
 
   // ---------- data ----------
   const q = async (p) => { const { data, error } = await p; if (error) throw error; return data; };
@@ -670,7 +802,14 @@ if (typeof document !== "undefined") (function () {
     if (arr) S.arrow = arr.concat((S.arrow || []).filter(a => !a.at_vendor));
     if (set) { const a = set.find(s => s.key === "arrow_alert_days"); if (a) S.arrowDays = Number(a.value);
                const t = set.find(s => s.key === "tv_link_made"); S.tvMade = t ? t : null; }
-    await loadPhotoStatus();
+    await Promise.all([loadPhotoStatus(), loadSync()]);
+  }
+  async function loadSync() {
+    const [last, good] = await Promise.all([
+      quiet(db.from("monday_sync_log").select("run_at, ok, summary").order("run_at", { ascending: false }).limit(1)),
+      quiet(db.from("monday_sync_log").select("run_at, ok, summary").eq("ok", true).order("run_at", { ascending: false }).limit(1))]);
+    // couldn't read it (no connection): say nothing, rather than a false alarm
+    if (last && good) S.sync = { last: last[0] || null, good: good[0] || null };
   }
   // the archive reminder. Quiet if photos.sql hasn't been run: nothing else on the page depends on it.
   async function loadPhotoStatus() {
@@ -765,18 +904,48 @@ if (typeof document !== "undefined") (function () {
       photos: S.photoStatus && S.photoStatus.due ? 1 : 0,
     };
     // everything that needs the office is on one tab, so only that tab carries a number
-    c.tasks = c.handoffs + c.problems + c.flags + c.ordering + c.arrow + c.photos;
+    c.sync = syncProblem() ? 1 : 0;
+    c.tasks = c.handoffs + c.problems + c.flags + c.ordering + c.arrow + c.photos + c.sync;
     return c;
   }
   function topBar() {
     const c = counts();
     return `<header class="top"><div class="top-row">
+        <button class="menubtn" data-menu="1" aria-label="Menu" aria-haspopup="true" aria-expanded="${!!S.menu}"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#FFF4D5" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h16M3 11h16M3 16h16"/></svg></button>
         <span class="brand">SHOP FLOOR</span><span class="place">Office</span>
         <nav class="tabs">${TABS.map(([k, label]) =>
-          `<button class="tab" data-tab="${k}" aria-current="${S.tab === k}">${label}${k === "tasks" && c.tasks ? `<span class="n">${c.tasks}</span>` : ""}</button>`).join("")}</nav>
+          `<button class="tab" data-tab="${k}" aria-current="${S.tab === k && !S.jobView}">${label}${k === "tasks" && c.tasks ? `<span class="n">${c.tasks}</span>` : ""}</button>`).join("")}</nav>
+        <div class="find"><input data-jobfind="1" value="${esc(S.jobFind)}" placeholder="Find a job — PROJ or name" aria-label="Find a job" autocomplete="off" inputmode="search">
+          <div class="hits" id="jobhits" hidden>${hitsHtml()}</div></div>
         <span class="who"><b>${esc(S.me.name)}</b></span>
         ${(store.get("pin", null) || {}).hash ? `<button class="lockbtn" data-lock="1">Lock</button>` : ""}
       </div></header>`;
+  }
+
+  function hitsHtml() {
+    if (!S.jobFind.trim()) return "";
+    if (!S.allJobs) return `<div class="none">Loading the jobs…</div>`;
+    const hits = jobMatches(S.allJobs, S.jobFind);
+    if (!hits.length) return `<div class="none">No job matches that.</div>`;
+    return hits.map((j, i) => `<button class="${i === 0 ? "first" : ""}" data-openjob="${esc(j.id)}"><b>${testTag(j)}${esc(j.project_id || "(no PROJ number)")}</b>
+      <span class="hn">${esc(j.name)}</span><span class="hp">${j.is_active ? "on the floor" : esc(j.phase || "not active")}</span></button>`).join("");
+  }
+
+  function menuHtml() {
+    if (!S.menu) return "";
+    return `<button class="mshade" data-menuclose="1" aria-label="Close the menu"></button>
+      <nav class="menu" aria-label="Menu">
+        <div class="mhead"><b>SHOP FLOOR</b><button class="link" data-menuclose="1">Close</button></div>
+        <div class="mlabel">Pages</div>
+        <a href="office.html" aria-current="page">Office<small>You're here</small></a>
+        <a href="upload.html">Upload a work order<small>The generator's upload file</small></a>
+        <a href="delivery.html">Deliveries<small>Schedule, signed tickets</small></a>
+        <a href="index.html">Tablet app<small>What the floor sees, as your login</small></a>
+        <div class="mline"></div>
+        <button class="mitem" data-tab="setup" aria-current="${S.tab === "setup" && !S.jobView}">Setup<small>Monday, catch-up, test jobs, TV link, lists</small></button>
+        <button class="mitem" data-signout="1">Sign out</button>
+        <div class="ver">Version ${esc(OFFICE_VERSION)}</div>
+      </nav>`;
   }
 
   const testTag = (x) => x && x.is_test ? `<span class="tag">TEST</span> ` : "";
@@ -784,11 +953,122 @@ if (typeof document !== "undefined") (function () {
   const msgBanner = () => S.msg ? `<div class="banner ${S.msg.ok ? "ok" : "warn"}">${esc(S.msg.text)}</div>` : "";
 
   // ---------- pieces of Needs you ----------
+  // ---------- the job page ----------
+  async function loadAllJobs() {
+    if (S.allJobs) return;
+    const j = await quiet(db.from("jobs").select("id, project_id, name, phase, delivery_date, is_active, is_test"));
+    if (j) S.allJobs = j;
+  }
+  async function loadJob(id) {
+    const job = (await quiet(db.from("jobs").select("id, project_id, name, phase, delivery_date, is_active, is_test").eq("id", id)) || [])[0];
+    if (!job) { S.job = { id, missing: true }; return; }
+    const wos = await quiet(db.from("work_orders").select("id, version, is_current, created_at").eq("job_id", id)) || [];
+    const cur = wos.find(w => w.is_current) || null;
+    const sheets = cur ? (await quiet(db.from("sheets").select("id, sheet_number, item_code").eq("work_order_id", cur.id)) || []) : [];
+    const [progress, flags, problems, arrow, defects, loadouts, photos] = await Promise.all([
+      sheets.length ? quiet(db.from("sheet_progress").select("sheet_id, department, qty_done, qty_required").in("sheet_id", sheets.map(s => s.id))) : [],
+      quiet(db.from("v_flags").select("*").eq("job_id", id).eq("is_open", true)),
+      quiet(db.from("v_problems").select("*").eq("job_id", id)),
+      quiet(db.from("v_outside_jobs").select("*").eq("job_id", id).eq("voided", false)),
+      quiet(db.from("v_defects").select("*").eq("job_id", id).eq("voided", false)),
+      quiet(db.from("v_loadouts").select("*").eq("job_id", id)),
+      quiet(db.from("v_photos").select("id").eq("job_id", id).eq("voided", false))]);
+    if (S.jobView !== id) return;                     // they moved on while it loaded
+    S.job = { id, job, wo: cur, sheets, progress: progress || [], flags: flags || [], problems: problems || [], arrow: arrow || [],
+              defects: defects || [], loadouts: loadouts || [], photoCount: photos ? photos.length : null };
+  }
+  async function openJob(id) {
+    S.jobBack = S.jobView ? S.jobBack : S.tab;
+    S.jobView = id; S.job = null; S.jobFind = ""; S.menu = false; S.msg = null;
+    render(); scrollTo(0, 0);
+    await loadJob(id); render();
+  }
+
+  function jobScreen() {
+    const J = S.job;
+    const back = `<button class="link" data-jobback="1" style="padding-left:0">← Back</button>`;
+    if (!J) return back + `<div class="empty">Loading the job…</div>`;
+    if (J.missing) return back + `<div class="empty"><b>Can't find that job</b>It may have been removed from Monday, or the connection dropped.</div>`;
+    const j = J.job;
+    const g = jobGrid(J.sheets, J.progress);
+    const pieces = J.sheets.length ? g.totals.reduce((a, t) => a + t.req, 0) : 0;
+    const flag = J.flags.slice().sort((a, b) => ({ critical: 0, priority: 1, watch: 2 }[a.level] - { critical: 0, priority: 1, watch: 2 }[b.level]))[0];
+    const facts = [j.phase || (j.is_active ? "In Production" : "Not in production"), j.delivery_date ? `due ${fmtDate(j.delivery_date)}` : "no delivery date",
+                   J.wo ? `work order version ${J.wo.version} · ${J.sheets.length} sheet${J.sheets.length === 1 ? "" : "s"}` : "no work order uploaded"];
+    const openP = J.problems.filter(p => p.status === "open"), answeredP = J.problems.filter(p => p.status !== "open");
+    const atArrow = J.arrow.filter(a => a.at_vendor), back2 = J.arrow.filter(a => !a.at_vendor);
+    const defectGroups = {}; J.defects.forEach(d => { defectGroups[d.defect_type] = (defectGroups[d.defect_type] || 0) + 1; });
+    const what = (a) => [a.sheet_numbers && a.sheet_numbers.length ? `sheet${a.sheet_numbers.length === 1 ? "" : "s"} ${a.sheet_numbers.join(", ")}` : "", a.description].filter(Boolean).join(" — ");
+    const cols = `grid-template-columns: minmax(110px, auto) repeat(${Math.max(1, g.depts.length)}, minmax(76px, 1fr))`;
+
+    const grid = !J.wo ? `<div class="empty"><b>No work order uploaded</b>Counts start once the work order is uploaded on the upload page.</div>`
+      : `<div class="gkey" style="margin-bottom:10px"><span><i style="background:var(--teal)"></i>Complete</span><span><i style="background:var(--sawdust); border:1px solid var(--gray)"></i>Started</span>
+           <span><i style="background:#fff; border:1px solid var(--gray)"></i>Not started</span><span>— not this department</span></div>
+         <div class="scroll"><div class="grid" style="${cols}">
+           <div></div>${g.depts.map(d => `<div class="gh">${esc(DEPT_NAME[d])}</div>`).join("")}
+           <div class="gs tot"><b>Whole job</b><small>${pieces} pieces</small></div>
+           ${g.totals.map(t => `<div class="tot"><div class="c">${t.done}/${t.req}</div><div class="tbar"><i class="${t.done >= t.req ? "full" : ""}" style="width:${t.pct}%"></i></div></div>`).join("")}
+           ${g.rows.map(r => `<div class="gs"><b>Sheet ${r.n}</b><small>${esc(r.code)}</small></div>${r.cells.map(c => `<div class="c ${c.kind}">${esc(c.text)}</div>`).join("")}`).join("")}
+         </div></div>`;
+
+    const side = `
+      <section class="panel"><h2>Problems ${openP.length ? `<span class="cnt num" style="color:var(--ink2)">${openP.length} open</span>` : ""}</h2>
+        ${openP.map(p => `<div class="row"><b>${p.sheet_number !== null ? `Sheet ${p.sheet_number}` : "Whole job"} · ${esc(p.department_name)}</b>
+            ${p.work_stopped ? ` <span class="stoptag">Work stopped</span>` : ""}<div>${esc(p.body)}</div><div class="meta2">${esc(p.raised_by_name)}, ${esc(ago(p.raised_at))}</div></div>`).join("")
+          || `<p class="sub" style="margin:0">None open.</p>`}
+        ${answeredP.length ? `<p class="meta2" style="margin:8px 0 0">${answeredP.length} answered</p>` : ""}
+        ${openP.length ? `<button class="link" data-tab="tasks" style="padding-left:0">Answer on Needs you</button>` : ""}</section>
+      <section class="panel"><h2>Arrow</h2>
+        ${atArrow.map(a => `<div class="row"><b>${esc(what(a))}</b><div class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent ${esc(fmtDate(a.sent_on))} by ${esc(a.sent_by_name)} · <b>${a.days_out} day${a.days_out === 1 ? "" : "s"} out</b></div></div>`).join("")
+          || `<p class="sub" style="margin:0">Nothing at Arrow.</p>`}
+        ${back2.length ? `<p class="meta2" style="margin:8px 0 0">${back2.length} returned</p>` : ""}</section>
+      <section class="panel"><h2>Defects ${J.defects.length ? `<span class="cnt num" style="color:var(--ink2)">${J.defects.length}</span>` : ""}</h2>
+        ${Object.entries(defectGroups).sort((a, b) => b[1] - a[1]).map(([t, n]) => `<div class="row">${esc(t)} <span class="num" style="float:right">${n}</span></div>`).join("")
+          || `<p class="sub" style="margin:0">None logged.</p>`}</section>
+      <section class="panel"><h2>Photos ${J.photoCount ? `<span class="cnt num" style="color:var(--ink2)">${J.photoCount}</span>` : ""}</h2>
+        ${J.photoCount ? `<button class="plain" data-jobphotos="${esc(j.project_id)}">See them on Photos</button>` : `<p class="sub" style="margin:0">None yet.</p>`}</section>
+      <section class="panel"><h2>Load-outs and deliveries</h2>
+        ${J.loadouts.slice().sort((a, b) => String(b.scheduled_for || b.started_at).localeCompare(String(a.scheduled_for || a.started_at))).map(l => `<div class="row">
+            <b>${l.kind === "shipment" ? "Shipment" : "Delivery"}</b> · ${l.completed_at ? `delivered ${esc(fmtWhen(l.completed_at))}${l.signed_name ? ` · signed by ${esc(l.signed_name)}` : ""}`
+              : l.scheduled_for ? `scheduled ${esc(fmtWhen(l.scheduled_for))}` : l.is_open ? `started ${esc(fmtWhen(l.started_at))}` : `finished ${esc(fmtWhen(l.finished_at || l.started_at))}`}
+            ${l.pieces_total ? `<div class="meta2">${l.pieces_here || 0} of ${l.pieces_total} pieces${l.scheduled_by_name ? ` · scheduled by ${esc(l.scheduled_by_name)}` : ""}</div>` : ""}</div>`).join("")
+          || `<p class="sub" style="margin:0">None yet.</p>`}</section>`;
+
+    return `${back}
+      <div class="jobhead"><h1>${testTag(j)}${esc(j.project_id || "(no PROJ number)")}<span class="jn">${esc(j.name)}</span></h1>
+        <p class="sub">${esc(facts.join(" · "))}</p></div>
+      ${flag ? `<div class="jobband ${flag.level}">${esc(LEVEL_NAME[flag.level])}: ${esc(flag.note)}<small>Set by ${esc(flag.set_by_name)}, ${esc(ago(flag.set_at))}${flag.department_name ? ` · ${esc(flag.department_name)} only` : ""}</small></div>` : ""}
+      <div class="jobcols"><section class="panel"><h2 style="margin-bottom:10px">Progress by sheet</h2>${grid}</section><div class="side">${side}</div></div>`;
+  }
+
+  // a PROJ number that opens the job page
+  const pidLink = (x) => x.job_id ? `<button class="pidlink" data-openjob="${esc(x.job_id)}">${esc(x.project_id)}</button>` : esc(x.project_id);
+
+  // the Monday sync: S.sync = { last, good } once read; nothing is said until it has been read
+  const syncProblem = () => S.sync ? syncHealth(S.sync.last, S.sync.good) : null;
+  function syncAlertHtml() {
+    const h = syncProblem();
+    if (!h) return "";
+    const when = h.since ? `The last good sync was ${esc(fmtWhenLocal(h.since))}. ` : "";
+    return `<section class="syncalert" data-need="sync"><div style="flex:1">
+        <h2>${esc(h.title)}</h2>
+        <div>${when}Until it works again, new jobs won't reach the floor and finished jobs won't leave it.
+          ${h.stopped ? "The sync hasn't run at all lately, so its timer may have stopped — the build spec's Monday tab says how to check it."
+                      : "If Monday refused access, the token needs replacing — the build spec's Monday tab walks through it."}</div>
+        ${h.reply ? `<div class="reply">Monday's last reply: “${esc(h.reply)}”</div>` : ""}
+      </div><button class="go" data-tab="setup">Open Setup</button></section>`;
+  }
+  const fmtWhenLocal = (ts) => {
+    const d = new Date(ts), today = localISO(new Date()) === localISO(d);
+    const t = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    return today ? `at ${t} today` : `on ${fmtDate(localISO(d))} at ${t}`;
+  };
+
   function problemCard(p) {
     const st = problemState(p);
     const d = S.drafts[p.id] || "";
     return `<div class="li ${p.status === "open" ? (p.work_stopped ? "stop" : "open") : ""}">
-      <div class="li-top"><b>${testTag(p)}${esc(p.project_id)}${p.sheet_number !== null ? ` · sheet ${p.sheet_number}` : " · whole job"}</b>
+      <div class="li-top"><b>${testTag(p)}${pidLink(p)}${p.sheet_number !== null ? ` · sheet ${p.sheet_number}` : " · whole job"}</b>
         <span class="meta2">${esc(p.department_name)} · ${esc(p.job_name)}</span>
         ${p.status === "open" && p.work_stopped ? `<span class="stoptag">Work stopped</span>` : ""}
         <span class="st${st.done ? " ok" : ""}">${esc(st.label)}</span></div>
@@ -971,12 +1251,12 @@ if (typeof document !== "undefined") (function () {
           <span class="meta2">The department taps Received when it's in hand.</span></div></div>`));
 
     if (stale.length) parts.push(sec("flags", "Flags older than two weeks — still right?", stale.length, `<div class="panel">${stale.map(x => `<div class="line">
-        <span class="body"><span class="flagtag ${x.level}">${LEVEL_NAME[x.level]}</span> <b>${testTag(x)}${esc(x.project_id)}</b> <span class="meta2">${esc(x.job_name)} · ${esc(scope(x))}</span>
+        <span class="body"><span class="flagtag ${x.level}">${LEVEL_NAME[x.level]}</span> <b>${testTag(x)}${pidLink(x)}</b> <span class="meta2">${esc(x.job_name)} · ${esc(scope(x))}</span>
           <div>${esc(x.note)}</div><div class="meta2">Set by ${esc(x.set_by_name)}, ${x.age_days} days ago</div></span>
         <span class="btns" style="margin:0"><button class="plain" data-clearflag="${esc(x.id)}">Clear it</button><button class="link" data-tab="flags">Change it on Flags</button></span></div>`).join("")}</div>`));
 
     if (late.length) parts.push(sec("arrow", `At Arrow over ${S.arrowDays} days`, late.length, `<div class="panel">${late.map(a => `<div class="line"><span class="qty">${a.days_out}</span>
-        <span class="body"><b>${testTag(a)}${esc(a.project_id)}</b> <span class="meta2">· ${esc(a.job_name)}</span><div>${esc(what(a))}</div>
+        <span class="body"><b>${testTag(a)}${pidLink(a)}</b> <span class="meta2">· ${esc(a.job_name)}</span><div>${esc(what(a))}</div>
           <div class="meta2">${a.service === "paint" ? "Paint" : "Powdercoat"} · sent ${esc(fmtDay(a.sent_on))} by ${esc(a.sent_by_name)} (${esc(a.department_name)}) · ${a.days_out} days out</div></span>
         <button class="plain" data-arret="${esc(a.id)}">Mark returned</button></div>`).join("")}</div>`));
 
@@ -998,8 +1278,8 @@ if (typeof document !== "undefined") (function () {
 
     return `<h1>Needs you</h1>
       <p class="sub">Everything waiting on the office, most urgent first.</p>
-      ${missingNote()}${msgBanner()}
-      ${parts.length ? parts.join("") : `<div class="empty"><b>Nothing needs you</b>No problems waiting, nothing to order, nothing overdue, no handoffs.</div>`}
+      ${missingNote()}${msgBanner()}${syncAlertHtml()}
+      ${parts.length ? parts.join("") : syncProblem() ? "" : `<div class="empty"><b>Nothing needs you</b>No problems waiting, nothing to order, nothing overdue, no handoffs.</div>`}
       <section class="later">
         <details class="more" data-keep="answered" ${keep("answered")}><summary>Answered problems — last 30 days (${answered.length})</summary>${answered.map(problemCard).join("") || `<p class="sub">None.</p>`}</details>
         <details class="more" data-keep="ordered" ${keep("ordered")}><summary>Ordered, not received (${ordered.length})</summary>
@@ -1274,7 +1554,7 @@ if (typeof document !== "undefined") (function () {
   // ---------- zips in the filing layout (deliveries.sql): photos, delivery files, signed tickets ----------
   async function pdfLib() {
     if (window.PDFLib) return window.PDFLib;
-    await new Promise((res, rej) => { const s = document.createElement("script"); s.src = PDF_LIB_URL; s.onload = res;
+    await new Promise((res, rej) => { const s = document.createElement("script"); s.integrity = PDF_LIB_SRI; s.crossOrigin = "anonymous"; s.src = PDF_LIB_URL; s.onload = res;
       s.onerror = () => rej(new Error("The PDF helper couldn't load. Check the connection and try again.")); document.head.appendChild(s); });
     return window.PDFLib;
   }
@@ -1391,16 +1671,46 @@ if (typeof document !== "undefined") (function () {
     if (S.locked) return pinScreen("unlock");
     const screens = { departments: departmentsScreen, setup: setupScreen, flags: flagsScreen, photos: photosScreen,
                       arrow: arrowScreen, routine: routineScreen };
-    const body = (screens[S.tab] || needsScreen)();
-    app.innerHTML = topBar() + `<main>${S.notice ? `<div class="banner warn">${esc(S.notice)}</div>` : ""}${body}
+    const body = S.jobView ? jobScreen() : (screens[S.tab] || needsScreen)();
+    // a redraw mustn't pull the cursor out of Find a job while someone is typing in it
+    const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches("[data-jobfind]");
+    app.innerHTML = topBar() + menuHtml() + `<main${S.jobView ? ' class="wide"' : ""}>${S.notice ? `<div class="banner warn">${esc(S.notice)}</div>` : ""}${body}
       <p style="text-align:center; margin-top:30px"><button class="link" data-signout="1">Sign out</button></p></main>` + viewerHtml();
     wire();
+    if (typing) { const f = app.querySelector("[data-jobfind]"); if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }
     fillPhotos();
   }
 
   function wire() {
     app.querySelectorAll("[data-tab]").forEach(b => b.onclick = async () => {
-      S.tab = b.dataset.tab; store.set("tab", S.tab); S.msg = null; render(); await loadTab(); render();
+      S.tab = b.dataset.tab; store.set("tab", S.tab); S.msg = null; S.menu = false; S.jobView = null; S.job = null;
+      render(); scrollTo(0, 0); await loadTab(); render();
+    });
+    // ☰ menu
+    app.querySelectorAll("[data-menu]").forEach(b => b.onclick = () => { S.menu = !S.menu; render(); });
+    app.querySelectorAll("[data-menuclose]").forEach(b => b.onclick = () => { S.menu = false; render(); });
+    // find a job: only the list under the box redraws while typing, so the box keeps its place
+    const find = app.querySelector("[data-jobfind]");
+    if (find) {
+      const hits = app.querySelector("#jobhits");
+      const redraw = () => { hits.innerHTML = hitsHtml(); hits.hidden = !S.jobFind.trim() || document.activeElement !== find;
+        hits.querySelectorAll("[data-openjob]").forEach(b => b.onmousedown = (ev) => { ev.preventDefault(); openJob(b.dataset.openjob); }); };
+      find.onfocus = async () => { await loadAllJobs(); redraw(); };
+      find.oninput = () => { S.jobFind = find.value; redraw(); };
+      find.onkeydown = (ev) => {
+        if (ev.key === "Enter") { const first = hits.querySelector("[data-openjob]"); if (first) openJob(first.dataset.openjob); }
+        if (ev.key === "Escape") { S.jobFind = ""; find.value = ""; redraw(); find.blur(); }
+      };
+      find.onblur = () => setTimeout(() => { if (document.activeElement !== find) { hits.hidden = true; } }, 150);
+      redraw();
+    }
+    app.querySelectorAll("main [data-openjob]").forEach(b => b.onclick = () => openJob(b.dataset.openjob));
+    app.querySelectorAll("[data-jobback]").forEach(b => b.onclick = async () => {
+      S.jobView = null; S.job = null; S.tab = S.jobBack || S.tab; render(); scrollTo(0, 0); await loadTab(); render();
+    });
+    app.querySelectorAll("[data-jobphotos]").forEach(b => b.onclick = async () => {
+      S.jobView = null; S.job = null; S.tab = "photos"; store.set("tab", "photos"); S.phText = b.dataset.jobphotos;
+      render(); scrollTo(0, 0); await loadTab(); await findJobPhotos(b.dataset.jobphotos); render();
     });
     app.querySelectorAll("[data-lock]").forEach(b => b.onclick = () => { S.locked = true; S.pinEntry = ""; render(); });
     app.querySelectorAll("[data-live]").forEach(b => b.onclick = async () => {
@@ -1645,6 +1955,13 @@ if (typeof document !== "undefined") (function () {
     const p = store.get("pin", null);
     if (S.me && p && p.hash && !S.locked && Date.now() - lastTouch > LOCK_AFTER_MINUTES * 60000) { S.locked = true; S.pinEntry = ""; render(); }
   }, 20000);
+  // a page left open all day still notices a broken sync; it only redraws when that changes
+  setInterval(async () => {
+    if (!S.me || S.locked || document.hidden) return;
+    const before = !!syncProblem();
+    await loadSync();
+    if (!!syncProblem() !== before) render();
+  }, 5 * 60000);
 
   // ---------- sign in ----------
   function signIn(message) {
@@ -1698,7 +2015,8 @@ if (typeof module !== "undefined") module.exports = { keyProblem, isManager, day
   localISO, daysSince, problemState, officeProblems, staleFlags, openFlags, needToOrder, orderedNotReceived, defectSummary, tvLink, taskWhen,
   crc32, makeZip, photoCsv, csvCell, fmtBytes, normProject, BATCH_STATE,
   fileCsv, filingItem, atDate, buildSignedTicket, pdfText, wrapText, signedFileName, fmtWhen, shopDate,
-  parseOptions, choicesFromForm, choiceSummary, supplyListFor };
+  parseOptions, choicesFromForm, choiceSummary, supplyListFor,
+  OFFICE_VERSION, SYNC_ALERT_MINUTES, syncHealth, agoWords, jobMatches, jobGrid };
 </script>
 </body>
 </html>

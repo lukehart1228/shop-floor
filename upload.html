@@ -21,6 +21,7 @@
   .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.16em; color:var(--orange)}
   .brand span{color:var(--sawdust)}
   header h1{margin:0; font-size:20px; font-weight:600}
+  header .toofc{margin-left:auto; color:var(--sawdust); font-weight:600; text-decoration:none; border-bottom:1.5px solid var(--orange)}
   main{max-width:640px; margin:0 auto; padding:24px 16px 60px}
   .card{background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:16px}
   h2{margin:0 0 6px; font-size:22px}
@@ -66,6 +67,7 @@
 <header>
   <div class="brand">PURPOSEFUL <span>DESIGN</span></div>
   <h1>Work order upload</h1>
+  <a class="toofc" href="office.html">← Office</a>
 </header>
 
 <main>
@@ -123,7 +125,8 @@
   </section>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<!-- the Supabase library, checked: the browser refuses it if even one byte differs from the published file -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
 <script>
 /* =====================================================================
    THE TWO SETTINGS — fill these in (walkthrough 2, step 3).

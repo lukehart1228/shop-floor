@@ -2,7 +2,7 @@
    Pages: fetched fresh when there's a connection (so updates arrive), the
    saved copy when there isn't. Library, fonts and icons: saved copy first.
    Database requests are never touched — the app handles those itself. */
-const SHELL = "shop-floor-shell-v2";   // v2: the manifest no longer overrides the tablet's rotation lock
+const SHELL = "shop-floor-shell-v3";   // v3: the library is checked (integrity), so older saved copies are cleared
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
@@ -28,8 +28,10 @@ self.addEventListener("fetch", (e) => {
       .catch(() => caches.match(e.request).then((hit) => hit || caches.match("./index.html"))));
     return;
   }
-  e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request).then((r) => {
-    if (r.ok || r.type === "opaque") { const copy = r.clone(); caches.open(SHELL).then((c) => c.put(e.request, copy)); }
+  // a checked library asks for a readable (CORS) copy; a saved copy that can't be read would fail the check, so skip it
+  const usable = (hit) => hit && !(e.request.mode === "cors" && hit.type === "opaque");
+  e.respondWith(caches.match(e.request).then((hit) => usable(hit) ? hit : fetch(e.request).then((r) => {
+    if (r.ok || (r.type === "opaque" && e.request.mode !== "cors")) { const copy = r.clone(); caches.open(SHELL).then((c) => c.put(e.request, copy)); }
     return r;
-  })));
+  }).catch(() => hit || Promise.reject(new Error("offline")))));
 });

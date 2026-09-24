@@ -41,6 +41,20 @@
        border-top:4px solid transparent; border-bottom:4px solid transparent; white-space:nowrap}
   .tab[aria-current="true"]{color:var(--sawdust); border-bottom-color:var(--orange)}
   @media (max-width: 700px){ .brand{display:none} }
+  /* managers and the Test Supervisor: one Department ▾ button instead of nine tabs */
+  .deptbtn{display:flex; align-items:center; gap:10px; background:#2C3348; border:none; border-radius:10px; padding:0 16px; min-height:44px; color:var(--sawdust); font-weight:700; white-space:nowrap}
+  .deptbtn svg{flex-shrink:0}
+  .dmshade{position:fixed; inset:0; z-index:30; background:rgba(24,29,46,.25); border:none; padding:0; cursor:default}
+  .deptmenu{position:fixed; z-index:31; top:calc(env(safe-area-inset-top,0px) + 56px); left:12px; width:min(380px, calc(100vw - 24px)); max-height:calc(100vh - 76px); overflow:auto;
+            background:#fff; border:1px solid var(--gray); border-radius:14px; box-shadow:0 12px 32px rgba(24,29,46,.25); padding:8px}
+  .dmhead{font-size:13px; font-weight:700; letter-spacing:.08em; color:var(--ink2); padding:8px 12px 4px; text-transform:uppercase}
+  .dmitem{display:flex; justify-content:space-between; align-items:center; gap:12px; width:100%; background:none; border:none; border-radius:10px; padding:0 12px; min-height:52px; text-align:left; font-weight:600}
+  .dmitem small{font-size:14px; font-weight:600; color:var(--ink2)}
+  .dmitem[aria-current="true"]{background:var(--midnight); color:var(--sawdust); font-weight:700}
+  .dmitem[aria-current="true"] small{color:#CFC9B8}
+  .dmitem.adv{color:var(--orange); font-weight:700}
+  .dmitem.adv[aria-current="true"]{color:var(--sawdust)}
+  .dmline{border-top:1px solid var(--line); margin:6px 4px}
 
   main{max-width:1100px; margin:0 auto; padding:12px 14px 80px}
   .banner{border-radius:10px; padding:12px 16px; margin-bottom:14px; font-weight:600}
@@ -324,6 +338,10 @@
   .mdl-btns{display:flex; gap:10px; margin-top:18px}
   .mdl-btns button{flex:1; min-height:56px}
   .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--midnight); color:var(--sawdust); padding:12px 20px; border-radius:99px; font-weight:600; z-index:50; max-width:90%; text-align:center}
+  /* Mark all done: the message offers Undo for a few seconds */
+  .toast.undo{display:flex; align-items:center; gap:18px; padding:8px 8px 8px 24px; text-align:left; box-shadow:0 10px 28px rgba(24,29,46,.35)}
+  .toast.undo button{background:var(--bright); color:var(--midnight); border:none; border-radius:99px; min-height:52px; padding:0 26px; font-weight:700; flex-shrink:0}
+  .toast.above{bottom:100px}
 
   /* sign in */
   .signin{max-width:440px; margin:8vh auto 0; background:#fff; border:1px solid var(--line); border-radius:14px; padding:24px}
@@ -353,7 +371,8 @@
 <!-- the camera: a plain file input that opens the tablet's rear camera -->
 <input type="file" id="camera" accept="image/*" capture="environment" hidden>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<!-- the Supabase library, checked: the browser refuses it if even one byte differs from the published file -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
 <script>
 /* =====================================================================
    THE TWO SETTINGS — the same two lines as upload.html.
@@ -1435,7 +1454,14 @@ if (typeof document !== "undefined") (function () {
   }
 
   // ---------- pieces used on several screens ----------
-  let toastTimer = null;
+  let toastTimer = null, undoTimer = null;
+  // after Mark all done: Undo sends the number the sheet had before, as an absolute count like any other
+  function offerUndo(r, prev) {
+    clearTimeout(undoTimer);
+    S.undo = { progressId: r.progress_id, prev, text: `Sheet ${r.sheet_number} marked ${r.qty_required} of ${r.qty_required} done` };
+    render();
+    undoTimer = setTimeout(() => { S.undo = null; render(); }, 8000);
+  }
   function showToast(text) {
     S.toast = text; render();
     clearTimeout(toastTimer);
@@ -1459,13 +1485,31 @@ if (typeof document !== "undefined") (function () {
 
   function topBar() {
     const adv = canAdvance(S.me);
-    const tabs = S.depts.length > 1 || adv
+    // managers and the Test Supervisor get one Department ▾ button; supervisors keep their tabs exactly as before
+    const tabs = adv
+      ? `<button class="deptbtn" data-deptmenu="1" aria-haspopup="true" aria-expanded="${!!S.deptMenu}">${esc(S.adv ? "Advance" : DEPT_NAME[S.dept])}<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 5l5 5 5-5"/></svg></button>`
+      : S.depts.length > 1
       ? `<nav class="tabs">${S.depts.map(k => `<button class="tab" data-dept="${k}" aria-current="${k === S.dept && !S.adv}">${esc(DEPT_NAME[k])}</button>`).join("")}${
           adv ? `<button class="tab adv" data-adv="1" aria-current="${!!S.adv}">Advance</button>` : ""}</nav>` : "";
     return `<header class="top"><div class="top-row">
         <span class="brand">SHOP FLOOR</span>${tabs}${syncBadge()}
         <span class="who"><b>${esc(S.me.name)}</b>${S.depts.length === 1 && !adv ? ` · ${esc(DEPT_NAME[S.dept])}` : ""}</span>
       </div></header>`;
+  }
+
+  function deptMenu() {
+    if (!S.deptMenu || !canAdvance(S.me)) return "";
+    return `<button class="dmshade" data-dmclose="1" aria-label="Close the menu"></button>
+      <nav class="deptmenu" aria-label="Departments"><div class="dmhead">Departments</div>
+        ${S.depts.map(k => `<button class="dmitem" data-dept="${k}" aria-current="${k === S.dept && !S.adv}">${esc(DEPT_NAME[k])}${isLogOnly(k) ? `<small>log only</small>` : ""}</button>`).join("")}
+        <div class="dmline"></div>
+        <button class="dmitem adv" data-adv="1" aria-current="${!!S.adv}">Advance<small>set counts by hand</small></button>
+      </nav>`;
+  }
+
+  function undoToast() {
+    if (!S.undo) return "";
+    return `<div class="toast undo" role="status"><span>${esc(S.undo.text)}</span><button data-undo="1">Undo</button></div>`;
   }
 
   function banners() {
@@ -2296,8 +2340,8 @@ if (typeof document !== "undefined") (function () {
     const topLevel = S.adv ? !S.advJob : !(S.tab === "work" && S.view.screen !== "queue");
     const foot = topLevel ? `<div class="foot"><button class="link" data-signout="1">Sign out</button></div>` : "";
     const scroll = S.modal ? (document.querySelector(".mdl") || {}).scrollTop : null;
-    app.innerHTML = topBar() + `<main>${banners()}${pinnedTasks()}${body}${foot}</main>` + modalHtml()
-      + (S.toast ? `<div class="toast" role="status">${esc(S.toast)}</div>` : "");
+    app.innerHTML = topBar() + deptMenu() + `<main>${banners()}${pinnedTasks()}${body}${foot}</main>` + modalHtml()
+      + (S.toast ? `<div class="toast${S.undo ? " above" : ""}" role="status">${esc(S.toast)}</div>` : "") + undoToast();
     if (scroll) { const m = document.querySelector(".mdl"); if (m) m.scrollTop = scroll; }
     wire();
     fillPhotos();
@@ -2370,11 +2414,20 @@ if (typeof document !== "undefined") (function () {
   const projectOf = (jobId) => (S.pickJobs.find(x => x.job_id === jobId) || rowsNow().find(x => x.job_id === jobId) || {}).project_id;
   function wire() {
     const on = (sel, fn) => app.querySelectorAll(sel).forEach(el => el.onclick = (ev) => fn(el, ev));
-    on("[data-dept]", (b) => advLeave(() => pickDept(b.dataset.dept)));
+    on("[data-dept]", (b) => { S.deptMenu = false; advLeave(() => pickDept(b.dataset.dept)); render(); });
+    on("[data-deptmenu]", () => { S.deptMenu = !S.deptMenu; render(); });
+    on("[data-dmclose]", () => { S.deptMenu = false; render(); });
+    on("[data-undo]", () => {
+      const u = S.undo; if (!u) return;
+      clearTimeout(undoTimer); S.undo = null;
+      const r = withPending(S.rows, S.outbox).find(x => x.progress_id === u.progressId);
+      if (r) setCount(r, u.prev); else render();
+    });
 
     // ---- Advance ----
     on("[data-adv]", async () => {
-      if (S.adv) { if (S.advJob) advLeave(() => { S.advJob = null; S.advSheet = null; render(); scrollTo(0, 0); }); return; }
+      S.deptMenu = false;
+      if (S.adv) { if (S.advJob) advLeave(() => { S.advJob = null; S.advSheet = null; render(); scrollTo(0, 0); }); else render(); return; }
       S.adv = true; store.set("adv", true); S.notice = null; S.advSheet = null; render(); scrollTo(0, 0);
       await Promise.all([loadPickJobs(), loadFlags(), S.advJob ? loadAdvRows(S.advJob) : null]); render();
     });
@@ -2442,7 +2495,12 @@ if (typeof document !== "undefined") (function () {
     });
     const current = () => rowsNow().find(x => x.progress_id === S.view.progressId);
     on("[data-step]", (b) => { const r = current(); if (r) setCount(r, r.qty_done + Number(b.dataset.step)); });
-    on("[data-all]", () => { const r = current(); if (r) setCount(r, r.qty_required); });
+    on("[data-all]", () => {
+      const r = current(); if (!r) return;
+      const prev = r.qty_done;
+      setCount(r, r.qty_required);
+      if (prev < r.qty_required) offerUndo(r, prev);
+    });
     on("[data-print]", () => window.print());
     on("[data-pdf]", async () => {
       const r = current(); if (!r) return;

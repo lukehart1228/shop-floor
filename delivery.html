@@ -42,6 +42,7 @@
   button.go{background:var(--orange); color:#fff; border-color:transparent}
   button.wide{width:100%; margin-top:16px; padding:14px}
   button.link{background:none; border:none; padding:4px; color:var(--ink2); text-decoration:underline; font-weight:500}
+  .me a.link{color:inherit; text-decoration:underline; font-weight:500}
   .btns{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; align-items:center}
   .jobs{max-height:260px; overflow:auto; border:1px solid var(--line); border-radius:9px; margin-top:8px}
   .jobs button{display:block; width:100%; text-align:left; border:none; border-bottom:1px solid var(--line); border-radius:0; padding:10px 12px; font-weight:500}
@@ -94,7 +95,8 @@
 <div id="app"></div>
 <input type="file" id="picker" hidden>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<!-- the Supabase library, checked: the browser refuses it if even one byte differs from the published file -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
 <script>
 /* =====================================================================
    THE TWO SETTINGS — the same two lines as upload.html.
@@ -108,6 +110,7 @@ const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 
 const TZ = "America/Indiana/Indianapolis";
 const PDF_LIB_URL = "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
+const PDF_LIB_SRI = "sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI";   // the browser refuses the file if it has been altered
 const MAX_FILE = 10 * 1024 * 1024;              // the bucket refuses anything bigger
 const TYPES = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" };
 const NO_SIGN_REASONS = ["Nobody on site", "Customer refused", "Other"];
@@ -378,7 +381,7 @@ if (typeof document !== "undefined") (function () {
   }
   async function pdfLib() {
     if (window.PDFLib) return window.PDFLib;
-    await new Promise((res, rej) => { const s = document.createElement("script"); s.src = PDF_LIB_URL; s.onload = res; s.onerror = () => rej(new Error("The PDF helper couldn't load. Check the connection and try again.")); document.head.appendChild(s); });
+    await new Promise((res, rej) => { const s = document.createElement("script"); s.integrity = PDF_LIB_SRI; s.crossOrigin = "anonymous"; s.src = PDF_LIB_URL; s.onload = res; s.onerror = () => rej(new Error("The PDF helper couldn't load. Check the connection and try again.")); document.head.appendChild(s); });
     return window.PDFLib;
   }
   function saveBlob(blob, name) {
@@ -499,7 +502,7 @@ if (typeof document !== "undefined") (function () {
   }
   function render() {
     if (!S.me) return;
-    document.getElementById("me").innerHTML = `${esc(S.me.name)} · <button class="link" data-signout="1">Sign out</button>`;
+    document.getElementById("me").innerHTML = `${S.me.role === "manager" || S.me.role === "admin" ? `<a class="link" href="office.html">← Office</a> · ` : ""}${esc(S.me.name)} · <button class="link" data-signout="1">Sign out</button>`;
     if (S.allowed === false) {
       app.innerHTML = `<main><div class="alarm"><h2>This login can't schedule deliveries</h2><p>${esc(S.me.name)} isn't set up to schedule deliveries. Luke can switch it on (Walkthrough 11, step 3). A manager's login works too.</p></div></main>`;
       return wire();
