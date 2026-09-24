@@ -480,6 +480,120 @@ function photoCsv(list, batch) {
                                       p.mistake ? "yes" : "", p.test ? "yes" : "", batch]);
   return "\uFEFF" + [head, ...rows].map(r => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }
+/** The spreadsheet for the filing layout (deliveries.sql): every photo and delivery file, by job, item and table. */
+function fileCsv(list, batch) {
+  const head = ["File", "Project", "Job", "Sheet", "Table", "What", "Note", "By", "When", "Where (GPS)", "Entered by mistake", "Test job", "Batch"];
+  const rows = (list || []).map(p => [p.name, p.project_id, p.job_name, p.sheet ?? "", p.table ?? "", p.kind, p.note, p.by, p.at, p.gps || "",
+                                      p.mistake ? "yes" : "", p.test ? "yes" : "", batch || ""]);
+  return "﻿" + [head, ...rows].map(r => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
+}
+/** A v_filing row as a file for the zip: PROJ-00418/TB-03/TB-03-2 Delivery Picture.jpg */
+function filingItem(f) {
+  return { source: f.source, id: f.id, bucket: f.bucket, path: f.storage_path, in_cloud: f.in_cloud, name: `${f.project_id}/${f.folder}/${f.file_name}`,
+           project_id: f.project_id, job_name: f.job_name, sheet: f.sheet_number, table: f.table_no, kind: f.what, note: f.note, by: f.by_name,
+           loadout_id: f.loadout_id, at: f.at, mistake: f.mistake, test: f.is_test, archive_batch: f.archive_batch,
+           gps: f.lat !== null && f.lat !== undefined ? `${Number(f.lat).toFixed(6)}, ${Number(f.lng).toFixed(6)}` : "" };
+}
+/** "2026-10-14 09:05" or an ISO timestamp → a Date for the zip */
+function atDate(at) {
+  const s = String(at || "");
+  const d = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s) ? new Date(s.replace(" ", "T") + ":00") : new Date(s);
+  return isNaN(d) ? new Date() : d;
+}
+
+/* ---- the signed ticket (the same as delivery.html's): the ticket as issued, then one signature page ---- */
+const DL_TZ = "America/Indiana/Indianapolis";
+const PDF_LIB_URL = "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
+function fmtWhen(ts, withYear = false) {
+  if (!ts) return "";
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: DL_TZ, weekday: "short", month: "short", day: "numeric", year: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true }).formatToParts(new Date(ts)).map(x => [x.type, x.value]));
+  return `${parts.weekday} ${parts.month} ${parts.day}${withYear ? ", " + parts.year : ""}, ${parts.hour}:${parts.minute} ${String(parts.dayPeriod).toLowerCase()}`;
+}
+function shopDate(ts) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: DL_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(ts)).map(x => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}`;
+}
+function signedFileName(d) { return `${d.project_id} Signed ticket ${shopDate(d.completed_at || d.scheduled_for || new Date())}.pdf`; }
+const CP1252 = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ";
+function pdfText(s) {
+  return String(s ?? "").replace(/\r\n?/g, "\n").replace(/[^\n]/g, ch => {
+    const c = ch.charCodeAt(0);
+    return (c >= 32 && c <= 126) || (c >= 160 && c <= 255) || CP1252.includes(ch) ? ch : (c === 9 ? " " : "?");
+  });
+}
+function wrapText(text, width, measure) {
+  const out = [];
+  for (const para of pdfText(text).split("\n")) {
+    let line = "";
+    for (const word of para.split(/\s+/).filter(Boolean)) {
+      const next = line ? line + " " + word : word;
+      if (measure(next) <= width || !line) line = next; else { out.push(line); line = word; }
+    }
+    out.push(line);
+  }
+  return out;
+}
+async function buildSignedTicket(PDFLib, d, ticket, signature) {
+  const { PDFDocument, StandardFonts, rgb } = PDFLib;
+  let doc;
+  if (ticket && ticket.mime === "application/pdf") doc = await PDFDocument.load(ticket.bytes, { ignoreEncryption: true });
+  else {
+    doc = await PDFDocument.create();
+    if (ticket) {
+      const img = ticket.mime === "image/png" ? await doc.embedPng(ticket.bytes) : await doc.embedJpg(ticket.bytes);
+      const pg = doc.addPage([612, 792]);
+      const s = Math.min(540 / img.width, 720 / img.height, 1);
+      pg.drawImage(img, { x: (612 - img.width * s) / 2, y: (792 - img.height * s) / 2, width: img.width * s, height: img.height * s });
+    }
+  }
+  doc.setTitle(pdfText(`${d.project_id} delivery ticket, signed`));
+  const font = await doc.embedFont(StandardFonts.Helvetica), bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const ink = rgb(0.094, 0.114, 0.18), grey = rgb(0.42, 0.44, 0.51), orange = rgb(0.93, 0.37, 0.06);
+  const page = doc.addPage([612, 792]);
+  const L = 54, W = 504;
+  let y = 738;
+  const text = (t, x, yy, size, f = font, color = ink) => page.drawText(pdfText(t), { x, y: yy, size, font: f, color });
+  text("PURPOSEFUL DESIGN", L, y, 10, bold, orange);
+  y -= 26; text("Delivery record", L, y, 22, bold);
+  y -= 16; text(ticket ? "Added by the shop floor system after the delivery ticket, which is as it was issued." : "No delivery ticket was attached, so this record stands on its own.", L, y, 10, font, grey);
+  y -= 28;
+  const rows = [["Project", `${d.project_id} — ${d.job_name || ""}`],
+                ["Scheduled for", d.scheduled_for ? fmtWhen(d.scheduled_for, true) : "Not scheduled"],
+                ["Delivered", `${fmtWhen(d.completed_at, true)}${d.completed_by_name ? ` by ${d.completed_by_name}` : ""}`],
+                ["At the site", d.pieces_total ? `${d.site_photographed || 0} of ${d.pieces_total} table${d.pieces_total === 1 ? "" : "s"} photographed` : `${d.site_photographed || 0} photographed`]];
+  if (d.complete_lat !== null && d.complete_lat !== undefined)
+    rows.push(["Where", `${Number(d.complete_lat).toFixed(6)}, ${Number(d.complete_lng).toFixed(6)}${d.complete_accuracy ? ` (within ${Math.round(d.complete_accuracy)} m)` : ""}`]);
+  for (const [k, v] of rows) {
+    text(k, L, y, 11, font, grey);
+    for (const ln of wrapText(v, W - 110, (s) => font.widthOfTextAtSize(s, 12))) { text(ln, L + 110, y, 12); y -= 16; }
+    y -= 4;
+  }
+  y -= 10;
+  if (d.signed_name) {
+    text("Customer signature", L, y, 11, bold); y -= 10;
+    const boxH = 150;
+    page.drawRectangle({ x: L, y: y - boxH, width: W, height: boxH, borderColor: grey, borderWidth: 0.8 });
+    if (signature) {
+      const img = await doc.embedPng(signature);
+      const s = Math.min((W - 20) / img.width, (boxH - 20) / img.height);
+      page.drawImage(img, { x: L + (W - img.width * s) / 2, y: y - boxH + (boxH - img.height * s) / 2, width: img.width * s, height: img.height * s });
+    }
+    y -= boxH + 18;
+    text(`Signed by ${d.signed_name}${d.signed_at ? `, ${fmtWhen(d.signed_at, true)}` : ""}`, L, y, 12, bold); y -= 26;
+  } else {
+    text(`Not signed — ${d.no_sign_reason || "no reason given"}`, L, y, 14, bold); y -= 20;
+    for (const ln of wrapText(d.no_sign_note || "", W, (s) => font.widthOfTextAtSize(s, 12))) { if (!ln) continue; text(ln, L, y, 12); y -= 16; }
+    y -= 10;
+  }
+  if (d.customer_note) {
+    text("The customer's note", L, y, 11, bold); y -= 16;
+    for (const ln of wrapText(d.customer_note, W, (s) => font.widthOfTextAtSize(s, 12))) { text(ln, L, y, 12); y -= 16; if (y < 70) break; }
+  }
+  text(`${d.project_id} · delivery record`, L, 40, 9, font, grey);
+  return await doc.save();
+}
+
 function fmtBytes(n) {
   n = Number(n) || 0;
   if (n >= 1073741824) return (n / 1073741824).toFixed(2).replace(/\.?0+$/, "") + " GB";
@@ -530,7 +644,7 @@ if (typeof document !== "undefined") (function () {
     msg: null, missing: false, openDetails: new Set(),
     supItems: [], supMissing: false, supEdit: null,
     // photos
-    photos: [], photoStatus: null, photoMissing: false, phText: "", phJob: null, viewer: null, arch: null,
+    photos: [], photoStatus: null, photoMissing: false, phText: "", phJob: null, viewer: null, arch: null, jobZip: null,
   };
   const TABS = [["tasks", "Needs you"], ["flags", "Flags"], ["arrow", "Arrow"], ["routine", "Routine tasks"],
                 ["departments", "Departments"], ["photos", "Photos"], ["setup", "Setup"]];
@@ -539,6 +653,8 @@ if (typeof document !== "undefined") (function () {
   const q = async (p) => { const { data, error } = await p; if (error) throw error; return data; };
 
   // the floor-log lists; each can fail on its own ("not set up yet") without taking the page down
+  // a part that may not be set up yet (deliveries.sql): no banner, just nothing
+  async function quiet(p) { try { return await q(p); } catch (e) { return null; } }
   async function soft(p) {
     try { return await q(p); }
     catch (e) { if (/does not exist|schema cache|could not find/i.test(String(e.message))) S.missing = true; else S.notice = friendlyError(e); return null; }
@@ -1042,7 +1158,7 @@ if (typeof document !== "undefined") (function () {
       catch (e) { const b = img.closest(".ph"); if (b) { b.classList.add("nofile"); b.textContent = "Photo not available"; } }
     });
   }
-  const photoWhat = (p) => p.kind === "loadout" ? (p.pallet ? `Pallet ${p.pallet}, wrapped` : p.sheet_number !== null ? `Sheet ${p.sheet_number}${p.piece ? ` · table ${p.piece}` : ""}` : p.note || "")
+  const photoWhat = (p) => p.kind === "loadout" ? (p.truck ? `Truck ${p.truck}, loaded` : p.pallet ? `Pallet ${p.pallet}, wrapped` : p.sheet_number !== null ? `Sheet ${p.sheet_number}${p.piece ? ` · table ${p.piece}` : ""}${p.stage === "site" ? " · at the site" : ""}` : p.note || "")
                                                 : `${p.department_name}${p.sheet_number !== null ? " · sheet " + p.sheet_number : ""}`;
   /** Thumbnails; an archived photo says which batch holds it. */
   function photoStrip(list, caption = false) {
@@ -1064,9 +1180,12 @@ if (typeof document !== "undefined") (function () {
   }
 
   async function findJobPhotos(project) {
-    const [ph, lo] = await Promise.all([soft(db.from("v_photos").select("*").eq("project_id", project)),
-                                        soft(db.from("v_loadouts").select("*").eq("project_id", project))]);
-    S.phJob = { project, photos: ph || [], loadouts: (lo || []).sort((a, b) => String(b.started_at).localeCompare(String(a.started_at))) };
+    const [ph, lo, dl] = await Promise.all([soft(db.from("v_photos").select("*").eq("project_id", project)),
+                                            soft(db.from("v_loadouts").select("*").eq("project_id", project)),
+                                            quiet(db.from("v_deliveries").select("*").eq("project_id", project))]);
+    S.phJob = { project, photos: ph || [], loadouts: (lo || []).sort((a, b) => String(b.started_at).localeCompare(String(a.started_at))),
+                deliveries: dl, filing: dl !== null };
+    S.jobZip = null;
     const byId = new Map(S.photos.map(p => [p.id, p])); for (const x of S.phJob.photos) byId.set(x.id, x); S.photos = [...byId.values()];
   }
 
@@ -1082,14 +1201,23 @@ if (typeof document !== "undefined") (function () {
       const time = (ts) => `${fmtDay(ts)} ${new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
       jobHtml = !j.photos.length && !j.loadouts.length ? `<div class="empty" style="margin-top:12px"><b>No photos on ${esc(j.project)}</b>Nothing has been photographed on this job, or the number isn't right.</div>`
         : `<h2 style="margin-top:18px">${esc(j.project)} <span class="meta2">${esc((j.photos[0] || j.loadouts[0] || {}).job_name || "")}</span></h2>
+        ${j.filing ? `<div class="btns"><button class="go" data-jobzip="1" ${S.jobZip && S.jobZip.busy ? "disabled" : ""}>Download this job's photos</button>
+            <span class="meta2">One zip: a folder per item (TB-03/TB-03-2 Delivery Picture.jpg), the trucks, the delivery tickets and signed tickets, and a spreadsheet.</span></div>
+          ${S.jobZip ? `<div class="banner ${S.jobZip.ok === false ? "warn" : "ok"}" style="margin-top:10px">${esc(S.jobZip.text)}</div>` : ""}` : ""}
         ${j.loadouts.length ? `<div class="deptname">What left the building</div>` + j.loadouts.map(l => { const mine = live.filter(p => p.loadout_id === l.id);
+            const dl = (j.deliveries || []).find(x => x.id === l.id);
             const done = new Set([...(l.sheets_here || []), ...(l.sheets_earlier || [])]).size;
             const ship = l.kind === "shipping", v2 = l.pieces_total !== undefined;
             const tables = v2 ? new Set([...(l.pieces_here || []), ...(l.pieces_earlier || [])]).size : 0;
             return `<div class="li"><div class="li-top"><b>${l.is_test ? `<span class="tag">TEST</span> ` : ""}${ship ? "Shipment · " : v2 ? "Delivery · " : ""}${l.finished_at ? `${ship ? "Picked up" : "Left"} ${esc(time(l.finished_at))}` : `${ship ? "Shipment" : "Load-out"} still open`}</b>
               <span class="meta2">started ${esc(time(l.started_at))} by ${esc(l.started_by_name)}</span></div>
               ${ship && (l.carrier || l.tracking) ? `<div class="meta2">${esc([l.carrier, l.tracking ? `tracking ${l.tracking}` : ""].filter(Boolean).join(" · "))}</div>` : ""}
-              ${v2 ? `<div class="meta2">${l.pieces_total ? `Tables on this ${ship ? "shipment" : "truck"}: ${(l.pieces_here || []).length} · ${tables} of ${l.pieces_total} photographed so far` : `${(l.pieces_here || []).length} photographed`}${ship ? ` · ${(l.pallets_here || []).length} wrapped pallet${(l.pallets_here || []).length === 1 ? "" : "s"}` : ""}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}</div>` : `<div class="meta2">On this truck: ${(l.sheets_here || []).length ? `sheet${l.sheets_here.length === 1 ? "" : "s"} ${esc(l.sheets_here.join(", "))}` : "no sheets"}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}${l.sheets_total ? ` · ${done} of ${l.sheets_total} sheets photographed so far` : ""}</div>`}
+              ${l.scheduled_for ? `<div class="meta2">Scheduled for ${esc(fmtWhen(l.scheduled_for))}${l.scheduled_by_name ? ` by ${esc(l.scheduled_by_name)}` : ""}</div>` : ""}
+              ${l.completed_at ? `<div><b>Delivered ${esc(fmtWhen(l.completed_at))}</b> · ${l.signed_name ? `signed by ${esc(l.signed_name)}` : `not signed (${esc(l.no_sign_reason || "")})`}${(l.site_here || []).length ? ` · ${(l.site_here || []).length} of ${l.pieces_total} tables photographed at the site` : ""}
+                  ${dl ? ` <button class="link" data-signedpdf="${esc(l.id)}">Signed ticket</button>` : ""}</div>
+                  ${dl && dl.customer_note ? `<div class="meta2">Customer's note: ${esc(dl.customer_note)}</div>` : ""}` : ""}
+              ${v2 && l.site_steps && !ship ? `<div class="meta2">Truck photos: ${(l.trucks_here || []).length}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}</div>`
+                : v2 ? `<div class="meta2">${l.pieces_total ? `Tables on this ${ship ? "shipment" : "truck"}: ${(l.pieces_here || []).length} · ${tables} of ${l.pieces_total} photographed so far` : `${(l.pieces_here || []).length} photographed`}${ship ? ` · ${(l.pallets_here || []).length} wrapped pallet${(l.pallets_here || []).length === 1 ? "" : "s"}` : ""}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}</div>` : `<div class="meta2">On this truck: ${(l.sheets_here || []).length ? `sheet${l.sheets_here.length === 1 ? "" : "s"} ${esc(l.sheets_here.join(", "))}` : "no sheets"}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}${l.sheets_total ? ` · ${done} of ${l.sheets_total} sheets photographed so far` : ""}</div>`}
               ${photoStrip(mine, true)}</div>`; }).join("") : ""}
         ${onEntries.length ? `<div class="deptname">On defects and problems</div>${photoStrip(onEntries, true)}` : ""}
         ${archived.length ? `<p class="sub" style="margin-top:12px">Some of this job's photos have been archived: ${archived.map(b => `photo-archive-${esc(b)}.zip, folder ${esc(j.project)}`).join("; ")}.</p>` : ""}
@@ -1143,7 +1271,48 @@ if (typeof document !== "undefined") (function () {
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 60000);
   }
+  // ---------- zips in the filing layout (deliveries.sql): photos, delivery files, signed tickets ----------
+  async function pdfLib() {
+    if (window.PDFLib) return window.PDFLib;
+    await new Promise((res, rej) => { const s = document.createElement("script"); s.src = PDF_LIB_URL; s.onload = res;
+      s.onerror = () => rej(new Error("The PDF helper couldn't load. Check the connection and try again.")); document.head.appendChild(s); });
+    return window.PDFLib;
+  }
+  async function fileBytes(bucket, path) {
+    const r = await db.storage.from(bucket || "photos").download(path);
+    if (r.error || !r.data) throw r.error || new Error("That file isn't there.");
+    return new Uint8Array(await r.data.arrayBuffer());
+  }
+  async function signedTicketFor(d, have = new Map()) {
+    const lib = await pdfLib();
+    const t = d.ticket && d.ticket.in_cloud !== false ? { bytes: have.get(d.ticket.path) || await fileBytes("deliveries", d.ticket.path), mime: d.ticket.mime } : null;
+    const s = d.signature_path ? (have.get(d.signature_path) || await fileBytes("deliveries", d.signature_path)) : null;
+    return new Uint8Array(await buildSignedTicket(lib, d, t, s));
+  }
+  /** Download every file in the list; signed tickets are put together from the ticket and the signature. */
+  async function collectFiles(list, progress = () => {}) {
+    const files = [], missing = [], have = new Map();
+    let bytes = 0, done = 0;
+    for (const x of list.filter(x => x.source !== "signed")) {
+      if (x.in_cloud === false) { missing.push(x.name); continue; }
+      try { const data = await fileBytes(x.bucket, x.path); have.set(x.path, data); bytes += data.length; files.push({ name: x.name, data, date: atDate(x.at) }); }
+      catch (e) { missing.push(x.name); }
+      progress(++done, list.length);
+    }
+    const signed = list.filter(x => x.source === "signed");
+    if (signed.length) {
+      const rows = await quiet(db.from("v_deliveries").select("*").in("id", signed.map(x => x.loadout_id || x.id))) || [];
+      for (const x of signed) {
+        const d = rows.find(r => r.id === (x.loadout_id || x.id));
+        try { if (!d || x.in_cloud === false) throw new Error("gone"); const data = await signedTicketFor(d, have); bytes += data.length; files.push({ name: x.name, data, date: atDate(x.at) }); }
+        catch (e) { missing.push(x.name); }
+        progress(++done, list.length);
+      }
+    }
+    return { files, missing, bytes };
+  }
   async function buildZip(info) {
+    if (info.files) return buildFilingZip(info);
     const list = info.photos || [];
     S.arch = { batch: info.batch, stage: "downloading", done: 0, total: list.length }; render();
     const files = [], missing = [];
@@ -1168,6 +1337,40 @@ if (typeof document !== "undefined") (function () {
     S.arch = { batch: info.batch, stage: "ready", total: list.length, bytes };
     render();
   }
+  // the archive, filed by job, item and table, with the delivery files and signed tickets
+  async function buildFilingZip(info) {
+    const list = info.files || [];
+    S.arch = { batch: info.batch, stage: "downloading", done: 0, total: list.length }; render();
+    const r = await collectFiles(list, (done) => { S.arch.done = done; if (done % 5 === 0 || done === list.length) render(); });
+    if (r.missing.length) {
+      S.arch = { batch: info.batch, stage: "failed", text: `${r.missing.length} file${r.missing.length === 1 ? "" : "s"} couldn't be downloaded (${r.missing.slice(0, 3).join(", ")}${r.missing.length > 3 ? "…" : ""}), so no zip was made and nothing is marked saved. Check the connection and press Download archive again.` };
+      return render();
+    }
+    r.files.push({ name: "photos.csv", data: utf8(fileCsv(list, info.batch)), date: new Date() });
+    saveBlob(new Blob([makeZip(r.files)], { type: "application/zip" }), `photo-archive-${info.batch}.zip`);
+    S.arch = { batch: info.batch, stage: "ready", total: list.length, bytes: r.bytes };
+    render();
+  }
+  /** After prepare_photo_archive(): the batch's delivery files join it, and everything is named the filing way. */
+  async function withFiling(info) {
+    const { data, error } = await db.rpc("file_archive_batch", { p_batch: info.batch });
+    return error ? info : { ...info, files: data.files };
+  }
+  async function removeDeliveryDocs() {
+    const { data, error } = await db.rpc("delivery_docs_to_remove");
+    if (error || !data || !data.length) return [];
+    const byBatch = {}, said = [];
+    for (const x of data) (byBatch[x.batch] = byBatch[x.batch] || []).push(x.path);
+    for (const [batch, paths] of Object.entries(byBatch)) {
+      for (let i = 0; i < paths.length; i += 100) {
+        const r = await db.storage.from("deliveries").remove(paths.slice(i, i + 100));
+        if (r.error) { said.push(`Batch ${batch}: ${friendlyError(r.error)}`); break; }
+      }
+      const m = await db.rpc("mark_delivery_docs_removed", { p_batch: batch });
+      if (m.error) said.push(friendlyError(m.error)); else if (m.data.summary) said.push(m.data.summary);
+    }
+    return said;
+  }
   async function removeReleased(list) {
     const byBatch = {};
     for (const x of list || []) (byBatch[x.batch] = byBatch[x.batch] || []).push(x.path);
@@ -1180,7 +1383,7 @@ if (typeof document !== "undefined") (function () {
       const { data, error } = await db.rpc("mark_photo_files_removed", { p_batch: batch });
       said.push(error ? friendlyError(error) : data.summary);
     }
-    return said;
+    return said.concat(await removeDeliveryDocs());       // delivery files leave with their batch (deliveries.sql)
   }
 
   function render() {
@@ -1349,12 +1552,35 @@ if (typeof document !== "undefined") (function () {
       const { data, error } = await db.rpc("prepare_photo_archive");
       S.busy = false;
       if (error) { S.msg = { ok: false, text: friendlyError(error) }; await loadPhotoStatus(); return render(); }
-      await buildZip(data); await loadPhotoStatus(); render();
+      await buildZip(await withFiling(data)); await loadPhotoStatus(); render();
     });
     on("[data-archagain]", async (b) => {
       const { data, error } = await db.rpc("photo_archive_files", { p_batch: b.dataset.archagain });
       if (error) { S.msg = { ok: false, text: friendlyError(error) }; return render(); }
-      await buildZip(data);
+      await buildZip(await withFiling(data));
+    });
+    // the whole job, now, in the filing layout (e.g. for a damage claim)
+    on("[data-jobzip]", async () => {
+      const j = S.phJob; if (!j) return;
+      S.jobZip = { busy: true, text: "Gathering the files…" }; render();
+      const rows = await quiet(db.from("v_filing").select("*").eq("project_id", j.project));
+      if (!rows) { S.jobZip = { ok: false, text: "The filing part isn't in the database yet. Run deliveries.sql (Walkthrough 11)." }; return render(); }
+      const list = rows.map(filingItem).sort((a, b) => a.name.localeCompare(b.name));
+      const away = list.filter(x => x.in_cloud === false);
+      const r = await collectFiles(list.filter(x => x.in_cloud !== false), (done, total) => { S.jobZip = { busy: true, text: `Downloading ${done} of ${total}… keep this page open.` }; if (done % 5 === 0) render(); });
+      if (!r.files.length) { S.jobZip = { ok: false, text: away.length ? "Every file on this job has been archived; they're in the archive zips." : "There's nothing to download on this job yet." }; return render(); }
+      r.files.push({ name: `${j.project}/photos.csv`, data: utf8(fileCsv(list, "")), date: new Date() });
+      saveBlob(new Blob([makeZip(r.files)], { type: "application/zip" }), `${j.project} photos ${shopDate(new Date())}.zip`);
+      const batches = [...new Set(away.map(x => x.archive_batch).filter(Boolean))];
+      S.jobZip = { ok: !r.missing.length, text: `${j.project} photos ${shopDate(new Date())}.zip has downloaded: ${r.files.length - 1} file${r.files.length === 2 ? "" : "s"}, ${fmtBytes(r.bytes)}.`
+        + (away.length ? ` ${away.length} archived file${away.length === 1 ? " is" : "s are"} in ${batches.map(b => `photo-archive-${b}.zip`).join(", ") || "the archive"} instead.` : "")
+        + (r.missing.length ? ` ${r.missing.length} couldn't be downloaded: ${r.missing.slice(0, 3).join(", ")}.` : "") };
+      render();
+    });
+    on("[data-signedpdf]", async (b) => {
+      const d = ((S.phJob && S.phJob.deliveries) || []).find(x => x.id === b.dataset.signedpdf); if (!d) return;
+      try { saveBlob(new Blob([await signedTicketFor(d)], { type: "application/pdf" }), signedFileName(d)); }
+      catch (e) { S.msg = { ok: false, text: friendlyError(e) }; render(); }
     });
     on("[data-archsaved]", async (b) => {
       S.busy = true; render();
@@ -1471,6 +1697,7 @@ if (typeof document !== "undefined") (function () {
 if (typeof module !== "undefined") module.exports = { keyProblem, isManager, daysLeft, fmtDate, daysText, ago, buildTasks, lastChanges, groupRules, ruleDepartments, catchUpTotals, pinHash, validPin, isNetworkError, friendlyError,
   localISO, daysSince, problemState, officeProblems, staleFlags, openFlags, needToOrder, orderedNotReceived, defectSummary, tvLink, taskWhen,
   crc32, makeZip, photoCsv, csvCell, fmtBytes, normProject, BATCH_STATE,
+  fileCsv, filingItem, atDate, buildSignedTicket, pdfText, wrapText, signedFileName, fmtWhen, shopDate,
   parseOptions, choicesFromForm, choiceSummary, supplyListFor };
 </script>
 </body>

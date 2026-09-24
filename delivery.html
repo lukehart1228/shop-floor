@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#181D2E">
+<title>Deliveries · Shop Floor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --midnight:#181D2E; --orange:#ED5E0F; --bright:#F0A721; --teal:#00B4B2;
+    --teal-ink:#00807E; --teal-bg:#DDF2F1; --sawdust:#FFF4D5; --gray:#C2BAA0;
+    --paper:#EFEDE6; --line:#E4DFCF; --ink2:#6B7082; --warn:#8A4B00;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--paper); color:var(--midnight);
+    font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:17px; line-height:1.45}
+  header{background:var(--midnight); color:var(--sawdust); padding:12px 20px; display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+  .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.16em; color:var(--orange)}
+  .brand span{color:var(--sawdust)}
+  header h1{margin:0; font-size:20px; font-weight:600}
+  header .me{margin-left:auto; color:var(--gray); font-size:15px}
+  header .me button{color:var(--sawdust)}
+  nav.tabs{display:flex; gap:6px; max-width:900px; margin:16px auto 0; padding:0 16px; flex-wrap:wrap}
+  nav.tabs button{border-radius:999px; padding:9px 16px; border:1px solid var(--gray); background:#fff}
+  nav.tabs button[aria-current="true"]{background:var(--midnight); color:var(--sawdust); border-color:var(--midnight)}
+  nav.tabs .c{margin-left:7px; color:var(--bright); font-family:'Barlow Condensed',sans-serif}
+  main{max-width:900px; margin:0 auto; padding:18px 16px 60px}
+  .card{background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin-bottom:14px}
+  h2{margin:0 0 6px; font-size:22px}
+  h3{margin:0; font-size:19px}
+  .sub{color:var(--ink2); margin:0 0 14px}
+  .meta{color:var(--ink2); font-size:15px}
+  label.f{display:block; font-weight:600; margin:14px 0 4px}
+  input.in, textarea.in{width:100%; font:inherit; padding:11px 12px; border:1px solid var(--gray); border-radius:9px; background:#fff}
+  textarea.in{min-height:70px; resize:vertical}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  button{font:inherit; font-weight:600; border-radius:9px; padding:11px 16px; cursor:pointer; border:1px solid var(--gray); background:#fff; color:var(--midnight)}
+  button:disabled{opacity:.45; cursor:default}
+  button.go{background:var(--orange); color:#fff; border-color:transparent}
+  button.wide{width:100%; margin-top:16px; padding:14px}
+  button.link{background:none; border:none; padding:4px; color:var(--ink2); text-decoration:underline; font-weight:500}
+  .btns{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; align-items:center}
+  .jobs{max-height:260px; overflow:auto; border:1px solid var(--line); border-radius:9px; margin-top:8px}
+  .jobs button{display:block; width:100%; text-align:left; border:none; border-bottom:1px solid var(--line); border-radius:0; padding:10px 12px; font-weight:500}
+  .jobs button:last-child{border-bottom:none}
+  .jobs button[aria-pressed="true"]{background:var(--sawdust); font-weight:700}
+  .jobs .pid{font-weight:700; margin-right:8px}
+  .picked{background:var(--sawdust); border-radius:9px; padding:10px 12px; margin-top:8px; display:flex; gap:10px; align-items:center; justify-content:space-between}
+  .drop{display:block; border:2px dashed var(--gray); border-radius:12px; background:#fff; padding:18px; text-align:center; cursor:pointer; margin-top:4px}
+  .drop b{display:block}
+  .drop span{color:var(--ink2); font-size:15px}
+  .files{list-style:none; margin:8px 0 0; padding:0}
+  .files li{display:flex; gap:10px; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); font-size:16px}
+  .files li:last-child{border-bottom:none}
+  .files .nm{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .dl{display:grid; grid-template-columns:auto 1fr; gap:4px 16px; margin:10px 0 0}
+  .dl dt{color:var(--ink2)} .dl dd{margin:0}
+  .when{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:24px; line-height:1.1}
+  .top{display:flex; gap:12px; align-items:baseline; flex-wrap:wrap}
+  .top .pid{font-weight:700}
+  .tag{display:inline-block; font-size:13px; font-weight:700; letter-spacing:.04em; border-radius:6px; padding:1px 7px; background:var(--sawdust); color:var(--warn); margin-right:6px}
+  .tag.new{background:var(--midnight); color:var(--sawdust)}
+  .done{color:var(--teal-ink); font-weight:700}
+  .banner{border-radius:10px; padding:12px 14px; margin-bottom:14px}
+  .banner.ok{background:var(--teal-bg); color:var(--teal-ink)}
+  .banner.warn{background:var(--sawdust); color:var(--warn); border-left:5px solid var(--bright)}
+  .alarm{background:var(--midnight); color:var(--sawdust); border-radius:12px; padding:20px}
+  .alarm h2{color:var(--bright)}
+  .empty{background:#fff; border:1px dashed var(--gray); border-radius:12px; padding:22px; text-align:center; color:var(--ink2)}
+  .empty b{display:block; color:var(--midnight); margin-bottom:4px}
+  ol.steps{list-style:none; padding:0; margin:10px 0 0}
+  ol.steps li{padding:4px 0}
+  @media (max-width: 600px){ .row2{grid-template-columns:1fr} main{padding:14px 12px 50px} }
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">PURPOSEFUL <span>DESIGN</span></div>
+  <h1>Deliveries</h1>
+  <div class="me" id="me"></div>
+</header>
+<div id="app"></div>
+<input type="file" id="picker" hidden>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* =====================================================================
+   THE TWO SETTINGS — the same two lines as upload.html.
+   Publishable key only. NEVER the secret key — this file is public.
+   ===================================================================== */
+const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
+const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
+
+
+/* ---- core: no screen code in here, so it can be tested on its own ---- */
+
+const TZ = "America/Indiana/Indianapolis";
+const PDF_LIB_URL = "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
+const MAX_FILE = 10 * 1024 * 1024;              // the bucket refuses anything bigger
+const TYPES = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" };
+const NO_SIGN_REASONS = ["Nobody on site", "Customer refused", "Other"];
+
+function keyProblem(url, key) {
+  if (!url || !key || url.includes("PASTE-") || key.includes("PASTE-"))
+    return { secret: false, text: "The project address and key haven't been filled in yet. Copy the two SUPABASE lines from upload.html into this file." };
+  const secret = { secret: true, text: "This is the SECRET key, not the publishable one. It bypasses every security rule, and this file is public. Take it out of the file now and use the publishable key — the same one upload.html has. If this file was already put on GitHub with it, create a new secret key in Supabase so the old one stops working." };
+  if (key.startsWith("sb_secret_")) return secret;
+  const parts = key.split(".");
+  if (parts.length === 3) {
+    try { if (JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))).role === "service_role") return secret; }
+    catch (e) { /* not a readable token */ }
+  }
+  if (!/^https:\/\//.test(url)) return { secret: false, text: "The project address should start with https:// — copy it from upload.html." };
+  return null;
+}
+function isNetworkError(err) {
+  const m = String((err && (err.message || err.details)) || err || "");
+  return /failed to fetch|networkerror|load failed|network request failed|fetch failed|timeout|aborted/i.test(m);
+}
+function friendlyError(err) {
+  const m = String((err && (err.message || err.error_description || err.error)) || err || "");
+  if (isNetworkError(err)) return "Can't reach the database right now. Check the connection and try again.";
+  if (/invalid login credentials/i.test(m)) return "That email and password didn't match. Check them and try again.";
+  if (/email not confirmed/i.test(m)) return "This login hasn't been confirmed. In Supabase → Authentication → Users, check it was created with Auto Confirm ticked.";
+  if (/jwt expired|refresh token/i.test(m)) return "The sign-in has expired. Sign out and back in.";
+  if (/could not find the function|schema cache|does not exist/i.test(m)) return "Deliveries aren't set up in the database yet. Run deliveries.sql (Walkthrough 11), then reload this page.";
+  if (/exceeded the maximum|413|too large/i.test(m)) return "That file is over 10 MB. Save a smaller copy (for a PDF, \"Reduce file size\") and add it again.";
+  if (/mime|415/i.test(m)) return "Only PDF, JPEG and PNG files can be added.";
+  if (/row-level security|403|unauthorized/i.test(m)) return "This login can't add files to deliveries.";
+  return m || "Something went wrong. Try again, and if it keeps happening, take a screenshot.";
+}
+function newId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ (Math.random() * 16) >> (c / 4)).toString(16));
+}
+
+/** What kind of file this is, from its type or its name. Null if it can't be added. */
+function fileKind(file) {
+  const t = String((file && file.type) || "").toLowerCase();
+  if (TYPES[t]) return t;
+  const n = String((file && file.name) || "").toLowerCase();
+  if (/\.pdf$/.test(n)) return "application/pdf";
+  if (/\.jpe?g$/.test(n)) return "image/jpeg";
+  if (/\.png$/.test(n)) return "image/png";
+  return null;
+}
+/** Where a delivery file lives: the job's folder, the delivery, the file's own id. The database insists on exactly this. */
+function docPath(projectId, deliveryClientId, fileId, mime) { return `${projectId}/${deliveryClientId}/${fileId}.${TYPES[mime]}`; }
+
+/** "2026-10-02" and "09:00" (as typed, on this computer's clock) → an ISO timestamp. Null if either is missing. */
+function whenISO(date, time) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || "") || !/^\d{1,2}:\d{2}$/.test(time || "")) return null;
+  const d = new Date(`${date}T${time.padStart(5, "0")}:00`);
+  return isNaN(d) ? null : d.toISOString();
+}
+/** The other way: a timestamp → { date, time } for the inputs, on this computer's clock. */
+function whenInputs(ts) {
+  const d = new Date(ts), p = (n) => String(n).padStart(2, "0");
+  return { date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`, time: `${p(d.getHours())}:${p(d.getMinutes())}` };
+}
+/** "Thu Oct 2, 9:00 am" on the shop's clock. */
+function fmtWhen(ts, withYear = false) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric", year: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true }).formatToParts(d).map(x => [x.type, x.value]));
+  return `${parts.weekday} ${parts.month} ${parts.day}${withYear ? ", " + parts.year : ""}, ${parts.hour}:${parts.minute} ${String(parts.dayPeriod).toLowerCase()}`;
+}
+/** "2026-10-02" on the shop's clock. */
+function shopDate(ts) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(ts)).map(x => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}`;
+}
+function fmtBytes(n) {
+  n = Number(n) || 0;
+  if (n >= 1048576) return (n / 1048576).toFixed(1).replace(/\.0$/, "") + " MB";
+  return Math.max(1, Math.round(n / 1024)) + " KB";
+}
+/** The file Julia downloads: "PROJ-00418 Signed ticket 2026-10-14.pdf". */
+function signedFileName(d) { return `${d.project_id} Signed ticket ${shopDate(d.completed_at || d.scheduled_for || new Date())}.pdf`; }
+
+/** Coming up (scheduled, not done: soonest first) and completed (newest first). */
+function splitDeliveries(list) {
+  const up = (list || []).filter(d => !d.is_done).sort((a, b) => String(a.scheduled_for).localeCompare(String(b.scheduled_for)));
+  const done = (list || []).filter(d => d.is_done).sort((a, b) => String(b.completed_at).localeCompare(String(a.completed_at)));
+  return { up, done, fresh: done.filter(d => !d.downloaded_at).length };
+}
+/** Where a scheduled delivery is, in words. */
+function tripLine(d) {
+  const parts = [];
+  if (d.finished_at) parts.push(`Truck left ${fmtWhen(d.finished_at)}${d.finished_by_name ? ` (${d.finished_by_name})` : ""}`);
+  else if (d.truck_photos) parts.push("Loading");
+  if (d.truck_photos) parts.push(`${d.truck_photos} truck photo${d.truck_photos === 1 ? "" : "s"}`);
+  if (d.site_photographed) parts.push(`${d.site_photographed}${d.pieces_total ? ` of ${d.pieces_total}` : ""} table${(d.pieces_total || d.site_photographed) === 1 ? "" : "s"} photographed at the site`);
+  return parts.join(" · ");
+}
+
+/* ---- the signed ticket: the ticket as issued, then one signature page ---- */
+
+// the PDF's built-in font only has the Western European letters: anything else becomes "?"
+const CP1252 = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ";
+function pdfText(s) {
+  return String(s ?? "").replace(/\r\n?/g, "\n").replace(/[^\n]/g, ch => {
+    const c = ch.charCodeAt(0);
+    return (c >= 32 && c <= 126) || (c >= 160 && c <= 255) || CP1252.includes(ch) ? ch : (c === 9 ? " " : "?");
+  });
+}
+/** Break text into lines no wider than `width` (points), keeping the writer's own line breaks. */
+function wrapText(text, width, measure) {
+  const out = [];
+  for (const para of pdfText(text).split("\n")) {
+    let line = "";
+    for (const word of para.split(/\s+/).filter(Boolean)) {
+      const next = line ? line + " " + word : word;
+      if (measure(next) <= width || !line) line = next; else { out.push(line); line = word; }
+    }
+    out.push(line);
+  }
+  return out;
+}
+/**
+ * Build the signed ticket. d = a v_deliveries row. ticket = { bytes, mime } or null; signature = PNG bytes or null.
+ * Returns the PDF's bytes. Always the same pages for the same delivery, so it can be made again any time.
+ */
+async function buildSignedTicket(PDFLib, d, ticket, signature) {
+  const { PDFDocument, StandardFonts, rgb } = PDFLib;
+  let doc;
+  if (ticket && ticket.mime === "application/pdf") doc = await PDFDocument.load(ticket.bytes, { ignoreEncryption: true });
+  else {
+    doc = await PDFDocument.create();
+    if (ticket) {                                       // a photo or scan of a paper ticket: one page, fitted to Letter
+      const img = ticket.mime === "image/png" ? await doc.embedPng(ticket.bytes) : await doc.embedJpg(ticket.bytes);
+      const pg = doc.addPage([612, 792]);
+      const s = Math.min(540 / img.width, 720 / img.height, 1);
+      pg.drawImage(img, { x: (612 - img.width * s) / 2, y: (792 - img.height * s) / 2, width: img.width * s, height: img.height * s });
+    }
+  }
+  doc.setTitle(pdfText(`${d.project_id} delivery ticket, signed`));
+  const font = await doc.embedFont(StandardFonts.Helvetica), bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const ink = rgb(0.094, 0.114, 0.18), grey = rgb(0.42, 0.44, 0.51), orange = rgb(0.93, 0.37, 0.06);
+  const page = doc.addPage([612, 792]);
+  const L = 54, W = 504;
+  let y = 738;
+  const text = (t, x, yy, size, f = font, color = ink) => page.drawText(pdfText(t), { x, y: yy, size, font: f, color });
+  text("PURPOSEFUL DESIGN", L, y, 10, bold, orange);
+  y -= 26; text("Delivery record", L, y, 22, bold);
+  y -= 16; text(ticket ? "Added by the shop floor system after the delivery ticket, which is as it was issued." : "No delivery ticket was attached, so this record stands on its own.", L, y, 10, font, grey);
+  y -= 28;
+  const rows = [["Project", `${d.project_id} — ${d.job_name || ""}`],
+                ["Scheduled for", d.scheduled_for ? fmtWhen(d.scheduled_for, true) : "Not scheduled"],
+                ["Delivered", `${fmtWhen(d.completed_at, true)}${d.completed_by_name ? ` by ${d.completed_by_name}` : ""}`],
+                ["At the site", d.pieces_total ? `${d.site_photographed || 0} of ${d.pieces_total} table${d.pieces_total === 1 ? "" : "s"} photographed` : `${d.site_photographed || 0} photographed`]];
+  if (d.complete_lat !== null && d.complete_lat !== undefined)
+    rows.push(["Where", `${Number(d.complete_lat).toFixed(6)}, ${Number(d.complete_lng).toFixed(6)}${d.complete_accuracy ? ` (within ${Math.round(d.complete_accuracy)} m)` : ""}`]);
+  for (const [k, v] of rows) {
+    text(k, L, y, 11, font, grey);
+    const lines = wrapText(v, W - 110, (s) => font.widthOfTextAtSize(s, 12));
+    for (const ln of lines) { text(ln, L + 110, y, 12); y -= 16; }
+    y -= 4;
+  }
+  y -= 10;
+  if (d.signed_name) {
+    text("Customer signature", L, y, 11, bold); y -= 10;
+    const boxH = 150;
+    page.drawRectangle({ x: L, y: y - boxH, width: W, height: boxH, borderColor: grey, borderWidth: 0.8 });
+    if (signature) {
+      const img = await doc.embedPng(signature);
+      const s = Math.min((W - 20) / img.width, (boxH - 20) / img.height);
+      page.drawImage(img, { x: L + (W - img.width * s) / 2, y: y - boxH + (boxH - img.height * s) / 2, width: img.width * s, height: img.height * s });
+    }
+    y -= boxH + 18;
+    text(`Signed by ${d.signed_name}${d.signed_at ? `, ${fmtWhen(d.signed_at, true)}` : ""}`, L, y, 12, bold); y -= 26;
+  } else {
+    text(`Not signed — ${d.no_sign_reason || "no reason given"}`, L, y, 14, bold); y -= 20;
+    for (const ln of wrapText(d.no_sign_note || "", W, (s) => font.widthOfTextAtSize(s, 12))) { if (!ln) continue; text(ln, L, y, 12); y -= 16; }
+    y -= 10;
+  }
+  if (d.customer_note) {
+    text("The customer's note", L, y, 11, bold); y -= 16;
+    for (const ln of wrapText(d.customer_note, W, (s) => font.widthOfTextAtSize(s, 12))) { text(ln, L, y, 12); y -= 16; if (y < 70) break; }
+  }
+  text(`${d.project_id} · delivery record`, L, 40, 9, font, grey);
+  return await doc.save();
+}
+
+/* ---- end core ---- */
+
+if (typeof module !== "undefined") module.exports = {
+  keyProblem, isNetworkError, friendlyError, fileKind, docPath, whenISO, whenInputs, fmtWhen, shopDate, fmtBytes, signedFileName,
+  splitDeliveries, tripLine, pdfText, wrapText, buildSignedTicket, NO_SIGN_REASONS,
+};
+
+
+/* ---- the screen ---- */
+if (typeof document !== "undefined") (function () {
+  const app = document.getElementById("app");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("sfd_" + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem("sfd_" + k, JSON.stringify(v)); } catch (e) {} },
+  };
+  const problem = keyProblem(SUPABASE_URL, SUPABASE_KEY);
+  if (problem) {
+    app.innerHTML = `<main><div class="alarm"><h2>${problem.secret ? "Stop — wrong key in this file" : "This page isn't set up yet"}</h2><p>${esc(problem.text)}</p></div></main>`;
+    return;
+  }
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const S = {
+    me: null, allowed: null, tab: store.get("tab", "new"), list: [], jobs: [], loaded: false, missing: false,
+    form: blankForm(), busy: false, msg: null, steps: null, edit: null, openAdd: null, showAll: false,
+  };
+  function blankForm() { return { jobId: null, filter: "", date: "", time: "09:00", note: "", ticket: null, files: [] }; }
+
+  // ---------- data ----------
+  async function load() {
+    const [d, j] = await Promise.all([db.from("v_deliveries").select("*"), db.from("v_pick_jobs").select("*")]);
+    if (d.error) {
+      S.missing = /does not exist|schema cache|could not find/i.test(String(d.error.message));
+      if (!S.missing) S.msg = { ok: false, text: friendlyError(d.error) };
+    } else { S.list = d.data || []; S.missing = false; }
+    if (!j.error) S.jobs = (j.data || []).filter(x => x.is_active || ["Delivery", "Project Closeout"].includes(x.phase));
+    S.loaded = true;
+  }
+  const deliveries = () => splitDeliveries(S.list);
+
+  // ---------- files: uploaded first, then recorded ----------
+  /** Shrink a big photo (over 1.5 MB) to 2000 pixels on the long side, JPEG. PDFs go as they are. */
+  async function prepare(file) {
+    const mime = fileKind(file);
+    if (!mime) throw new Error(`"${file.name}" isn't a PDF, JPEG or PNG, so it can't be added.`);
+    if (mime === "application/pdf" || file.size <= 1.5 * 1048576) {
+      if (file.size > MAX_FILE) throw new Error(`"${file.name}" is over 10 MB. Save a smaller copy and add it again.`);
+      return { blob: file, mime, name: file.name };
+    }
+    const shrink = window.sfShrinkImage || (async (f) => {
+      const src = await createImageBitmap(f);
+      const s = Math.min(1, 2000 / Math.max(src.width, src.height)), c = document.createElement("canvas");
+      c.width = Math.round(src.width * s); c.height = Math.round(src.height * s);
+      c.getContext("2d").drawImage(src, 0, 0, c.width, c.height);
+      return await new Promise(res => c.toBlob(res, "image/jpeg", 0.8));
+    });
+    const blob = await shrink(file);
+    if (!blob || blob.size > MAX_FILE) throw new Error(`"${file.name}" is too big even after shrinking.`);
+    return { blob, mime: "image/jpeg", name: file.name.replace(/\.png$/i, ".jpg") };
+  }
+  async function addFile(d, file, kind) {
+    const p = await prepare(file), id = newId();
+    const up = await db.storage.from("deliveries").upload(docPath(d.project_id, d.client_id, id, p.mime), p.blob, { contentType: p.mime, upsert: false });
+    if (up.error) throw up.error;
+    const r = await db.rpc("add_delivery_doc", { p_client_id: id, p_loadout: d.client_id, p_kind: kind, p_file_name: p.name });
+    if (r.error) throw r.error;
+    return r.data;
+  }
+  async function openFile(path) {
+    const w = window.open("", "_blank");
+    const { data, error } = await db.storage.from("deliveries").createSignedUrl(path, 600);
+    if (error || !data) { if (w) w.close(); S.msg = { ok: false, text: friendlyError(error || "That file couldn't be opened.") }; return render(); }
+    if (w) w.location = data.signedUrl; else window.open(data.signedUrl, "_blank");
+  }
+  async function bytesOf(path) {
+    const { data, error } = await db.storage.from("deliveries").download(path);
+    if (error) throw error;
+    return new Uint8Array(await data.arrayBuffer());
+  }
+  async function pdfLib() {
+    if (window.PDFLib) return window.PDFLib;
+    await new Promise((res, rej) => { const s = document.createElement("script"); s.src = PDF_LIB_URL; s.onload = res; s.onerror = () => rej(new Error("The PDF helper couldn't load. Check the connection and try again.")); document.head.appendChild(s); });
+    return window.PDFLib;
+  }
+  function saveBlob(blob, name) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  }
+
+  // ---------- screens ----------
+  function signInScreen(err) {
+    return `<main><div class="card" style="max-width:460px; margin:30px auto"><h2>Sign in</h2>
+      <p class="sub">Use your own login: the delivery manager's, or a manager's.</p>
+      <form id="f"><label class="f" for="e">Email</label><input class="in" id="e" type="email" autocomplete="username" required>
+        <label class="f" for="p">Password</label><input class="in" id="p" type="password" autocomplete="current-password" required>
+        <button class="go wide" type="submit">Sign in</button></form>
+      <div id="err" class="banner warn" style="margin-top:14px" ${err ? "" : "hidden"}>${esc(err || "")}</div></div></main>`;
+  }
+  function tabsBar() {
+    const { up, fresh } = deliveries();
+    const t = (k, label, n) => `<button data-tab="${k}" aria-current="${S.tab === k}">${label}${n ? `<span class="c">${n}</span>` : ""}</button>`;
+    return `<nav class="tabs">${t("new", "Schedule a delivery")}${t("up", "Coming up", up.length)}${t("done", "Completed", fresh)}</nav>`;
+  }
+  function msgBanner() { return S.msg ? `<div class="banner ${S.msg.ok ? "ok" : "warn"}">${esc(S.msg.text)}</div>` : ""; }
+
+  function jobList(filter, picked) {
+    const t = String(filter || "").trim().toLowerCase().replace(/^proj-?/, "");
+    const list = S.jobs.filter(j => !t || String(j.project_id).toLowerCase().includes(t) || String(j.job_name || "").toLowerCase().includes(t))
+      .sort((a, b) => (b.is_active - a.is_active) || (a.delivery_date || "9999").localeCompare(b.delivery_date || "9999")).slice(0, 60);
+    return list.length ? `<div class="jobs">${list.map(j => `<button data-pickjob="${esc(j.job_id)}" aria-pressed="${picked === j.job_id}">
+        <span class="pid">${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</span>${esc(j.job_name)}
+        <span class="meta"> · ${esc(j.phase || "")}${j.delivery_date ? ` · due ${esc(j.delivery_date)}` : ""}</span></button>`).join("")}</div>`
+      : `<div class="empty" style="margin-top:8px"><b>No job matches</b>Type part of the PROJ number or the job's name.</div>`;
+  }
+  function newScreen() {
+    const f = S.form, job = S.jobs.find(j => j.job_id === f.jobId);
+    const ready = f.jobId && whenISO(f.date, f.time) && !S.busy;
+    return `${msgBanner()}
+      <div class="card"><h2>Schedule a delivery</h2>
+        <p class="sub">Pick the job, set when, and add the delivery ticket and anything that helps the driver on site. It shows on Delivery's phone straight away.</p>
+        <label class="f" for="jf">Job</label>
+        ${job ? `<div class="picked"><span><b>${job.is_test ? "TEST " : ""}${esc(job.project_id)}</b> ${esc(job.job_name)}</span><button class="link" data-unpick="1">Change</button></div>`
+              : `<input class="in" id="jf" data-field="filter" value="${esc(f.filter)}" placeholder="PROJ number or name, e.g. 418" autocomplete="off">${jobList(f.filter, f.jobId)}`}
+        <div class="row2"><div><label class="f" for="dd">Date</label><input class="in" id="dd" type="date" data-field="date" value="${esc(f.date)}"></div>
+          <div><label class="f" for="dt">Time</label><input class="in" id="dt" type="time" data-field="time" value="${esc(f.time)}"></div></div>
+        <label class="f" for="dn">Note for the driver <span class="meta">(optional)</span></label>
+        <textarea class="in" id="dn" data-field="note" maxlength="500" placeholder="e.g. Back entrance. Ask for Pat.">${esc(f.note)}</textarea>
+        <label class="f">Delivery ticket</label>
+        ${f.ticket ? `<ul class="files"><li><span class="nm">${esc(f.ticket.name)}</span><span class="meta">${esc(fmtBytes(f.ticket.size))}</span><button class="link" data-dropticket="1">Remove</button></li></ul>`
+                   : `<label class="drop"><b>Choose the ticket</b><span>PDF (or a photo of a paper ticket). The customer's signature is added after it.</span>
+                       <input type="file" id="ticketIn" accept=".pdf,application/pdf,image/jpeg,image/png" hidden></label>`}
+        <label class="f">Site files <span class="meta">(optional: site maps, photos of where it goes)</span></label>
+        ${f.files.length ? `<ul class="files">${f.files.map((x, i) => `<li><span class="nm">${esc(x.name)}</span><span class="meta">${esc(fmtBytes(x.size))}</span><button class="link" data-dropfile="${i}">Remove</button></li>`).join("")}</ul>` : ""}
+        <label class="drop"><b>${f.files.length ? "Add more" : "Choose files"}</b><span>PDF, JPEG or PNG. The driver's phone keeps them for no signal.</span>
+          <input type="file" id="filesIn" accept=".pdf,application/pdf,image/jpeg,image/png" multiple hidden></label>
+        <button class="go wide" data-schedule="1" ${ready ? "" : "disabled"}>${S.busy ? "Saving…" : "Schedule this delivery"}</button>
+        ${S.steps ? `<ol class="steps">${S.steps.map(s => `<li>${s.done ? "✓" : s.failed ? "✗" : "…"} ${esc(s.text)}</li>`).join("")}</ol>` : ""}
+      </div>`;
+  }
+  function filesBlock(d, editable) {
+    const t = d.ticket, files = d.files || [];
+    return `<ul class="files">
+      ${t ? `<li><span class="nm"><b>Ticket:</b> ${esc(t.name)}</span><span class="meta">${esc(fmtBytes(t.bytes))}</span>
+             ${t.in_cloud === false ? `<span class="meta">archived</span>` : `<button class="link" data-open="${esc(t.path)}">Open</button>`}</li>`
+          : `<li><span class="nm"><b>No ticket yet.</b></span></li>`}
+      ${files.map(x => `<li><span class="nm">${esc(x.name)}</span><span class="meta">${esc(fmtBytes(x.bytes))}</span>
+             ${x.in_cloud === false ? `<span class="meta">archived</span>` : `<button class="link" data-open="${esc(x.path)}">Open</button>`}
+             ${editable ? `<button class="link" data-retire="${esc(x.id)}">Take off</button>` : ""}</li>`).join("")}</ul>`;
+  }
+  function upScreen() {
+    const { up } = deliveries();
+    return `${msgBanner()}${up.length ? up.map(d => {
+      const ed = S.edit && S.edit.id === d.id;
+      const line = tripLine(d);
+      return `<div class="card" data-card="${esc(d.id)}">
+        <div class="top"><span class="when">${esc(fmtWhen(d.scheduled_for))}</span>
+          <span class="pid">${d.is_test ? `<span class="tag">TEST</span>` : ""}${esc(d.project_id)}</span><span>${esc(d.job_name)}</span></div>
+        ${d.schedule_note ? `<div class="meta" style="margin-top:4px">Note for the driver: ${esc(d.schedule_note)}</div>` : ""}
+        ${line ? `<div class="meta" style="margin-top:4px">${esc(line)}</div>` : ""}
+        ${filesBlock(d, true)}
+        ${ed ? `<div class="row2"><div><label class="f" for="ed">Date</label><input class="in" id="ed" type="date" data-edit="date" value="${esc(S.edit.date)}"></div>
+                 <div><label class="f" for="et">Time</label><input class="in" id="et" type="time" data-edit="time" value="${esc(S.edit.time)}"></div></div>
+               <label class="f" for="en">Note for the driver</label><textarea class="in" id="en" data-edit="note" maxlength="500">${esc(S.edit.note)}</textarea>
+               <div class="btns"><button class="go" data-savewhen="${esc(d.id)}" ${whenISO(S.edit.date, S.edit.time) && !S.busy ? "" : "disabled"}>Save</button><button data-canceledit="1">Cancel</button></div>`
+             : `<div class="btns"><button data-editwhen="${esc(d.id)}">Change date, time or note</button>
+                 <button data-addticket="${esc(d.id)}">${d.ticket ? "Replace the ticket" : "Add the ticket"}</button>
+                 <button data-addfiles="${esc(d.id)}">Add site files</button>
+                 <button class="link" data-cancel="${esc(d.id)}">Cancel this delivery</button></div>`}
+        <div class="meta" style="margin-top:8px">Scheduled by ${esc(d.scheduled_by_name || d.started_by_name || "")}</div></div>`; }).join("")
+      : `<div class="empty"><b>Nothing scheduled</b>Schedule a delivery and it shows here, and on Delivery's phone.</div>`}`;
+  }
+  function doneScreen() {
+    const { done } = deliveries();
+    const shown = S.showAll ? done : done.slice(0, 40);
+    return `${msgBanner()}${shown.length ? shown.map(d => `<div class="card">
+        <div class="top">${d.downloaded_at ? "" : `<span class="tag new">New</span>`}<span class="pid">${d.is_test ? `<span class="tag">TEST</span>` : ""}${esc(d.project_id)}</span><span>${esc(d.job_name)}</span></div>
+        <dl class="dl">
+          <dt>Delivered</dt><dd>${esc(fmtWhen(d.completed_at, true))}${d.completed_by_name ? ` · ${esc(d.completed_by_name)}` : ""}</dd>
+          <dt>Signature</dt><dd>${d.signed_name ? `<span class="done">Signed</span> by ${esc(d.signed_name)}` : `<b>Not signed</b> — ${esc(d.no_sign_reason || "")}${d.no_sign_note ? `: ${esc(d.no_sign_note)}` : ""}`}</dd>
+          ${d.customer_note ? `<dt>Customer's note</dt><dd>${esc(d.customer_note)}</dd>` : ""}
+          <dt>At the site</dt><dd>${esc(d.pieces_total ? `${d.site_photographed} of ${d.pieces_total} tables photographed` : `${d.site_photographed} photographed`)}</dd>
+        </dl>
+        <div class="btns"><button class="go" data-download="${esc(d.id)}" ${S.busy ? "disabled" : ""}>Download signed ticket</button>
+          <span class="meta">${d.downloaded_at ? `Downloaded ${esc(fmtWhen(d.downloaded_at))}${d.downloaded_by_name ? ` by ${esc(d.downloaded_by_name)}` : ""}` : "Not downloaded yet"}${d.ticket ? "" : " · no ticket was attached, so it's the signature page on its own"}</span></div>
+      </div>`).join("") + (done.length > shown.length ? `<p style="text-align:center"><button data-showall="1">Show all ${done.length}</button></p>` : "")
+      : `<div class="empty"><b>No deliveries done yet</b>Once a driver marks one delivered, it shows here with its signed ticket.</div>`}`;
+  }
+  function render() {
+    if (!S.me) return;
+    document.getElementById("me").innerHTML = `${esc(S.me.name)} · <button class="link" data-signout="1">Sign out</button>`;
+    if (S.allowed === false) {
+      app.innerHTML = `<main><div class="alarm"><h2>This login can't schedule deliveries</h2><p>${esc(S.me.name)} isn't set up to schedule deliveries. Luke can switch it on (Walkthrough 11, step 3). A manager's login works too.</p></div></main>`;
+      return wire();
+    }
+    if (S.missing) {
+      app.innerHTML = `<main><div class="alarm"><h2>Deliveries aren't set up yet</h2><p>Run deliveries.sql in the Supabase SQL Editor (Walkthrough 11, step 1), wait a minute, then reload this page.</p></div></main>`;
+      return wire();
+    }
+    const body = !S.loaded ? `<p class="sub">Loading…</p>` : S.tab === "up" ? upScreen() : S.tab === "done" ? doneScreen() : newScreen();
+    app.innerHTML = tabsBar() + `<main>${body}</main>`;
+    wire();
+  }
+
+  // ---------- what the buttons do ----------
+  const on = (sel, fn) => app.querySelectorAll(sel).forEach(el => el.onclick = (ev) => fn(el, ev));
+  function pick(accept, multiple, done) {
+    const p = document.getElementById("picker");
+    p.value = ""; p.accept = accept; p.multiple = multiple;
+    p.onchange = () => done([...(p.files || [])]);
+    p.click();
+  }
+  async function refresh() { await load(); render(); }
+  function wire() {
+    document.querySelectorAll("[data-signout]").forEach(b => b.onclick = async () => { await db.auth.signOut(); location.reload(); });
+    on("[data-tab]", (b) => { S.tab = b.dataset.tab; store.set("tab", S.tab); S.msg = null; S.edit = null; render(); });
+    app.querySelectorAll("[data-field]").forEach(el => el.oninput = el.onchange = () => {
+      S.form[el.dataset.field] = el.value;
+      if (el.dataset.field === "filter") {
+        const box = app.querySelector(".jobs, .empty"); const html = jobList(S.form.filter, S.form.jobId);
+        if (box) { box.outerHTML = html; on("[data-pickjob]", pickJob); }
+      }
+      const btn = app.querySelector("[data-schedule]"); if (btn) btn.disabled = !(S.form.jobId && whenISO(S.form.date, S.form.time) && !S.busy);
+    });
+    const pickJob = (b) => {
+      S.form.jobId = b.dataset.pickjob;
+      const j = S.jobs.find(x => x.job_id === S.form.jobId);
+      if (j && !S.form.date && j.delivery_date) S.form.date = j.delivery_date;     // Monday's delivery date, as a start
+      render();
+    };
+    on("[data-pickjob]", pickJob);
+    on("[data-unpick]", () => { S.form.jobId = null; render(); });
+    const ti = app.querySelector("#ticketIn"); if (ti) ti.onchange = () => { if (ti.files[0]) { S.form.ticket = ti.files[0]; render(); } };
+    const fi = app.querySelector("#filesIn"); if (fi) fi.onchange = () => { S.form.files.push(...fi.files); render(); };
+    on("[data-dropticket]", () => { S.form.ticket = null; render(); });
+    on("[data-dropfile]", (b) => { S.form.files.splice(Number(b.dataset.dropfile), 1); render(); });
+    on("[data-schedule]", scheduleIt);
+    on("[data-open]", (b) => openFile(b.dataset.open));
+
+    // coming up
+    on("[data-editwhen]", (b) => { const d = S.list.find(x => x.id === b.dataset.editwhen); S.edit = { id: d.id, ...whenInputs(d.scheduled_for), note: d.schedule_note || "" }; render(); });
+    on("[data-canceledit]", () => { S.edit = null; render(); });
+    app.querySelectorAll("[data-edit]").forEach(el => el.oninput = el.onchange = () => {
+      S.edit[el.dataset.edit] = el.value;
+      const btn = app.querySelector("[data-savewhen]"); if (btn) btn.disabled = !whenISO(S.edit.date, S.edit.time);
+    });
+    on("[data-savewhen]", async (b) => {
+      const d = S.list.find(x => x.id === b.dataset.savewhen); if (!d) return;
+      S.busy = true; render();
+      const r = await db.rpc("schedule_delivery", { p_job: d.job_id, p_when: whenISO(S.edit.date, S.edit.time), p_note: S.edit.note, p_loadout: d.client_id, p_client_id: null });
+      S.busy = false;
+      S.msg = r.error ? { ok: false, text: friendlyError(r.error) } : { ok: true, text: r.data.summary };
+      if (!r.error) S.edit = null;
+      await refresh();
+    });
+    const addTo = (id, kind) => pick(".pdf,application/pdf,image/jpeg,image/png", kind === "site_file", async (files) => {
+      const d = S.list.find(x => x.id === id); if (!d || !files.length) return;
+      S.busy = true; S.msg = { ok: true, text: `Adding ${files.length === 1 ? `"${files[0].name}"` : files.length + " files"}…` }; render();
+      const said = []; let bad = false;
+      for (const f of files) {
+        try { const r = await addFile(d, f, kind); said.push(r.summary); }
+        catch (e) { bad = true; said.push(`${f.name}: ${friendlyError(e)}`); }
+      }
+      S.busy = false; S.msg = { ok: !bad, text: said.join(" ") };
+      await refresh();
+    });
+    on("[data-addticket]", (b) => addTo(b.dataset.addticket, "ticket"));
+    on("[data-addfiles]", (b) => addTo(b.dataset.addfiles, "site_file"));
+    on("[data-retire]", async (b) => {
+      if (!confirm("Take this file off the delivery? It's kept in history.")) return;
+      const r = await db.rpc("retire_delivery_doc", { p_doc: b.dataset.retire });
+      S.msg = r.error ? { ok: false, text: friendlyError(r.error) } : { ok: true, text: r.data.summary };
+      await refresh();
+    });
+    on("[data-cancel]", async (b) => {
+      const d = S.list.find(x => x.id === b.dataset.cancel); if (!d) return;
+      if (!confirm(`Cancel the ${fmtWhen(d.scheduled_for)} delivery of ${d.project_id}? It comes off Delivery's phone and stays in history.`)) return;
+      const r = await db.rpc("void_loadout", { p_loadout: d.client_id, p_reason: "Delivery cancelled" });
+      S.msg = r.error ? { ok: false, text: friendlyError(r.error) } : { ok: true, text: `The ${fmtWhen(d.scheduled_for)} delivery of ${d.project_id} is cancelled.` };
+      await refresh();
+    });
+
+    // completed
+    on("[data-showall]", () => { S.showAll = true; render(); });
+    on("[data-download]", async (b) => {
+      const d = S.list.find(x => x.id === b.dataset.download); if (!d) return;
+      S.busy = true; S.msg = { ok: true, text: `Putting together the signed ticket for ${d.project_id}…` }; render();
+      try {
+        const lib = await pdfLib();
+        const ticket = d.ticket && d.ticket.in_cloud !== false ? { bytes: await bytesOf(d.ticket.path), mime: d.ticket.mime } : null;
+        const sig = d.signature_path ? await bytesOf(d.signature_path) : null;
+        const pdf = await buildSignedTicket(lib, d, ticket, sig);
+        saveBlob(new Blob([pdf], { type: "application/pdf" }), signedFileName(d));
+        const r = await db.rpc("mark_ticket_downloaded", { p_loadout: d.client_id });
+        S.msg = { ok: true, text: `${signedFileName(d)} has downloaded.${r.error ? " (It couldn't be marked downloaded: " + friendlyError(r.error) + ")" : ""}` };
+      } catch (e) { S.msg = { ok: false, text: friendlyError(e) }; }
+      S.busy = false; await refresh();
+    });
+  }
+
+  async function scheduleIt() {
+    const f = S.form, job = S.jobs.find(j => j.job_id === f.jobId), when = whenISO(f.date, f.time);
+    if (!job || !when) return;
+    const cid = newId();
+    S.busy = true; S.msg = null;
+    S.steps = [{ text: `Schedule ${job.project_id} for ${fmtWhen(when)}` }, ...(f.ticket ? [{ text: `Delivery ticket: ${f.ticket.name}` }] : []),
+               ...f.files.map(x => ({ text: x.name }))];
+    render();
+    const r = await db.rpc("schedule_delivery", { p_job: job.job_id, p_when: when, p_note: f.note || null, p_loadout: null, p_client_id: cid });
+    if (r.error) { S.busy = false; S.steps[0].failed = true; S.msg = { ok: false, text: `${friendlyError(r.error)} Nothing was saved.` }; return render(); }
+    S.steps[0].done = true; render();
+    const d = { project_id: job.project_id, client_id: cid };
+    let i = 1, bad = [];
+    for (const [file, kind] of [...(f.ticket ? [[f.ticket, "ticket"]] : []), ...f.files.map(x => [x, "site_file"])]) {
+      try { await addFile(d, file, kind); S.steps[i].done = true; }
+      catch (e) { S.steps[i].failed = true; bad.push(`${file.name}: ${friendlyError(e)}`); }
+      i++; render();
+    }
+    S.busy = false;
+    S.msg = bad.length ? { ok: false, text: `The delivery is scheduled, but ${bad.length === 1 ? "a file" : bad.length + " files"} didn't go: ${bad.join(" · ")} Add ${bad.length === 1 ? "it" : "them"} from Coming up.` }
+                       : { ok: true, text: `${r.data.summary} It's on Delivery's phone now.` };
+    S.form = blankForm();
+    await load();
+    S.tab = "up"; store.set("tab", "up"); S.steps = null;
+    render();
+  }
+
+  // ---------- start ----------
+  async function start(user) {
+    const { data } = await db.from("profiles").select("*").eq("id", user.id).maybeSingle();
+    S.me = { id: user.id, email: user.email, name: (data && data.full_name) || user.email, role: data && data.role };
+    const c = await db.rpc("can_schedule_deliveries", {});
+    if (c.error) { S.missing = /could not find|schema cache|does not exist/i.test(String(c.error.message)); S.allowed = S.missing ? null : false; }
+    else S.allowed = !!c.data;
+    render();
+    if (S.allowed) { await load(); render(); }
+  }
+  (async () => {
+    const { data } = await db.auth.getSession();
+    if (data && data.session) return start(data.session.user);
+    app.innerHTML = signInScreen();
+    const f = document.getElementById("f");
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      const r = await db.auth.signInWithPassword({ email: document.getElementById("e").value.trim(), password: document.getElementById("p").value });
+      if (r.error) { const el = document.getElementById("err"); el.hidden = false; el.textContent = friendlyError(r.error); return; }
+      start(r.data.user);
+    };
+  })();
+})();
+</script>
+</body>
+</html>
