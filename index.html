@@ -2016,7 +2016,9 @@ if (typeof document !== "undefined") (function () {
       ${photos.length || pend.length ? `<h2 class="sec">Photos on this delivery</h2>
         <div class="phs">${photos.map(x => `<button class="ph" data-viewphoto="${esc(x.id)}"><img alt="" data-photopath="${esc(x.storage_path)}"><span class="cap">${esc(cap(x))}</span></button>`).join("")}
           ${pend.map(x => `<span class="ph"><img alt="" src="${esc(x.url)}"><span class="cap">${esc(cap(x))} · waiting</span></span>`).join("")}</div>` : ""}
-      ${(lo.started_by === S.me.id || !lo.id) && !plan.delivered ? `<p style="text-align:center"><button class="linkish" data-lovoid="1">This load-out was started by mistake</button></p>` : ""}`;
+      ${plan.delivered ? ""
+        : lo.scheduled_for ? `<p class="meta2" style="text-align:center">Delivery called off or moved? ${esc(lo.scheduled_by_name || "Whoever scheduled it")} changes it on the Deliveries page. A wrong photo: tap it and mark it entered by mistake.</p>`
+        : lo.started_by === S.me.id || !lo.id ? `<p style="text-align:center"><button class="linkish" data-lovoid="1">This load-out was started by mistake</button></p>` : ""}`;
   }
   // the signature pad: strokes are kept (0–1 across and down), so a redraw of the screen doesn't lose them
   function initSigPad() {

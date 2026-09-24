@@ -52,6 +52,14 @@
   .drop{display:block; border:2px dashed var(--gray); border-radius:12px; background:#fff; padding:18px; text-align:center; cursor:pointer; margin-top:4px}
   .drop b{display:block}
   .drop span{color:var(--ink2); font-size:15px}
+  .drop:hover{border-color:var(--midnight)}
+  body.dragging .drop{border-color:var(--midnight); background:var(--sawdust)}
+  .drop.over, body.dragging .drop.over{border-style:solid; border-color:var(--midnight); background:var(--sawdust); box-shadow:0 0 0 3px var(--midnight) inset}
+  .drops{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px}
+  .drop.sm{padding:12px; margin:0; font-weight:600; width:100%}
+  .drop.sm span{display:block; font-weight:400; font-size:14px}
+  h3.sec{margin:26px 0 8px; font-size:17px; color:var(--ink2)}
+  .card.off{background:transparent}
   .files{list-style:none; margin:8px 0 0; padding:0}
   .files li{display:flex; gap:10px; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); font-size:16px}
   .files li:last-child{border-bottom:none}
@@ -73,7 +81,7 @@
   .empty b{display:block; color:var(--midnight); margin-bottom:4px}
   ol.steps{list-style:none; padding:0; margin:10px 0 0}
   ol.steps li{padding:4px 0}
-  @media (max-width: 600px){ .row2{grid-template-columns:1fr} main{padding:14px 12px 50px} }
+  @media (max-width: 600px){ .row2, .drops{grid-template-columns:1fr} main{padding:14px 12px 50px} }
   [hidden]{display:none!important}
 </style>
 </head>
@@ -310,14 +318,16 @@ if (typeof document !== "undefined") (function () {
   }
   const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const S = {
-    me: null, allowed: null, tab: store.get("tab", "new"), list: [], jobs: [], loaded: false, missing: false,
+    me: null, allowed: null, tab: store.get("tab", "new"), list: [], cancelled: [], jobs: [], loaded: false, missing: false,
     form: blankForm(), busy: false, msg: null, steps: null, edit: null, openAdd: null, showAll: false,
   };
   function blankForm() { return { jobId: null, filter: "", date: "", time: "09:00", note: "", ticket: null, files: [] }; }
 
   // ---------- data ----------
   async function load() {
-    const [d, j] = await Promise.all([db.from("v_deliveries").select("*"), db.from("v_pick_jobs").select("*")]);
+    const [d, j, c] = await Promise.all([db.from("v_deliveries").select("*"), db.from("v_pick_jobs").select("*"),
+                                         db.from("v_cancelled_deliveries").select("*").order("voided_at", { ascending: false })]);
+    S.cancelled = c.error ? [] : (c.data || []);        // no list until deliveries_v2.sql has run
     if (d.error) {
       S.missing = /does not exist|schema cache|could not find/i.test(String(d.error.message));
       if (!S.missing) S.msg = { ok: false, text: friendlyError(d.error) };
@@ -418,11 +428,11 @@ if (typeof document !== "undefined") (function () {
         <textarea class="in" id="dn" data-field="note" maxlength="500" placeholder="e.g. Back entrance. Ask for Pat.">${esc(f.note)}</textarea>
         <label class="f">Delivery ticket</label>
         ${f.ticket ? `<ul class="files"><li><span class="nm">${esc(f.ticket.name)}</span><span class="meta">${esc(fmtBytes(f.ticket.size))}</span><button class="link" data-dropticket="1">Remove</button></li></ul>`
-                   : `<label class="drop"><b>Choose the ticket</b><span>PDF (or a photo of a paper ticket). The customer's signature is added after it.</span>
+                   : `<label class="drop" data-dropzone="ticket"><b>Drag the ticket here, or click to choose it</b><span>PDF (or a photo of a paper ticket). The customer's signature is added after it.</span>
                        <input type="file" id="ticketIn" accept=".pdf,application/pdf,image/jpeg,image/png" hidden></label>`}
         <label class="f">Site files <span class="meta">(optional: site maps, photos of where it goes)</span></label>
         ${f.files.length ? `<ul class="files">${f.files.map((x, i) => `<li><span class="nm">${esc(x.name)}</span><span class="meta">${esc(fmtBytes(x.size))}</span><button class="link" data-dropfile="${i}">Remove</button></li>`).join("")}</ul>` : ""}
-        <label class="drop"><b>${f.files.length ? "Add more" : "Choose files"}</b><span>PDF, JPEG or PNG. The driver's phone keeps them for no signal.</span>
+        <label class="drop" data-dropzone="files"><b>${f.files.length ? "Drag more here, or click to add them" : "Drag files here, or click to choose them"}</b><span>PDF, JPEG or PNG, several at once is fine. The driver's phone keeps them for no signal.</span>
           <input type="file" id="filesIn" accept=".pdf,application/pdf,image/jpeg,image/png" multiple hidden></label>
         <button class="go wide" data-schedule="1" ${ready ? "" : "disabled"}>${S.busy ? "Saving…" : "Schedule this delivery"}</button>
         ${S.steps ? `<ol class="steps">${S.steps.map(s => `<li>${s.done ? "✓" : s.failed ? "✗" : "…"} ${esc(s.text)}</li>`).join("")}</ol>` : ""}
@@ -453,12 +463,23 @@ if (typeof document !== "undefined") (function () {
                  <div><label class="f" for="et">Time</label><input class="in" id="et" type="time" data-edit="time" value="${esc(S.edit.time)}"></div></div>
                <label class="f" for="en">Note for the driver</label><textarea class="in" id="en" data-edit="note" maxlength="500">${esc(S.edit.note)}</textarea>
                <div class="btns"><button class="go" data-savewhen="${esc(d.id)}" ${whenISO(S.edit.date, S.edit.time) && !S.busy ? "" : "disabled"}>Save</button><button data-canceledit="1">Cancel</button></div>`
-             : `<div class="btns"><button data-editwhen="${esc(d.id)}">Change date, time or note</button>
-                 <button data-addticket="${esc(d.id)}">${d.ticket ? "Replace the ticket" : "Add the ticket"}</button>
-                 <button data-addfiles="${esc(d.id)}">Add site files</button>
+             : `<div class="drops"><button class="drop sm" data-addticket="${esc(d.id)}" data-dropzone="ticket" data-for="${esc(d.id)}" ${S.busy ? "disabled" : ""}>${d.ticket ? "Replace the ticket" : "Add the ticket"}<span>Drag it here, or click</span></button>
+                 <button class="drop sm" data-addfiles="${esc(d.id)}" data-dropzone="files" data-for="${esc(d.id)}" ${S.busy ? "disabled" : ""}>Add site files<span>Drag them here, or click</span></button></div>
+               <div class="btns"><button data-editwhen="${esc(d.id)}">Change date, time or note</button>
                  <button class="link" data-cancel="${esc(d.id)}">Cancel this delivery</button></div>`}
         <div class="meta" style="margin-top:8px">Scheduled by ${esc(d.scheduled_by_name || d.started_by_name || "")}</div></div>`; }).join("")
-      : `<div class="empty"><b>Nothing scheduled</b>Schedule a delivery and it shows here, and on Delivery's phone.</div>`}`;
+      : `<div class="empty"><b>Nothing scheduled</b>Schedule a delivery and it shows here, and on Delivery's phone.</div>`}${cancelledList()}`;
+  }
+  const keptLine = (d) => { const k = [d.has_ticket ? "the ticket" : null, d.site_files ? `${d.site_files} site file${d.site_files === 1 ? "" : "s"}` : null].filter(Boolean);
+    return k.length ? `${k.join(" and ")} kept` : "nothing was attached"; };
+  function cancelledList() {
+    if (!S.cancelled.length) return "";
+    return `<h3 class="sec">Cancelled in the last 60 days</h3>` + S.cancelled.map(d => `<div class="card off">
+        <div class="top"><span class="pid">${d.is_test ? `<span class="tag">TEST</span>` : ""}${esc(d.project_id)}</span><span>${esc(d.job_name)}</span>
+          <span class="meta">was ${esc(fmtWhen(d.scheduled_for))}</span></div>
+        <div class="meta" style="margin-top:4px">Cancelled ${esc(fmtWhen(d.voided_at))}${d.voided_by_name ? ` by ${esc(d.voided_by_name)}` : ""}${d.void_reason && d.void_reason !== "Delivery cancelled" ? ` (${esc(d.void_reason)})` : ""}
+          · ${esc(keptLine(d))}</div>
+        <div class="btns"><button data-restore="${esc(d.id)}" ${S.busy ? "disabled" : ""}>Put it back</button></div></div>`).join("");
   }
   function doneScreen() {
     const { done } = deliveries();
@@ -501,6 +522,25 @@ if (typeof document !== "undefined") (function () {
     p.click();
   }
   async function refresh() { await load(); render(); }
+  const hasFiles = (e) => !!e.dataTransfer && [...(e.dataTransfer.types || [])].includes("Files");
+  function sortDropped(list) {
+    const good = [], bad = [];
+    for (const f of [...(list || [])]) (fileKind(f) && f.size > 0 ? good : bad).push(f);   // a folder comes through empty
+    return { good, bad: bad.map(f => f.name || "That item") };
+  }
+  let dragDepth = 0;
+  document.addEventListener("dragenter", (e) => { if (!hasFiles(e)) return; dragDepth++; document.body.classList.add("dragging"); });
+  document.addEventListener("dragleave", (e) => { if (!hasFiles(e)) return; dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) document.body.classList.remove("dragging"); });
+  document.addEventListener("dragover", (e) => { if (hasFiles(e)) { e.preventDefault(); if (!e.target.closest || !e.target.closest("[data-dropzone]")) e.dataTransfer.dropEffect = "none"; } });
+  document.addEventListener("drop", (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); dragDepth = 0; document.body.classList.remove("dragging");
+    if (S.me && S.allowed && !(e.target.closest && e.target.closest("[data-dropzone]"))) {
+      const zones = app.querySelectorAll("[data-dropzone]").length;
+      S.msg = { ok: false, text: zones ? "Drop files onto one of the dashed boxes: the ticket box or the site files box." : "Files are added on Schedule a delivery, or on a delivery under Coming up." };
+      render();
+    }
+  });
   function wire() {
     document.querySelectorAll("[data-signout]").forEach(b => b.onclick = async () => { await db.auth.signOut(); location.reload(); });
     on("[data-tab]", (b) => { S.tab = b.dataset.tab; store.set("tab", S.tab); S.msg = null; S.edit = null; render(); });
@@ -543,7 +583,8 @@ if (typeof document !== "undefined") (function () {
       if (!r.error) S.edit = null;
       await refresh();
     });
-    const addTo = (id, kind) => pick(".pdf,application/pdf,image/jpeg,image/png", kind === "site_file", async (files) => {
+    const addTo = (id, kind) => pick(".pdf,application/pdf,image/jpeg,image/png", kind === "site_file", (files) => addFilesTo(id, kind, files));
+    const addFilesTo = async (id, kind, files) => {
       const d = S.list.find(x => x.id === id); if (!d || !files.length) return;
       S.busy = true; S.msg = { ok: true, text: `Adding ${files.length === 1 ? `"${files[0].name}"` : files.length + " files"}…` }; render();
       const said = []; let bad = false;
@@ -553,7 +594,7 @@ if (typeof document !== "undefined") (function () {
       }
       S.busy = false; S.msg = { ok: !bad, text: said.join(" ") };
       await refresh();
-    });
+    };
     on("[data-addticket]", (b) => addTo(b.dataset.addticket, "ticket"));
     on("[data-addfiles]", (b) => addTo(b.dataset.addfiles, "site_file"));
     on("[data-retire]", async (b) => {
@@ -561,6 +602,37 @@ if (typeof document !== "undefined") (function () {
       const r = await db.rpc("retire_delivery_doc", { p_doc: b.dataset.retire });
       S.msg = r.error ? { ok: false, text: friendlyError(r.error) } : { ok: true, text: r.data.summary };
       await refresh();
+    });
+    on("[data-restore]", async (b) => {
+      const d = S.cancelled.find(x => x.id === b.dataset.restore); if (!d) return;
+      S.busy = true; render();
+      const r = await db.rpc("restore_delivery", { p_loadout: d.client_id });
+      S.busy = false;
+      S.msg = r.error ? { ok: false, text: friendlyError(r.error) } : { ok: true, text: r.data.summary };
+      await refresh();
+    });
+
+    // dragging files in: onto the ticket box, the site-files box, or a delivery's boxes on Coming up
+    app.querySelectorAll("[data-dropzone]").forEach(z => {
+      z.ondragenter = z.ondragover = (e) => { if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = z.disabled ? "none" : "copy"; z.classList.add("over"); };
+      z.ondragleave = (e) => { if (!z.contains(e.relatedTarget)) z.classList.remove("over"); };
+      z.ondrop = (e) => {
+        e.preventDefault(); e.stopPropagation(); z.classList.remove("over"); document.body.classList.remove("dragging"); dragDepth = 0;
+        if (z.disabled || S.busy) return;
+        const { good, bad } = sortDropped(e.dataTransfer.files);
+        const notes = bad.length ? [`${bad.map(n => `"${n}"`).join(", ")} ${bad.length === 1 ? "isn't a PDF, JPEG or PNG, so it wasn't" : "aren't PDF, JPEG or PNG files, so they weren't"} added.`] : [];
+        if (!good.length) { S.msg = { ok: false, text: notes[0] || "Nothing to add there." }; return render(); }
+        const ticket = z.dataset.dropzone === "ticket";
+        if (ticket && good.length > 1) notes.push(`A delivery has one ticket, so only "${good[0].name}" was used. Drop the others on the site files.`);
+        const use = ticket ? [good[0]] : good;
+        if (z.dataset.for) {                                  // Coming up: straight onto that delivery
+          addFilesTo(z.dataset.for, ticket ? "ticket" : "site_file", use).then(() => { if (notes.length) { S.msg = { ok: false, text: `${S.msg ? S.msg.text + " " : ""}${notes.join(" ")}` }; render(); } });
+          return;
+        }
+        if (ticket) S.form.ticket = use[0]; else S.form.files.push(...use);
+        S.msg = notes.length ? { ok: false, text: notes.join(" ") } : null;
+        render();
+      };
     });
     on("[data-cancel]", async (b) => {
       const d = S.list.find(x => x.id === b.dataset.cancel); if (!d) return;
