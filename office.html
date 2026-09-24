@@ -197,6 +197,10 @@
   .li-top{display:flex; gap:10px; align-items:baseline; flex-wrap:wrap}
   .meta2{font-size:15px; color:var(--ink2)}
   .st{font-size:13px; font-weight:700; padding:2px 8px; border-radius:5px; border:1.5px solid var(--midnight)}
+  .st.quiet{border-color:var(--gray); color:var(--ink2)}
+  .ktag{display:inline-block; font-size:12px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; padding:2px 7px; border-radius:4px; margin-right:2px}
+  .ktag.issue{background:var(--midnight); color:var(--sawdust)}
+  .ktag.defect{border:1.5px solid var(--midnight); color:var(--midnight); padding:1px 6px}
   .st.ok{background:var(--teal-bg); color:var(--teal-ink); border-color:transparent}
   .stoptag{font-size:13px; font-weight:700; padding:2px 8px; border-radius:5px; background:var(--sawdust); color:var(--warn); border:1.5px solid var(--warn)}
   .msg{background:var(--paper); border-radius:9px; padding:10px 12px; margin-top:8px}
@@ -453,6 +457,30 @@ function officeProblems(list, today = new Date()) {
   return { open, answered };
 }
 
+/** Where a defect stands for the office. Only counted, unless the floor asked the office about it. */
+function defectOfficeState(d) {
+  if (d.office_status === "answered") return { label: "Answered", done: true };
+  if (d.office_status === "open") {
+    if (d.came_back) return { label: "Came back", done: false };
+    if ((d.thread || []).some(m => m.kind === "office_note")) return { label: "You replied — still open", done: false };
+    return { label: "Waiting for you", done: false };
+  }
+  return { label: "Counted", done: true, quiet: true };
+}
+/** Everything the floor has asked the office: issues, and defects with Ask the office.
+ *  Work stopped first, then came back, then oldest. Answered: the last 30 days. */
+function officeIssues(problems, defects, today = new Date()) {
+  const P = (problems || []).map(p => ({ ...p, kind: "issue", at: p.raised_at }));
+  const D = (defects || []).filter(d => !d.voided && d.office_status)
+    .map(d => ({ ...d, kind: "defect", at: d.logged_at, status: d.office_status, work_stopped: false }));
+  const all = P.concat(D);
+  const open = all.filter(x => x.status === "open")
+    .sort((a, b) => (b.work_stopped - a.work_stopped) || (b.came_back - a.came_back) || String(a.at).localeCompare(String(b.at)));
+  const answered = all.filter(x => x.status === "answered" && daysSince(x.answered_at, today) <= 30)
+    .sort((a, b) => String(b.answered_at).localeCompare(String(a.answered_at)));
+  return { open, answered };
+}
+
 /** Flags older than two weeks are surfaced for review — stale flags stop meaning anything. */
 function staleFlags(flags, days = 14) {
   return (flags || []).filter(f => f.is_open && f.age_days > days).sort((a, b) => b.age_days - a.age_days);
@@ -687,7 +715,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "24 Sep 2026";
+const OFFICE_VERSION = "25 Sep 2026";
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -766,7 +794,7 @@ if (typeof document !== "undefined") (function () {
     uploaded: [], testMsg: null, busy: false,
     locked: false, pinEntry: "", pinBad: 0,
     // the floor log
-    problems: [], defects: [], defFrom: "month", flags: [], activeJobs: [], supplies: [], oticked: new Set(), notOrdering: null,
+    problems: [], defects: [], metal: [], noteOpen: null, defFrom: "month", flags: [], activeJobs: [], supplies: [], oticked: new Set(), notOrdering: null,
     arrow: [], arrowDays: 14, tasks: [], people: [], types: [], tvMade: null, tvKey: null,
     drafts: {}, flagForm: { jobId: "", department: "", level: "priority", note: "" },
     taskForm: { name: "", department: "sanding", assigned_to: "", schedule_type: "weekly", week_interval: 1, monthly_occurrence: 1, weekday: 1, start_date: "", is_test: false },
@@ -792,11 +820,14 @@ if (typeof document !== "undefined") (function () {
     catch (e) { if (/does not exist|schema cache|could not find/i.test(String(e.message))) S.missing = true; else S.notice = friendlyError(e); return null; }
   }
   async function loadCounts() {
-    const [probs, flags, sup, arr, set] = await Promise.all([
+    const [probs, flags, sup, arr, set, defs, metal] = await Promise.all([
       soft(db.from("v_problems").select("*")), soft(db.from("v_flags").select("*").eq("is_open", true)),
       soft(db.from("v_supply_requests").select("*").eq("is_open", true)), soft(db.from("v_outside_jobs").select("*").eq("at_vendor", true)),
-      soft(db.from("app_settings").select("*"))]);
+      soft(db.from("app_settings").select("*")), soft(db.from("v_defects").select("*").eq("voided", false)),
+      quiet(db.from("v_metal_cut_sheets").select("*"))]);      // ready_issues.sql; quiet if it hasn't been run
     if (probs) S.problems = probs;
+    if (defs) S.defects = defs;
+    S.metal = (metal || []).slice().sort((a, b) => String(a.delivery_date || "9999").localeCompare(String(b.delivery_date || "9999")));
     if (flags) S.flags = flags.concat((S.flags || []).filter(f => !f.is_open));
     if (sup) S.supplies = sup.concat((S.supplies || []).filter(r => !r.is_open));
     if (arr) S.arrow = arr.concat((S.arrow || []).filter(a => !a.at_vendor));
@@ -836,13 +867,13 @@ if (typeof document !== "undefined") (function () {
       }
       if (S.tab === "tasks") {          // Needs you: problems, ordering, stale flags, Arrow, the photo archive, handoffs
         await loadCounts();
-        const [h, cols, r, d] = await Promise.all([soft(db.from("v_handoff_tasks").select("*")), soft(db.from("monday_columns").select("*")),
-          soft(db.from("v_supply_requests").select("*")), soft(db.from("v_defects").select("*").eq("voided", false))]);
+        const [h, cols, r] = await Promise.all([soft(db.from("v_handoff_tasks").select("*")), soft(db.from("monday_columns").select("*")),
+          soft(db.from("v_supply_requests").select("*"))]);
         if (h) S.tasks = h;
         if (cols) S.columns = cols;
         if (r) S.supplies = r.filter(x => x.is_open || daysSince(x.updated_at) <= 60);
-        if (d) S.defects = d;
         await loadPhotosWhere("problem_id", (S.problems || []).map(p => p.id));
+        await loadPhotosWhere("defect_id", (S.defects || []).filter(d => d.office_status).map(d => d.id));
         return;
       }
       if (S.tab === "flags") {
@@ -897,7 +928,8 @@ if (typeof document !== "undefined") (function () {
   function counts() {
     const c = {
       handoffs: S.tasks.length,
-      problems: officeProblems(S.problems).open.length,
+      problems: officeIssues(S.problems, S.defects).open.length,
+      metal: (S.metal || []).length,
       flags: staleFlags(S.flags).length,
       ordering: needToOrder(S.supplies).reduce((a, g) => a + g.lines.length, 0),
       arrow: (S.arrow || []).filter(a => a.at_vendor && a.days_out > S.arrowDays).length,
@@ -905,7 +937,7 @@ if (typeof document !== "undefined") (function () {
     };
     // everything that needs the office is on one tab, so only that tab carries a number
     c.sync = syncProblem() ? 1 : 0;
-    c.tasks = c.handoffs + c.problems + c.flags + c.ordering + c.arrow + c.photos + c.sync;
+    c.tasks = c.handoffs + c.problems + c.metal + c.flags + c.ordering + c.arrow + c.photos + c.sync;
     return c;
   }
   function topBar() {
@@ -996,6 +1028,7 @@ if (typeof document !== "undefined") (function () {
     const facts = [j.phase || (j.is_active ? "In Production" : "Not in production"), j.delivery_date ? `due ${fmtDate(j.delivery_date)}` : "no delivery date",
                    J.wo ? `work order version ${J.wo.version} · ${J.sheets.length} sheet${J.sheets.length === 1 ? "" : "s"}` : "no work order uploaded"];
     const openP = J.problems.filter(p => p.status === "open"), answeredP = J.problems.filter(p => p.status !== "open");
+    const askedD = J.defects.filter(d => d.office_status === "open");
     const atArrow = J.arrow.filter(a => a.at_vendor), back2 = J.arrow.filter(a => !a.at_vendor);
     const defectGroups = {}; J.defects.forEach(d => { defectGroups[d.defect_type] = (defectGroups[d.defect_type] || 0) + 1; });
     const what = (a) => [a.sheet_numbers && a.sheet_numbers.length ? `sheet${a.sheet_numbers.length === 1 ? "" : "s"} ${a.sheet_numbers.join(", ")}` : "", a.description].filter(Boolean).join(" — ");
@@ -1012,12 +1045,14 @@ if (typeof document !== "undefined") (function () {
          </div></div>`;
 
     const side = `
-      <section class="panel"><h2>Problems ${openP.length ? `<span class="cnt num" style="color:var(--ink2)">${openP.length} open</span>` : ""}</h2>
+      <section class="panel"><h2>Issues ${openP.length + askedD.length ? `<span class="cnt num" style="color:var(--ink2)">${openP.length + askedD.length} open</span>` : ""}</h2>
         ${openP.map(p => `<div class="row"><b>${p.sheet_number !== null ? `Sheet ${p.sheet_number}` : "Whole job"} · ${esc(p.department_name)}</b>
-            ${p.work_stopped ? ` <span class="stoptag">Work stopped</span>` : ""}<div>${esc(p.body)}</div><div class="meta2">${esc(p.raised_by_name)}, ${esc(ago(p.raised_at))}</div></div>`).join("")
-          || `<p class="sub" style="margin:0">None open.</p>`}
+            ${p.work_stopped ? ` <span class="stoptag">Work stopped</span>` : ""}<div>${esc(p.body)}</div><div class="meta2">${esc(p.raised_by_name)}, ${esc(ago(p.raised_at))}</div></div>`).join("")}
+        ${askedD.map(d => `<div class="row"><b>${d.sheet_number !== null ? `Sheet ${d.sheet_number}` : "Whole job"} · ${esc(d.department_name)}</b> <span class="meta2">defect</span>
+            <div>${esc(d.defect_type)}${d.note ? ` — ${esc(d.note)}` : ""}</div><div class="meta2">${esc(d.logged_by_name)}, ${esc(ago(d.logged_at))}</div></div>`).join("")}
+        ${openP.length + askedD.length ? "" : `<p class="sub" style="margin:0">None open.</p>`}
         ${answeredP.length ? `<p class="meta2" style="margin:8px 0 0">${answeredP.length} answered</p>` : ""}
-        ${openP.length ? `<button class="link" data-tab="tasks" style="padding-left:0">Answer on Needs you</button>` : ""}</section>
+        ${openP.length + askedD.length ? `<button class="link" data-tab="tasks" style="padding-left:0">Answer on Needs you</button>` : ""}</section>
       <section class="panel"><h2>Arrow</h2>
         ${atArrow.map(a => `<div class="row"><b>${esc(what(a))}</b><div class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent ${esc(fmtDate(a.sent_on))} by ${esc(a.sent_by_name)} · <b>${a.days_out} day${a.days_out === 1 ? "" : "s"} out</b></div></div>`).join("")
           || `<p class="sub" style="margin:0">Nothing at Arrow.</p>`}
@@ -1068,7 +1103,7 @@ if (typeof document !== "undefined") (function () {
     const st = problemState(p);
     const d = S.drafts[p.id] || "";
     return `<div class="li ${p.status === "open" ? (p.work_stopped ? "stop" : "open") : ""}">
-      <div class="li-top"><b>${testTag(p)}${pidLink(p)}${p.sheet_number !== null ? ` · sheet ${p.sheet_number}` : " · whole job"}</b>
+      <div class="li-top"><span class="ktag issue">Issue</span><b>${testTag(p)}${pidLink(p)}${p.sheet_number !== null ? ` · sheet ${p.sheet_number}` : " · whole job"}</b>
         <span class="meta2">${esc(p.department_name)} · ${esc(p.job_name)}</span>
         ${p.status === "open" && p.work_stopped ? `<span class="stoptag">Work stopped</span>` : ""}
         <span class="st${st.done ? " ok" : ""}">${esc(st.label)}</span></div>
@@ -1080,6 +1115,25 @@ if (typeof document !== "undefined") (function () {
           <button class="plain" data-answer="${esc(p.id)}" data-close="0" ${d.trim() ? "" : "disabled"}>Reply, keep it open</button></div>` : ""}
     </div>`;
   }
+  /** A defect on Needs you: the ones the floor asked about wait for an answer; any other can take a note. */
+  function defectCard(d) {
+    const st = defectOfficeState(d), dr = S.drafts[d.id] || "", waiting = d.office_status === "open";
+    return `<div class="li ${waiting ? "open" : ""}">
+      <div class="li-top"><span class="ktag defect">Defect</span><b>${testTag(d)}${pidLink(d)}${d.sheet_number !== null ? ` · sheet ${d.sheet_number}` : " · whole job"}</b>
+        <span class="meta2">${esc(d.department_name)} · ${esc(d.job_name)}</span>
+        <span class="st${st.quiet ? " quiet" : st.done ? " ok" : ""}">${esc(st.label)}</span></div>
+      <div class="msg"><div><b>${esc(d.defect_type)}</b>${d.note ? ` — ${esc(d.note)}` : ""}</div><div class="msg-meta">${esc(d.logged_by_name)} · ${esc(fmtDay(d.logged_at))} (${esc(ago(d.logged_at))})</div></div>
+      ${(d.thread || []).map(m => `<div class="msg ${esc(m.kind)}"><div>${esc(m.body)}</div><div class="msg-meta">${esc(m.by)} · ${esc(fmtDay(m.at))}${m.kind === "answer" ? " · answered" : ""}</div></div>`).join("")}
+      ${photoStrip(S.photos.filter(x => x.defect_id === d.id))}
+      ${waiting ? `<textarea class="in" style="margin-top:10px" data-draft="${esc(d.id)}" placeholder="Your answer — what did you decide, or what should they do?">${esc(dr)}</textarea>
+        <div class="btns"><button class="go" data-danswer="${esc(d.id)}" data-close="1" ${dr.trim() ? "" : "disabled"}>Answer and close</button>
+          <button class="plain" data-danswer="${esc(d.id)}" data-close="0" ${dr.trim() ? "" : "disabled"}>Reply, keep it open</button></div>`
+      : !d.office_status && S.noteOpen === d.id ? `<textarea class="in" style="margin-top:10px" data-draft="${esc(d.id)}" placeholder="A note to ${esc(d.logged_by_name)}. It shows on their tablet; the defect still won't wait on you.">${esc(dr)}</textarea>
+        <div class="btns"><button class="go" data-danswer="${esc(d.id)}" data-close="0" ${dr.trim() ? "" : "disabled"}>Send the note</button><button class="link" data-dnote="">Cancel</button></div>`
+      : !d.office_status ? `<div class="btns"><button class="link" data-dnote="${esc(d.id)}" style="padding-left:0">Send a note</button></div>` : ""}
+    </div>`;
+  }
+  const issueCard = (x) => x.kind === "defect" ? defectCard(x) : problemCard(x);
   function supplyForm(e) {
     return `<div class="supform">
       ${S.msg && !S.msg.ok && S.msgFrom === "sup" ? `<div class="banner warn" style="margin:0 0 10px">${esc(S.msg.text)}</div>` : ""}
@@ -1111,11 +1165,13 @@ if (typeof document !== "undefined") (function () {
   function defectsPanel() {
     const month = localISO(new Date()).slice(0, 7) + "-01";
     const sum = defectSummary(S.defects, S.defFrom === "month" ? month : "0000");
-    return `<p class="sub">Counted, never discussed — logging a defect interrupts nobody. Entries marked "entered by mistake" aren't counted.</p>
+    const recent = (S.defects || []).filter(d => !d.office_status).sort((a, b) => String(b.logged_at).localeCompare(String(a.logged_at))).slice(0, 12);
+    return `<p class="sub">Counted — a defect only waits on you when the floor asks. You can send a note on any of them; it shows on that tablet. Entries marked "entered by mistake" aren't counted.</p>
       <div class="seg"><button data-deffrom="month" aria-pressed="${S.defFrom === "month"}">This month</button><button data-deffrom="all" aria-pressed="${S.defFrom === "all"}">All time</button></div>
       <div style="margin-top:10px">${sum.length ? sum.map(g => `<details class="more"><summary>${esc(g.name)} — ${g.n}</summary>
           ${g.types.map(t => `<div class="countline"><span>${esc(t.type)}</span><span class="n num">${t.n}</span></div>`).join("")}</details>`).join("")
-        : `<p class="sub" style="margin:0">No defects logged ${S.defFrom === "month" ? "this month" : "yet"}.</p>`}</div>`;
+        : `<p class="sub" style="margin:0">No defects logged ${S.defFrom === "month" ? "this month" : "yet"}.</p>`}</div>
+      ${recent.length ? `<div class="deptname" style="margin-top:14px">Most recent</div>${recent.map(defectCard).join("")}` : ""}`;
   }
 
   // ---------- Flags ----------
@@ -1218,7 +1274,7 @@ if (typeof document !== "undefined") (function () {
   // long, the photo archive when it's due, then handoffs. A section shows only when it has something.
   // What's done or just for reference is folded away at the bottom.
   function needsScreen() {
-    const { open, answered } = officeProblems(S.problems);
+    const { open, answered } = officeIssues(S.problems, S.defects);
     const groups = needToOrder(S.supplies);
     const ordered = orderedNotReceived(S.supplies);
     const closed = (S.supplies || []).filter(r => !r.is_open).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
@@ -1237,7 +1293,7 @@ if (typeof document !== "undefined") (function () {
     const keep = (k) => S.openDetails.has(k) ? "open" : "";
     const parts = [];
 
-    if (open.length) parts.push(sec("problems", "Problems from the floor", open.length, open.map(problemCard).join("")));
+    if (open.length) parts.push(sec("problems", "Issues from the floor", open.length, `<p class="sub">Issues, and defects the floor asked you about. Work stopped comes first.</p>${open.map(issueCard).join("")}`));
 
     if (groups.length) parts.push(sec("ordering", "Supplies to order", nLines, `<div class="panel">
         ${groups.map(g => `<div class="deptname">${esc(g.name)}</div>${g.lines.map(r => `<div class="line">
@@ -1266,6 +1322,15 @@ if (typeof document !== "undefined") (function () {
         : `${ps.eligible} photo${ps.eligible === 1 ? " is" : "s are"} ready to archive${ps.last_batch ? ` — the last archive was ${ps.days_since_last} days ago` : ""}.`}</p>
         <button class="go" data-tab="photos">Open Photos</button></div>`));
 
+    if ((S.metal || []).length) parts.push(sec("metal", "Needs metal cut sheets", S.metal.length, `<p class="sub">Jobs where Monday's Metal Status says “Not Ready”. Each clears by itself within 15 minutes of Metal Status changing in Monday.</p>
+      <div class="panel">${S.metal.map(t => { const d = daysLeft(t.delivery_date); return `
+        <div class="task">
+          <div class="what">Needs metal cut sheets: ${pidLink(t)}</div>
+          <div class="when">${d === null ? `<div class="l">no delivery date</div>`
+              : `<div class="d num">${Math.abs(d)}</div><div class="l">${d < 0 ? "days late" : d === 1 ? "day left" : "days left"}</div>`}</div>
+          <div class="detail">${esc(t.job_name)} · ${esc(t.phase)} · due ${esc(fmtDate(t.delivery_date))} · Monday says “${esc(t.metal_status)}”</div>
+        </div>`; }).join("")}</div>`));
+
     if (!connected) parts.push(sec("handoffs", "Handoffs", 0, `<div class="banner warn">The Handed Off column hasn't been found on the Monday board yet, so this list can't be worked out. In the Supabase SQL Editor, run <b>select * from setup_monday_columns();</b> and then <b>select run_monday_sync();</b></div>`));
     else if (handoffs.length) parts.push(sec("handoffs", "Handoffs", handoffs.length, `<p class="sub">Jobs Monday doesn't show as Handed Off, soonest delivery first. Each clears by itself within 15 minutes of Handed Off being set to Yes in Monday.</p>
       <div class="panel">${handoffs.map(t => `
@@ -1279,9 +1344,9 @@ if (typeof document !== "undefined") (function () {
     return `<h1>Needs you</h1>
       <p class="sub">Everything waiting on the office, most urgent first.</p>
       ${missingNote()}${msgBanner()}${syncAlertHtml()}
-      ${parts.length ? parts.join("") : syncProblem() ? "" : `<div class="empty"><b>Nothing needs you</b>No problems waiting, nothing to order, nothing overdue, no handoffs.</div>`}
+      ${parts.length ? parts.join("") : syncProblem() ? "" : `<div class="empty"><b>Nothing needs you</b>No issues waiting, nothing to order, nothing overdue, no handoffs.</div>`}
       <section class="later">
-        <details class="more" data-keep="answered" ${keep("answered")}><summary>Answered problems — last 30 days (${answered.length})</summary>${answered.map(problemCard).join("") || `<p class="sub">None.</p>`}</details>
+        <details class="more" data-keep="answered" ${keep("answered")}><summary>Answered issues — last 30 days (${answered.length})</summary>${answered.map(issueCard).join("") || `<p class="sub">None.</p>`}</details>
         <details class="more" data-keep="ordered" ${keep("ordered")}><summary>Ordered, not received (${ordered.length})</summary>
           ${ordered.length ? `<div class="panel">${ordered.map(r => { const n = daysSince(r.ordered_at); return `<div class="line"><span class="qty">${r.qty}</span>
             <span class="body"><b>${testTag(r)}${esc(r.item)}</b> <span class="meta2">· ${esc(DEPT_NAME[r.department] || r.department)}</span>
@@ -1302,7 +1367,7 @@ if (typeof document !== "undefined") (function () {
       <div class="panel">${S.depts.map(d => {
         const l = last[d.key];
         if (d.log_only) return `<div class="dept"><span class="nm">${esc(d.name)}</span>
-          <span class="hist">Log-only: problems, defects, Arrow and routine tasks — no work orders, so no queue and nothing on the TV.</span></div>`;
+          <span class="hist">Log-only: issues, defects, Arrow and routine tasks — no work orders, so no queue and nothing on the TV.</span></div>`;
         return `<div class="dept">
           <span class="nm">${esc(d.name)}</span>
           <button class="switch" role="switch" aria-checked="${d.is_live}" aria-label="${esc(d.name)} live" data-live="${esc(d.key)}" ${S.busy ? "disabled" : ""}></button>
@@ -1450,7 +1515,7 @@ if (typeof document !== "undefined") (function () {
   }
   function viewerHtml() {
     const p = S.viewer; if (!p) return "";
-    const what = p.kind === "loadout" ? `Load-out · ${photoWhat(p)}` : p.kind === "defect" ? `Defect: ${p.defect_type || ""}` : `Problem: ${p.problem_body || ""}`;
+    const what = p.kind === "loadout" ? `Load-out · ${photoWhat(p)}` : p.kind === "defect" ? `Defect: ${p.defect_type || ""}` : `Issue: ${p.problem_body || ""}`;
     return `<div class="ovl" data-closeviewer="1"><div class="viewer" role="dialog" aria-modal="true" aria-label="Photo">
       <img alt="Photo by ${esc(p.taken_by_name)}" data-photopath="${esc(p.storage_path)}">
       <div class="vcap"><b>${p.is_test ? "TEST " : ""}${esc(p.project_id)}${p.sheet_number !== null ? ` · sheet ${p.sheet_number}` : ""}</b> · ${esc(p.department_name)}
@@ -1499,7 +1564,7 @@ if (typeof document !== "undefined") (function () {
               ${v2 && l.site_steps && !ship ? `<div class="meta2">Truck photos: ${(l.trucks_here || []).length}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}</div>`
                 : v2 ? `<div class="meta2">${l.pieces_total ? `Tables on this ${ship ? "shipment" : "truck"}: ${(l.pieces_here || []).length} · ${tables} of ${l.pieces_total} photographed so far` : `${(l.pieces_here || []).length} photographed`}${ship ? ` · ${(l.pallets_here || []).length} wrapped pallet${(l.pallets_here || []).length === 1 ? "" : "s"}` : ""}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}</div>` : `<div class="meta2">On this truck: ${(l.sheets_here || []).length ? `sheet${l.sheets_here.length === 1 ? "" : "s"} ${esc(l.sheets_here.join(", "))}` : "no sheets"}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}${l.sheets_total ? ` · ${done} of ${l.sheets_total} sheets photographed so far` : ""}</div>`}
               ${photoStrip(mine, true)}</div>`; }).join("") : ""}
-        ${onEntries.length ? `<div class="deptname">On defects and problems</div>${photoStrip(onEntries, true)}` : ""}
+        ${onEntries.length ? `<div class="deptname">On defects and issues</div>${photoStrip(onEntries, true)}` : ""}
         ${archived.length ? `<p class="sub" style="margin-top:12px">Some of this job's photos have been archived: ${archived.map(b => `photo-archive-${esc(b)}.zip, folder ${esc(j.project)}`).join("; ")}.</p>` : ""}
         ${mistakes ? `<p class="sub">${mistakes} photo${mistakes === 1 ? " was" : "s were"} marked entered by mistake and ${mistakes === 1 ? "isn't" : "aren't"} shown.</p>` : ""}`;
     }
@@ -1533,7 +1598,7 @@ if (typeof document !== "undefined") (function () {
             ${b.files_left > 0 ? `<button class="link" data-archagain="${esc(b.id)}">Download again</button>` : ""}</div>`).join("")}</details>` : ""}`;
     }
     return `<h1>Photos</h1>
-      <p class="sub">Photos taken on the floor: on defects and problems, and Delivery's load-outs. Look a job up to see everything photographed on it, and what left the building when.</p>
+      <p class="sub">Photos taken on the floor: on defects and issues, and Delivery's load-outs. Look a job up to see everything photographed on it, and what left the building when.</p>
       ${msgBanner()}
       <section class="panel"><h2>Look up a job</h2>
         <div class="btns" style="margin-top:4px"><input class="in" id="phJob" style="flex:1 1 220px; max-width:320px" value="${esc(S.phText)}" placeholder="PROJ number, e.g. 418">
@@ -1776,10 +1841,13 @@ if (typeof document !== "undefined") (function () {
     };
     app.querySelectorAll("[data-draft]").forEach(t => t.oninput = () => {
       S.drafts[t.dataset.draft] = t.value;
-      app.querySelectorAll(`[data-answer="${t.dataset.draft}"]`).forEach(b => b.disabled = !t.value.trim());
+      app.querySelectorAll(`[data-answer="${t.dataset.draft}"], [data-danswer="${t.dataset.draft}"]`).forEach(b => b.disabled = !t.value.trim());
     });
     on("[data-answer]", (b) => act("answer_problem", { p_problem: b.dataset.answer, p_body: (S.drafts[b.dataset.answer] || "").trim(), p_close: b.dataset.close === "1" },
                                    () => { delete S.drafts[b.dataset.answer]; }));
+    on("[data-danswer]", (b) => act("answer_defect", { p_defect: b.dataset.danswer, p_body: (S.drafts[b.dataset.danswer] || "").trim(), p_close: b.dataset.close === "1" },
+                                    () => { delete S.drafts[b.dataset.danswer]; S.noteOpen = null; }));
+    on("[data-dnote]", (b) => { S.noteOpen = b.dataset.dnote || null; render(); });
     on("[data-deffrom]", (b) => { S.defFrom = b.dataset.deffrom; render(); });
     // folded sections on Needs you stay open across refreshes
     app.querySelectorAll("details[data-keep]").forEach(d => d.ontoggle = () => { d.open ? S.openDetails.add(d.dataset.keep) : S.openDetails.delete(d.dataset.keep); });
@@ -2012,7 +2080,7 @@ if (typeof document !== "undefined") (function () {
 
 /* lets the core be tested outside a browser */
 if (typeof module !== "undefined") module.exports = { keyProblem, isManager, daysLeft, fmtDate, daysText, ago, buildTasks, lastChanges, groupRules, ruleDepartments, catchUpTotals, pinHash, validPin, isNetworkError, friendlyError,
-  localISO, daysSince, problemState, officeProblems, staleFlags, openFlags, needToOrder, orderedNotReceived, defectSummary, tvLink, taskWhen,
+  localISO, daysSince, problemState, officeProblems, defectOfficeState, officeIssues, staleFlags, openFlags, needToOrder, orderedNotReceived, defectSummary, tvLink, taskWhen,
   crc32, makeZip, photoCsv, csvCell, fmtBytes, normProject, BATCH_STATE,
   fileCsv, filingItem, atDate, buildSignedTicket, pdfText, wrapText, signedFileName, fmtWhen, shopDate,
   parseOptions, choicesFromForm, choiceSummary, supplyListFor,
