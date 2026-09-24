@@ -62,6 +62,7 @@
   .go:disabled{opacity:.45; cursor:default}
   .plain{background:#fff; border:1px solid var(--gray); border-radius:9px; padding:10px 16px; font-weight:600}
   .link{background:none; border:none; color:var(--ink2); text-decoration:underline; padding:6px}
+  .link:disabled{opacity:.3; text-decoration:none; cursor:default}
 
   /* your tasks */
   .task{display:grid; grid-template-columns:1fr auto; gap:4px 18px; padding:14px 0; border-bottom:1px solid var(--line)}
@@ -160,6 +161,12 @@
   .typ:last-child{border-bottom:none}
   .typ span{flex:1}
   .typ.off span{color:var(--ink2); text-decoration:line-through}
+  .typ small{display:block; color:var(--ink2); font-size:14px}
+  .typ.off small{text-decoration:none}
+  .supform{background:var(--paper); border-radius:10px; padding:12px 14px; margin:8px 0}
+  .supform label{display:block; font-weight:600; font-size:14px; color:var(--ink2); margin:10px 0 4px}
+  .supform label:first-child{margin-top:0}
+  .supform .grp{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2.4fr); gap:8px; margin-top:6px}
 
   /* photos */
   .phs{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
@@ -219,6 +226,25 @@ const DEPT_NAME = { milling: "Milling", cnc: "CNC", sanding: "Sanding", finishin
 /* every department that logs, counted or not (Delivery is log-only) */
 const LOG_DEPTS = [...DEPT_ORDER, "delivery"];
 const LEVEL_NAME = { critical: "Critical", priority: "Priority", watch: "Watch" };
+
+/* ---- supply lists ---- */
+/** "Ash, Maple ,, White Oak" → ["Ash", "Maple", "White Oak"] */
+function parseOptions(text) { return String(text || "").split(",").map(x => x.trim()).filter(Boolean); }
+/** The form's two rows → what set_supply_item() takes. A row left completely blank is skipped. */
+function choicesFromForm(groups) {
+  return (groups || []).map(g => ({ label: String(g.label || "").trim(), options: parseOptions(g.options) }))
+    .filter(g => g.label || g.options.length);
+}
+/** An item's choices as one line: "Wood: Ash, Maple · Thickness: 1/4, 1/2" */
+function choiceSummary(choices) {
+  return (choices || []).map(g => `${g.label}: ${(g.options || []).join(", ")}`).join(" · ");
+}
+/** One department's list: live items in their order, then retired ones. */
+function supplyListFor(items, dept) {
+  const mine = (items || []).filter(i => i.department === dept);
+  const byOrder = (a, b) => (a.sort_order - b.sort_order) || String(a.name).localeCompare(String(b.name));
+  return { live: mine.filter(i => !i.retired).sort(byOrder), retired: mine.filter(i => i.retired).sort(byOrder) };
+}
 const WEEKDAYS = { 1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday" };
 
 function keyProblem(url, key) {
@@ -502,6 +528,7 @@ if (typeof document !== "undefined") (function () {
     drafts: {}, flagForm: { jobId: "", department: "", level: "priority", note: "" },
     taskForm: { name: "", department: "sanding", assigned_to: "", schedule_type: "weekly", week_interval: 1, monthly_occurrence: 1, weekday: 1, start_date: "", is_test: false },
     msg: null, missing: false, openDetails: new Set(),
+    supItems: [], supMissing: false, supEdit: null,
     // photos
     photos: [], photoStatus: null, photoMissing: false, phText: "", phJob: null, viewer: null, arch: null,
   };
@@ -590,6 +617,8 @@ if (typeof document !== "undefined") (function () {
       } else if (S.tab === "setup") {
         const [ty, set] = await Promise.all([soft(db.from("defect_types").select("*")), soft(db.from("app_settings").select("*"))]);
         if (ty) S.types = ty;
+        try { S.supItems = await q(db.from("supply_items").select("*")) || []; S.supMissing = false; }
+        catch (e) { if (/does not exist|schema cache|could not find/i.test(String(e.message))) S.supMissing = true; else S.notice = friendlyError(e); }
         if (set) { const t = set.find(s => s.key === "tv_link_made"); S.tvMade = t || null; }
         S.columns = await q(db.from("monday_columns").select("*"));
         const log = await q(db.from("monday_sync_log").select("run_at, ok, summary, problems").order("run_at", { ascending: false }).limit(1));
@@ -655,6 +684,34 @@ if (typeof document !== "undefined") (function () {
           <button class="plain" data-answer="${esc(p.id)}" data-close="0" ${d.trim() ? "" : "disabled"}>Reply, keep it open</button></div>` : ""}
     </div>`;
   }
+  function supplyForm(e) {
+    return `<div class="supform">
+      ${S.msg && !S.msg.ok && S.msgFrom === "sup" ? `<div class="banner warn" style="margin:0 0 10px">${esc(S.msg.text)}</div>` : ""}
+      <label for="supName">${e.id ? "Name" : "New item"}</label>
+      <input class="in" id="supName" data-supf="name" value="${esc(e.name)}" placeholder="e.g. Boxes of biscuits" maxlength="60">
+      <label>Choices <span style="font-weight:400">(optional — up to two sets, with a comma between each choice)</span></label>
+      ${e.groups.map((g, i) => `<div class="grp">
+        <input class="in" data-supg="${i}" data-part="label" value="${esc(g.label)}" placeholder="${i ? "e.g. Thickness" : "e.g. Wood"}" aria-label="Name of choice set ${i + 1}">
+        <input class="in" data-supg="${i}" data-part="options" value="${esc(g.options)}" placeholder="${i ? "e.g. 1/4, 1/2, 3/4, 3/4 MDF" : "e.g. Ash, Maple, White Oak"}" aria-label="Choices in set ${i + 1}"></div>`).join("")}
+      <div class="btns"><button class="go" data-supsave="1" ${S.busy || !e.name.trim() ? "disabled" : ""}>${e.id ? "Save" : "Add to the list"}</button>
+        <button class="plain" data-supcancel="1">Cancel</button></div></div>`;
+  }
+  function supplyDept(d) {
+    const { live, retired } = supplyListFor(S.supItems, d);
+    const e = S.supEdit && S.supEdit.dept === d ? S.supEdit : null;
+    const row = (i, k) => e && e.id === i.id ? supplyForm(e) : `<div class="typ${i.retired ? " off" : ""}">
+      <span>${esc(i.name)}${(i.choices || []).length ? `<small>${esc(choiceSummary(i.choices))}</small>` : ""}</span>
+      ${i.retired ? `<button class="link" data-supback="${esc(i.id)}">Bring back</button>` : `
+        <button class="link" data-supmove="${esc(i.id)}" data-up="1" ${k === 0 ? "disabled" : ""} aria-label="Move ${esc(i.name)} up">↑</button>
+        <button class="link" data-supmove="${esc(i.id)}" data-up="0" ${k === live.length - 1 ? "disabled" : ""} aria-label="Move ${esc(i.name)} down">↓</button>
+        <button class="link" data-supedit="${esc(i.id)}">Edit</button>
+        <button class="link" data-supretire="${esc(i.id)}">Retire</button>`}</div>`;
+    return `<details class="more" data-keep="sup_${d}" ${S.openDetails.has("sup_" + d) ? "open" : ""}><summary>${esc(DEPT_NAME[d])} — ${live.length}</summary>
+      ${live.map(row).join("") || `<p class="sub" style="margin:4px 0">No list yet — the tablet shows only the typed box.</p>`}
+      ${e && !e.id ? supplyForm(e) : `<div class="btns"><button class="plain" data-supadd="${d}">Add an item</button></div>`}
+      ${retired.length ? `<div class="deptname">Retired</div>${retired.map(row).join("")}` : ""}</details>`;
+  }
+
   function defectsPanel() {
     const month = localISO(new Date()).slice(0, 7) + "-01";
     const sum = defectSummary(S.defects, S.defFrom === "month" ? month : "0000");
@@ -947,6 +1004,14 @@ if (typeof document !== "undefined") (function () {
       </section>
 
       <section class="panel">
+        <h2>Supply lists</h2>
+        <p class="sub">What each department taps on its tablet's Supplies tab. An item can have up to two sets of choices, like the wood and the thickness; the tablet won't send it until each is picked, and the office sees the full wording ("Plywood — White Oak, 3/4 MDF"). Anything not on the list can still be typed. Retiring takes an item off the tablets; past requests keep it.</p>
+        ${S.supMissing ? `<div class="banner warn" style="margin:0">Supply lists aren't set up in the database yet. Run <b>supply_lists.sql</b> in the SQL Editor, wait a minute, then reload.</div>`
+          : (S.msg && S.msgFrom === "sup" && !(S.supEdit && !S.msg.ok) ? `<div class="banner ${S.msg.ok ? "ok" : "warn"}" style="margin:0 0 8px">${esc(S.msg.text)}</div>` : "")
+            + DEPT_ORDER.map(supplyDept).join("")}
+      </section>
+
+      <section class="panel">
         <h2>Test jobs</h2>
         <p class="sub">A copy of a real job with every count at zero, for trying things on a tablet signed in as the Test Supervisor. Test jobs are invisible to real supervisors, stay off the TV and out of Monday, and are labelled TEST.</p>
         <div class="row">
@@ -977,7 +1042,7 @@ if (typeof document !== "undefined") (function () {
       catch (e) { const b = img.closest(".ph"); if (b) { b.classList.add("nofile"); b.textContent = "Photo not available"; } }
     });
   }
-  const photoWhat = (p) => p.kind === "loadout" ? (p.sheet_number !== null ? `Sheet ${p.sheet_number}` : p.note || "")
+  const photoWhat = (p) => p.kind === "loadout" ? (p.pallet ? `Pallet ${p.pallet}, wrapped` : p.sheet_number !== null ? `Sheet ${p.sheet_number}${p.piece ? ` · table ${p.piece}` : ""}` : p.note || "")
                                                 : `${p.department_name}${p.sheet_number !== null ? " · sheet " + p.sheet_number : ""}`;
   /** Thumbnails; an archived photo says which batch holds it. */
   function photoStrip(list, caption = false) {
@@ -1019,9 +1084,12 @@ if (typeof document !== "undefined") (function () {
         : `<h2 style="margin-top:18px">${esc(j.project)} <span class="meta2">${esc((j.photos[0] || j.loadouts[0] || {}).job_name || "")}</span></h2>
         ${j.loadouts.length ? `<div class="deptname">What left the building</div>` + j.loadouts.map(l => { const mine = live.filter(p => p.loadout_id === l.id);
             const done = new Set([...(l.sheets_here || []), ...(l.sheets_earlier || [])]).size;
-            return `<div class="li"><div class="li-top"><b>${l.is_test ? `<span class="tag">TEST</span> ` : ""}${l.finished_at ? `Left ${esc(time(l.finished_at))}` : "Load-out still open"}</b>
+            const ship = l.kind === "shipping", v2 = l.pieces_total !== undefined;
+            const tables = v2 ? new Set([...(l.pieces_here || []), ...(l.pieces_earlier || [])]).size : 0;
+            return `<div class="li"><div class="li-top"><b>${l.is_test ? `<span class="tag">TEST</span> ` : ""}${ship ? "Shipment · " : v2 ? "Delivery · " : ""}${l.finished_at ? `${ship ? "Picked up" : "Left"} ${esc(time(l.finished_at))}` : `${ship ? "Shipment" : "Load-out"} still open`}</b>
               <span class="meta2">started ${esc(time(l.started_at))} by ${esc(l.started_by_name)}</span></div>
-              <div class="meta2">On this truck: ${(l.sheets_here || []).length ? `sheet${l.sheets_here.length === 1 ? "" : "s"} ${esc(l.sheets_here.join(", "))}` : "no sheets"}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}${l.sheets_total ? ` · ${done} of ${l.sheets_total} sheets photographed so far` : ""}</div>
+              ${ship && (l.carrier || l.tracking) ? `<div class="meta2">${esc([l.carrier, l.tracking ? `tracking ${l.tracking}` : ""].filter(Boolean).join(" · "))}</div>` : ""}
+              ${v2 ? `<div class="meta2">${l.pieces_total ? `Tables on this ${ship ? "shipment" : "truck"}: ${(l.pieces_here || []).length} · ${tables} of ${l.pieces_total} photographed so far` : `${(l.pieces_here || []).length} photographed`}${ship ? ` · ${(l.pallets_here || []).length} wrapped pallet${(l.pallets_here || []).length === 1 ? "" : "s"}` : ""}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}</div>` : `<div class="meta2">On this truck: ${(l.sheets_here || []).length ? `sheet${l.sheets_here.length === 1 ? "" : "s"} ${esc(l.sheets_here.join(", "))}` : "no sheets"}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}${l.sheets_total ? ` · ${done} of ${l.sheets_total} sheets photographed so far` : ""}</div>`}
               ${photoStrip(mine, true)}</div>`; }).join("") : ""}
         ${onEntries.length ? `<div class="deptname">On defects and problems</div>${photoStrip(onEntries, true)}` : ""}
         ${archived.length ? `<p class="sub" style="margin-top:12px">Some of this job's photos have been archived: ${archived.map(b => `photo-archive-${esc(b)}.zip, folder ${esc(j.project)}`).join("; ")}.</p>` : ""}
@@ -1184,8 +1252,8 @@ if (typeof document !== "undefined") (function () {
 
     // ---- the floor log ----
     const on = (sel, fn) => app.querySelectorAll(sel).forEach(el => el.onclick = () => fn(el));
-    const act = async (fn, args, after) => {      // one database call, its plain answer shown at the top
-      S.busy = true; S.msg = null; render();
+    const act = async (fn, args, after, from = null) => {      // one database call, its plain answer shown at the top
+      S.busy = true; S.msg = null; S.msgFrom = from; render();
       const { data, error } = await db.rpc(fn, args);
       S.busy = false;
       S.msg = error ? { ok: false, text: friendlyError(error) } : { ok: true, text: typeof data === "string" ? data : (data && data.summary) || "Done." };
@@ -1243,6 +1311,26 @@ if (typeof document !== "undefined") (function () {
       act("new_tv_link", {}, (data) => { S.tvKey = data.key; });
     });
     on("[data-tvcopy]", async () => { try { await navigator.clipboard.writeText(tvLink(location.href, S.tvKey)); S.msg = { ok: true, text: "Copied." }; } catch (e) { S.msg = { ok: false, text: "Couldn't copy — select the link and copy it by hand." }; } render(); });
+    // ---- supply lists ----
+    const supOpen = (d, item) => {
+      const g = [0, 1].map(i => { const c = item && (item.choices || [])[i]; return { label: c ? c.label : "", options: c ? c.options.join(", ") : "" }; });
+      S.supEdit = { id: item ? item.id : null, dept: d, name: item ? item.name : "", groups: g };
+      S.openDetails.add("sup_" + d); S.msg = null; S.msgFrom = null; render();
+      const n = app.querySelector("#supName"); if (n) n.focus();
+    };
+    on("[data-supadd]", (b) => supOpen(b.dataset.supadd, null));
+    on("[data-supedit]", (b) => { const i = S.supItems.find(x => x.id === b.dataset.supedit); if (i) supOpen(i.department, i); });
+    on("[data-supcancel]", () => { S.supEdit = null; render(); });
+    app.querySelectorAll("[data-supf]").forEach(el => el.oninput = () => {
+      S.supEdit.name = el.value;
+      const go = app.querySelector("[data-supsave]"); if (go) go.disabled = !el.value.trim();
+    });
+    app.querySelectorAll("[data-supg]").forEach(el => el.oninput = () => { S.supEdit.groups[Number(el.dataset.supg)][el.dataset.part] = el.value; });
+    on("[data-supsave]", () => { const e = S.supEdit;
+      act("set_supply_item", { p_id: e.id, p_department: e.dept, p_name: e.name.trim(), p_choices: choicesFromForm(e.groups) }, () => { S.supEdit = null; }, "sup"); });
+    on("[data-supmove]", (b) => act("move_supply_item", { p_id: b.dataset.supmove, p_up: b.dataset.up === "1" }, null, "sup"));
+    on("[data-supretire]", (b) => { if (confirm("Retire this item? It comes off the tablets. Past requests keep it, and you can bring it back.")) act("retire_supply_item", { p_id: b.dataset.supretire, p_retire: true }, null, "sup"); });
+    on("[data-supback]", (b) => act("retire_supply_item", { p_id: b.dataset.supback, p_retire: false }, null, "sup"));
     on("[data-typeset]", (b) => act("set_defect_type", { p_department: b.dataset.typeset, p_label: b.dataset.label, p_active: b.dataset.active === "1" }));
     // ---- photos ----
     on("[data-viewphoto]", (b) => { S.viewer = S.photos.find(x => x.id === b.dataset.viewphoto) || null; render(); });
@@ -1382,7 +1470,8 @@ if (typeof document !== "undefined") (function () {
 /* lets the core be tested outside a browser */
 if (typeof module !== "undefined") module.exports = { keyProblem, isManager, daysLeft, fmtDate, daysText, ago, buildTasks, lastChanges, groupRules, ruleDepartments, catchUpTotals, pinHash, validPin, isNetworkError, friendlyError,
   localISO, daysSince, problemState, officeProblems, staleFlags, openFlags, needToOrder, orderedNotReceived, defectSummary, tvLink, taskWhen,
-  crc32, makeZip, photoCsv, csvCell, fmtBytes, normProject, BATCH_STATE };
+  crc32, makeZip, photoCsv, csvCell, fmtBytes, normProject, BATCH_STATE,
+  parseOptions, choicesFromForm, choiceSummary, supplyListFor };
 </script>
 </body>
 </html>

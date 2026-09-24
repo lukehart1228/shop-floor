@@ -67,9 +67,9 @@
        border-radius:12px; padding:16px 18px; margin-bottom:12px}
   .job.f-critical{border-left:8px solid var(--orange)}
   .job.f-priority{border-left:8px solid var(--bright)}
-  .job-top{display:flex; gap:12px; align-items:baseline; flex-wrap:wrap}
-  .pid{font-weight:700; letter-spacing:.02em}
-  .jname{color:var(--ink2); flex:1 1 220px; min-width:0}
+  .job-top{display:flex; gap:12px; align-items:baseline}
+  .pid{font-weight:700; letter-spacing:.02em; flex:none; white-space:nowrap}
+  .jname{color:var(--ink2); flex:1 1 0; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .due{color:var(--ink2); font-size:16px; white-space:nowrap}
   .due b{color:var(--midnight)}
   .tally{display:flex; align-items:center; gap:12px; margin-top:10px}
@@ -201,6 +201,43 @@
   .losheet.here{background:var(--teal-bg); border-color:transparent}
   .losheet.here .no, .losheet.here small{color:var(--teal-ink)}
   .losheet.earlier{background:var(--paper); border-style:dashed}
+  /* load-outs, version 2: a spot per table, pallets, the work order page */
+  .lokind{display:flex; gap:8px; margin:0 0 14px}
+  .lokind button{flex:1; background:#fff; border:1.5px solid var(--gray); border-radius:10px; padding:10px 14px; text-align:left; font-weight:700; min-height:56px}
+  .lokind button small{display:block; font-weight:500; font-size:13px; color:var(--ink2)}
+  .lokind button[aria-pressed="true"]{background:var(--midnight); color:var(--sawdust); border-color:var(--midnight)}
+  .lokind button[aria-pressed="true"] small{color:#CFC9B8}
+  .lopages{border:1.5px solid var(--gray); border-radius:10px; padding:10px 14px; margin:0 0 14px; font-weight:600; color:var(--ink2); background:#fff}
+  .lopages.ready{border-color:var(--teal); color:var(--teal-ink)}
+  .lostep{font-size:17px; font-weight:700; margin:18px 2px 8px}
+  .lostep span{color:var(--ink2); font-weight:600}
+  .locard{background:#fff; border:1.5px solid var(--gray); border-radius:12px; padding:12px 14px; margin-bottom:10px}
+  .locard.done{border-color:var(--teal); background:var(--teal-bg)}
+  .locard .lotop{display:flex; align-items:baseline; gap:12px}
+  .locard .no{font-size:26px; font-weight:700; line-height:1; flex:none}
+  .locard .size{font-size:18px; font-weight:700; flex:1; min-width:0}
+  .locard .cnt{color:var(--ink2); font-weight:600; white-space:nowrap}
+  .locard.done .no, .locard.done .cnt{color:var(--teal-ink)}
+  .loslots{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
+  .loslot{background:#fff; border:1.5px solid var(--gray); border-radius:9px; padding:10px 14px; font-weight:700; min-height:48px; min-width:96px; text-align:left}
+  .loslot small{display:block; font-weight:500; font-size:12px; color:var(--ink2)}
+  .loslot.here{background:var(--teal); border-color:var(--teal); color:#fff}
+  .loslot.here small{color:#E6FAF9}
+  .loslot.earlier{background:var(--paper); border-style:dashed; color:var(--ink2)}
+  .lowo{margin-top:10px; background:none; border:1.5px solid var(--gray); border-radius:9px; padding:8px 14px; font-weight:600; color:var(--midnight); min-height:44px}
+  .lodet{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px}
+  @media (max-width: 600px){ .lodet{grid-template-columns:minmax(0,1fr)} }
+  .lopage{background:#fff; border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-top:12px; min-height:200px}
+  .lopage img{display:block; width:100%; height:auto}
+  .lopage .missing{padding:24px; color:var(--ink2)}
+  /* phones: the area tabs stay on one row, and a job name may take two lines */
+  @media (max-width: 600px){
+    .subtabs{flex-wrap:nowrap; overflow-x:auto; gap:6px; scrollbar-width:none}
+    .subtab{flex:none; padding:10px 13px; min-height:48px}
+    .job-top{flex-wrap:wrap}
+    .job-top .due{margin-left:auto}
+    .jname{order:3; flex:1 1 100%; white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical}
+  }
 
   /* forms */
   label.f{display:block; font-weight:700; margin:14px 0 6px}
@@ -225,6 +262,10 @@
   .chk input{width:26px; height:26px; margin:0; flex-shrink:0; accent-color:var(--orange)}
   .chk small{display:block; font-weight:500; color:var(--ink2); font-size:14px}
   .seg{display:flex; gap:8px}
+  .spick{margin-top:6px} .spick .schip{min-width:0; font-size:17px} .spick .schip.other{font-weight:600; color:var(--ink2); border-style:dashed}
+  .spick .schip.other[aria-pressed="true"]{color:var(--sawdust); border-style:solid}
+  .sgroup{font-weight:700; margin:14px 0 0}
+  .swhat{margin-top:12px; font-size:18px; font-weight:700}
   .seg button{flex:1; background:#fff; border:1.5px solid var(--gray); border-radius:10px; padding:12px; font-weight:700; min-height:52px}
   .seg button[aria-pressed="true"]{background:var(--midnight); color:var(--sawdust); border-color:var(--midnight)}
   .qty{display:flex; align-items:center; gap:14px}
@@ -322,7 +363,7 @@ const DEPT_NAME = Object.fromEntries(DEPTS);
 /* Delivery is log-only for now: no work orders to count, no supplies tab. */
 const LOG_ONLY = ["delivery"];
 const ARROW_DEPTS = ["metal", "assembly_qc", "delivery"];
-const TAB_NAME = { work: "Work orders", problems: "Problems", log: "Log", supplies: "Supplies", loadout: "Load-out" };
+const TAB_NAME = { work: "Work orders", arrow: "Arrow", problems: "Problems", log: "Log", supplies: "Supplies", loadout: "Load-out" };
 const PHOTO_MAX_EACH = 3;          // photos on one defect, problem or reply, from the tablet
 
 function keyProblem(url, key) {
@@ -348,8 +389,26 @@ function departmentsFor(me) {
 const isLogOnly = (dept) => LOG_ONLY.includes(dept);
 /** The areas a department's tablet has. */
 function tabsFor(dept) {
-  if (dept === "delivery") return ["loadout", "problems", "log"];
-  return isLogOnly(dept) ? ["problems", "log"] : ["work", "problems", "log", "supplies"];
+  const arrow = ARROW_DEPTS.includes(dept) ? ["arrow"] : [];
+  if (dept === "delivery") return ["loadout", ...arrow, "problems", "log"];
+  return isLogOnly(dept) ? [...arrow, "problems", "log"] : ["work", ...arrow, "problems", "log", "supplies"];
+}
+
+/** A department's supply list, in its order. Retired items never show. */
+function supplyItemsFor(items, dept) {
+  return (items || []).filter(i => i.department === dept && !i.retired)
+    .sort((a, b) => (a.sort_order - b.sort_order) || String(a.name).localeCompare(String(b.name)));
+}
+/** The choices of an item still to be made, by name (e.g. ["Wood", "Thickness"]). */
+function supplyMissing(item, picked) {
+  return ((item && item.choices) || []).map((g, i) => (picked || {})[i] ? null : g.label).filter(Boolean);
+}
+/** What the office will read: "Plywood — White Oak, 3/4 MDF". Null until every choice is made. */
+function supplyText(item, picked) {
+  if (!item) return null;
+  if (supplyMissing(item, picked).length) return null;
+  const opts = (item.choices || []).map((g, i) => picked[i]);
+  return opts.length ? `${item.name} — ${opts.join(", ")}` : item.name;
 }
 
 /** Put any counts still waiting to send on top of what the database last said. */
@@ -716,7 +775,10 @@ async function flushPhotobox(store, db, isPending = () => false) {
     }
     let res;
     try {
-      res = await db.rpc("add_photo", { p_client_id: rec.id, p_kind: rec.kind, p_parent: rec.parent, p_sheet: rec.sheet ?? null,
+      res = rec.kind === "loadout" && (rec.piece || rec.pallet)      // a load-out photo of one table, or a pallet
+        ? await db.rpc("add_loadout_photo", { p_client_id: rec.id, p_loadout: rec.parent, p_sheet: rec.sheet ?? null, p_piece: rec.piece || null,
+                                              p_pallet: rec.pallet || null, p_note: rec.note || null, p_width: rec.width || null, p_height: rec.height || null })
+        : await db.rpc("add_photo", { p_client_id: rec.id, p_kind: rec.kind, p_parent: rec.parent, p_sheet: rec.sheet ?? null,
                                         p_note: rec.note || null, p_width: rec.width || null, p_height: rec.height || null });
     } catch (e) { res = { error: e }; }
     if (res.error) {
@@ -755,6 +817,50 @@ function loadoutSheets(sheets, lo, pending = []) {
   };
 }
 
+/** A sheet's size the way the shop says it: "36 rnd · 42 H", "30 × 60 · 30 H", "42 × 84 oval". Null if there's nothing to go on. */
+function sizeLabel(s) {
+  if (!s) return null;
+  const n = (v) => { const t = String(v ?? "").replace(/["”″]|\binch(es)?\b|\bin\b/gi, "").trim(); return t || null; };
+  const w = n(s.width), l = n(s.length), h = n(s.total_height);
+  const shape = String(s.shape || "").trim(), sh = shape.toLowerCase();
+  let size = null;
+  if (/round|circle/.test(sh)) size = w || l ? `${w || l} rnd` : null;
+  else if (w && l) size = `${w} × ${l}` + (sh && !/rect|square|^sq/.test(sh) ? ` ${sh}` : "");
+  else if (w || l) size = `${w || l}` + (sh && !/rect|square|^sq/.test(sh) ? ` ${sh}` : "");
+  if (!size && !h) return null;
+  return [size, h ? `${h} H` : null].filter(Boolean).join(" · ");
+}
+/** A load-out, table by table: every sheet's tables (photographed here, waiting to send, or gone on an earlier truck),
+ *  the pallets photographed, and what's still missing. Tables are "sheet:table", e.g. "4:2". */
+function loadoutPieces(sheets, lo, pending = [], planned = 1) {
+  const here = new Set((lo && lo.pieces_here) || []), earlier = new Set((lo && lo.pieces_earlier) || []);
+  const mine = pending.filter(p => p.sheet !== null && p.sheet !== undefined);
+  const waiting = new Set(mine.map(p => `${p.sheet}:${p.piece || 1}`));
+  const list = (sheets || []).map(s => {
+    const qty = Math.max(1, Number(s.qty) || 1);
+    const slots = Array.from({ length: qty }, (_, i) => {
+      const k = `${s.sheet_number}:${i + 1}`;
+      return { piece: i + 1, here: here.has(k) || waiting.has(k), waiting: waiting.has(k) && !here.has(k), earlier: earlier.has(k) && !here.has(k) && !waiting.has(k) };
+    });
+    const done = slots.filter(x => x.here || x.earlier).length;
+    return { ...s, qty, slots, done, complete: done === qty };
+  });
+  const palletsHere = new Set([...((lo && lo.pallets_here) || []), ...pending.filter(p => p.pallet).map(p => Number(p.pallet))]);
+  const pallets = Math.max(planned || 1, ...palletsHere, 1);
+  const missing = list.filter(s => !s.complete).map(s => ({ sheet: s.sheet_number, qty: s.qty, pieces: s.slots.filter(x => !x.here && !x.earlier).map(x => x.piece) }));
+  return {
+    list, total: list.reduce((a, s) => a + s.qty, 0), done: list.reduce((a, s) => a + s.done, 0),
+    onTruck: list.reduce((a, s) => a + s.slots.filter(x => x.here).length, 0), missing,
+    pallets, palletsHere: [...palletsHere].sort((a, b) => a - b),
+    palletsMissing: Array.from({ length: pallets }, (_, i) => i + 1).filter(i => !palletsHere.has(i)),
+    other: ((lo && lo.other_items) || 0) + pending.filter(p => (p.sheet === null || p.sheet === undefined) && !p.pallet).length,
+  };
+}
+/** "sheet 4: table 3 · sheet 6: all 3 tables" */
+function missingText(missing) {
+  return missing.map(m => `sheet ${m.sheet}: ${m.pieces.length === m.qty ? (m.qty === 1 ? "the table" : `all ${m.qty} tables`) : `table${m.pieces.length === 1 ? "" : "s"} ${m.pieces.join(", ")}`}`).join(" · ");
+}
+
 /* ---- end core ---- */
 
 
@@ -783,13 +889,14 @@ if (typeof document !== "undefined") (function () {
     // the log side
     flags: store.get("flags", []), tasks: store.get("tasks", []), types: store.get("types", []),
     problems: [], probScope: "mine", defects: [], supplies: [], arrow: [], pickJobs: store.get("pickjobs", []),
-    pickSheets: {}, piece: {}, qcJob: null, qcEntries: [], arrowForm: null, supplyForm: { item: "", qty: 1, note: "" },
+    pickSheets: {}, piece: {}, qcJob: null, qcEntries: [], arrowForm: null, supplyForm: { item: "", qty: 1, note: "", pick: null, picked: {} }, supplyItems: [],
     openTask: null, modal: null, toast: null, missing: {},
     // photos and load-outs
     photos: [],                 // photos on what's on screen (the piece, the problems list), from the database
     pending: [],                // photos still on this tablet, waiting to send (no image bytes kept here)
     loadouts: [], localLoadouts: store.get("loadouts_local", []), loView: null,
-    loForm: { jobId: null, filter: "" }, loItem: "", loPhotos: [], viewer: null,
+    loForm: { jobId: null, filter: "", kind: "delivery" }, loItem: "", loPhotos: [], viewer: null,
+    loSheets: {}, loWo: null, loPallets: store.get("lo_pallets", {}), loPages: {}, loDet: {},
     // Advance (managers only): a job, a sheet on it, and unsaved changes to that sheet
     adv: store.get("adv", false), advJob: null, advSheet: null, advRows: [], advAt: null, advCached: false,
     advEdit: {}, advFilter: "", advLoading: false,
@@ -997,6 +1104,21 @@ if (typeof document !== "undefined") (function () {
     if (ids.length) mergePhotos(await read("photos", db.from("v_photos").select("*").in("problem_id", ids), null));
   }
   // ---------- load-outs (Delivery) ----------
+  async function loadLoSheets(jobId) {
+    const d = await read("losheets", db.from("v_loadout_sheets").select("*").eq("job_id", jobId), "losheets_" + jobId);
+    if (d) S.loSheets[jobId] = d.slice().sort((a, b) => a.sheet_number - b.sheet_number);
+  }
+  const lo2 = () => !S.missing.losheets;              // version 2 is set up in the database
+  // every work order page of the load-out's job, kept on this phone for the road
+  async function saveLoPages(jobId) {
+    const list = (S.loSheets[jobId] || []).filter(x => x.png_path && x.pages_ready);
+    const st = S.loPages[jobId] = { total: list.length, saved: 0, busy: true, offline: false };
+    render();
+    for (const x of list) {
+      try { await pageImage(x.png_path); st.saved++; } catch (e) { if (isNetworkError(e)) st.offline = true; }
+    }
+    st.busy = false; render();
+  }
   async function loadLoadouts() {
     const d = await read("loadouts", db.from("v_loadouts").select("*"), "loadouts");
     if (d) {
@@ -1007,7 +1129,7 @@ if (typeof document !== "undefined") (function () {
     }
     const lo = currentLoadout();
     if (lo) {
-      const jobs = [loadPickSheets(lo.job_id)];
+      const jobs = [loadPickSheets(lo.job_id), loadLoSheets(lo.job_id).then(() => { if (!S.loPages[lo.job_id] || (!S.loPages[lo.job_id].busy && S.loPages[lo.job_id].saved < S.loPages[lo.job_id].total)) saveLoPages(lo.job_id); })];
       if (lo.id) jobs.push(read("photos", db.from("v_photos").select("*").eq("loadout_id", lo.id), null).then(p => { if (p) S.loPhotos = p.filter(x => !x.voided); }));
       await Promise.all(jobs);
     }
@@ -1023,6 +1145,11 @@ if (typeof document !== "undefined") (function () {
   async function loadSupplies() {
     const d = await read("supplies", db.from("v_supply_requests").select("*").eq("department", S.dept), "supplies_" + S.dept);
     if (d) S.supplies = d;
+  }
+  async function loadSupplyItems() {
+    const d = await read("supplyitems", db.from("supply_items").select("*").eq("department", S.dept).eq("retired", false), "supplyitems_" + S.dept);
+    delete S.missing.supplyitems;                    // no list yet just means the typed box, as before
+    if (d) S.supplyItems = d;
   }
   async function loadArrow() {
     const d = await read("arrow", db.from("v_outside_jobs").select("*").eq("voided", false), "arrow");
@@ -1068,15 +1195,16 @@ if (typeof document !== "undefined") (function () {
   const advNow = () => advSheets(withAdvPending(withPending(S.advRows, S.outbox), S.logbox));
 
   async function loadTab() {
+    if (S.tab !== "arrow" && ARROW_DEPTS.includes(S.dept)) loadArrow().then(render);   // keeps the Arrow tab's count current
     if (S.tab === "work") return loadRows();
     if (S.tab === "problems") return loadProblems();
     if (S.tab === "log") {
       const jobs = [loadDefects(), loadTasks()];
-      if (ARROW_DEPTS.includes(S.dept)) jobs.push(loadArrow());
       if (S.dept === "assembly_qc" && S.qcJob) jobs.push(loadQc(S.qcJob));
       return Promise.all(jobs);
     }
-    if (S.tab === "supplies") return loadSupplies();
+    if (S.tab === "arrow") return loadArrow();
+    if (S.tab === "supplies") return Promise.all([loadSupplies(), loadSupplyItems()]);
     if (S.tab === "loadout") { if (!S.pickJobs.length) loadPickJobs().then(render); return loadLoadouts(); }
   }
   async function refreshAll() {
@@ -1119,6 +1247,7 @@ if (typeof document !== "undefined") (function () {
       if (S.view.screen === "sheet") { const cur = rowsNow().find(x => x.progress_id === S.view.progressId); if (cur) await loadPiece(cur); }
     }
     render();
+    if (!r.offline && Object.keys(S.logbox).length) return flushLog();   // entries made while that was sending (photos follow them)
     await flushPhotos();
   }
 
@@ -1251,7 +1380,8 @@ if (typeof document !== "undefined") (function () {
     const dueHere = (S.tasks || []).filter(t => t.department === S.dept && !t.done_today && t.days_until <= 0 && !!t.is_test === !!(S.me && S.me.is_test)).length;
     const toReceive = (S.supplies || []).filter(r => r.state === "ordered").length;
     const openLo = (S.loadouts || []).filter(l => l.is_open).length + (S.localLoadouts || []).length;
-    const count = { problems: openHere, log: dueHere, supplies: toReceive, loadout: openLo };
+    const atArrow = (S.arrow || []).filter(a => a.at_vendor).length;
+    const count = { problems: openHere, log: dueHere, supplies: toReceive, loadout: openLo, arrow: atArrow };
     return `<nav class="subtabs" aria-label="${esc(DEPT_NAME[S.dept])}">${tabs().map(t =>
       `<button class="subtab" data-tab="${t}" aria-current="${S.tab === t}">${TAB_NAME[t]}${count[t] ? `<span class="c">${count[t]}</span>` : ""}</button>`).join("")}</nav>`;
   }
@@ -1284,9 +1414,9 @@ if (typeof document !== "undefined") (function () {
     return head + q.map(j => {
       const pct = j.total ? Math.round(j.done / j.total * 100) : 0;
       const dl = daysLeft(j.delivery_date);
-      const marks = [flagTag(j.flag), j.materials_ordered ? "" : `<span class="chip">Materials not ordered yet</span>`].filter(Boolean);
+      const marks = [flagTag(j.flag)].filter(Boolean);
       return `<button class="job${j.flag && j.flag.level !== "watch" ? " f-" + j.flag.level : ""}" data-job="${esc(j.job_id)}">
-        <div class="job-top"><span class="pid">${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</span><span class="jname">${esc(j.name)}</span>
+        <div class="job-top"><span class="pid">${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</span><span class="jname" title="${esc(j.name)}">${esc(j.name)}</span>
           <span class="due">Due ${esc(fmtDate(j.delivery_date))}${dl === null ? "" : ` · <b>${esc(daysText(dl))}</b>`}</span></div>
         <div class="tally"><span class="big num">${j.done}</span><span class="of num">/ ${j.total} pieces</span>
           <span class="bar"><i style="width:${pct}%"></i></span></div>
@@ -1305,7 +1435,6 @@ if (typeof document !== "undefined") (function () {
       <h1>${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</h1>
       <span class="hsub">${esc(j.job_name)} · due ${esc(fmtDate(j.delivery_date))} · ${done} of ${total} pieces done</span></div>
       ${flagBand(flagFor(S.flags, j.job_id, S.dept))}
-      ${j.materials_ordered ? "" : `<div class="banner warn">Materials for this job haven't been marked as ordered in Monday yet.</div>`}
       ${list.map(r => {
         const full = r.qty_done >= r.qty_required;
         const size = [r.width, r.length, r.thickness].filter(Boolean).join(" × ");
@@ -1482,7 +1611,7 @@ if (typeof document !== "undefined") (function () {
         <div class="mdl-btns"><button class="btn" data-arcancel="1">Cancel</button>
           <button class="go" data-arsend="1" ${f.jobId && (f.sheets.length || f.description.trim()) ? "" : "disabled"}>Send to Arrow</button></div>
       </div>` : `<button class="btn wide" data-aropen="1">Send something to Arrow</button>`;
-    return `<h2 class="sec">At Arrow</h2>${missingNote("arrow")}${form}
+    return `${missingNote("arrow")}${form}
       <h2 class="sec">At Arrow now</h2>
       ${out.length ? out.map(a => `<div class="li"><div class="li-top"><b>${a.is_test ? `<span class="tag">TEST</span>` : ""}${esc(a.project_id)}</b>
           <span class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent ${esc(fmtDate(a.sent_on))} by ${esc(a.sent_by_name)}</span>
@@ -1516,7 +1645,6 @@ if (typeof document !== "undefined") (function () {
 
   function logScreen() {
     let out = "";
-    if (ARROW_DEPTS.includes(S.dept)) out += arrowSection();
     if (S.dept === "assembly_qc") out += qcSection();
     return tasksSection() + out + defectsSection();
   }
@@ -1527,6 +1655,11 @@ if (typeof document !== "undefined") (function () {
     const closed = S.supplies.filter(r => !r.is_open && daysSince(r.updated_at) <= 14)
       .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
     const f = S.supplyForm;
+    const list = supplyItemsFor(S.supplyItems, S.dept);
+    const item = list.find(i => i.id === f.pick) || null;               // a pick from the list
+    const typed = !list.length || f.pick === "other";                    // or typed, as before
+    const missing = item ? supplyMissing(item, f.picked) : [];
+    const what = item ? supplyText(item, f.picked) : typed ? f.item.trim() : null;
     return `${missingNote("supplies")}<h2 class="sec" style="margin-top:4px">Open for ${esc(DEPT_NAME[S.dept])}</h2>
       ${open.length ? open.map(r => `<div class="li"><div class="li-top"><b>${r.is_test ? `<span class="tag">TEST</span>` : ""}${esc(r.item)}</b></div>
           ${r.note ? `<div class="meta2">${esc(r.note)}</div>` : ""}
@@ -1539,14 +1672,21 @@ if (typeof document !== "undefined") (function () {
           </div></div>`).join("")
         : `<div class="empty">Nothing on order for ${esc(DEPT_NAME[S.dept])}.</div>`}
       <div class="card" style="margin-top:18px">
-        <label class="f" style="margin-top:0" for="supItem">What do you need?</label>
-        <textarea class="in" id="supItem" data-sfield="item" placeholder="e.g. 120 grit discs, 6 inch, hook and loop">${esc(f.item)}</textarea>
+        ${list.length ? `<label class="f" style="margin-top:0">What do you need?</label>
+        <div class="schips spick">${list.map(i => `<button class="schip" data-spick="${esc(i.id)}" aria-pressed="${f.pick === i.id}">${esc(i.name)}</button>`).join("")}
+          <button class="schip other" data-spick="other" aria-pressed="${typed}">Something else</button></div>
+        ${item ? (item.choices || []).map((g, gi) => `<div class="sgroup">${esc(g.label)}</div>
+          <div class="schips">${g.options.map(o => `<button class="schip" data-schoice="${gi}" data-opt="${esc(o)}" aria-pressed="${f.picked[gi] === o}">${esc(o)}</button>`).join("")}</div>`).join("") : ""}
+        ${typed ? `<label class="f" for="supItem">What is it?</label>
+        <textarea class="in" id="supItem" data-sfield="item" placeholder="e.g. 6 inch hook and loop discs">${esc(f.item)}</textarea>` : ""}`
+        : `<label class="f" style="margin-top:0" for="supItem">What do you need?</label>
+        <textarea class="in" id="supItem" data-sfield="item" placeholder="e.g. 120 grit discs, 6 inch, hook and loop">${esc(f.item)}</textarea>`}
         <label class="f">How many?</label>
         <div class="qty"><button class="step" data-snew="-1" ${f.qty <= 1 ? "disabled" : ""} aria-label="One fewer">−</button>
           <span class="n num">${f.qty}</span><button class="step" data-snew="1" aria-label="One more">+</button></div>
         <label class="f" for="supNote">Note <span class="meta2">(optional)</span></label>
         <input class="in" id="supNote" data-sfield="note" value="${esc(f.note)}" placeholder="e.g. the red box, not the blue one">
-        <button class="go wide" style="margin-top:16px" data-ssend="1" ${f.item.trim() ? "" : "disabled"}>Send to the office</button>
+        ${item ? `<div class="swhat">${missing.length ? `<span class="meta2">Pick the ${esc(missing.map(m => m.toLowerCase()).join(" and "))}</span>` : `${f.qty} × ${esc(what)}`}</div>` : ""}<button class="go wide" style="margin-top:16px" data-ssend="1" ${what ? "" : "disabled"}>Send to the office</button>
       </div>
       ${closed.length ? `<h2 class="sec">Closed in the last two weeks</h2>` + closed.map(r => `<div class="li">
           <div class="li-top"><b>${esc(r.qty)} × ${esc(r.item)}</b></div><div class="meta2">${esc(supplyLine(r))}</div></div>`).join("") : ""}`;
@@ -1556,6 +1696,15 @@ if (typeof document !== "undefined") (function () {
   // Every item or pallet is photographed against its sheet before the truck leaves,
   // so the photos double as a check that everything's on board.
   function loadoutLine(lo) {
+    if (lo.pieces_total !== undefined || (lo.local && lo2())) {
+      const pend = S.pending.filter(x => x.parent === lo.client_id);
+      const p = loadoutPieces(S.loSheets[lo.job_id] || [], lo, pend, 1);
+      const total = lo.pieces_total ?? p.total;
+      return [lo.kind === "shipping" ? "Shipment" : "Delivery",
+              total ? `${p.done} of ${total} table${total === 1 ? "" : "s"} photographed` : `${p.onTruck} photographed`,
+              lo.kind === "shipping" ? `${p.palletsHere.length} pallet${p.palletsHere.length === 1 ? "" : "s"}` : null,
+              p.other ? `${p.other} other item${p.other === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ");
+    }
     const pend = S.pending.filter(x => x.parent === lo.client_id), has = (x) => x.sheet !== null && x.sheet !== undefined;
     const done = new Set([...(lo.sheets_here || []), ...(lo.sheets_earlier || []), ...pend.filter(has).map(x => x.sheet)]).size;
     const other = (lo.other_items || 0) + pend.filter(x => !has(x)).length;
@@ -1565,6 +1714,7 @@ if (typeof document !== "undefined") (function () {
   }
   function loadoutScreen() {
     const lo = currentLoadout();
+    if (lo && lo2()) return S.loWo ? loadoutWo(lo) : loadoutDetail2(lo);
     if (lo) return loadoutDetail(lo);
     const open = [...S.localLoadouts.map(l => ({ ...l, local: true, is_open: true })), ...S.loadouts.filter(l => l.is_open)];
     const done = S.loadouts.filter(l => !l.is_open).sort((a, b) => String(b.finished_at).localeCompare(String(a.finished_at)));
@@ -1573,6 +1723,7 @@ if (typeof document !== "undefined") (function () {
     return `${missingNote("loadouts")}
       <div class="card"><h3 style="margin:0 0 4px">Start a load-out</h3>
         <p class="sub" style="margin:0 0 6px">Pick the job going on the truck. Then photograph each item or pallet against its sheet.</p>
+        ${lo2() ? kindButtons(f.kind, "lostartkind") : ""}
         ${jobPicker(f.jobId, f.filter)}
         ${already ? `<div class="banner info" style="margin:12px 0 0">${esc(already.project_id)} already has a load-out open, started ${esc(agoText(already.started_at))}. Carry on with it, or start another for a second truck.
             <div class="rowbtns"><button data-loopen="${esc(already.client_id)}">Carry on with it</button></div></div>` : ""}
@@ -1586,6 +1737,87 @@ if (typeof document !== "undefined") (function () {
       ${done.length ? `<h2 class="sec">Left in the last two weeks</h2>` + done.map(l => `<div class="li">
           <div class="li-top"><b>${l.is_test ? `<span class="tag">TEST</span>` : ""}${esc(l.project_id)}</b><span class="meta2">${esc(l.job_name)}</span></div>
           <div class="meta2">Left ${esc(fmtDate(localISO(l.finished_at)))}${l.finished_by_name ? ` · ${esc(l.finished_by_name)}` : ""} · ${esc(loadoutLine(l))}</div></div>`).join("") : ""}`;
+  }
+  function kindButtons(kind, attr) {
+    return `<div class="lokind"><button data-${attr}="delivery" aria-pressed="${kind !== "shipping"}">Delivery<small>White glove, our truck</small></button>
+      <button data-${attr}="shipping" aria-pressed="${kind === "shipping"}">Shipping<small>Palletized, a carrier</small></button></div>`;
+  }
+  const loPend = (lo) => S.pending.filter(x => x.parent === lo.client_id);
+  const loPlanned = (lo) => S.loPallets[lo.client_id] || 1;
+  function loSlots(s) {
+    return `<div class="loslots">${s.slots.map(x => `<button class="loslot${x.here ? " here" : x.earlier ? " earlier" : ""}" data-loshoot="${s.sheet_number}" data-piece="${x.piece}">
+      ${s.qty === 1 ? "The table" : `Table ${x.piece}`}<small>${x.waiting ? "Waiting to send" : x.here ? "Photographed · tap for another" : x.earlier ? "Went on an earlier truck" : "Tap to photograph"}</small></button>`).join("")}</div>`;
+  }
+  function loadoutDetail2(lo) {
+    const sheets = S.loSheets[lo.job_id];
+    const p = loadoutPieces(sheets || [], lo, loPend(lo), loPlanned(lo));
+    const ship = lo.kind === "shipping";
+    const pg = S.loPages[lo.job_id];
+    const photos = S.loPhotos.filter(x => x.loadout_id === lo.id);
+    const d = S.loDet[lo.client_id] || { carrier: lo.carrier || "", tracking: lo.tracking || "" };
+    const changed = (d.carrier || "") !== (lo.carrier || "") || (d.tracking || "") !== (lo.tracking || "");
+    const cap = (x) => x.pallet ? `Pallet ${x.pallet}` : (x.sheet ?? x.sheet_number) != null ? `Sheet ${x.sheet ?? x.sheet_number}${x.piece ? ` · table ${x.piece}` : ""}` : x.note;
+    return `<button class="back" data-loback="1">← Load-outs</button>
+      <h1>${lo.is_test ? `<span class="tag">TEST</span>` : ""}${esc(lo.project_id)}</h1>
+      <p class="sub">${esc(lo.job_name)} · started ${esc(agoText(lo.started_at))}${lo.started_by_name ? ` by ${esc(lo.started_by_name)}` : ""}${lo.id ? "" : " · waiting to send"}</p>
+      ${lo.finished_at ? "" : kindButtons(lo.kind, "lokind")}
+      ${pg && pg.total ? `<div class="lopages${pg.saved === pg.total ? " ready" : ""}">${pg.saved === pg.total ? `✓ Ready for no signal · ${pg.total} work order page${pg.total === 1 ? "" : "s"} saved on this device`
+          : pg.busy ? `Saving the work order pages for no signal… ${pg.saved} of ${pg.total}`
+          : `${pg.saved} of ${pg.total} work order pages saved on this device. ${pg.offline ? "The rest need a connection — open this load-out again on Wi-Fi before leaving." : ""}`}</div>` : ""}
+      <div class="lohead">
+        ${p.total ? `<div class="tally"><span class="big num">${p.done}</span> <span class="of num">of ${p.total} table${p.total === 1 ? "" : "s"} photographed</span></div>`
+                  : `<div><b>No work order uploaded.</b> Photograph each item and say what it is.</div>`}
+        ${ship ? `<div class="meta2" style="margin-top:6px">Pallets photographed wrapped: ${p.palletsHere.length} of ${p.pallets}</div>` : ""}
+      </div>
+      ${sheets === undefined ? `<div class="meta2">Loading the sheets…</div>` : ""}
+      ${p.list.length ? `<div class="lostep">${ship ? "1 · Every table, before it's wrapped" : "Every table"} <span>— ${p.done} of ${p.total}</span></div>
+        ${p.list.map(s => `<div class="locard${s.complete ? " done" : ""}">
+          <div class="lotop"><span class="no num">${s.sheet_number}</span><span class="size">${esc(sizeLabel(s) || s.item_code || "Sheet " + s.sheet_number)}</span><span class="cnt">${s.done} of ${s.qty}</span></div>
+          ${loSlots(s)}
+          ${s.png_path && s.pages_ready ? `<button class="lowo" data-lowo="${s.sheet_number}">Work order</button>` : ""}</div>`).join("")}` : ""}
+      ${ship ? `<div class="lostep">${p.list.length ? "2 · " : ""}Each pallet, once it's wrapped <span>— ${p.palletsHere.length} of ${p.pallets}</span></div>
+        ${Array.from({ length: p.pallets }, (_, i) => i + 1).map(n => { const has = p.palletsHere.includes(n);
+          return `<div class="locard${has ? " done" : ""}"><div class="lotop"><span class="no num">P${n}</span><span class="size">Pallet ${n}</span><span class="cnt">${has ? "Photographed" : "Not yet"}</span></div>
+            <div class="loslots"><button class="loslot${has ? " here" : ""}" data-lopallet="${n}">${has ? "Wrapped ✓" : "Photograph it wrapped"}<small>${has ? "Tap for another photo" : "Once it's wrapped"}</small></button></div></div>`; }).join("")}
+        <button class="btn" data-loaddpallet="1">Add another pallet</button>
+        <div class="card" style="margin-top:14px"><div class="lodet">
+          <div><label class="f" style="margin-top:0" for="loCarrier">Carrier <span class="meta2">(optional)</span></label>
+            <input class="in" id="loCarrier" data-lodet="carrier" value="${esc(d.carrier)}" placeholder="e.g. Estes" maxlength="80"></div>
+          <div><label class="f" style="margin-top:0" for="loTracking">Tracking or BOL number <span class="meta2">(optional)</span></label>
+            <input class="in" id="loTracking" data-lodet="tracking" value="${esc(d.tracking)}" placeholder="e.g. BOL 44812" maxlength="80"></div></div>
+          <button class="btn" style="margin-top:10px" data-losavedet="1" ${changed ? "" : "disabled"}>Save carrier and tracking</button></div>` : ""}
+      <div class="card"><label class="f" style="margin-top:0" for="loItem">Something with no sheet</label>
+        <input class="in" id="loItem" data-loitem="1" value="${esc(S.loItem)}" placeholder="e.g. hardware box, 2 of 2">
+        <button class="addph" data-loshootitem="1" ${S.loItem.trim() ? "" : "disabled"}>Photograph it</button></div>
+      ${photos.length || loPend(lo).length ? `<h2 class="sec">Photos on this load-out</h2>
+        <div class="phs">${photos.map(x => `<button class="ph" data-viewphoto="${esc(x.id)}"><img alt="" data-photopath="${esc(x.storage_path)}"><span class="cap">${esc(cap(x))}</span></button>`).join("")}
+          ${loPend(lo).map(x => `<span class="ph"><img alt="" src="${esc(x.url)}"><span class="cap">${esc(cap(x))} · waiting</span></span>`).join("")}</div>` : ""}
+      ${!lo.finished_at ? `<button class="go wide" style="margin-top:18px" data-lofinish="1">${ship ? "Picked up — finish this shipment" : "The truck is leaving — finish this load-out"}</button>` : `<div class="complete">Finished</div>`}
+      ${lo.started_by === S.me.id || !lo.id ? `<p style="text-align:center"><button class="linkish" data-lovoid="1">This load-out was started by mistake</button></p>` : ""}`;
+  }
+  // one sheet's work order page, from the load-out (saved on the device, so it shows with no signal)
+  function loadoutWo(lo) {
+    const s = (S.loSheets[lo.job_id] || []).find(x => x.sheet_number === S.loWo);
+    if (!s) { S.loWo = null; return loadoutDetail2(lo); }
+    const row = loadoutPieces([s], lo, loPend(lo), 1).list[0];
+    return `<button class="back" data-lowoback="1">← Load-out</button>
+      <h1>Sheet ${s.sheet_number}</h1>
+      <p class="sub">${esc(lo.project_id)} · ${esc(sizeLabel(s) || s.item_code || "")} · ${s.qty} table${s.qty === 1 ? "" : "s"}</p>
+      ${loSlots(row)}
+      <div class="lopage" id="lopage"><div class="missing">Loading the page…</div></div>
+      <p class="meta2" style="text-align:center">Pinch to zoom.</p>`;
+  }
+  async function showLoPage() {
+    const lo = currentLoadout(); const el = document.getElementById("lopage");
+    const s = lo && (S.loSheets[lo.job_id] || []).find(x => x.sheet_number === S.loWo);
+    if (!s || !el) return;
+    try {
+      const url = await pageImage(s.png_path);
+      const now = document.getElementById("lopage"); if (!now || S.loWo !== s.sheet_number) return;
+      now.innerHTML = `<img alt="Work order ${esc(lo.project_id)} sheet ${s.sheet_number}" src="${url}">`;
+    } catch (e) {
+      el.innerHTML = `<div class="missing">${esc(isNetworkError(e) ? "No connection, and this page wasn't saved on this device before. Open the load-out on Wi-Fi to save its pages." : friendlyError(e))}</div>`;
+    }
   }
   function loadoutDetail(lo) {
     const sheets = S.pickSheets[lo.job_id];
@@ -1790,7 +2022,7 @@ if (typeof document !== "undefined") (function () {
     else if (S.tab === "work" && S.view.screen === "sheet") body = sheetScreen();
     else if (S.tab === "work" && S.view.screen === "job") body = jobScreen();
     else {
-      const top = S.tab === "problems" ? problemsScreen() : S.tab === "log" ? logScreen() : S.tab === "supplies" ? suppliesScreen()
+      const top = S.tab === "problems" ? problemsScreen() : S.tab === "log" ? logScreen() : S.tab === "arrow" ? arrowSection() : S.tab === "supplies" ? suppliesScreen()
                 : S.tab === "loadout" ? loadoutScreen() : queueScreen();
       body = subTabs() + top;
     }
@@ -1804,6 +2036,7 @@ if (typeof document !== "undefined") (function () {
     fillPhotos();
     if (S.adv) { if (S.advJob && S.advSheet) advShowPage(); }
     else if (S.tab === "work" && S.view.screen === "sheet") showPage();
+    if (S.tab === "loadout" && S.loWo && !S.adv) showLoPage();
   }
 
   async function showPage() {
@@ -1861,6 +2094,7 @@ if (typeof document !== "undefined") (function () {
     S.dept = dept; store.set("dept", S.dept);
     if (!tabs().includes(S.tab)) S.tab = tabs()[0];
     S.view = { screen: "queue" }; S.rows = (store.get("rows_" + S.dept, { rows: [] })).rows; S.problems = []; S.defects = []; S.supplies = []; S.qcJob = null;
+    S.supplyItems = store.get("supplyitems_" + S.dept, []) || []; S.supplyForm = { ...S.supplyForm, pick: null, picked: {} };
     render();
     await loadTab(); render();
   }
@@ -2065,30 +2299,69 @@ if (typeof document !== "undefined") (function () {
 
     // ---- load-outs ----
     const lo = currentLoadout();
+    on("[data-lostartkind]", (b) => { S.loForm.kind = b.dataset.lostartkind; render(); });
     on("[data-lostart]", () => {
       const j = S.pickJobs.find(x => x.job_id === S.loForm.jobId); if (!j) return;
-      const cid = newId();
-      S.localLoadouts.push({ client_id: cid, job_id: j.job_id, project_id: j.project_id, job_name: j.job_name, is_test: !!j.is_test,
+      const cid = newId(), kind = lo2() ? S.loForm.kind : "delivery";
+      S.localLoadouts.push({ client_id: cid, job_id: j.job_id, project_id: j.project_id, job_name: j.job_name, is_test: !!j.is_test, kind,
                              started_at: new Date().toISOString(), started_by: S.me.id, started_by_name: S.me.name });
       store.set("loadouts_local", S.localLoadouts);
-      S.loView = cid; S.loPhotos = []; S.loForm = { jobId: null, filter: "" };
+      S.loView = cid; S.loWo = null; S.loPhotos = []; S.loForm = { jobId: null, filter: "", kind: "delivery" };
       if (!S.pickSheets[j.job_id]) loadPickSheets(j.job_id).then(render);
+      if (lo2()) loadLoSheets(j.job_id).then(() => { render(); saveLoPages(j.job_id); });
       send("start_loadout", { p_job: j.job_id, p_client_id: cid }, "Load-out");
+      if (kind === "shipping") send("set_loadout_details", { p_loadout: cid, p_kind: "shipping", p_carrier: null, p_tracking: null }, "Load-out");
     });
-    on("[data-loopen]", async (b) => { S.loView = b.dataset.loopen; S.loPhotos = []; S.loItem = ""; render(); scrollTo(0, 0); await loadLoadouts(); render(); });
-    on("[data-loback]", async () => { S.loView = null; render(); await loadLoadouts(); render(); });
-    const shootFor = (sheet, note, label) => takePhoto(async (shot) => {
+    on("[data-lokind]", (b) => {
+      if (!lo || lo.kind === b.dataset.lokind) return;
+      lo.kind = b.dataset.lokind; store.set("loadouts_local", S.localLoadouts); render();
+      send("set_loadout_details", { p_loadout: lo.client_id, p_kind: lo.kind, p_carrier: null, p_tracking: null }, "Load-out");
+    });
+    on("[data-lowo]", (b) => { S.loWo = Number(b.dataset.lowo); render(); scrollTo(0, 0); });
+    on("[data-lowoback]", () => { S.loWo = null; render(); });
+    on("[data-loaddpallet]", () => { if (!lo) return; S.loPallets[lo.client_id] = loadoutPieces([], lo, loPend(lo), loPlanned(lo)).pallets + 1; store.set("lo_pallets", S.loPallets); render(); });
+    on("[data-lopallet]", (b) => { const n = Number(b.dataset.lopallet); shootFor(null, null, `Pallet ${n}`, { pallet: n }); });
+    app.querySelectorAll("[data-lodet]").forEach(el => el.oninput = () => {
       if (!lo) return;
-      await queuePhotos([shot], { kind: "loadout", parent: lo.client_id, projectId: lo.project_id, sheet, note, label });
+      const d = S.loDet[lo.client_id] = S.loDet[lo.client_id] || { carrier: lo.carrier || "", tracking: lo.tracking || "" };
+      d[el.dataset.lodet] = el.value;
+      const btn = app.querySelector("[data-losavedet]"); if (btn) btn.disabled = d.carrier === (lo.carrier || "") && d.tracking === (lo.tracking || "");
+    });
+    const saveDet = () => {
+      const d = lo && S.loDet[lo.client_id]; if (!d) return;
+      lo.carrier = d.carrier.trim(); lo.tracking = d.tracking.trim(); store.set("loadouts_local", S.localLoadouts);
+      send("set_loadout_details", { p_loadout: lo.client_id, p_kind: null, p_carrier: lo.carrier, p_tracking: lo.tracking }, "Carrier and tracking");
+      delete S.loDet[lo.client_id];
+    };
+    on("[data-losavedet]", () => { saveDet(); render(); });
+    on("[data-loopen]", async (b) => { S.loView = b.dataset.loopen; S.loWo = null; S.loPhotos = []; S.loItem = ""; render(); scrollTo(0, 0); await loadLoadouts(); render(); });
+    on("[data-loback]", async () => { S.loView = null; S.loWo = null; render(); await loadLoadouts(); render(); });
+    const shootFor = (sheet, note, label, extra = {}) => takePhoto(async (shot) => {
+      if (!lo) return;
+      await queuePhotos([shot], { kind: "loadout", parent: lo.client_id, projectId: lo.project_id, sheet, note, label, ...extra });
       render(); flushPhotos();
     });
-    on("[data-loshoot]", (b) => shootFor(Number(b.dataset.loshoot), null, `Sheet ${b.dataset.loshoot}`));
+    on("[data-loshoot]", (b) => lo2() && b.dataset.piece
+      ? shootFor(Number(b.dataset.loshoot), null, `Sheet ${b.dataset.loshoot}, table ${b.dataset.piece}`, { piece: Number(b.dataset.piece) })
+      : shootFor(Number(b.dataset.loshoot), null, `Sheet ${b.dataset.loshoot}`));
     app.querySelectorAll("[data-loitem]").forEach(el => el.oninput = () => {
       S.loItem = el.value; const btn = app.querySelector("[data-loshootitem]"); if (btn) btn.disabled = !S.loItem.trim();
     });
     on("[data-loshootitem]", () => { const note = S.loItem.trim(); if (!note) return; S.loItem = ""; shootFor(null, note, note); });
     on("[data-lofinish]", () => {
       if (!lo) return;
+      if (lo2()) {
+        const p = loadoutPieces(S.loSheets[lo.job_id] || [], lo, loPend(lo), loPlanned(lo)), ship = lo.kind === "shipping";
+        const gaps = [p.missing.length ? `Not photographed — ${missingText(p.missing)}.` : "",
+                      ship && p.palletsMissing.length ? `No wrapped photo of pallet${p.palletsMissing.length === 1 ? "" : "s"} ${p.palletsMissing.join(", ")}.` : ""].filter(Boolean);
+        S.modal = { kind: "confirm", title: ship ? "Picked up?" : "The truck is leaving?",
+          text: gaps.length ? `${gaps.join(" ")} Finish anyway? That's fine if something is going later.`
+                            : `Everything is photographed. This records that the ${ship ? "shipment was picked up" : "truck left"} now.`,
+          yes: ship ? "Finish shipment" : "Finish load-out",
+          run: () => { if (S.loDet[lo.client_id]) saveDet();
+                       send("finish_loadout", { p_loadout: lo.client_id, p_note: null }, "Load-out", () => { S.loView = null; S.loWo = null; }); } };
+        return render();
+      }
       const p = loadoutSheets(S.pickSheets[lo.job_id] || [], lo, S.pending.filter(x => x.parent === lo.client_id));
       S.modal = { kind: "confirm", title: "The truck is leaving?",
         text: p.missing.length ? `${sheetsText(p.missing)} ${p.missing.length === 1 ? "isn't" : "aren't"} photographed. Finish anyway? That's fine if ${p.missing.length === 1 ? "it's" : "they're"} going on another truck.`
@@ -2150,10 +2423,21 @@ if (typeof document !== "undefined") (function () {
       const btn = app.querySelector("[data-ssend]"); if (btn) btn.disabled = !S.supplyForm.item.trim();
     });
     on("[data-snew]", (b) => { S.supplyForm.qty = Math.max(1, S.supplyForm.qty + Number(b.dataset.snew)); render(); });
+    on("[data-spick]", (b) => {
+      const f = S.supplyForm, v = b.dataset.spick;
+      f.pick = f.pick === v ? null : v; f.picked = {};                    // tap it again to un-pick
+      render();
+      if (f.pick === "other") { const t = app.querySelector("#supItem"); if (t) t.focus(); }
+    });
+    on("[data-schoice]", (b) => { S.supplyForm.picked[Number(b.dataset.schoice)] = b.dataset.opt; render(); });
     on("[data-ssend]", () => {
       const f = S.supplyForm;
-      send("request_supply", { p_department: S.dept, p_item: f.item.trim(), p_qty: f.qty, p_note: f.note.trim() || null, p_client_id: null }, "Supply request",
-           () => { S.supplyForm = { item: "", qty: 1, note: "" }; render(); });
+      const list = supplyItemsFor(S.supplyItems, S.dept);
+      const item = list.find(i => i.id === f.pick) || null;
+      const what = item ? supplyText(item, f.picked) : (!list.length || f.pick === "other") ? f.item.trim() : null;
+      if (!what) return;
+      send("request_supply", { p_department: S.dept, p_item: what, p_qty: f.qty, p_note: f.note.trim() || null, p_client_id: null }, "Supply request",
+           () => { S.supplyForm = { item: "", qty: 1, note: "", pick: null, picked: {} }; render(); });
     });
     on("[data-sqty]", (b) => {
       const r = S.supplies.find(x => x.id === b.dataset.sqty); if (!r) return;
@@ -2227,7 +2511,8 @@ if (typeof document !== "undefined") (function () {
 if (typeof module !== "undefined") module.exports = { keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
   daysLeft, daysText, fmtDate, localISO, daysSince, agoText, setPending, flushOutbox, newId, queueEntry, flushLogbox, dueForMe, taskWhen,
   problemState, splitProblems, defectCounts, supplyLine, filterJobs, sheetsText, isNetworkError, friendlyError, DEPTS,
-  fitSize, photoPath, photoError, flushPhotobox, loadoutSheets,
+  fitSize, photoPath, photoError, flushPhotobox, loadoutSheets, sizeLabel, loadoutPieces, missingText,
+  supplyItemsFor, supplyMissing, supplyText,
   CHAIN, canAdvance, advJobs, advSheets, advShown, advBefore, advHere, advTidy, advChanges, withAdvPending };
 </script>
 </body>
