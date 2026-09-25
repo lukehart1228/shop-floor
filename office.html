@@ -55,6 +55,14 @@
   .banner.warn{background:var(--sawdust); color:var(--warn); border-left:5px solid var(--bright)}
   .banner.ok{background:var(--teal-bg); color:var(--teal-ink)}
   .panel{background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px 22px; margin-bottom:18px}
+  .panel[id], .setgroup, .ops-flags{scroll-margin-top:84px}
+  .jumps{display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 20px}
+  .jumps button{min-height:44px}
+  .sethead{font-size:24px; margin:26px 0 4px}
+  .setsub{font-size:18px; margin:0 0 6px}
+  .opshead, .ops-flags > h2{font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--ink2); margin:22px 0 12px; padding-bottom:6px; border-bottom:2px solid var(--line)}
+  .ops-flags{margin-top:30px}
+  .ops-flags > h2 .meta2{text-transform:none; letter-spacing:0}
   .panel > .sub:last-child{margin-bottom:0}
   .empty{border:1px dashed var(--gray); border-radius:12px; padding:28px 20px; text-align:center; color:var(--ink2); background:#fff}
   .empty b{display:block; color:var(--midnight); font-size:19px; margin-bottom:4px}
@@ -531,6 +539,10 @@ function tvLink(pageUrl, key) {
   return u.origin + u.pathname + "#k=" + key;
 }
 
+/** Routine tasks past their due day and not done — they wait on Operations, most overdue first */
+function overdueRoutine(tasks) {
+  return (tasks || []).filter(t => !t.done_today && Number(t.days_until) < 0).sort((a, b) => a.days_until - b.days_until);
+}
 function taskWhen(t) {
   if (t.done_today) return `Done today${t.last_done_by ? " by " + t.last_done_by : ""}`;
   const n = t.days_until;
@@ -721,7 +733,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "25 Sep 2026 · inventory";
+const OFFICE_VERSION = "25 Sep 2026 · operations";
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -803,7 +815,8 @@ if (typeof document !== "undefined") (function () {
   const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const S = {
     // Problems and Ordering are part of "Needs you" (the tasks tab) now; a computer that remembers either opens there
-    me: null, tab: ({ problems: "tasks", ordering: "tasks" })[store.get("tab", "tasks")] || store.get("tab", "tasks"), notice: null,
+    // Flags is part of Operations; Routine tasks and Departments are sections of Setup (25 Sep)
+    me: null, tab: ({ problems: "tasks", ordering: "tasks", flags: "tasks", routine: "setup", departments: "setup" })[store.get("tab", "tasks")] || store.get("tab", "tasks"), notice: null,
     tasks: [], depts: [], liveLog: [], names: {},
     columns: [], lastSync: null, rules: [], preview: null, ticked: new Set(), cuResult: null,
     uploaded: [], testMsg: null, busy: false,
@@ -811,7 +824,7 @@ if (typeof document !== "undefined") (function () {
     // the floor log
     problems: [], defects: [], metal: [], noteOpen: null, defFrom: "month", flags: [], activeJobs: [], supplies: [], oticked: new Set(), notOrdering: null,
     arrow: [], arrowDays: 14, tasks: [], people: [], types: [], tvMade: null, tvKey: null,
-    drafts: {}, flagForm: { jobId: "", department: "", level: "priority", note: "" },
+    drafts: {}, flagForm: { jobId: "", department: "", level: "priority", note: "" }, flagFormOpen: false, routine: [],
     taskForm: { name: "", department: "sanding", assigned_to: "", schedule_type: "weekly", week_interval: 1, monthly_occurrence: 1, weekday: 1, start_date: "", is_test: false },
     msg: null, missing: false, openDetails: new Set(),
     supItems: [], supMissing: false, supEdit: null,
@@ -821,8 +834,8 @@ if (typeof document !== "undefined") (function () {
     menu: false, sync: null, allJobs: null, jobFind: "", jobView: null, job: null,
   };
   // Setup lives in the ☰ menu now (it's the least-used); it still opens as a screen of its own
-  const TABS = [["tasks", "Needs you"], ["flags", "Flags"], ["arrow", "Arrow"], ["routine", "Routine tasks"],
-                ["departments", "Departments"], ["photos", "Photos"]];
+  // Operations = what used to be Needs you, with Flags; Routine tasks and Departments live in Setup
+  const TABS = [["tasks", "Operations"], ["arrow", "Arrow"], ["photos", "Photos"]];
 
   // ---------- data ----------
   const q = async (p) => { const { data, error } = await p; if (error) throw error; return data; };
@@ -882,8 +895,9 @@ if (typeof document !== "undefined") (function () {
         if (S.phJob) await findJobPhotos(S.phJob.project);
         return;
       }
-      if (S.tab === "tasks") {          // Needs you: problems, ordering, stale flags, Arrow, the photo archive, handoffs
+      if (S.tab === "tasks") {          // Operations: problems, ordering, stale flags, overdue routine tasks, Arrow, the photo archive, handoffs, then flags
         await loadCounts();
+        await Promise.all([loadFlags(), loadRoutine()]);
         const [h, cols, r] = await Promise.all([soft(db.from("v_handoff_tasks").select("*")), soft(db.from("monday_columns").select("*")),
           soft(db.from("v_supply_requests").select("*"))]);
         if (h) S.tasks = h;
@@ -893,31 +907,14 @@ if (typeof document !== "undefined") (function () {
         await loadPhotosWhere("defect_id", (S.defects || []).filter(d => d.office_status).map(d => d.id));
         return;
       }
-      if (S.tab === "flags") {
-        const [f, j] = await Promise.all([soft(db.from("v_flags").select("*")),
-          soft(db.from("jobs").select("id, project_id, name, delivery_date, is_test, is_active").eq("is_active", true))]);
-        if (f) S.flags = f.filter(x => x.is_open || daysSince(x.cleared_at) <= 30);
-        if (j) S.activeJobs = j.sort((a, b) => (a.is_test - b.is_test) || String(a.project_id).localeCompare(String(b.project_id)));
-        return;
-      }
       if (S.tab === "arrow") {
         const [a, set] = await Promise.all([soft(db.from("v_outside_jobs").select("*").eq("voided", false)), soft(db.from("app_settings").select("*"))]);
         if (a) S.arrow = a.filter(x => x.at_vendor || daysSince(x.returned_on) <= 92);
         if (set) { const s = set.find(x => x.key === "arrow_alert_days"); if (s) S.arrowDays = Number(s.value); }
         return;
       }
-      if (S.tab === "routine") {
-        const [t, p] = await Promise.all([soft(db.from("v_routine_tasks").select("*")), soft(db.from("profiles").select("id, full_name, role, departments, is_test, active"))]);
-        if (t) S.routine = t;
-        if (p) S.people = p.filter(x => x.active).sort((a, b) => a.full_name.localeCompare(b.full_name));
-        return;
-      }
-      if (S.tab === "departments") {
-        S.depts = await q(db.from("departments").select("*").order("sort_order"));
-        S.liveLog = await q(db.from("department_live_log").select("*").order("changed_at", { ascending: false }).limit(50));
-        const people = await q(db.from("profiles").select("id, full_name"));
-        S.names = Object.fromEntries((people || []).map(p => [p.id, p.full_name]));
-      } else if (S.tab === "setup") {
+      if (S.tab === "setup") {
+        await Promise.all([loadRoutine(), loadDepartments()]);
         const [ty, set] = await Promise.all([soft(db.from("defect_types").select("*")), soft(db.from("app_settings").select("*"))]);
         if (ty) S.types = ty;
         try { S.supItems = await q(db.from("supply_items").select("*")) || []; S.supMissing = false; }
@@ -936,6 +933,25 @@ if (typeof document !== "undefined") (function () {
     } catch (e) { S.notice = friendlyError(e); }
   }
 
+  // the pieces Operations and Setup share with what used to be their own tabs
+  async function loadFlags() {
+    const [f, j] = await Promise.all([soft(db.from("v_flags").select("*")),
+      soft(db.from("jobs").select("id, project_id, name, delivery_date, is_test, is_active").eq("is_active", true))]);
+    if (f) S.flags = f.filter(x => x.is_open || daysSince(x.cleared_at) <= 30);
+    if (j) S.activeJobs = j.sort((a, b) => (a.is_test - b.is_test) || String(a.project_id).localeCompare(String(b.project_id)));
+  }
+  async function loadRoutine() {
+    const [t, p] = await Promise.all([soft(db.from("v_routine_tasks").select("*")), soft(db.from("profiles").select("id, full_name, role, departments, is_test, active"))]);
+    if (t) S.routine = t;
+    if (p) S.people = p.filter(x => x.active).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }
+  async function loadDepartments() {
+    S.depts = await q(db.from("departments").select("*").order("sort_order"));
+    S.liveLog = await q(db.from("department_live_log").select("*").order("changed_at", { ascending: false }).limit(50));
+    const people = await q(db.from("profiles").select("id, full_name"));
+    S.names = Object.fromEntries((people || []).map(p => [p.id, p.full_name]));
+  }
+
   async function loadPreview() {
     const { data, error } = await db.rpc("catch_up_preview");
     if (error) { S.notice = friendlyError(error); S.preview = []; return; }
@@ -952,13 +968,14 @@ if (typeof document !== "undefined") (function () {
       metal: (S.metal || []).length,
       inventory: (S.inv || []).length,
       flags: staleFlags(S.flags).length,
+      routine: overdueRoutine(S.routine).length,
       ordering: needToOrder(S.supplies).reduce((a, g) => a + g.lines.length, 0),
       arrow: (S.arrow || []).filter(a => a.at_vendor && a.days_out > S.arrowDays).length,
       photos: S.photoStatus && S.photoStatus.due ? 1 : 0,
     };
     // everything that needs the office is on one tab, so only that tab carries a number
     c.sync = syncProblem() ? 1 : 0;
-    c.tasks = c.handoffs + c.problems + c.metal + c.flags + c.ordering + c.arrow + c.photos + c.sync + c.inventory;
+    c.tasks = c.handoffs + c.problems + c.metal + c.flags + c.routine + c.ordering + c.arrow + c.photos + c.sync + c.inventory;
     return c;
   }
   function topBar() {
@@ -994,9 +1011,10 @@ if (typeof document !== "undefined") (function () {
         <a href="upload.html">Upload a work order<small>The generator's upload file</small></a>
         <a href="delivery.html">Deliveries<small>Schedule, signed tickets</small></a>
         <a href="inventory.html">Inventory<small>Month-end counts, scrap rate</small></a>
+        <a href="pace.html">Pace<small>Square feet a week, time in stage</small></a>
         <a href="index.html">Tablet app<small>What the floor sees, as your login</small></a>
         <div class="mline"></div>
-        <button class="mitem" data-tab="setup" aria-current="${S.tab === "setup" && !S.jobView}">Setup<small>Monday, catch-up, test jobs, TV link, lists</small></button>
+        <button class="mitem" data-tab="setup" aria-current="${S.tab === "setup" && !S.jobView}">Setup<small>Routine tasks, departments, lists, Monday, TV link, test jobs</small></button>
         <button class="mitem" data-signout="1">Sign out</button>
         <div class="ver">Version ${esc(OFFICE_VERSION)}</div>
       </nav>`;
@@ -1199,15 +1217,15 @@ if (typeof document !== "undefined") (function () {
   }
 
   // ---------- Flags ----------
-  function flagsScreen() {
+  function flagsSection() {
     const open = openFlags(S.flags);
     const cleared = (S.flags || []).filter(f => !f.is_open).sort((a, b) => String(b.cleared_at).localeCompare(String(a.cleared_at)));
     const f = S.flagForm;
     const scope = (x) => x.department_name ? `${x.department_name} only` : "whole job";
-    return `<h1>Flags</h1>
-      <p class="sub">Put something in front of the floor. <b>Watch</b> is a marker on the job card. <b>Priority</b> pins the job to the top of the queue, in colour. <b>Critical</b> puts it at the top of every affected queue and gives it its own band on the TV. The note is the important part — say what has to happen by when.</p>
-      ${missingNote()}${msgBanner()}
+    const fmsg = S.msg && S.msgFrom === "flags" ? `<div class="banner ${S.msg.ok ? "ok" : "warn"}">${esc(S.msg.text)}</div>` : "";
+    const form = !S.flagFormOpen ? `<div class="btns" style="margin:0 0 14px"><button class="go" data-flagform="1">Set a flag</button></div>` : `
       <section class="panel"><h2>Set a flag</h2>
+        <p class="sub">Put something in front of the floor. <b>Watch</b> is a marker on the job card. <b>Priority</b> pins the job to the top of the queue, in colour. <b>Critical</b> puts it at the top of every affected queue and gives it its own band on the TV. The note is the important part — say what has to happen by when.</p>
         <div class="grid2">
           <div><label for="ffJob">Job</label><select class="in" id="ffJob" data-ff="jobId"><option value="">Pick a job…</option>
             ${S.activeJobs.map(j => `<option value="${esc(j.id)}" ${f.jobId === j.id ? "selected" : ""}>${j.is_test ? "TEST · " : ""}${esc(j.project_id)} · ${esc(j.name)}</option>`).join("")}</select></div>
@@ -1219,20 +1237,22 @@ if (typeof document !== "undefined") (function () {
         <label style="display:block; font-weight:600; margin:12px 0 4px" for="ffNote">Note</label>
         <textarea class="in" id="ffNote" data-ff="note" placeholder="e.g. Customer on site Thursday — tops must be through finishing Wednesday">${esc(f.note)}</textarea>
         <div class="btns"><button class="go" data-setflag="1" ${f.jobId && f.note.trim() && !S.busy ? "" : "disabled"}>Set the flag</button>
+          <button class="link" data-flagform="0">Cancel</button>
           <span class="meta2">A job has one flag at a time (per department): a new one replaces the old, and both stay in history.</span></div>
-      </section>
-      <h2 style="margin-top:8px">Open flags</h2>
+      </section>`;
+    return `<section class="ops-flags" id="opsflags"><h2>Flags${open.length ? ` <span class="meta2" style="font-weight:600">· ${open.length} open</span>` : ""}</h2>
+      ${fmsg}${form}
       ${open.length ? open.map(x => `<div class="li"><div class="li-top"><span class="flagtag ${x.level}">${LEVEL_NAME[x.level]}</span>
           <b>${testTag(x)}${esc(x.project_id)}</b><span class="meta2">${esc(x.job_name)} · ${esc(scope(x))}</span></div>
           <div style="margin-top:6px">${esc(x.note)}</div>
           <div class="meta2">Set by ${esc(x.set_by_name)}, ${esc(fmtDay(x.set_at))}${x.age_days ? ` — ${x.age_days} day${x.age_days === 1 ? "" : "s"} ago` : ", today"}${x.age_days > 14 ? " · <b>over two weeks: still right?</b>" : ""}${x.job_active ? "" : " · the job has left production"}</div>
           <div class="btns"><button class="plain" data-clearflag="${esc(x.id)}">Clear it</button></div></div>`).join("")
         : `<div class="empty"><b>No open flags</b>The floor is working in delivery-date order.</div>`}
-      <details class="more"><summary>Cleared in the last 30 days (${cleared.length})</summary>
+      <details class="more" data-keep="clearedflags" ${S.openDetails.has("clearedflags") ? "open" : ""}><summary>Flags cleared in the last 30 days (${cleared.length})</summary>
         ${cleared.map(x => `<div class="li"><div class="li-top"><span class="flagtag ${x.level}">${LEVEL_NAME[x.level]}</span><b>${testTag(x)}${esc(x.project_id)}</b>
           <span class="meta2">${esc(scope(x))}</span></div><div>${esc(x.note)}</div>
           <div class="meta2">Set by ${esc(x.set_by_name)} ${esc(fmtDay(x.set_at))} · cleared by ${esc(x.cleared_by_name)} ${esc(fmtDay(x.cleared_at))}${x.clear_note ? " — " + esc(x.clear_note) : ""}</div></div>`).join("") || `<p class="sub">None.</p>`}
-      </details>`;
+      </details></section>`;
   }
 
   // ---------- Arrow ----------
@@ -1261,13 +1281,13 @@ if (typeof document !== "undefined") (function () {
   }
 
   // ---------- Routine tasks ----------
-  function routineScreen() {
+  function routineSection() {
     const f = S.taskForm;
     const byDept = LOG_DEPTS.map(d => ({ d, list: (S.routine || []).filter(t => t.department === d).sort((a, b) => a.days_until - b.days_until) })).filter(g => g.list.length);
     const people = S.people.filter(p => f.is_test ? p.is_test : !p.is_test);
-    return `<h1>Routine tasks</h1>
-      <p class="sub">Recurring jobs on the floor, Monday to Thursday. Each sits in its department's Log tab; a person's due tasks are pinned to the top of their tablet. Only managers add or remove them. Removing one keeps its history.</p>
-      ${missingNote()}${msgBanner()}
+    return `<div id="set-routine" class="setgroup"><h2 class="sethead">Routine tasks</h2>
+      <p class="sub">Recurring jobs on the floor, Monday to Thursday. Each shows on its department's Tasks tab, with a ! when one is due; one that's overdue waits on Operations. Only managers add or remove them. Removing one keeps its history.</p>
+      ${S.msg && S.msgFrom === "routine" ? `<div class="banner ${S.msg.ok ? "ok" : "warn"}">${esc(S.msg.text)}</div>` : ""}
       <section class="panel"><h2>Add a routine task</h2>
         <div class="grid2">
           <div><label for="tfName">Task</label><input class="in" id="tfName" data-tf="name" value="${esc(f.name)}" placeholder="e.g. Change dust collector filter"></div>
@@ -1285,12 +1305,12 @@ if (typeof document !== "undefined") (function () {
         <label class="meta2" style="display:flex; gap:8px; align-items:center; margin-top:12px"><input type="checkbox" data-tftest ${f.is_test ? "checked" : ""}> Test task — only the Test Supervisor sees it (for the bench run)</label>
         <div class="btns"><button class="go" data-addtask="1" ${f.name.trim() && !S.busy ? "" : "disabled"}>Add the task</button></div>
       </section>
-      ${byDept.length ? byDept.map(g => `<section class="panel"><h2>${esc(DEPT_NAME[g.d])}</h2>${g.list.map(t => `<div class="line">
+      ${byDept.length ? byDept.map(g => `<section class="panel"><h3 class="setsub">${esc(DEPT_NAME[g.d])}</h3>${g.list.map(t => `<div class="line">
           <span class="body"><b>${testTag(t)}${esc(t.name)}</b>
             <div class="meta2">${esc(t.schedule_text)} · ${esc(t.assigned_to_name || "anyone in " + DEPT_NAME[g.d])}</div>
             <div class="meta2">${esc(taskWhen(t))}${t.last_done_on && !t.done_today ? ` · last done ${esc(fmtDay(t.last_done_on))} by ${esc(t.last_done_by)}` : ""}</div></span>
           <button class="link" data-retiretask="${esc(t.id)}">Remove</button></div>`).join("")}</section>`).join("")
-        : `<div class="empty"><b>No routine tasks yet</b>Add them above. Export the old app's backup first, for the record.</div>`}`;
+        : `<div class="empty"><b>No routine tasks yet</b>Add them above.</div>`}</div>`;
   }
 
   // ---------- Needs you: everything waiting on the office, most urgent first ----------
@@ -1333,7 +1353,13 @@ if (typeof document !== "undefined") (function () {
     if (stale.length) parts.push(sec("flags", "Flags older than two weeks — still right?", stale.length, `<div class="panel">${stale.map(x => `<div class="line">
         <span class="body"><span class="flagtag ${x.level}">${LEVEL_NAME[x.level]}</span> <b>${testTag(x)}${pidLink(x)}</b> <span class="meta2">${esc(x.job_name)} · ${esc(scope(x))}</span>
           <div>${esc(x.note)}</div><div class="meta2">Set by ${esc(x.set_by_name)}, ${x.age_days} days ago</div></span>
-        <span class="btns" style="margin:0"><button class="plain" data-clearflag="${esc(x.id)}">Clear it</button><button class="link" data-tab="flags">Change it on Flags</button></span></div>`).join("")}</div>`));
+        <span class="btns" style="margin:0"><button class="plain" data-clearflag="${esc(x.id)}">Clear it</button><button class="link" data-jump="opsflags">See it under Flags</button></span></div>`).join("")}</div>`));
+
+    const overdue = overdueRoutine(S.routine);
+    if (overdue.length) parts.push(sec("routine", "Routine tasks overdue", overdue.length, `<p class="sub">Past their day and not ticked off on the tablet. Each clears when the department ticks it. Add or remove tasks in Setup.</p>
+      <div class="panel">${overdue.map(t => `<div class="line"><span class="qty">${-t.days_until}</span>
+        <span class="body"><b>${testTag(t)}${esc(t.name)}</b> <span class="meta2">· ${esc(DEPT_NAME[t.department] || t.department)}</span>
+          <div class="meta2">${esc(taskWhen(t))} · ${esc(t.schedule_text || "")} · ${esc(t.assigned_to_name || "anyone in " + (DEPT_NAME[t.department] || t.department))}${t.last_done_on ? ` · last done ${esc(fmtDay(t.last_done_on))}${t.last_done_by ? " by " + esc(t.last_done_by) : ""}` : " · never done yet"}</div></span></div>`).join("")}</div>`));
 
     if (late.length) parts.push(sec("arrow", `At Arrow over ${S.arrowDays} days`, late.length, `<div class="panel">${late.map(a => `<div class="line"><span class="qty">${a.days_out}</span>
         <span class="body"><b>${testTag(a)}${pidLink(a)}</b> <span class="meta2">· ${esc(a.job_name)}</span><div>${esc(what(a))}</div>
@@ -1368,10 +1394,12 @@ if (typeof document !== "undefined") (function () {
           <div class="detail">${esc(t.job_name)} · ${esc(t.phase)} · due ${esc(fmtDate(t.delivery_date))}${t.handed_off_text ? ` · Monday says “${esc(t.handed_off_text)}”` : ""}</div>
         </div>`).join("")}</div>`));
 
-    return `<h1>Needs you</h1>
-      <p class="sub">Everything waiting on the office, most urgent first.</p>
-      ${missingNote()}${msgBanner()}${syncAlertHtml()}
+    return `<h1>Operations</h1>
+      <p class="sub">What's waiting on the office, most urgent first, then the flags in front of the floor.</p>
+      ${missingNote()}${S.msgFrom === "flags" ? "" : msgBanner()}${syncAlertHtml()}
+      <h2 class="opshead">Needs you</h2>
       ${parts.length ? parts.join("") : syncProblem() ? "" : `<div class="empty"><b>Nothing needs you</b>No issues waiting, nothing to order, nothing overdue, no handoffs.</div>`}
+      ${flagsSection()}
       <section class="later">
         <details class="more" data-keep="answered" ${keep("answered")}><summary>Answered issues — last 30 days (${answered.length})</summary>${answered.map(issueCard).join("") || `<p class="sub">None.</p>`}</details>
         <details class="more" data-keep="ordered" ${keep("ordered")}><summary>Ordered, not received (${ordered.length})</summary>
@@ -1386,10 +1414,10 @@ if (typeof document !== "undefined") (function () {
       </section>`;
   }
 
-  function departmentsScreen() {
+  function departmentsSection() {
     const last = lastChanges(S.liveLog);
     const live = S.depts.filter(d => d.is_live).map(d => d.name);
-    return `<h1>Departments</h1>
+    return `<section class="panel" id="set-departments"><h2>Departments</h2>
       <p class="sub">Which departments are live on the floor. The TV shows live departments only — right now: <b>${esc(live.join(", ") || "none")}</b>. Every department's tablet queue works whether it's live or not. Going live is flipping the switch, creating the supervisor's login, and handing over a tablet.</p>
       <div class="panel">${S.depts.map(d => {
         const l = last[d.key];
@@ -1401,7 +1429,7 @@ if (typeof document !== "undefined") (function () {
           <span class="state">${d.is_live ? "Live" : "Off"}</span>
           <span class="hist">${l ? `Switched ${l.is_live ? "on" : "off"} by ${esc(S.names[l.changed_by] || "someone")}, ${esc(ago(l.changed_at))}` : ""}</span>
         </div>`;
-      }).join("")}</div>`;
+      }).join("")}</div></section>`;
   }
 
   function setupScreen() {
@@ -1443,16 +1471,21 @@ if (typeof document !== "undefined") (function () {
     const real = S.uploaded.filter(u => !u.is_test && u.is_active).sort((a, b) => a.project_id.localeCompare(b.project_id));
     const tests = S.uploaded.filter(u => u.is_test && u.is_active).sort((a, b) => a.project_id.localeCompare(b.project_id));
 
+    const jumps = [["set-routine", "Routine tasks"], ["set-departments", "Departments"], ["set-monday", "Monday connection"], ["set-catchup", "Catch up from Monday"],
+      ["set-tv", "TV link"], ["set-defects", "Defect lists"], ["set-finishby", "Finish-by days"], ["set-supplies", "Supply lists"], ["set-test", "Test jobs"]];
     return `<h1>Setup</h1>
-      <p class="sub">Things done once, or now and then: the Monday connection, catching the floor up with Monday, and test jobs for trying things safely.</p>
+      <p class="sub">Things set up once, or changed now and then. Jump to a section:</p>
+      <nav class="jumps" aria-label="Setup sections">${jumps.map(([id, t]) => `<button class="plain" data-jump="${id}">${t}</button>`).join("")}</nav>
+      ${routineSection()}
+      ${departmentsSection()}
 
-      <section class="panel">
+      <section class="panel" id="set-monday">
         <h2>Monday connection</h2>
         ${sync}
         <div class="facts">${colFacts}</div>
       </section>
 
-      <section class="panel">
+      <section class="panel" id="set-catchup">
         <h2>Catch up from Monday</h2>
         <p class="sub">For jobs already partway through the shop when their work order was uploaded. It reads the stage Monday shows and marks the departments <b>before</b> that stage as complete. It only fills counts that are still at zero, never lowers one, and skips anything a supervisor has counted. The stage Monday names is left for the supervisor to enter.</p>
         <details ${groups.length && !groups.some(g => g.rows.some(r => r.set_by)) ? "open" : ""}>
@@ -1470,7 +1503,7 @@ if (typeof document !== "undefined") (function () {
         ${result}
       </section>
 
-      <section class="panel">
+      <section class="panel" id="set-tv">
         <h2>TV link</h2>
         <p class="sub">The floor TV opens <b>tv.html</b> with a secret link instead of a login, so nobody else can read the numbers. Make a link, open it on the TV's computer, and bookmark it there. Making a new link switches the old one off — do that if a link ever ends up somewhere it shouldn't.</p>
         <p class="sub" style="margin:0">${S.tvMade ? `Last link made ${esc(ago(S.tvMade.updated_at))} by ${esc(S.tvMade.updated_by_name || "someone")}.` : "No TV link has been made yet."}</p>
@@ -1480,7 +1513,7 @@ if (typeof document !== "undefined") (function () {
           <p class="sub" style="margin:8px 0 0">This is the only time the link is shown. If it's lost, make a new one.</p>` : ""}
       </section>
 
-      <section class="panel">
+      <section class="panel" id="set-defects">
         <h2>Defect lists</h2>
         <p class="sub">What each department picks from when it logs a defect. Retiring one takes it off the tablets; defects already logged keep it.</p>
         ${LOG_DEPTS.map(d => { const list = (S.types || []).filter(t => t.department === d).sort((a, b) => a.sort_order - b.sort_order);
@@ -1491,7 +1524,7 @@ if (typeof document !== "undefined") (function () {
               <button class="plain" data-typeadd="${esc(d)}">Add</button></div></details>`; }).join("")}
       </section>
 
-      <section class="panel">
+      <section class="panel" id="set-finishby">
         <h2>Finish-by days</h2>
         <p class="sub">How many days before Monday's delivery date each department's <b>last piece</b> must be done. Each supervisor's job cards show their own date. Calendar days; a date on a weekend stays there. Delivery keeps the delivery date. Every change is kept.</p>
         ${S.fbMissing ? `<div class="banner warn" style="margin:0">Finish-by dates aren't set up in the database yet. Run <b>finish_by.sql</b> in the SQL Editor, wait a minute, then reload.</div>`
@@ -1506,7 +1539,7 @@ if (typeof document !== "undefined") (function () {
                   <span class="meta2">${esc(h.set_by_name)}, ${esc(fmtWhen(h.set_at))}</span></div>`).join("")}</details>` : "")}
       </section>
 
-      <section class="panel">
+      <section class="panel" id="set-supplies">
         <h2>Supply lists</h2>
         <p class="sub">What each department taps on its tablet's Supplies tab. An item can have up to two sets of choices, like the wood and the thickness; the tablet won't send it until each is picked, and the office sees the full wording ("Plywood — White Oak, 3/4 MDF"). Anything not on the list can still be typed. Retiring takes an item off the tablets; past requests keep it.</p>
         ${S.supMissing ? `<div class="banner warn" style="margin:0">Supply lists aren't set up in the database yet. Run <b>supply_lists.sql</b> in the SQL Editor, wait a minute, then reload.</div>`
@@ -1514,7 +1547,7 @@ if (typeof document !== "undefined") (function () {
             + DEPT_ORDER.map(supplyDept).join("")}
       </section>
 
-      <section class="panel">
+      <section class="panel" id="set-test">
         <h2>Test jobs</h2>
         <p class="sub">A copy of a real job with every count at zero, for trying things on a tablet signed in as the Test Supervisor. Test jobs are invisible to real supervisors, stay off the TV and out of Monday, and are labelled TEST.</p>
         <div class="row">
@@ -1776,8 +1809,7 @@ if (typeof document !== "undefined") (function () {
   function render() {
     if (!S.me) return;
     if (S.locked) return pinScreen("unlock");
-    const screens = { departments: departmentsScreen, setup: setupScreen, flags: flagsScreen, photos: photosScreen,
-                      arrow: arrowScreen, routine: routineScreen };
+    const screens = { setup: setupScreen, photos: photosScreen, arrow: arrowScreen };
     const body = S.jobView ? jobScreen() : (screens[S.tab] || needsScreen)();
     // a redraw mustn't pull the cursor out of Find a job while someone is typing in it
     const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches("[data-jobfind]");
@@ -1899,10 +1931,13 @@ if (typeof document !== "undefined") (function () {
       const go = app.querySelector("[data-setflag]"); if (go) go.disabled = !(S.flagForm.jobId && S.flagForm.note.trim());
     });
     on("[data-fflevel]", (b) => { S.flagForm.level = b.dataset.fflevel; render(); });
+    on("[data-flagform]", (b) => { S.flagFormOpen = b.dataset.flagform === "1"; if (S.msgFrom === "flags") S.msg = null; render();
+      const j = app.querySelector("#ffJob"); if (j && S.flagFormOpen) j.focus(); });
+    on("[data-jump]", (b) => { const el = document.getElementById(b.dataset.jump); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" }); });
     on("[data-setflag]", () => { const f = S.flagForm;
       act("set_flag", { p_job: f.jobId, p_level: f.level, p_note: f.note.trim(), p_department: f.department || null },
-          () => { S.flagForm = { jobId: "", department: "", level: "priority", note: "" }; }); });
-    on("[data-clearflag]", (b) => { if (confirm("Clear this flag? It stays in the history.")) act("clear_flag", { p_flag: b.dataset.clearflag, p_note: null }); });
+          () => { S.flagForm = { jobId: "", department: "", level: "priority", note: "" }; S.flagFormOpen = false; }, "flags"); });
+    on("[data-clearflag]", (b) => { if (confirm("Clear this flag? It stays in the history.")) act("clear_flag", { p_flag: b.dataset.clearflag, p_note: null }, null, "flags"); });
 
     app.querySelectorAll("[data-otick]").forEach(box => box.onchange = () => { box.checked ? S.oticked.add(box.dataset.otick) : S.oticked.delete(box.dataset.otick); render(); });
     on("[data-order]", () => act("order_supplies", { p_requests: [...S.oticked] }, () => { S.oticked = new Set(); }));
@@ -1929,8 +1964,8 @@ if (typeof document !== "undefined") (function () {
       act("add_routine_task", { p_name: f.name.trim(), p_department: f.department, p_schedule_type: f.schedule_type, p_weekday: Number(f.weekday),
           p_week_interval: Number(f.week_interval) || 1, p_monthly_occurrence: f.schedule_type === "monthly" ? Number(f.monthly_occurrence) : null,
           p_start_date: f.start_date || localISO(new Date()), p_assigned_to: f.assigned_to || null, p_is_test: !!f.is_test },
-          () => { S.taskForm = { ...S.taskForm, name: "", assigned_to: "" }; }); });
-    on("[data-retiretask]", (b) => { if (confirm("Remove this routine task? Its history is kept.")) act("retire_routine_task", { p_task: b.dataset.retiretask }); });
+          () => { S.taskForm = { ...S.taskForm, name: "", assigned_to: "" }; }, "routine"); });
+    on("[data-retiretask]", (b) => { if (confirm("Remove this routine task? Its history is kept.")) act("retire_routine_task", { p_task: b.dataset.retiretask }, null, "routine"); });
 
     on("[data-tvnew]", () => {
       if (S.tvMade && !confirm("Make a new TV link? The TV using the old one will stop showing numbers until you open the new link on it.")) return;
@@ -2114,7 +2149,7 @@ if (typeof document !== "undefined") (function () {
     touch();
     render();
     await loadTab();
-    if (S.tab !== "tasks") { try { S.tasks = await q(db.from("v_handoff_tasks").select("*")); } catch (e) {} await loadCounts(); }
+    if (S.tab !== "tasks") { try { S.tasks = await q(db.from("v_handoff_tasks").select("*")); } catch (e) {} await loadCounts(); if (S.tab !== "setup") await loadRoutine(); }
     render();
   }
 
@@ -2125,7 +2160,7 @@ if (typeof document !== "undefined") (function () {
 
 /* lets the core be tested outside a browser */
 if (typeof module !== "undefined") module.exports = { finishByLabel, keyProblem, isManager, daysLeft, fmtDate, daysText, ago, buildTasks, lastChanges, groupRules, ruleDepartments, catchUpTotals, pinHash, validPin, isNetworkError, friendlyError,
-  localISO, daysSince, problemState, officeProblems, defectOfficeState, officeIssues, staleFlags, openFlags, needToOrder, orderedNotReceived, defectSummary, tvLink, taskWhen,
+  localISO, daysSince, problemState, officeProblems, defectOfficeState, officeIssues, staleFlags, openFlags, overdueRoutine, needToOrder, orderedNotReceived, defectSummary, tvLink, taskWhen,
   crc32, makeZip, photoCsv, csvCell, fmtBytes, normProject, BATCH_STATE,
   fileCsv, filingItem, atDate, buildSignedTicket, pdfText, wrapText, signedFileName, fmtWhen, shopDate,
   parseOptions, choicesFromForm, choiceSummary, supplyListFor,
