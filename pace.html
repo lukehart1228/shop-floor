@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#181D2E">
+<title>Pace · Shop Floor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+
+  :root{
+    --midnight:#181D2E; --orange:#ED5E0F; --bright:#F0A721; --teal:#00B4B2;
+    --teal-ink:#00807E; --teal-bg:#DDF2F1; --sawdust:#FFF4D5; --gray:#C2BAA0;
+    --paper:#EFEDE6; --line:#E4DFCF; --ink2:#6B7082; --warn:#8A4B00;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--paper); color:var(--midnight);
+    font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:17px; line-height:1.45}
+  button,input,select{font:inherit; color:inherit}
+  button{cursor:pointer}
+  button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--bright); outline-offset:2px}
+  [hidden]{display:none!important}
+  .num{font-family:'Barlow Condensed',sans-serif; font-variant-numeric:tabular-nums}
+  header{background:var(--midnight); color:var(--sawdust); padding:0 16px; position:sticky; top:0; z-index:10}
+  .hrow{display:flex; align-items:center; gap:14px; min-height:52px; flex-wrap:wrap}
+  .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.14em; color:var(--orange); white-space:nowrap}
+  header h1{margin:0; font-size:19px; font-weight:600}
+  .me{margin-left:auto; color:var(--gray); font-size:15px; white-space:nowrap}
+  .me a,.me button{color:var(--sawdust); background:none; border:none; padding:0; text-decoration:underline; font-weight:500}
+  nav.tabs{display:flex; gap:2px; overflow-x:auto; scrollbar-width:none}
+  nav.tabs button{background:none; border:none; color:#9AA0B4; padding:0 12px; min-height:48px; font-weight:600; white-space:nowrap;
+                  border-bottom:4px solid transparent; border-radius:0}
+  nav.tabs button[aria-current="true"]{color:var(--sawdust); border-bottom-color:var(--orange)}
+  nav.tabs .badge{display:inline-grid; place-items:center; min-width:20px; height:20px; border-radius:99px; background:var(--orange); color:#fff; font-size:13px; margin-left:6px; padding:0 5px}
+  main{max-width:1060px; margin:0 auto; padding:16px 14px 90px}
+  h2{font-size:25px; margin:4px 2px 2px}
+  h3{font-size:17px; color:var(--ink2); margin:24px 2px 10px}
+  .sub{color:var(--ink2); margin:0 2px 16px}
+  .card{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:12px}
+  .btn{background:var(--midnight); color:var(--sawdust); border:none; border-radius:10px; padding:10px 18px; font-weight:700; min-height:46px}
+  .btn.ghost{background:#fff; color:var(--midnight); border:1px solid var(--gray)}
+  .btn.or{background:var(--orange); color:#fff}
+  .btn:disabled{opacity:.4; cursor:default}
+  .link{background:none; border:none; color:var(--orange); font-weight:700; padding:6px 2px}
+  .muted{color:var(--ink2)} .small{font-size:14px}
+  .banner{border-radius:10px; padding:12px 16px; margin-bottom:14px; font-weight:600; background:var(--sawdust); color:var(--warn); border-left:5px solid var(--bright)}
+  .banner.ok{background:var(--teal-bg); color:var(--teal-ink); border-left-color:var(--teal)}
+  .banner small{display:block; font-weight:500}
+  .alarm{background:var(--midnight); color:var(--sawdust); border-radius:12px; padding:20px}
+  .alarm h2{color:var(--bright)}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px}
+  .stat{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px}
+  .stat.done{background:var(--teal-bg); border-color:transparent}
+  .stat .t{font-weight:700; font-size:19px}
+  .stat .o{color:var(--ink2); font-size:14px}
+  .stat .s{margin-top:10px; font-weight:600}
+  .stat.done .s{color:var(--teal-ink)}
+  .stat.off{background:transparent}
+  .step{display:flex; gap:10px; align-items:baseline; padding:6px 0}
+  .step .mk{font-weight:700; color:var(--ink2); width:18px}
+  .step.ok .mk{color:var(--teal-ink)}
+  /* tables */
+  .tw{overflow-x:auto; background:#fff; border:1px solid var(--line); border-radius:12px}
+  table{border-collapse:collapse; width:100%; min-width:640px}
+  th,td{padding:10px 12px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap}
+  th{font-size:14px; color:var(--ink2); font-weight:700; background:#fff}
+  th:first-child,td:first-child,.l{text-align:left}
+  tr.subtot td{font-weight:700; background:var(--paper)}
+  tr.grand td{font-weight:700; font-size:18px}
+  tr.click{cursor:pointer}
+  tr.click:hover td{background:var(--paper)}
+  tr.mistake td{color:var(--ink2); text-decoration:line-through}
+  .rate{font-size:20px; font-weight:700}
+  .flag{display:inline-block; font-size:13px; font-weight:700; padding:3px 8px; border-radius:6px; background:var(--bright); color:var(--midnight)}
+  .flag.o{background:var(--orange); color:#fff}
+  .tag{display:inline-block; font-size:12px; font-weight:700; padding:2px 7px; border-radius:5px; border:1.5px solid var(--ink2); color:var(--ink2)}
+  .form{display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:10px; align-items:end}
+  .form label{display:flex; flex-direction:column; gap:4px; font-size:14px; color:var(--ink2); font-weight:600}
+  .form input,.form select{min-height:46px; border:1px solid var(--gray); border-radius:8px; padding:6px 10px; background:#fff; font-size:17px}
+  .note{font-size:14px; color:var(--ink2)}
+  /* pace */
+  .period{display:flex; gap:0; border:2px solid var(--midnight); border-radius:10px; overflow:hidden; margin-left:auto}
+  .period button{background:#fff; border:none; padding:8px 16px; min-height:44px; font-weight:700}
+  .period button[aria-pressed="true"]{background:var(--midnight); color:var(--sawdust)}
+  .titlerow{display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; margin-bottom:12px}
+  table.pace td{vertical-align:top}
+  table.pace td small{display:block; color:var(--ink2); font-size:13px; font-weight:500}
+  table.pace td b{font-weight:700}
+  table.pace tr.sel td{background:var(--sawdust)}
+  table.pace tr.sel td:first-child{box-shadow:inset 5px 0 0 var(--midnight)}
+  table.pace td:first-child button{background:none; border:none; padding:0; font-weight:700; font-size:17px; text-align:left; min-height:40px}
+  .two{display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:14px; margin-top:16px}
+  @media (max-width:860px){ .two{grid-template-columns:1fr} }
+  .bars{display:flex; align-items:flex-end; gap:10px; height:200px; border-bottom:2px solid var(--midnight); padding:0 4px; margin-top:10px}
+  .bar{flex:1 1 0; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px; height:100%; min-width:0}
+  .bar .v{font-size:13px; font-weight:700; white-space:nowrap}
+  .bar .b{width:100%; max-width:60px; background:var(--midnight); border-radius:4px 4px 0 0; min-height:2px}
+  .bar.now .b{background:var(--gray)}
+  .barlbl{display:flex; gap:10px; padding:4px 4px 0}
+  .barlbl div{flex:1 1 0; text-align:center; font-size:12px; color:var(--ink2); min-width:0}
+  .lrow{display:flex; gap:12px; padding:9px 0; border-top:1px solid var(--line); font-size:15px; flex-wrap:wrap}
+  .lrow b{min-width:104px}
+  .lrow .grow{flex:1 1 60px; color:var(--ink2)}
+  .lrow .rt{margin-left:auto; white-space:nowrap}
+  .days{display:flex; gap:4px; flex-wrap:wrap}
+  .days button{min-width:52px; min-height:44px; border:1px solid var(--gray); background:#fff; border-radius:8px; font-weight:700}
+  .days button[aria-pressed="true"]{background:var(--midnight); color:var(--sawdust); border-color:var(--midnight)}
+  .schrow{display:flex; gap:14px; align-items:center; padding:12px 16px; border-top:1px solid var(--line); flex-wrap:wrap}
+  .schrow:first-child{border-top:none}
+  .schrow .nm{flex:0 0 150px; font-weight:700}
+  .schrow .who{flex:1 1 180px; font-size:14px; color:var(--ink2)}
+  @media (max-width:700px){ .brand{display:none} h2{font-size:22px}
+    .tw:has(table.pace){overflow:visible; background:none; border:none}
+    table.pace{min-width:0} table.pace thead{display:none}
+    table.pace tr{display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:10px}
+    table.pace tr.sel{background:var(--sawdust); box-shadow:inset 5px 0 0 var(--midnight)}
+    table.pace tr.sel td, table.pace tr.sel td:first-child{background:none; box-shadow:none}
+    table.pace td{display:block; border:none; padding:0; text-align:left; white-space:normal}
+    table.pace td:first-child{grid-column:1 / -1}
+    table.pace td[data-l]::before{content:attr(data-l); display:block; font-size:12px; font-weight:700; color:var(--ink2); text-transform:uppercase; letter-spacing:.03em}
+    .period{margin-left:0} }
+</style>
+</head>
+<body>
+<header>
+  <div class="hrow"><div class="brand">PURPOSEFUL</div><h1>Pace</h1><div class="me" id="me"></div></div>
+  <nav class="tabs" id="tabs" hidden></nav>
+</header>
+<div id="app"></div>
+
+<!-- the Supabase library, checked: the browser refuses it if even one byte differs from the published file -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+<script>
+/* =====================================================================
+   THE TWO SETTINGS — the same two lines as upload.html.
+   Publishable key only. NEVER the secret key — this file is public.
+   ===================================================================== */
+const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
+const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
+
+
+/* ---- core: no screen code in here, so it can be tested on its own ---- */
+
+function keyProblem(url, key) {
+  if (!url || !key || url.includes("PASTE-") || key.includes("PASTE-"))
+    return { secret: false, text: "The project address and key haven't been filled in yet. Copy the two SUPABASE lines from upload.html into this file." };
+  const secret = { secret: true, text: "This is the SECRET key, not the publishable one. It bypasses every security rule, and this file is public. Take it out of the file now and use the publishable key — the same one upload.html has. If this file was already put on GitHub with it, create a new secret key in Supabase so the old one stops working." };
+  if (key.startsWith("sb_secret_")) return secret;
+  const parts = key.split(".");
+  if (parts.length === 3) {
+    try { if (JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))).role === "service_role") return secret; }
+    catch (e) { /* not a readable token */ }
+  }
+  if (!/^https:\/\//.test(url)) return { secret: false, text: "The project address should start with https:// — copy it from upload.html." };
+  return null;
+}
+function isNetworkError(err) {
+  const m = String((err && (err.message || err.details)) || err || "");
+  return /failed to fetch|networkerror|load failed|network request failed|fetch failed|timeout|aborted/i.test(m);
+}
+function isMissing(err) { return /could not find the function|schema cache|does not exist/i.test(String((err && err.message) || err || "")); }
+function friendlyError(err) {
+  const m = String((err && (err.message || err.error_description || err.error)) || err || "");
+  if (isNetworkError(err)) return "Can't reach the database right now. Check the connection and reload.";
+  if (/invalid login credentials/i.test(m)) return "That email and password didn't match. Check them and try again.";
+  if (/jwt expired|refresh token/i.test(m)) return "The sign-in has expired. Sign out and back in.";
+  if (isMissing(err)) return "Pace isn't set up in the database yet. Run pace.sql (Walkthrough 16), wait a minute, then reload this page.";
+  if (/Only a manager/i.test(m)) return m;
+  if (/row-level security|permission denied|insufficient/i.test(m)) return "This login can't do that. The Pace page is for managers.";
+  return m || "Something went wrong. Try again, and if it keeps happening, take a screenshot.";
+}
+const DAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+/** [1,2,3,4] → "Mon–Thu"; all seven → "Every day"; gaps → "Mon Wed Fri" */
+function daysLabel(days) {
+  const d = [...new Set((days || []).map(Number))].filter(x => x >= 1 && x <= 7).sort((a, b) => a - b);
+  if (!d.length) return "No days";
+  if (d.length === 7) return "Every day";
+  const run = d.every((x, i) => i === 0 || x === d[i - 1] + 1);
+  if (run && d.length >= 3) return `${DAY[d[0] - 1]}–${DAY[d[d.length - 1] - 1]}`;
+  return d.map(x => DAY[x - 1]).join(" ");
+}
+/** 1234.5 → "1,235"; 45.4 → "45.4" */
+function num(n) {
+  const x = Number(n) || 0;
+  return Math.abs(x) >= 100 ? Math.round(x).toLocaleString("en-US") : String(Math.round(x * 10) / 10);
+}
+const unitOf = (dep) => dep.measure === "pieces" ? "pieces" : "sq ft";
+function amount(dep, n) { const x = Number(n) || 0; return `${num(x)} ${dep.measure === "pieces" ? (x === 1 ? "piece" : "pieces") : "sq ft"}`; }
+/** the second number beside the main one: "+ 4 cabinets" */
+function extraText(dep, n) {
+  const x = Number(n) || 0;
+  if (!dep.extra_label || !x) return "";
+  const label = x === 1 ? dep.extra_label.replace(/^cabinets$/, "cabinet").replace(/^pieces/, "piece") : dep.extra_label;
+  return `+ ${num(x)} ${label}`;
+}
+/** ready ÷ weekly pace, in weeks; null when there's no pace to divide by */
+function queueWeeks(ready, pace) { const p = Number(pace) || 0; return p > 0 ? Math.round((Number(ready) || 0) / p * 10) / 10 : null; }
+function weeksText(w) { return w === null ? "—" : w === 0 ? "nothing ready" : `${w} week${w === 1 ? "" : "s"}`; }
+function daysText(d) { if (d === null || d === undefined || d === "") return "—"; const x = Math.round(Number(d) * 10) / 10; return `${x} day${x === 1 ? "" : "s"}`; }
+/** "2026-09-14" → "Sep 14" */
+function dateShort(d) { if (!d) return ""; const [y, m, dd] = String(d).slice(0, 10).split("-").map(Number); return `${new Date(y, m - 1, 1).toLocaleString("en-US", { month: "short" })} ${dd}`; }
+/** the bars to show: the last `weeks` finished weeks, then this week so far */
+function barsFor(dep, weeks) {
+  const all = dep.weekly || [];
+  const done = all.slice(0, -1).slice(-weeks), now = all.slice(-1);
+  const rows = [...done.map(w => ({ ...w, now: false })), ...now.map(w => ({ ...w, now: true }))];
+  const max = Math.max(1, ...rows.map(r => Number(r.main) || 0));
+  return rows.map(r => ({ week: r.week, main: Number(r.main) || 0, extra: Number(r.extra) || 0, now: r.now, pct: Math.round((Number(r.main) || 0) / max * 100) }));
+}
+function finishLabel(key) { return key === "metal" ? "To paint / PC by" : "Done by"; }
+
+/* ---- end core ---- */
+
+if (typeof module !== "undefined") module.exports = {
+  keyProblem, isNetworkError, isMissing, friendlyError, daysLabel, num, amount, extraText, queueWeeks, weeksText, daysText, dateShort, barsFor, finishLabel,
+};
+
+
+/* ---- the screen ---- */
+if (typeof document !== "undefined") (function () {
+  const app = document.getElementById("app"), tabsEl = document.getElementById("tabs"), meEl = document.getElementById("me");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("sfp_" + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem("sfp_" + k, JSON.stringify(v)); } catch (e) {} },
+  };
+  const problem = keyProblem(SUPABASE_URL, SUPABASE_KEY);
+  if (problem) {
+    app.innerHTML = `<main><div class="alarm"><h2>${problem.secret ? "Stop — wrong key in this file" : "This page isn't set up yet"}</h2><p>${esc(problem.text)}</p></div></main>`;
+    return;
+  }
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const TABS = [["pace", "Pace"], ["days", "Working days"]];
+  const S = {
+    me: null, tab: store.get("tab", "pace"), weeks: store.get("weeks", 4), dept: store.get("dept", "finishing"),
+    loaded: false, missing: false, msg: null, report: null, drafts: {}, busy: false,
+  };
+
+  // ---------- data ----------
+  async function load() {
+    try {
+      const r = await db.rpc("pace_report", { p_weeks: S.weeks });
+      if (r.error) throw r.error;
+      S.report = r.data; S.missing = false; S.msg = null;
+      const keys = (S.report.departments || []).map(d => d.key);
+      if (!keys.includes(S.dept)) S.dept = keys[0];
+    } catch (e) {
+      S.missing = isMissing(e);
+      if (!S.missing) S.msg = { ok: false, text: friendlyError(e) };
+    }
+    S.loaded = true;
+  }
+
+  // ---------- screens ----------
+  function render() {
+    if (!S.me) return;
+    meEl.innerHTML = `<a href="office.html">← Office</a> · ${esc(S.me.name)} · <button id="so">Sign out</button>`;
+    document.getElementById("so").onclick = async () => { await db.auth.signOut(); location.reload(); };
+    if (S.me.role !== "manager" && S.me.role !== "admin") {
+      tabsEl.hidden = true;
+      app.innerHTML = `<main><div class="card"><h2>For managers</h2><p class="sub">The Pace page is for the office.</p></div></main>`;
+      return;
+    }
+    if (!S.loaded) { app.innerHTML = `<main><p class="muted">Loading…</p></main>`; return; }
+    if (S.missing) { tabsEl.hidden = true; app.innerHTML = `<main><div class="banner">Pace isn't set up in the database yet<small>Run pace.sql in the Supabase SQL Editor (Walkthrough 16), wait a minute, then reload this page.</small></div></main>`; return; }
+    tabsEl.hidden = false;
+    tabsEl.innerHTML = TABS.map(([k, t]) => `<button data-tab="${k}" aria-current="${S.tab === k}">${t}</button>`).join("");
+    const head = S.msg ? `<div class="banner ${S.msg.ok ? "ok" : ""}">${esc(S.msg.text)}</div>` : "";
+    const body = !S.report ? "" : S.tab === "days" ? viewDays() : viewPace();
+    app.innerHTML = `<main>${head}${body}</main>`;
+    wire();
+  }
+
+  function sel() { return (S.report.departments || []).find(d => d.key === S.dept) || S.report.departments[0]; }
+
+  function viewPace() {
+    const R = S.report, deps = R.departments || [];
+    const basis = R.weeks_used === 0
+      ? `<div class="banner">No tablet counts to go on yet<small>Pace appears after the first full week of counting on the tablets.</small></div>`
+      : R.weeks_used < R.weeks
+        ? `<div class="banner">Based on ${R.weeks_used} week${R.weeks_used === 1 ? "" : "s"}, not ${R.weeks}<small>Tablet counts start the week of ${esc(dateShort(R.first_week))}, so there are only ${R.weeks_used} full week${R.weeks_used === 1 ? "" : "s"} to average.</small></div>` : "";
+    const rows = deps.map(d => {
+      const qw = queueWeeks(d.ready, d.pace);
+      return `<tr class="${d.key === S.dept ? "sel" : ""}">
+        <td><button data-dept="${esc(d.key)}" aria-pressed="${d.key === S.dept}">${esc(d.name)}</button></td>
+        <td class="l" data-l="Measured in">${d.measure === "pieces" ? "pieces" : d.extra_label ? `sq ft + ${esc(d.extra_label === "cabinets" ? "cabinets" : "bases")}` : "sq ft of top"}</td>
+        <td data-l="Pace per week"><b class="num">${d.pace === null ? "—" : esc(amount(d, d.pace))}</b><small>${esc(extraText(d, d.pace_extra))}</small></td>
+        <td data-l="Ready and waiting"><b class="num">${esc(amount(d, d.ready))}</b><small>${esc([extraText(d, d.ready_extra), `on ${d.ready_sheets} sheet${d.ready_sheets === 1 ? "" : "s"}`].filter(Boolean).join(", "))}</small></td>
+        <td data-l="Queue ≈"><b class="num">${esc(weeksText(qw))}</b>${qw === null && Number(d.ready) > 0 ? `<small>no pace yet</small>` : ""}</td>
+        <td data-l="Wait to start"><b class="num">${esc(daysText(d.wait_days))}</b><small>${d.wait_sheets ? `${d.wait_sheets} sheet${d.wait_sheets === 1 ? "" : "s"}` : ""}</small></td>
+        <td data-l="Working time"><b class="num">${esc(daysText(d.work_days))}</b><small>${d.work_sheets ? `${d.work_sheets} sheet${d.work_sheets === 1 ? "" : "s"}` : ""}</small></td>
+      </tr>`;
+    }).join("");
+    return `<div class="titlerow"><div><h2>Pace and time in stage</h2>
+        <p class="sub" style="margin-bottom:0">Tablet counts only. Wood stages in square feet of top (a round counts as diameter × diameter); Metal and Full Custom in pieces. Per week, so overtime and weekend work show as a bigger week.</p></div>
+        <div class="period" role="group" aria-label="Period">${[4, 8].map(n => `<button data-weeks="${n}" aria-pressed="${S.weeks === n}">Last ${n} weeks</button>`).join("")}</div></div>
+      ${basis}
+      <div class="tw"><table class="pace"><thead><tr><th>Department</th><th class="l">Measured in</th><th>Pace per week</th><th>Ready and waiting</th><th>Queue ≈</th><th>Wait to start</th><th>Working time</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+      <p class="note" style="margin:8px 2px 0">Wait to start = from a sheet's first pieces being cleared by the stage before, to this department's first tablet count (Milling, Metal and Full Custom: from the upload). Working time = first count to every piece done, for sheets counted in more than one go (a sheet entered all at once says nothing about how long it took). Both in each department's working days (see Working days), the middle value across sheets, larger sheets counting more. Sheets started by Advance, catch-up or a carried-over count are left out.</p>
+      ${viewDetail(sel())}`;
+  }
+
+  function viewDetail(d) {
+    if (!d) return "";
+    const bars = barsFor(d, S.weeks);
+    const barHtml = bars.map(b => `<div class="bar ${b.now ? "now" : ""}"><span class="v num">${esc(num(b.main))}${b.extra ? `<br><span class="muted">+${esc(num(b.extra))}</span>` : ""}</span><div class="b" style="height:${b.pct}%"></div></div>`).join("");
+    const lblHtml = bars.map(b => `<div>${b.now ? "this week" : "wk of " + esc(dateShort(b.week))}</div>`).join("");
+    const notes = [];
+    if (d.extra_label === "cabinets") notes.push(`Cabinets are counted beside the square feet: a sheet with Full Custom on it that comes to ${esc(d.name)}. The queue estimate is tops only, so a cabinet-heavy queue will take longer than it says.`);
+    if (d.extra_label === "pieces without a top") notes.push(`Base-only sheets have no top, so their pieces are counted beside the square feet.`);
+    if (d.key === "full_custom") notes.push(`Only Full Custom's own sheets count here. Pieces vary a lot in size, so this pace is rough.`);
+    if (d.no_size_sheets) notes.push(`${d.no_size_sheets} sheet${d.no_size_sheets === 1 ? "" : "s"} in ${esc(d.name)} ${d.no_size_sheets === 1 ? "has" : "have"} no readable top size, so ${d.no_size_sheets === 1 ? "it isn't" : "they aren't"} in the square feet.`);
+    const waiting = (d.waiting || []).map(w => `<div class="lrow"><b>${esc(w.project_id || "")}</b><span>Sheet ${esc(w.sheet_number)}${w.item_code ? " · " + esc(w.item_code) : ""}</span>
+        <span class="grow">${esc([amount(d, w.main), extraText(d, w.extra)].filter(Boolean).join(" "))}</span><span class="num rt">ready ${esc(daysText(w.ready_days))}</span></div>`).join("")
+      || `<p class="muted">Nothing ready and waiting to start.</p>`;
+    let late;
+    if (!S.report.finish_by_ready) late = `<p class="muted">Shows once finish-by dates are set up in the database (finish_by.sql, Walkthrough 14).</p>`;
+    else if (!(Number(d.pace) > 0)) late = `<p class="muted">No pace yet for ${esc(d.name)}, so no dates to compare.</p>`;
+    else late = (d.late || []).map(l => `<div class="lrow"><b>${esc(l.project_id || "")}</b><span class="grow" style="color:inherit">${esc(finishLabel(d.key))} ${esc(dateShort(l.finish_by))} · its turn clears about ${esc(dateShort(l.clears_on))}${Number(l.left_extra) && d.extra_label === "cabinets" ? `, plus ${esc(num(l.left_extra))} cabinet${Number(l.left_extra) === 1 ? "" : "s"}` : ""}</span></div>`).join("")
+      || `<p>None — every job's date is after its turn in the queue.</p>`;
+    return `<div class="two">
+      <div class="card"><h3 style="margin:2px 0 0;color:var(--midnight);font-size:21px">${esc(d.name)} — done each week</h3>
+        <div class="note">${esc(unitOf(d))}${d.extra_label ? ", with " + esc(d.extra_label) + " beside" : ""} · works ${esc(daysLabel(d.schedule).replace("Every day", "every day"))}</div>
+        <div class="bars" role="img" aria-label="${esc(d.name)} done each week">${barHtml}</div><div class="barlbl">${lblHtml}</div>
+        ${notes.map(n => `<p class="note" style="margin:10px 0 0">${n}</p>`).join("")}
+      </div>
+      <div>
+        <div class="card"><h3 style="margin:2px 0 8px;color:var(--midnight);font-size:19px">Ready and not started, longest first</h3>${waiting}</div>
+        <div class="card"><h3 style="margin:2px 0 4px;color:var(--midnight);font-size:19px">At this pace, past ${esc(d.name)}'s date</h3>
+          <p class="note" style="margin:0 0 6px">Jobs whose finish-by date comes before the work ahead of them clears, in delivery-date order at this department's weekly pace. Calendar days, like the tablets.</p>${late}</div>
+      </div></div>`;
+  }
+
+  function viewDays() {
+    const deps = S.report.departments || [];
+    const rows = deps.map(d => {
+      const cur = (S.drafts[d.key] || d.schedule || []).map(Number);
+      const changed = S.drafts[d.key] && daysLabel(S.drafts[d.key]) !== daysLabel(d.schedule);
+      return `<div class="schrow"><div class="nm">${esc(d.name)}</div>
+        <div class="days" role="group" aria-label="${esc(d.name)} working days">${DAY.map((n, i) => `<button data-day="${esc(d.key)}|${i + 1}" aria-pressed="${cur.includes(i + 1)}">${n}</button>`).join("")}</div>
+        <button class="btn" data-save="${esc(d.key)}" ${changed && !S.busy ? "" : "disabled"}>Save</button>
+        <div class="who">${esc(daysLabel(d.schedule))} · ${esc(d.schedule_set_by || "")}${d.schedule_changes ? ` · changed ${d.schedule_changes} time${d.schedule_changes === 1 ? "" : "s"}` : ""}</div></div>`;
+    }).join("");
+    return `<h2>Working days</h2>
+      <p class="sub">Used for wait to start and working time, so a sheet left over a day off isn't counted as waiting. Pace is per week, so it doesn't use these. Overtime doesn't need changing here — it just shows as a bigger week.</p>
+      <div class="card" style="padding:0">${rows}</div>`;
+  }
+
+  function wire() {
+    tabsEl.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { S.tab = b.dataset.tab; store.set("tab", S.tab); render(); });
+    app.querySelectorAll("[data-dept]").forEach(b => b.onclick = () => { S.dept = b.dataset.dept; store.set("dept", S.dept); render(); });
+    app.querySelectorAll("[data-weeks]").forEach(b => b.onclick = async () => {
+      const n = Number(b.dataset.weeks); if (n === S.weeks) return;
+      S.weeks = n; store.set("weeks", n); await load(); render();
+    });
+    app.querySelectorAll("[data-day]").forEach(b => b.onclick = () => {
+      const [k, day] = b.dataset.day.split("|"), dep = S.report.departments.find(d => d.key === k);
+      const cur = new Set((S.drafts[k] || dep.schedule || []).map(Number)), n = Number(day);
+      cur.has(n) ? cur.delete(n) : cur.add(n);
+      S.drafts[k] = [...cur].sort((a, b) => a - b); render();
+    });
+    app.querySelectorAll("[data-save]").forEach(b => b.onclick = async () => {
+      const k = b.dataset.save;
+      S.busy = true; render();
+      const r = await db.rpc("set_pace_schedule", { p_department: k, p_days: S.drafts[k] || [] });
+      S.busy = false;
+      if (r.error) { S.msg = { ok: false, text: friendlyError(r.error) }; render(); return; }
+      delete S.drafts[k];
+      await load();
+      S.msg = { ok: true, text: r.data };
+      render();
+    });
+  }
+
+  // ---------- start ----------
+  async function start(user) {
+    const { data } = await db.from("profiles").select("*").eq("id", user.id).maybeSingle();
+    S.me = { id: user.id, email: user.email, name: (data && data.full_name) || user.email, role: data && data.role };
+    render();
+    if (S.me.role === "manager" || S.me.role === "admin") { await load(); render(); }
+  }
+  (async () => {
+    const { data } = await db.auth.getSession();
+    if (data && data.session) return start(data.session.user);
+    app.innerHTML = `<main><div class="card" style="max-width:460px;margin:30px auto"><h2>Sign in</h2><p class="sub">Use a manager's login.</p>
+      <form id="f"><div class="form" style="grid-template-columns:1fr"><label>Email<input id="e" type="email" autocomplete="username" required></label>
+        <label>Password<input id="p" type="password" autocomplete="current-password" required></label><button class="btn or" type="submit">Sign in</button></div></form>
+      <div id="err" class="banner" style="margin-top:14px" hidden></div></div></main>`;
+    document.getElementById("f").onsubmit = async (e) => {
+      e.preventDefault();
+      const r = await db.auth.signInWithPassword({ email: document.getElementById("e").value.trim(), password: document.getElementById("p").value });
+      if (r.error) { const el = document.getElementById("err"); el.hidden = false; el.textContent = friendlyError(r.error); return; }
+      start(r.data.user);
+    };
+  })();
+})();
+</script>
+</body>
+</html>
