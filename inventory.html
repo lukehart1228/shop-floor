@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#181D2E">
+<title>Inventory · Shop Floor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --midnight:#181D2E; --orange:#ED5E0F; --bright:#F0A721; --teal:#00B4B2;
+    --teal-ink:#00807E; --teal-bg:#DDF2F1; --sawdust:#FFF4D5; --gray:#C2BAA0;
+    --paper:#EFEDE6; --line:#E4DFCF; --ink2:#6B7082; --warn:#8A4B00;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--paper); color:var(--midnight);
+    font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:17px; line-height:1.45}
+  button,input,select{font:inherit; color:inherit}
+  button{cursor:pointer}
+  button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--bright); outline-offset:2px}
+  [hidden]{display:none!important}
+  .num{font-family:'Barlow Condensed',sans-serif; font-variant-numeric:tabular-nums}
+  header{background:var(--midnight); color:var(--sawdust); padding:0 16px; position:sticky; top:0; z-index:10}
+  .hrow{display:flex; align-items:center; gap:14px; min-height:52px; flex-wrap:wrap}
+  .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.14em; color:var(--orange); white-space:nowrap}
+  header h1{margin:0; font-size:19px; font-weight:600}
+  .me{margin-left:auto; color:var(--gray); font-size:15px; white-space:nowrap}
+  .me a,.me button{color:var(--sawdust); background:none; border:none; padding:0; text-decoration:underline; font-weight:500}
+  nav.tabs{display:flex; gap:2px; overflow-x:auto; scrollbar-width:none}
+  nav.tabs button{background:none; border:none; color:#9AA0B4; padding:0 12px; min-height:48px; font-weight:600; white-space:nowrap;
+                  border-bottom:4px solid transparent; border-radius:0}
+  nav.tabs button[aria-current="true"]{color:var(--sawdust); border-bottom-color:var(--orange)}
+  nav.tabs .badge{display:inline-grid; place-items:center; min-width:20px; height:20px; border-radius:99px; background:var(--orange); color:#fff; font-size:13px; margin-left:6px; padding:0 5px}
+  main{max-width:1060px; margin:0 auto; padding:16px 14px 90px}
+  h2{font-size:25px; margin:4px 2px 2px}
+  h3{font-size:17px; color:var(--ink2); margin:24px 2px 10px}
+  .sub{color:var(--ink2); margin:0 2px 16px}
+  .card{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:12px}
+  .btn{background:var(--midnight); color:var(--sawdust); border:none; border-radius:10px; padding:10px 18px; font-weight:700; min-height:46px}
+  .btn.ghost{background:#fff; color:var(--midnight); border:1px solid var(--gray)}
+  .btn.or{background:var(--orange); color:#fff}
+  .btn:disabled{opacity:.4; cursor:default}
+  .link{background:none; border:none; color:var(--orange); font-weight:700; padding:6px 2px}
+  .muted{color:var(--ink2)} .small{font-size:14px}
+  .banner{border-radius:10px; padding:12px 16px; margin-bottom:14px; font-weight:600; background:var(--sawdust); color:var(--warn); border-left:5px solid var(--bright)}
+  .banner.ok{background:var(--teal-bg); color:var(--teal-ink); border-left-color:var(--teal)}
+  .banner small{display:block; font-weight:500}
+  .alarm{background:var(--midnight); color:var(--sawdust); border-radius:12px; padding:20px}
+  .alarm h2{color:var(--bright)}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px}
+  .stat{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px}
+  .stat.done{background:var(--teal-bg); border-color:transparent}
+  .stat .t{font-weight:700; font-size:19px}
+  .stat .o{color:var(--ink2); font-size:14px}
+  .stat .s{margin-top:10px; font-weight:600}
+  .stat.done .s{color:var(--teal-ink)}
+  .stat.off{background:transparent}
+  .step{display:flex; gap:10px; align-items:baseline; padding:6px 0}
+  .step .mk{font-weight:700; color:var(--ink2); width:18px}
+  .step.ok .mk{color:var(--teal-ink)}
+  /* lumber */
+  .spec{background:#fff; border:1px solid var(--line); border-radius:12px; margin-bottom:12px; overflow:hidden}
+  .spec>summary{list-style:none; cursor:pointer; display:flex; align-items:baseline; gap:12px; padding:14px 16px; flex-wrap:wrap}
+  .spec>summary::-webkit-details-marker{display:none}
+  .spec>summary .nm{font-weight:700; font-size:19px; flex:1 1 200px}
+  .spec>summary .bf{font-size:24px; font-weight:700}
+  .spec>summary .was{color:var(--ink2); font-size:14px; white-space:nowrap}
+  .spec>summary .chev{color:var(--ink2); transition:transform .15s}
+  .spec[open]>summary .chev{transform:rotate(90deg)}
+  .lens{padding:0 16px 14px}
+  .len{border-top:1px solid var(--line); padding:12px 0}
+  .lenhead{display:flex; align-items:baseline; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+  .lenhead b{font-size:18px}
+  .lenhead .tot{margin-left:auto; color:var(--ink2); white-space:nowrap}
+  .lenhead .tot b{color:var(--midnight); font-size:17px}
+  .bundle{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:6px 0}
+  .bundle .lbl{width:78px; color:var(--ink2); font-size:14px}
+  .bundle input{width:78px; min-height:44px; border:1px solid var(--gray); border-radius:8px; padding:6px 10px; font-size:20px; text-align:right; background:#fff}
+  .q{display:flex; gap:4px}
+  .q button{min-width:44px; min-height:44px; border:1px solid var(--gray); background:#fff; border-radius:8px; font-weight:700}
+  .q button[aria-pressed="true"]{background:var(--midnight); color:var(--sawdust); border-color:var(--midnight)}
+  .bundle .x{background:none; border:none; color:var(--ink2); font-size:14px; text-decoration:underline}
+  .addrow{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px}
+  .addrow input,.addrow select{min-height:44px; border:1px solid var(--gray); border-radius:8px; padding:6px 10px; background:#fff}
+  .saving{font-size:14px; color:var(--ink2)}
+  /* tables */
+  .tw{overflow-x:auto; background:#fff; border:1px solid var(--line); border-radius:12px}
+  table{border-collapse:collapse; width:100%; min-width:640px}
+  th,td{padding:10px 12px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap}
+  th{font-size:14px; color:var(--ink2); font-weight:700; background:#fff}
+  th:first-child,td:first-child,.l{text-align:left}
+  tr.subtot td{font-weight:700; background:var(--paper)}
+  tr.grand td{font-weight:700; font-size:18px}
+  tr.click{cursor:pointer}
+  tr.click:hover td{background:var(--paper)}
+  tr.mistake td{color:var(--ink2); text-decoration:line-through}
+  .rate{font-size:20px; font-weight:700}
+  .flag{display:inline-block; font-size:13px; font-weight:700; padding:3px 8px; border-radius:6px; background:var(--bright); color:var(--midnight)}
+  .flag.o{background:var(--orange); color:#fff}
+  .tag{display:inline-block; font-size:12px; font-weight:700; padding:2px 7px; border-radius:5px; border:1.5px solid var(--ink2); color:var(--ink2)}
+  /* roll-over / rows */
+  .ro{display:flex; gap:14px; align-items:center; padding:12px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap}
+  .ro:last-child{border-bottom:none}
+  .ro .w{flex:1 1 300px; min-width:0}
+  .ro .w b{margin-right:8px}
+  .ro .bfv{white-space:nowrap; text-align:right}
+  .ro .bfv b{font-size:20px}
+  .ro label.tick{display:flex; align-items:center; gap:8px; font-weight:600; min-height:44px; white-space:nowrap}
+  .ro input[type=checkbox]{width:26px; height:26px; accent-color:var(--midnight)}
+  .ro.rolled{background:var(--paper)}
+  .ro.rolled .bfv{text-decoration:line-through; color:var(--ink2)}
+  .note{font-size:14px; color:var(--ink2)}
+  .form{display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:10px; align-items:end}
+  .form label{display:flex; flex-direction:column; gap:4px; font-size:14px; color:var(--ink2); font-weight:600}
+  .form input,.form select{min-height:46px; border:1px solid var(--gray); border-radius:8px; padding:6px 10px; background:#fff; font-size:17px}
+  select.pick{min-height:44px; border:1px solid var(--gray); border-radius:8px; padding:6px 10px; background:#fff; max-width:100%}
+  input.price{width:110px; min-height:40px; border:1px solid var(--gray); border-radius:8px; padding:4px 8px; text-align:right}
+  .monthpick{display:flex; gap:8px; align-items:center; margin:0 2px 14px; flex-wrap:wrap}
+  .drawer{position:fixed; inset:0; z-index:40; background:rgba(24,29,46,.35); display:flex; justify-content:flex-end}
+  .drawer .pane{background:#fff; width:min(620px,100%); height:100%; overflow:auto; padding:18px 18px 40px}
+  .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--midnight); color:var(--sawdust); padding:12px 20px; border-radius:10px; font-weight:600; z-index:60; max-width:90vw}
+  @media (max-width:700px){ .brand{display:none} h2{font-size:22px} .bundle .lbl{width:100%} }
+</style>
+</head>
+<body>
+<header>
+  <div class="hrow"><div class="brand">PURPOSEFUL</div><h1>Inventory</h1><div class="me" id="me"></div></div>
+  <nav class="tabs" id="tabs" hidden></nav>
+</header>
+<div id="app"></div>
+
+<!-- the Supabase library, checked: the browser refuses it if even one byte differs from the published file -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+<script>
+/* =====================================================================
+   THE TWO SETTINGS — the same two lines as upload.html.
+   Publishable key only. NEVER the secret key — this file is public.
+   ===================================================================== */
+const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
+const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
+
+
+/* ---- core: no screen code in here, so it can be tested on its own ---- */
+
+const ROW_W = 42;
+function keyProblem(url, key) {
+  if (!url || !key || url.includes("PASTE-") || key.includes("PASTE-"))
+    return { secret: false, text: "The project address and key haven't been filled in yet. Copy the two SUPABASE lines from upload.html into this file." };
+  const secret = { secret: true, text: "This is the SECRET key, not the publishable one. It bypasses every security rule, and this file is public. Take it out of the file now and use the publishable key — the same one upload.html has. If this file was already put on GitHub with it, create a new secret key in Supabase so the old one stops working." };
+  if (key.startsWith("sb_secret_")) return secret;
+  const parts = key.split(".");
+  if (parts.length === 3) {
+    try { if (JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))).role === "service_role") return secret; }
+    catch (e) { /* not a readable token */ }
+  }
+  if (!/^https:\/\//.test(url)) return { secret: false, text: "The project address should start with https:// — copy it from upload.html." };
+  return null;
+}
+function isNetworkError(err) {
+  const m = String((err && (err.message || err.details)) || err || "");
+  return /failed to fetch|networkerror|load failed|network request failed|fetch failed|timeout|aborted/i.test(m);
+}
+function friendlyError(err) {
+  const m = String((err && (err.message || err.error_description || err.error)) || err || "");
+  if (isNetworkError(err)) return "Can't reach the database right now. What you typed is kept on this computer and sends when the connection is back.";
+  if (/invalid login credentials/i.test(m)) return "That email and password didn't match. Check them and try again.";
+  if (/jwt expired|refresh token/i.test(m)) return "The sign-in has expired. Sign out and back in.";
+  if (/could not find the function|schema cache|does not exist/i.test(m)) return "Inventory isn't set up in the database yet. Run inventory.sql (Walkthrough 15), wait a minute, then reload this page.";
+  if (/row-level security|permission denied|insufficient/i.test(m) && !/Only a manager/.test(m)) return "This login can't do that. The Inventory page is for managers.";
+  return m || "Something went wrong. Try again, and if it keeps happening, take a screenshot.";
+}
+function newId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ (Math.random() * 16) >> (c / 4)).toString(16));
+}
+/** "6/4" → 1.5 */
+const stockIn = (s) => { const m = /^(\d+)\/4$/.exec(String(s || "")); return m ? Number(m[1]) / 4 : 0; };
+/** Board feet of one rack line: length × width × rows × stock thickness ÷ 144 */
+const lineBf = (len, width, rows, stock) => (Number(len) || 0) * (Number(width) || ROW_W) * (Number(rows) || 0) * stockIn(stock) / 144;
+const rowsOf = (bundles) => (bundles || []).reduce((a, b) => a + (Number(b) || 0), 0);
+/** 19.25 → "19¼" */
+function fracText(r) {
+  r = Number(r) || 0;
+  const w = Math.floor(r + 1e-9), f = Math.round((r - w) * 4);
+  return (w || !f ? String(w) : "") + ["", "¼", "½", "¾"][f];
+}
+/** A bundle number with its whole part and quarter set separately (the ¼ ½ ¾ buttons) */
+function setWhole(cur, whole) { const f = (Number(cur) || 0) - Math.floor((Number(cur) || 0) + 1e-9); return whole === "" && !f ? null : Math.max(0, parseInt(whole, 10) || 0) + f; }
+function toggleQuarter(cur, q) { const c = Number(cur) || 0, w = Math.floor(c + 1e-9), f = Math.round((c - w) * 4); return w + (f === q ? 0 : q / 4); }
+const ftin = (len) => { const ft = Math.floor(len / 12), i = Math.round((len % 12) * 100) / 100; return i ? `${ft}' ${i}"` : `${ft}'`; };
+const f0 = (n) => Math.round(Number(n) || 0).toLocaleString("en-US");
+const f1 = (n) => (Math.round((Number(n) || 0) * 10) / 10).toLocaleString("en-US");
+const money = (n) => "$" + Math.round(Number(n) || 0).toLocaleString("en-US");
+const monthName = (d) => { if (!d) return ""; const [y, m] = String(d).split("-").map(Number); return new Date(y, m - 1, 1).toLocaleString("en-US", { month: "long", year: "numeric" }); };
+const monthShort = (d) => { if (!d) return ""; const [y, m] = String(d).split("-").map(Number); return new Date(y, m - 1, 1).toLocaleString("en-US", { month: "long" }); };
+const dayShort = (d) => { if (!d) return ""; const [y, m, dd] = String(d).slice(0, 10).split("-").map(Number); return `${dd} ${new Date(y, m - 1, 1).toLocaleString("en-US", { month: "short" })}`; };
+/** The month before a month-end date: "2026-09-30" → "2026-08-31" */
+function prevMonthEnd(d) { const [y, m] = String(d).split("-").map(Number); const x = new Date(Date.UTC(y, m - 1, 0)); return x.toISOString().slice(0, 10); }
+
+/** Lumber lines to show for the month: this month's lines, plus last month's lengths (empty) not yet on it. */
+function lumberLines(items, cur, prev) {
+  const out = new Map();
+  for (const it of items) out.set(it.id, []);
+  for (const l of prev || []) if (out.has(l.item_id) && !out.get(l.item_id).some(x => Number(x.length_in) === Number(l.length_in)))
+    out.get(l.item_id).push({ item_id: l.item_id, length_in: Number(l.length_in), width_in: Number(l.width_in) || ROW_W, bundles: [], fromLast: true });
+  for (const l of cur || []) {
+    if (!out.has(l.item_id)) continue;
+    const arr = out.get(l.item_id), i = arr.findIndex(x => Number(x.length_in) === Number(l.length_in));
+    const row = { item_id: l.item_id, length_in: Number(l.length_in), width_in: Number(l.width_in) || ROW_W, bundles: (l.bundles || []).map(b => b === null ? null : Number(b)) };
+    if (i >= 0) arr[i] = row; else arr.push(row);
+  }
+  for (const arr of out.values()) { arr.sort((a, b) => a.length_in - b.length_in); for (const l of arr) if (!l.bundles.length) l.bundles = [null]; }
+  return out;
+}
+/** Latest match per work-order species (the rows come newest first or not — sorted here) */
+function currentMatches(rows) {
+  const by = new Map();
+  for (const r of [...(rows || [])].sort((a, b) => String(a.set_at).localeCompare(String(b.set_at)) || a.id - b.id)) by.set(r.wo_norm, r);
+  return by;
+}
+const norm = (s) => String(s || "").toLowerCase().replace(/[\s\-_]+/g, " ").trim();
+
+/* ---- end core ---- */
+
+if (typeof module !== "undefined") module.exports = {
+  keyProblem, isNetworkError, friendlyError, stockIn, lineBf, rowsOf, fracText, setWhole, toggleQuarter, ftin, prevMonthEnd, lumberLines, currentMatches, norm, monthName,
+};
+
+
+/* ---- the screen ---- */
+if (typeof document !== "undefined") (function () {
+  const app = document.getElementById("app"), tabsEl = document.getElementById("tabs"), meEl = document.getElementById("me");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("sfi_" + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem("sfi_" + k, JSON.stringify(v)); } catch (e) {} },
+  };
+  const problem = keyProblem(SUPABASE_URL, SUPABASE_KEY);
+  if (problem) {
+    app.innerHTML = `<main><div class="alarm"><h2>${problem.secret ? "Stop — wrong key in this file" : "This page isn't set up yet"}</h2><p>${esc(problem.text)}</p></div></main>`;
+    return;
+  }
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const TABS = [["month", "This month"], ["lumber", "Lumber count"], ["deliveries", "Deliveries in"], ["rollover", "Month-end"], ["scrap", "Scrap rate"], ["values", "Values"], ["setup", "Setup"]];
+  const S = {
+    me: null, tab: store.get("tab", "month"), loaded: false, missing: false, msg: null, toast: null,
+    month: null, status: [], months: [], items: [], prices: new Map(), curLines: [], prevLines: [], lines: new Map(),
+    closeByMonth: [], receipts: [], pool: [], scrap: [], values: [], rules: [], matches: [],
+    open: store.get("open", {}), pickMonth: null, drill: null, setupList: "lumber", editItem: null,
+    pending: store.get("pending_lines", {}), saving: false,
+  };
+
+  // ---------- data ----------
+  async function q(query) { const r = await query; if (r.error) throw r.error; return r.data || []; }
+  async function load() {
+    try {
+      const status = await q(db.from("v_inv_status").select("*"));
+      S.status = status; S.month = status[0] ? status[0].month_end : null;
+      const prev = S.month ? prevMonthEnd(S.month) : null;
+      const [months, items, prices, lines, close, rec, pool, scrap, values, rules, matches] = await Promise.all([
+        q(db.from("inv_months").select("*").order("month_end", { ascending: false })),
+        q(db.from("inv_items").select("*")),
+        q(db.from("v_inv_prices").select("*")),
+        q(db.from("inv_lumber_lines").select("*").in("month_end", [S.month, prev])),
+        q(db.from("v_inv_lumber_close").select("*")),
+        q(db.from("inv_receipts").select("*").order("received_on", { ascending: true })),
+        q(db.from("v_inv_pool").select("*")),
+        q(db.from("v_inv_scrap").select("*")),
+        q(db.from("v_inv_values").select("*")),
+        q(db.from("inv_thickness_rules").select("*").order("from_in")),
+        q(db.from("inv_species_matches").select("*")),
+      ]);
+      Object.assign(S, { months, items, closeByMonth: close, receipts: rec, pool, scrap, values, rules, matches });
+      S.prices = new Map(prices.map(p => [p.item_id, p]));
+      S.curLines = lines.filter(l => l.month_end === S.month); S.prevLines = lines.filter(l => l.month_end === prev);
+      rebuildLines();
+      S.missing = false; S.msg = null;
+      if (!S.pickMonth || !S.scrap.some(r => r.month_end === S.pickMonth)) S.pickMonth = S.month;
+    } catch (e) {
+      S.missing = /does not exist|schema cache|could not find/i.test(String(e.message));
+      if (!S.missing) S.msg = { ok: false, text: friendlyError(e) };
+    }
+    S.loaded = true;
+  }
+  function rebuildLines() {
+    S.lines = lumberLines(lumberItems(true), S.curLines, S.prevLines);
+    // what's still waiting to send wins over what the database said
+    for (const [k, p] of Object.entries(S.pending)) {
+      if (p.month !== S.month) { delete S.pending[k]; continue; }
+      const arr = S.lines.get(p.item); if (!arr) continue;
+      const i = arr.findIndex(l => l.length_in === p.length);
+      const row = { item_id: p.item, length_in: p.length, width_in: p.width, bundles: p.bundles.length ? p.bundles : [null] };
+      if (i >= 0) arr[i] = row; else { arr.push(row); arr.sort((a, b) => a.length_in - b.length_in); }
+    }
+  }
+  const lumberItems = (withRetired) => S.items.filter(i => i.list_key === "lumber" && (withRetired || !i.retired)).sort((a, b) => a.name.localeCompare(b.name));
+  const itemById = (id) => S.items.find(i => i.id === id);
+  const statusOf = (k) => S.status.find(s => s.list_key === k) || {};
+  const monthRow = () => S.months.find(m => m.month_end === S.month) || {};
+  const closed = () => monthRow().status === "closed";
+  const closingBf = (itemId) => { const arr = S.lines.get(itemId) || [], it = itemById(itemId); return arr.reduce((a, l) => a + lineBf(l.length_in, l.width_in, rowsOf(l.bundles), it && it.stock), 0); };
+  const openingBf = (itemId) => { const r = S.closeByMonth.find(c => c.item_id === itemId && c.month_end === prevMonthEnd(S.month)); return r ? Number(r.board_feet) : 0; };
+
+  async function rpc(fn, args, okText) {
+    const r = await db.rpc(fn, args);
+    if (r.error) { S.msg = { ok: false, text: friendlyError(r.error) }; render(); return null; }
+    S.toast = (r.data && r.data.summary) || okText || "Saved"; S.msg = null;
+    await load(); render(); setTimeout(() => { S.toast = null; render(); }, 2600);
+    return r.data;
+  }
+
+  // ---- lumber: each line is sent whole (absolute numbers), a moment after the last keystroke ----
+  let timer = null;
+  function queueLine(itemId, length, width, bundles) {
+    const clean = bundles.filter(b => b !== null && b !== undefined && b !== "").map(Number);
+    S.pending[itemId + "|" + length] = { month: S.month, item: itemId, length, width, bundles: clean };
+    store.set("pending_lines", S.pending);
+    clearTimeout(timer); timer = setTimeout(flushLines, 700);
+    showSaving();
+  }
+  async function flushLines() {
+    if (S.saving) return;
+    const keys = Object.keys(S.pending); if (!keys.length) return showSaving();
+    S.saving = true; showSaving();
+    for (const k of keys) {
+      const p = S.pending[k];
+      const r = await db.rpc("set_lumber_line", { p_item: p.item, p_length: p.length, p_bundles: p.bundles, p_width: p.width });
+      if (r.error) {
+        if (isNetworkError(r.error)) break;                     // keep it; try again shortly
+        delete S.pending[k]; S.msg = { ok: false, text: friendlyError(r.error) };
+        continue;
+      }
+      if (S.pending[k] === p) delete S.pending[k];
+      const i = S.curLines.findIndex(l => l.item_id === p.item && Number(l.length_in) === p.length);
+      const row = { month_end: S.month, item_id: p.item, length_in: p.length, width_in: p.width, bundles: p.bundles };
+      if (i >= 0) S.curLines[i] = row; else S.curLines.push(row);
+    }
+    store.set("pending_lines", S.pending);
+    S.saving = false; showSaving();
+    if (S.msg) render();
+    if (Object.keys(S.pending).length) { clearTimeout(timer); timer = setTimeout(flushLines, 5000); }
+  }
+  function showSaving() {
+    const el = document.getElementById("saving"); if (!el) return;
+    const n = Object.keys(S.pending).length;
+    el.textContent = n ? (S.saving ? "Saving…" : `${n} line${n === 1 ? "" : "s"} waiting to save`) : "All saved";
+  }
+  window.addEventListener("online", () => flushLines());
+
+  // ---------- screens ----------
+  function render() {
+    if (!S.me) return;
+    meEl.innerHTML = `<a href="office.html">← Office</a> · ${esc(S.me.name)} · <button id="so">Sign out</button>`;
+    document.getElementById("so").onclick = async () => { await db.auth.signOut(); location.reload(); };
+    if (S.me.role !== "manager" && S.me.role !== "admin") {
+      tabsEl.hidden = true;
+      app.innerHTML = `<main><div class="card"><h2>For managers</h2><p class="sub">The Inventory page is for the office. Departments send their counts from the Inventory tab on their tablet on the last day of the month.</p></div></main>`;
+      return;
+    }
+    if (!S.loaded) { app.innerHTML = `<main><p class="muted">Loading…</p></main>`; return; }
+    if (S.missing) { tabsEl.hidden = true; app.innerHTML = `<main><div class="banner">Inventory isn't set up in the database yet<small>Run inventory.sql in the Supabase SQL Editor (Walkthrough 15), wait a minute, then reload this page.</small></div></main>`; return; }
+    const probs = S.pool.filter(p => p.problem && !p.rolled).length;
+    tabsEl.hidden = false;
+    tabsEl.innerHTML = TABS.map(([k, t]) => `<button data-tab="${k}" aria-current="${S.tab === k}">${t}${
+      k === "rollover" && !monthRow().rollover_done_at && !closed() ? `<span class="badge">!</span>` : ""}${k === "setup" && probs ? `<span class="badge">${probs}</span>` : ""}</button>`).join("");
+    const head = (S.msg ? `<div class="banner ${S.msg.ok ? "ok" : ""}">${esc(S.msg.text)}</div>` : "")
+      + (closed() ? `<div class="banner ok">${esc(monthName(S.month))} is closed<small>Closed by ${esc(monthRow().closed_by_name || "")}. Its numbers and prices are saved as they were.</small></div>` : "");
+    const body = { month: viewMonth, lumber: viewLumber, deliveries: viewDeliveries, rollover: viewRollover, scrap: viewScrap, values: viewValues, setup: viewSetup }[S.tab] || viewMonth;
+    app.innerHTML = `<main>${head}${body()}</main>${S.drill ? drillPane() : ""}${S.toast ? `<div class="toast" role="status">${esc(S.toast)}</div>` : ""}`;
+    wire();
+    showSaving();
+  }
+
+  function viewMonth() {
+    const m = S.month, lumberTot = lumberItems(true).reduce((a, i) => a + closingBf(i.id), 0);
+    const cards = S.status.map(s => {
+      const due = s.due;
+      const st = !due ? `Not due — counted every three months` : s.done ? `${s.list_key === "lumber" ? "Counted" : "Sent"} ${dayShort(s.done_at)} by ${s.done_by}` :
+        s.list_key === "lumber" ? "In progress — Lumber count tab" : s.count_day_reached ? "Waiting — on their tablet now" : `Opens on their tablet ${dayShort(m)}`;
+      return `<div class="stat ${due ? (s.done ? "done" : "") : "off"}"><div class="t">${esc(s.name)}</div>
+        <div class="o">${esc(s.department_name || "Office")} · ${s.every_months === 1 ? "monthly" : "every three months"}</div>
+        ${s.list_key === "lumber" ? `<div class="num" style="font-size:26px;font-weight:700;margin-top:6px">${f0(lumberTot)} bd ft</div>` : ""}
+        <div class="s">${esc(st)}</div></div>`;
+    }).join("");
+    const probs = S.pool.filter(p => p.problem && !p.rolled).length;
+    const allIn = S.status.every(s => !s.due || s.done);
+    const today = new Date().toISOString().slice(0, 10);
+    const steps = [
+      ["Every count due is in", allIn, S.status.filter(s => s.due && !s.done).map(s => s.name).join(", ") + " still to come"],
+      ["Month-end roll-over reviewed", !!monthRow().rollover_done_at, "Pick the sheets whose lumber hasn't been pulled (Month-end tab)"],
+      ["Every sheet has a stock size and species match", probs === 0, `${probs} sheet${probs === 1 ? "" : "s"} need${probs === 1 ? "s" : ""} Setup`],
+    ];
+    const canClose = steps.every(s => s[1]) && !closed();
+    return `<h2>${esc(monthName(m))}</h2><p class="sub">Counted on the last day of the month. The scrap rate needs the lumber count, the deliveries and the roll-over.</p>
+      <div class="grid">${cards}</div>
+      <h3>Before closing the month</h3>
+      <div class="card">${steps.map(([t, ok, why]) => `<div class="step ${ok ? "ok" : ""}"><span class="mk">${ok ? "✓" : "○"}</span><span><b>${esc(t)}</b>${ok ? "" : `<br><span class="note">${esc(why)}</span>`}</span></div>`).join("")}
+        <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          ${closed() ? `<span class="muted">Closed.</span>` : `<button class="btn or" data-close ${canClose ? "" : "disabled"}>Close ${esc(monthShort(m))}</button>
+          <span class="note">Closing saves the counts, the sheets and today's prices for good. It can't be done before ${esc(dayShort(m))}.</span>`}
+        </div></div>`;
+  }
+
+  function viewLumber() {
+    const items = lumberItems(false);
+    const shown = items.filter(i => (S.lines.get(i.id) || []).length > 0 || S.open["add_" + i.id]);
+    const tot = items.reduce((a, i) => a + closingBf(i.id), 0), openTot = items.reduce((a, i) => a + openingBf(i.id), 0);
+    const addable = items.filter(i => !shown.includes(i));
+    const done = !!monthRow().lumber_done_at;
+    return `<h2>Lumber count</h2><p class="sub">Each length has its bundles; type the rows in each. Row width is 42". Leave out lumber already marked for jobs in production. Every number saves itself.</p>
+      <div class="card" style="display:flex;gap:14px;align-items:baseline;flex-wrap:wrap"><span class="num" style="font-size:30px;font-weight:700">${f0(tot)} bd ft</span>
+        <span class="muted">on the racks · ${esc(dayShort(prevMonthEnd(S.month)))} was ${f0(openTot)}</span><span class="saving" id="saving" style="margin-left:auto"></span></div>
+      ${shown.sort((a, b) => closingBf(b.id) - closingBf(a.id) || openingBf(b.id) - openingBf(a.id)).map(specCard).join("")}
+      <div class="addrow card"><select class="pick" id="newkey"><option value="">Add a species and thickness…</option>${addable.map(i => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join("")}</select>
+        <button class="btn ghost" data-addkey>Add</button><span class="note">Not on the list? Add it in Setup → Count lists.</span></div>
+      <div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span style="flex:1">${done ? `Marked counted by ${esc(monthRow().lumber_done_by)}. You can still correct a number until the month closes.` : "When every rack is counted, mark it done."}</span>
+        ${closed() ? "" : done ? `<button class="link" data-lumdone="0">Not done yet</button>` : `<button class="btn" data-lumdone="1">Lumber count is done</button>`}</div>`;
+  }
+  function specCard(it) {
+    const lines = S.lines.get(it.id) || [], isOpen = !!S.open[it.id];
+    return `<details class="spec" data-item="${esc(it.id)}" ${isOpen ? "open" : ""}><summary><span class="chev">▸</span><span class="nm">${esc(it.name)}</span>
+      <span class="was">${esc(dayShort(prevMonthEnd(S.month)))} ${f0(openingBf(it.id))}</span><span class="bf num" data-bf="${esc(it.id)}">${f0(closingBf(it.id))} bd ft</span></summary>
+      <div class="lens">${lines.map((l, li) => {
+        const rows = rowsOf(l.bundles);
+        return `<div class="len"><div class="lenhead"><b>${l.length_in}"</b><span class="note">${ftin(l.length_in)}${Number(l.width_in) !== ROW_W ? ` · ${l.width_in}" wide` : ""}</span>
+          <span class="tot" data-tot="${esc(it.id)}|${li}">${fracText(rows)} rows = <b class="num">${f0(lineBf(l.length_in, l.width_in, rows, it.stock))}</b> bd ft</span></div>
+          ${l.bundles.map((b, bi) => {
+            const w = b === null ? "" : Math.floor(b + 1e-9), fr = b === null ? 0 : Math.round((b - Math.floor(b + 1e-9)) * 4);
+            return `<div class="bundle"><span class="lbl">Bundle ${bi + 1}</span>
+              <input type="number" inputmode="numeric" min="0" step="1" value="${b === null ? "" : (w === 0 && fr ? "" : w)}" data-b="${esc(it.id)}|${li}|${bi}" aria-label="${esc(it.name)} ${l.length_in} inch, bundle ${bi + 1}, whole rows" ${closed() ? "disabled" : ""}>
+              <span class="q">${[1, 2, 3].map(q => `<button data-frac="${esc(it.id)}|${li}|${bi}|${q}" aria-pressed="${fr === q}" aria-label="plus ${["", "a quarter", "a half", "three quarters"][q]} row" ${closed() ? "disabled" : ""}>${["", "¼", "½", "¾"][q]}</button>`).join("")}</span>
+              <span class="note">rows</span>${l.bundles.length > 1 && !closed() ? `<button class="x" data-del="${esc(it.id)}|${li}|${bi}">Remove</button>` : ""}</div>`;
+          }).join("")}
+          ${closed() ? "" : `<button class="link" data-add="${esc(it.id)}|${li}">+ Add a bundle</button>`}</div>`;
+      }).join("")}
+      ${closed() ? "" : `<div class="addrow"><input type="number" inputmode="decimal" placeholder="Length in inches" id="nl-${esc(it.id)}" style="width:170px" aria-label="New length in inches for ${esc(it.name)}">
+        <button class="btn ghost" data-addlen="${esc(it.id)}">Add a length</button></div>`}</div></details>`;
+  }
+
+  function viewDeliveries() {
+    const rec = S.receipts.filter(r => r.month_end === S.month);
+    const lum = rec.filter(r => r.kind === "lumber"), ply = rec.filter(r => r.kind === "plywood");
+    const live = (a) => a.filter(r => !r.mistake_at);
+    const lumTot = live(lum).reduce((a, r) => a + Number(r.board_feet), 0), plyTot = live(ply).reduce((a, r) => a + r.sheets, 0);
+    const today = new Date(), iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const maxDate = iso < S.month ? iso : S.month;
+    const row = (r, what) => `<tr class="${r.mistake_at ? "mistake" : ""}"><td>${esc(dayShort(r.received_on))}</td><td class="l">${esc(r.supplier || "—")}</td><td class="l">${what}</td>
+      <td>${r.mistake_at ? `<span class="note">Entered by mistake · ${esc(r.mistake_by_name)}</span>` : closed() ? "" : `<button class="link" data-mistake="${esc(r.id)}">Entered by mistake</button>`}</td></tr>`;
+    const form = !closed();
+    return `<h2>Deliveries in — ${esc(monthShort(S.month))}</h2><p class="sub">One line per packing slip. The monthly totals add themselves up.</p>
+      <h3>Lumber · ${f0(lumTot)} bd ft</h3>
+      ${lum.length ? `<div class="tw"><table><thead><tr><th>Date</th><th class="l">Supplier</th><th class="l">What</th><th></th></tr></thead><tbody>
+        ${lum.map(r => row(r, `${esc((itemById(r.item_id) || {}).name || "?")} · <b class="num">${f0(r.board_feet)}</b> bd ft`)).join("")}</tbody></table></div>` : `<p class="muted small" style="margin:0 2px">None yet this month.</p>`}
+      ${form ? `<div class="card" style="margin-top:10px"><div class="form">
+        <label>Date<input type="date" id="rd" value="${esc(maxDate)}" max="${esc(maxDate)}"></label>
+        <label>Supplier<input id="rs" list="suppliers" placeholder="Frank Miller Lumber"></label>
+        <label>Species and thickness<select id="rk"><option value="">Choose…</option>${lumberItems(false).map(i => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join("")}</select></label>
+        <label>Board feet<input id="rb" type="number" inputmode="decimal" min="1"></label>
+        <button class="btn" data-addrec>Add lumber slip</button></div></div>` : ""}
+      <h3>Plywood · ${plyTot} sheets</h3>
+      ${ply.length ? `<div class="tw"><table><thead><tr><th>Date</th><th class="l">Supplier</th><th class="l">Sheets</th><th></th></tr></thead><tbody>
+        ${ply.map(r => row(r, `<b class="num">${r.sheets}</b>`)).join("")}</tbody></table></div>` : `<p class="muted small" style="margin:0 2px">None yet this month.</p>`}
+      ${form ? `<div class="card" style="margin-top:10px"><div class="form">
+        <label>Date<input type="date" id="pd" value="${esc(maxDate)}" max="${esc(maxDate)}"></label>
+        <label>Supplier<input id="ps" list="suppliers" placeholder="Hood Distribution – DSI"></label>
+        <label>Sheets<input id="pn" type="number" inputmode="numeric" min="1"></label>
+        <button class="btn" data-addply>Add plywood slip</button></div></div>` : ""}
+      <datalist id="suppliers">${[...new Set(["Frank Miller Lumber", "Charles F. Shiels & Co.", "Hood Distribution – DSI", ...S.receipts.map(r => r.supplier).filter(Boolean)])].map(s => `<option>${esc(s)}</option>`).join("")}</datalist>
+      <p class="note">Nothing is deleted: a wrong slip is marked <i>Entered by mistake</i> and stops counting, but stays on record.</p>`;
+  }
+
+  function viewRollover() {
+    const pool = S.pool.filter(p => !p.mill_finished).sort((a, b) => (b.mill_done === 0) - (a.mill_done === 0) || a.project_id.localeCompare(b.project_id) || a.sheet_number - b.sheet_number);
+    const fromBefore = S.pool.filter(p => p.carried_over).length, finished = S.pool.length - pool.length;
+    const rolled = pool.filter(p => p.rolled), rolledBf = rolled.reduce((a, p) => a + (Number(p.board_feet) || 0), 0);
+    const done = !!monthRow().rollover_done_at;
+    return `<h2>Month-end roll-over</h2>
+      <p class="sub">${esc(monthShort(S.month))}'s list is every sheet uploaded this month${fromBefore ? ` plus ${fromBefore} rolled over from before` : ""} — ${S.pool.length} sheets that go through Milling. ${finished} are finished in Milling and count automatically. Below are the ${pool.length} still in Milling: tick the ones whose lumber hasn't been pulled. They move to next month.</p>
+      ${pool.length ? `<div class="card" style="padding:0">${pool.map(p => `<div class="ro ${p.rolled ? "rolled" : ""}"><div class="w"><b>${esc(p.project_id)}</b><span>Sheet ${p.sheet_number} · ${esc(p.item_code || "")}</span>
+          ${p.carried_over ? ` <span class="tag">From ${esc(monthShort(p.upload_month))}</span>` : ""}${p.is_active ? "" : ` <span class="tag">Job not in production</span>`}
+          <div class="note">${esc(p.species || "no species")} · ${esc(p.shape || "")} ${esc(p.width || "?")}${p.length ? ` × ${esc(p.length)}` : ""} · ${esc(p.thickness || "?")} · ${p.qty} top${p.qty === 1 ? "" : "s"} · Milling ${p.mill_done} of ${p.mill_required}</div>
+          ${p.problem ? `<div style="margin-top:4px"><span class="flag">${esc(p.problem)}</span></div>` : p.leave_out ? `<div class="note">Left out — not lumber</div>` : ""}</div>
+        <div class="bfv"><b class="num">${p.board_feet !== null ? f0(p.board_feet) : "—"}</b><div class="note">${p.board_feet !== null ? `bd ft ${esc(p.stock)}` : p.leave_out ? "left out" : "fix in Setup"}</div></div>
+        ${p.mill_done > 0 ? `<span class="note" style="width:160px">Pieces counted — lumber is out</span>`
+          : `<label class="tick"><input type="checkbox" data-roll="${esc(p.job_id)}|${p.sheet_number}" ${p.rolled ? "checked" : ""} ${closed() ? "disabled" : ""}> Not pulled</label>`}</div>`).join("")}</div>`
+        : `<div class="card muted">Nothing is still in Milling. Every sheet on the list counts this month.</div>`}
+      <div class="card" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <span style="flex:1">${rolled.length} sheet${rolled.length === 1 ? "" : "s"} roll${rolled.length === 1 ? "s" : ""} to next month (${f0(rolledBf)} bd ft).</span>
+        ${closed() ? "" : done ? `<span style="color:var(--teal-ink);font-weight:700">✓ Reviewed by ${esc(monthRow().rollover_done_by)}</span> <button class="link" data-rodone="0">Change it</button>`
+                              : `<button class="btn" data-rodone="1">Done — these are right</button>`}</div>`;
+  }
+
+  function monthPicker() {
+    const ms = [...new Set(S.scrap.map(r => r.month_end))].sort().reverse();
+    if (ms.length < 2) return "";
+    return `<div class="monthpick"><label class="muted small" for="mp">Month</label><select class="pick" id="mp">${ms.map(m => `<option value="${m}" ${m === S.pickMonth ? "selected" : ""}>${esc(monthName(m))}${m === S.month && !closed() ? " (open)" : ""}</option>`).join("")}</select></div>`;
+  }
+  function viewScrap() {
+    const pm = S.pickMonth || S.month;
+    const rows = S.scrap.filter(r => r.month_end === pm && (Number(r.used_bf) || Number(r.zero_bf) || Number(r.received_bf)));
+    const isOpen = pm === S.month && !closed();
+    const probs = isOpen ? S.pool.filter(p => p.problem && !p.rolled) : [];
+    const by = {}; rows.forEach(r => (by[r.stock] = by[r.stock] || []).push(r));
+    const sum = (a, f) => a.reduce((x, r) => x + (Number(r[f]) || 0), 0);
+    const line = (r, cls, click) => {
+      const used = Number(r.used_bf) || 0, zero = Number(r.zero_bf) || 0, rate = used > 0 && zero > 0 ? (used - zero) / used : null;
+      const verdict = r.opening_bf === null || r.opening_bf === undefined ? (cls ? "" : `<span class="note">starting count</span>`)
+        : zero > used + 0.5 ? `<span class="flag o">Check</span>` : rate === null ? `<span class="note">${used > 0 ? "no tops" : "—"}</span>` : `<span class="rate num">${f1(rate * 100)}%</span>`;
+      return `<tr class="${cls || ""} ${click ? "click" : ""}" ${click ? `data-drill="${esc(r.species)}|${esc(r.stock)}"` : ""}><td>${esc(r.label || r.name)}</td>
+        <td class="num">${r.opening_bf === null ? "—" : f0(r.opening_bf)}</td><td class="num">+ ${f0(r.received_bf)}</td><td class="num">− ${f0(r.closing_bf)}</td>
+        <td class="num"><b>${r.used_bf === null ? "—" : f0(used)}</b></td><td class="num">${f0(zero)}</td><td class="num">${r.used_bf === null ? "—" : f0(used - zero)}</td><td>${verdict}</td></tr>`;
+    };
+    let body = "";
+    for (const st of Object.keys(by).sort()) {
+      by[st].sort((a, b) => (Number(b.used_bf) || 0) - (Number(a.used_bf) || 0)).forEach(r => body += line(r, "", true));
+      body += line({ label: `All ${st}`, opening_bf: sum(by[st], "opening_bf"), received_bf: sum(by[st], "received_bf"), closing_bf: sum(by[st], "closing_bf"), used_bf: sum(by[st], "used_bf"), zero_bf: sum(by[st], "zero_bf") }, "subtot");
+    }
+    body += line({ label: "All lumber", opening_bf: sum(rows, "opening_bf"), received_bf: sum(rows, "received_bf"), closing_bf: sum(rows, "closing_bf"), used_bf: sum(rows, "used_bf"), zero_bf: sum(rows, "zero_bf") }, "grand");
+    return `<h2>Scrap rate — ${esc(monthName(pm))}</h2>
+      <p class="sub">Used = last month's count + received − this month's count. 0-scrap = every top started this month at full rectangle × stock thickness. Scrap rate = (used − 0-scrap) ÷ used. Tap a row to see its tops.</p>
+      ${monthPicker()}
+      ${isOpen && !monthRow().rollover_done_at ? `<div class="banner">The month-end roll-over isn't done yet<small>Until you pick the sheets whose lumber hasn't been pulled, they count as used and the 0-scrap numbers run high.</small></div>` : ""}
+      ${isOpen && !monthRow().lumber_done_at ? `<div class="banner">The lumber count isn't marked done<small>Until it is, "this month's count" is whatever has been typed so far.</small></div>` : ""}
+      ${probs.length ? `<div class="banner">${probs.length} sheet${probs.length === 1 ? "" : "s"} left out of 0-scrap<small>${probs.slice(0, 6).map(p => `${esc(p.project_id)} sheet ${p.sheet_number}: ${esc(p.problem)}`).join(" · ")}${probs.length > 6 ? " …" : ""} — fix in Setup.</small></div>` : ""}
+      ${rows.length ? `<div class="tw"><table><thead><tr><th>Species and thickness</th><th>Last count</th><th>Received</th><th>This count</th><th>Used</th><th>0-scrap</th><th>Scrap</th><th>Scrap rate</th></tr></thead><tbody>${body}</tbody></table></div>`
+        : `<div class="card muted">Nothing to show for this month yet.</div>`}
+      <p class="note"><span class="flag o">Check</span> means more tops started than lumber used — usually a sheet that should roll over, a missed delivery slip, or a counting slip. Board feet throughout. Lumber used with no tops started (4/4 for other parts, say) shows "no tops".</p>`;
+  }
+  function drillPane() {
+    const [sp, st] = S.drill.split("|"), pm = S.pickMonth || S.month;
+    const r = S.scrap.find(x => x.month_end === pm && x.species === sp && x.stock === st) || {};
+    const isOpen = pm === S.month && !closed();
+    const list = isOpen ? S.pool.filter(p => !p.rolled && !p.problem && p.board_feet !== null && norm(p.inventory_species) === norm(sp) && p.stock === st) : null;
+    return `<div class="drawer" data-shut><div class="pane" data-stay>
+      <button class="link" data-shut>← Back</button><h2>${esc(sp)} ${esc(st)}</h2>
+      <p class="sub">${r.used_bf === null ? "" : `${f0(r.used_bf)} bd ft used · `}${f0(r.zero_bf)} bd ft of tops${r.scrap_rate !== null && r.scrap_rate !== undefined ? ` · ${f1(r.scrap_rate * 100)}% scrap` : ""}</p>
+      ${list === null ? `<p class="muted">A closed month's tops are saved with it; this list shows the open month.</p>` : list.length ? `<div class="tw"><table style="min-width:0"><thead><tr><th>Sheet</th><th class="l">Top</th><th>Tops</th><th>bd ft</th></tr></thead><tbody>
+        ${list.sort((a, b) => b.board_feet - a.board_feet).map(p => `<tr><td>${esc(p.project_id)}<br><span class="note">Sheet ${p.sheet_number} · ${esc(p.item_code || "")}</span></td>
+          <td class="l">${esc(p.width)}${p.length ? ` × ${esc(p.length)}` : ""} · ${esc(p.thickness)}<br><span class="note">counted as ${Number(p.width_in)}" × ${Number(p.length_in)}" × ${stockIn(p.stock)}" (${esc(p.stock)})</span></td>
+          <td class="num">${p.qty}</td><td class="num"><b>${f0(p.board_feet)}</b></td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">No tops started in this species and thickness this month.</p>`}
+      <p class="note">Only the sheet number, item code and the top size used for the maths — the work order page itself stays the source.</p></div></div>`;
+  }
+
+  function viewValues() {
+    const pm = S.pickMonth || S.month;
+    const rows = S.values.filter(v => v.month_end === pm);
+    const gl = { "1201": 0, "1204-01": 0, "1207": 0, "1208": 0 };
+    for (const v of rows) if (v.gl_account) gl[v.gl_account] = (gl[v.gl_account] || 0) + Number(v.value || 0);
+    const names = { "1201": "Wood (lumber + plywood)", "1204-01": "Steel", "1207": "Other", "1208": "Finishing materials" };
+    const tot = Object.values(gl).reduce((a, b) => a + b, 0);
+    const byList = {}; rows.filter(v => v.gl_account).forEach(v => (byList[v.list_key] = byList[v.list_key] || []).push(v));
+    const listName = (k) => ({ lumber: "Lumber", plywood: "Plywood", metal: "Metal", finish: "Finish", other: "Other" }[k] || k);
+    const noPrice = rows.filter(v => v.gl_account && Number(v.qty) > 0 && (v.price === null || v.price === undefined));
+    return `<h2>Values — ${esc(monthName(pm))}</h2><p class="sub">Count × price, by GL account — the same totals as the Summary tab of your spreadsheet. ${pm === S.month && !closed() ? "Today's prices; they're frozen when the month closes." : "The prices this month closed with."}</p>
+      ${monthPicker()}
+      <div class="tw"><table style="min-width:420px"><thead><tr><th>GL account</th><th class="l">What</th><th>Value</th></tr></thead><tbody>
+        ${Object.keys(gl).map(a => `<tr><td>${a}</td><td class="l">${names[a] || ""}</td><td class="num">${money(gl[a])}</td></tr>`).join("")}
+        <tr class="grand"><td>Total</td><td></td><td class="num">${money(tot)}</td></tr></tbody></table></div>
+      <p class="note">A count not in yet adds nothing. Metal's shop supplies have no dollar value, as on your sheet.${noPrice.length ? ` ${noPrice.length} counted item${noPrice.length === 1 ? " has" : "s have"} no price — Setup → Prices.` : ""}</p>
+      ${Object.keys(byList).map(k => `<h3>${esc(listName(k))} · ${money(byList[k].reduce((a, v) => a + Number(v.value || 0), 0))}</h3>
+        <div class="tw"><table style="min-width:520px"><thead><tr><th>Item</th><th>Count</th><th>Price</th><th>Value</th></tr></thead><tbody>
+        ${byList[k].filter(v => Number(v.qty) > 0).sort((a, b) => Number(b.value) - Number(a.value)).map(v => `<tr><td>${esc(v.name)}</td><td class="num">${f1(v.qty)} ${esc(v.unit)}</td>
+          <td class="num">${v.price === null ? `<span class="flag">No price</span>` : "$" + Number(v.price).toFixed(2)}</td><td class="num">${money(v.value)}</td></tr>`).join("")}</tbody></table></div>`).join("")}`;
+  }
+
+  function viewSetup() {
+    const cur = currentMatches(S.matches);
+    const invSpecies = [...new Set(lumberItems(false).map(i => i.species))].sort();
+    const woSpecies = new Map();
+    for (const p of S.pool) if (p.species) woSpecies.set(norm(p.species), p.species);
+    for (const m of cur.values()) if (!woSpecies.has(m.wo_norm)) woSpecies.set(m.wo_norm, m.wo_species);
+    const speciesRows = [...woSpecies.entries()].sort((a, b) => a[1].localeCompare(b[1])).map(([n, name]) => {
+      const m = cur.get(n), auto = !m && invSpecies.find(s => norm(s) === n);
+      const val = m ? (m.leave_out ? "__out" : m.inventory_species) : auto || "";
+      const waiting = S.pool.some(p => norm(p.species) === n && p.problem && /matched/.test(p.problem));
+      return `<div class="ro"><div class="w"><b>${esc(name)}</b>${waiting ? ` <span class="flag">Not matched</span>` : auto ? ` <span class="note">matches by itself</span>` : ""}</div>
+        <select class="pick" data-match="${esc(name)}"><option value="">Choose inventory species…</option>
+          ${invSpecies.map(s => `<option ${val === s ? "selected" : ""}>${esc(s)}</option>`).join("")}<option value="__out" ${val === "__out" ? "selected" : ""}>Not lumber — leave out</option></select></div>`;
+    }).join("");
+    const rules = S.rules.filter(r => !r.retired_at);
+    const L = S.setupList, list = S.items.filter(i => i.list_key === L).sort((a, b) => (a.retired - b.retired) || String(a.section).localeCompare(String(b.section)) || a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+    const lists = [["lumber", "Lumber"], ["plywood", "Plywood"], ["metal", "Metal"], ["finish", "Finish"], ["other", "Other"]];
+    const e = S.editItem;
+    return `<h2>Setup</h2>
+      <h3>Thickness rules — finished top to stock</h3>
+      <div class="card" style="padding:0">${rules.map(r => `<div class="ro"><div class="w"><b class="num">${Number(r.from_in)}"${Number(r.to_in) !== Number(r.from_in) ? ` – ${Number(r.to_in)}"` : ""}</b> → <b>${esc(r.stock)}</b> <span class="note">· ${esc(r.set_by_name)}</span></div>
+        <button class="link" data-retirerule="${r.id}">Retire</button></div>`).join("")}</div>
+      <div class="card"><div class="form">
+        <label>Finished thickness from (inches)<input id="tf" type="number" step="0.01" min="0" placeholder="1.75"></label>
+        <label>to (leave blank for just one)<input id="tt" type="number" step="0.01" min="0"></label>
+        <label>Stock<select id="ts"><option>4/4</option><option>5/4</option><option>6/4</option><option selected>8/4</option><option>10/4</option><option>12/4</option></select></label>
+        <button class="btn" data-addrule>Add rule</button></div></div>
+      <h3>Species — work order name to inventory name</h3>
+      <p class="note" style="margin:0 2px 8px">Names that are the same apart from spacing, capitals or hyphens match by themselves. Pick one for the rest; "Not lumber" leaves those sheets out of the scrap rate.</p>
+      ${speciesRows ? `<div class="card" style="padding:0">${speciesRows}</div>` : `<div class="card muted">No work order species on this month's list yet.</div>`}
+      <h3>Count lists and prices</h3>
+      <div class="monthpick">${lists.map(([k, t]) => `<button class="btn ${k === L ? "" : "ghost"}" data-setlist="${k}">${t}</button>`).join("")}</div>
+      <div class="card" style="padding:0">${list.map(i => {
+        const p = S.prices.get(i.id);
+        return `<div class="ro"><div class="w"><b>${esc(i.name)}</b>${i.retired ? ` <span class="tag">Retired</span>` : ""}<div class="note">${esc(i.section || "")}${i.section ? " · " : ""}${esc(i.unit)}${i.std_length_ft ? ` · ${Number(i.std_length_ft)}' sticks` : ""} · ${i.gl_account ? "GL " + esc(i.gl_account) : "no dollar value"}</div></div>
+          <label class="note" style="display:flex;gap:6px;align-items:center">$<input class="price" type="number" step="0.01" min="0" value="${p ? Number(p.price) : ""}" data-price="${esc(i.id)}" aria-label="Price of ${esc(i.name)}"> per ${esc(i.unit)}</label>
+          <button class="link" data-edititem="${esc(i.id)}">Edit</button><button class="link" data-retire="${esc(i.id)}|${i.retired ? 0 : 1}">${i.retired ? "Bring back" : "Retire"}</button></div>`;
+      }).join("")}</div>
+      <div class="card"><b>${e && e.id ? "Change an item" : "Add an item"}</b><div class="form" style="margin-top:8px">
+        ${L === "lumber" ? `<label>Species<input id="ei_sp" value="${esc(e ? e.species || "" : "")}" placeholder="Maple"></label>
+          <label>Stock<select id="ei_st">${["4/4", "5/4", "6/4", "8/4", "10/4", "12/4"].map(s => `<option ${e && e.stock === s ? "selected" : ""}>${s}</option>`).join("")}</select></label>`
+        : `<label>Name<input id="ei_nm" value="${esc(e ? e.name || "" : "")}"></label>
+          <label>Group<input id="ei_sec" value="${esc(e ? e.section || "" : "")}" placeholder="${L === "metal" ? "Square Tube" : ""}"></label>
+          <label>Unit<input id="ei_un" value="${esc(e ? e.unit || "" : L === "plywood" ? "sheets" : "each")}"></label>
+          ${L === "metal" ? `<label>Stick length in feet (steel only)<input id="ei_len" type="number" min="0" step="0.5" value="${esc(e && e.std_length_ft ? Number(e.std_length_ft) : "")}"></label>` : ""}
+          <label>GL account (blank = no dollar value)<input id="ei_gl" value="${esc(e ? e.gl_account || "" : { plywood: "1201", metal: "1204-01", finish: "1208", other: "1207" }[L] || "")}"></label>`}
+        <button class="btn" data-saveitem>${e && e.id ? "Save" : "Add"}</button>${e && e.id ? `<button class="link" data-canceledit>Cancel</button>` : ""}</div></div>
+      <p class="note">Every price change is kept with who made it; a closed month keeps its own prices. Retired items keep their history.</p>`;
+  }
+
+  // ---------- events ----------
+  function wire() {
+    const on = (sel, fn, ev = "click") => app.querySelectorAll(sel).forEach(el => el.addEventListener(ev, (e) => fn(el, e)));
+    tabsEl.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { S.tab = b.dataset.tab; store.set("tab", S.tab); S.msg = null; if (S.tab !== "scrap" && S.tab !== "values") S.pickMonth = S.month; render(); scrollTo(0, 0); });
+    on("details.spec", (el) => { S.open[el.dataset.item] = el.open; store.set("open", S.open); }, "toggle");
+    on("[data-b]", (el) => {
+      const [id, li, bi] = el.dataset.b.split("|"), line = S.lines.get(id)[li];
+      line.bundles[bi] = setWhole(line.bundles[bi], el.value);
+      queueLine(id, line.length_in, line.width_in, line.bundles); refreshCard(id, Number(li));
+    }, "input");
+    on("[data-frac]", (el) => {
+      const [id, li, bi, q] = el.dataset.frac.split("|"), line = S.lines.get(id)[li];
+      line.bundles[bi] = toggleQuarter(line.bundles[bi], Number(q));
+      queueLine(id, line.length_in, line.width_in, line.bundles); S.open[id] = true; render();
+    });
+    on("[data-add]", (el) => { const [id, li] = el.dataset.add.split("|"); S.lines.get(id)[li].bundles.push(null); S.open[id] = true; render();
+      const ins = app.querySelectorAll(`[data-b^="${id}|${li}|"]`); if (ins.length) ins[ins.length - 1].focus(); });
+    on("[data-del]", (el) => { const [id, li, bi] = el.dataset.del.split("|"), line = S.lines.get(id)[li]; line.bundles.splice(Number(bi), 1);
+      queueLine(id, line.length_in, line.width_in, line.bundles); S.open[id] = true; render(); });
+    on("[data-addlen]", (el) => {
+      const id = el.dataset.addlen, len = Number(document.getElementById("nl-" + id).value);
+      if (!len || len < 12 || len > 480) { S.msg = { ok: false, text: "Type a row length in inches, between 12 and 480." }; return render(); }
+      const arr = S.lines.get(id);
+      if (arr.some(l => l.length_in === len)) { S.msg = { ok: false, text: `${len}" is already on the list.` }; return render(); }
+      arr.push({ item_id: id, length_in: len, width_in: ROW_W, bundles: [null] }); arr.sort((a, b) => a.length_in - b.length_in);
+      queueLine(id, len, ROW_W, []); S.open[id] = true; S.msg = null; render();
+    });
+    on("[data-addkey]", () => { const id = document.getElementById("newkey").value; if (!id) return; S.open["add_" + id] = true; S.open[id] = true;
+      if (!(S.lines.get(id) || []).length) S.lines.set(id, [{ item_id: id, length_in: 114, width_in: ROW_W, bundles: [null] }]); render(); });
+    on("[data-lumdone]", (el) => rpc("set_lumber_done", { p_done: el.dataset.lumdone === "1" }));
+    on("[data-rodone]", (el) => rpc("set_rollover_done", { p_done: el.dataset.rodone === "1" }));
+    on("[data-roll]", (el) => { const [job, n] = el.dataset.roll.split("|"); rpc("set_rollover", { p_job: job, p_sheet_number: Number(n), p_rolled: el.checked }); }, "change");
+    on("[data-addrec]", () => rpc("add_inventory_receipt", { p_kind: "lumber", p_date: val("rd"), p_supplier: val("rs"), p_item: val("rk") || null,
+      p_board_feet: Number(val("rb")) || null, p_sheets: null, p_note: null, p_client_id: newId() }));
+    on("[data-addply]", () => rpc("add_inventory_receipt", { p_kind: "plywood", p_date: val("pd"), p_supplier: val("ps"), p_item: null,
+      p_board_feet: null, p_sheets: Number(val("pn")) || null, p_note: null, p_client_id: newId() }));
+    on("[data-mistake]", (el) => { if (confirm("Mark this slip as entered by mistake? It stays on record but stops counting.")) rpc("mark_receipt_mistake", { p_id: el.dataset.mistake }); });
+    on("[data-close]", () => { if (confirm(`Close ${monthName(S.month)}? The counts, the sheets and today's prices are saved for good, and next month's list starts with the rolled-over sheets.`)) rpc("close_inventory_month", {}); });
+    on("#mp", (el) => { S.pickMonth = el.value; render(); }, "change");
+    on("[data-drill]", (el) => { S.drill = el.dataset.drill; render(); });
+    app.querySelectorAll("[data-shut]").forEach(el => el.addEventListener("click", (e) => { if (e.target.closest("[data-stay]") && !e.target.matches("button[data-shut]")) return; S.drill = null; render(); }));
+    on("[data-addrule]", () => rpc("add_thickness_rule", { p_from: Number(val("tf")) || null, p_to: Number(val("tt")) || null, p_stock: val("ts") }));
+    on("[data-retirerule]", (el) => { if (confirm("Retire this rule? Tops at that thickness will need a new one.")) rpc("retire_thickness_rule", { p_id: Number(el.dataset.retirerule) }); });
+    on("[data-match]", (el) => { const v = el.value; if (!v) return; rpc("set_species_match", { p_wo_species: el.dataset.match, p_inventory_species: v === "__out" ? null : v, p_leave_out: v === "__out" }); }, "change");
+    on("[data-setlist]", (el) => { S.setupList = el.dataset.setlist; S.editItem = null; render(); });
+    on("[data-price]", (el) => { if (el.value === "") return; rpc("set_inventory_price", { p_item: el.dataset.price, p_price: Number(el.value) }); }, "change");
+    on("[data-edititem]", (el) => { S.editItem = { ...itemById(el.dataset.edititem) }; render(); });
+    on("[data-canceledit]", () => { S.editItem = null; render(); });
+    on("[data-retire]", (el) => { const [id, r] = el.dataset.retire.split("|"); rpc("retire_inventory_item", { p_id: id, p_retired: r === "1" }); });
+    on("[data-saveitem]", async () => {
+      const e = S.editItem || {}, L = S.setupList;
+      const ok = await rpc("set_inventory_item", L === "lumber"
+        ? { p_id: e.id || null, p_list: L, p_section: "Lumber", p_name: null, p_unit: "bd ft", p_std_length_ft: null, p_gl_account: "1201", p_species: val("ei_sp"), p_stock: val("ei_st") }
+        : { p_id: e.id || null, p_list: L, p_section: val("ei_sec"), p_name: val("ei_nm"), p_unit: val("ei_un"), p_std_length_ft: Number(val("ei_len")) || null,
+            p_gl_account: val("ei_gl") || null, p_species: null, p_stock: null });
+      if (ok) { S.editItem = null; render(); }
+    });
+  }
+  const val = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+  function refreshCard(id, li) {
+    const it = itemById(id), line = S.lines.get(id)[li], rows = rowsOf(line.bundles);
+    const t = app.querySelector(`[data-tot="${id}|${li}"]`); if (t) t.innerHTML = `${fracText(rows)} rows = <b class="num">${f0(lineBf(line.length_in, line.width_in, rows, it.stock))}</b> bd ft`;
+    const b = app.querySelector(`[data-bf="${id}"]`); if (b) b.textContent = `${f0(closingBf(id))} bd ft`;
+  }
+
+  // ---------- start ----------
+  async function start(user) {
+    const { data } = await db.from("profiles").select("*").eq("id", user.id).maybeSingle();
+    S.me = { id: user.id, email: user.email, name: (data && data.full_name) || user.email, role: data && data.role };
+    render();
+    if (S.me.role === "manager" || S.me.role === "admin") { await load(); render(); flushLines(); }
+  }
+  (async () => {
+    const { data } = await db.auth.getSession();
+    if (data && data.session) return start(data.session.user);
+    app.innerHTML = `<main><div class="card" style="max-width:460px;margin:30px auto"><h2>Sign in</h2><p class="sub">Use a manager's login.</p>
+      <form id="f"><div class="form" style="grid-template-columns:1fr"><label>Email<input id="e" type="email" autocomplete="username" required></label>
+        <label>Password<input id="p" type="password" autocomplete="current-password" required></label><button class="btn or" type="submit">Sign in</button></div></form>
+      <div id="err" class="banner" style="margin-top:14px" hidden></div></div></main>`;
+    document.getElementById("f").onsubmit = async (e) => {
+      e.preventDefault();
+      const r = await db.auth.signInWithPassword({ email: document.getElementById("e").value.trim(), password: document.getElementById("p").value });
+      if (r.error) { const el = document.getElementById("err"); el.hidden = false; el.textContent = friendlyError(r.error); return; }
+      start(r.data.user);
+    };
+  })();
+})();
+</script>
+</body>
+</html>
