@@ -60,6 +60,7 @@
   .banner{border-radius:10px; padding:12px 16px; margin-bottom:14px; font-weight:600}
   .banner.warn{background:var(--warn-bg); color:var(--warn); border-left:5px solid var(--bright)}
   .banner.info{background:#fff; color:var(--ink2); border:1px solid var(--line)}
+  .banner.ok{background:var(--teal-bg); color:var(--teal-ink); border-left:5px solid var(--teal)}
   h1{font-size:26px; margin:2px 2px 4px}
   .sub{color:var(--ink2); margin:0 2px 16px; font-size:16px}
   .back{background:none; border:none; color:var(--orange); font-weight:700; padding:10px 2px; font-size:18px}
@@ -303,6 +304,17 @@
   .rchip{display:inline-block; font-size:14px; font-weight:700; padding:3px 9px; border-radius:6px; border:1.5px solid var(--midnight); background:#fff; color:var(--midnight); white-space:nowrap}
   .why{font-size:14px; font-weight:600; color:var(--ink2)}
   .sheet .meta .rchip, .sheet .meta .why{display:block; width:max-content; max-width:100%; margin-top:4px}
+  .invlist{background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden}
+  .invgroup{font-weight:700; color:var(--ink2); padding:14px 16px 6px; font-size:15px; background:var(--paper)}
+  .invitem{display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap}
+  .invitem .nm{flex:1 1 240px; min-width:0; font-weight:600}
+  .invitem .nm small{display:block; color:var(--ink2); font-size:14px; font-weight:500}
+  .invitem input{width:92px; min-height:52px; border:1px solid var(--gray); border-radius:10px; padding:6px 10px; font:inherit; font-size:22px; text-align:right; background:#fff}
+  .invitem .u{color:var(--ink2); font-size:15px}
+  .invitem .eq{color:var(--ink2); font-size:15px; min-width:90px; text-align:right}
+  .invbar{position:sticky; bottom:0; background:#fff; border-top:1px solid var(--line); padding:12px 0; display:flex; gap:12px; align-items:center; margin-top:10px}
+  .invbar .invcount{flex:1; color:var(--ink2)}
+  .go.ghost{background:#fff; color:var(--midnight); border:1px solid var(--gray)}
   .subtab .due{display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; margin-left:8px; border-radius:50%;
                background:var(--orange); color:#fff; font-family:'Barlow Condensed',sans-serif; font-size:17px; line-height:1; vertical-align:1px}
   .ktag{display:inline-block; font-size:12px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; padding:2px 7px; border-radius:4px}
@@ -413,7 +425,7 @@ const DEPT_NAME = Object.fromEntries(DEPTS);
 /* Delivery is log-only for now: no work orders to count, no supplies tab. */
 const LOG_ONLY = ["delivery"];
 const ARROW_DEPTS = ["metal", "assembly_qc", "delivery"];
-const TAB_NAME = { work: "Work orders", arrow: "Arrow", qc: "QC", tasks: "Tasks", issues: "Issues", supplies: "Supplies", loadout: "Load-out" };
+const TAB_NAME = { work: "Work orders", arrow: "Arrow", qc: "QC", tasks: "Tasks", issues: "Issues", supplies: "Supplies", loadout: "Load-out", inventory: "Inventory" };
 /* Departments with a stage before them get Ready / All on their queue. The rest can start any time. */
 const HAS_UPSTREAM = ["cnc", "sanding", "finishing", "assembly_qc"];
 /* Tabs from before the 25 Sep build, for a tablet that remembers one */
@@ -448,6 +460,24 @@ function tabsFor(dept) {
   if (isLogOnly(dept)) return [...arrow, "tasks", "issues"];
   return ["work", ...arrow, ...(dept === "assembly_qc" ? ["qc"] : []), "tasks", "issues", "supplies"];
 }
+
+/* ---- Inventory (inventory.sql): a department's month-end count ---- */
+/** The department's count list, if it's showing now: from the last day of the month until the office closes it. */
+function invListFor(lists, dept) { return (lists || []).find(l => l.department === dept && l.open_now) || null; }
+/** The tabs, plus Inventory while the department's count is open. */
+function tabsWithInventory(dept, lists) { const t = tabsFor(dept); return invListFor(lists, dept) ? [...t, "inventory"] : t; }
+/** What goes to send_inventory_count: every item typed, as absolute numbers. Steel as full sticks + loose feet. */
+function invPayload(items, draft) {
+  const out = [];
+  for (const it of items || []) {
+    const d = (draft || {})[it.item_id]; if (!d) continue;
+    if (it.std_length_ft) { if ((d.sticks ?? "") === "" && (d.loose ?? "") === "") continue; out.push({ item_id: it.item_id, sticks: d.sticks === "" ? null : Number(d.sticks), loose_ft: d.loose === "" ? null : Number(d.loose) }); }
+    else { if ((d.n ?? "") === "") continue; out.push({ item_id: it.item_id, qty: Number(d.n) }); }
+  }
+  return out;
+}
+/** Feet from sticks and loose feet */
+const invFeet = (it, d) => (Number((d || {}).sticks) || 0) * Number(it.std_length_ft || 0) + (Number((d || {}).loose) || 0);
 
 /* ---- Ready: what the stage before has cleared for this department ---- */
 /** Put each sheet's `available` (pieces the stages before have finished), what it's waiting on,
@@ -1068,6 +1098,7 @@ if (typeof document !== "undefined") (function () {
     problems: [], probScope: "mine", defects: [], supplies: [], arrow: [], pickJobs: store.get("pickjobs", []),
     pickSheets: {}, piece: {}, qcJob: null, qcEntries: [], arrowForm: null, supplyForm: { item: "", qty: 1, note: "", pick: null, picked: {} }, supplyItems: [],
     openTask: null, modal: null, toast: null, missing: {},
+    invLists: store.get("invlists", []), invItems: [], invDrafts: store.get("invdrafts", {}),
     // photos and load-outs
     photos: [],                 // photos on what's on screen (the piece, the problems list), from the database
     pending: [],                // photos still on this tablet, waiting to send (no image bytes kept here)
@@ -1204,7 +1235,7 @@ if (typeof document !== "undefined") (function () {
   }
 
   function rowsNow() { return withPending(S.rows, S.outbox); }
-  function tabs() { return tabsFor(S.dept); }
+  function tabs() { return tabsWithInventory(S.dept, S.me && S.me.is_test ? [] : S.invLists); }
   function myDepts() { return S.depts; }
   const owns = (d) => S.me && (S.me.role === "manager" || S.me.role === "admin" || (S.me.departments || []).includes(d));
 
@@ -1406,6 +1437,17 @@ if (typeof document !== "undefined") (function () {
     delete S.missing.supplyitems;                    // no list yet just means the typed box, as before
     if (d) S.supplyItems = d;
   }
+  async function loadInvLists() {
+    const d = await read("invlists", db.from("v_inv_tablet_lists").select("*"), "invlists");
+    delete S.missing.invlists;                        // no inventory.sql yet just means no Inventory tab
+    if (d) S.invLists = d;
+    if (!tabs().includes(S.tab) && S.tab === "inventory") S.tab = tabs()[0];
+  }
+  async function loadInvItems() {
+    const l = invListFor(S.invLists, S.dept); if (!l) return;
+    const d = await read("invitems", db.from("v_inv_tablet_items").select("*").eq("list_key", l.list_key), "invitems_" + l.list_key);
+    if (d) S.invItems = d.sort((a, b) => String(a.section).localeCompare(String(b.section)) || a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+  }
   async function loadArrow() {
     const d = await read("arrow", db.from("v_outside_jobs").select("*").eq("voided", false), "arrow");
     if (d) S.arrow = d;
@@ -1457,10 +1499,11 @@ if (typeof document !== "undefined") (function () {
     if (S.tab === "qc") { if (!S.pickJobs.length) loadPickJobs().then(render); return S.qcJob ? loadQc(S.qcJob) : null; }
     if (S.tab === "arrow") return loadArrow();
     if (S.tab === "supplies") return Promise.all([loadSupplies(), loadSupplyItems()]);
+    if (S.tab === "inventory") return loadInvItems();
     if (S.tab === "loadout") { if (!S.pickJobs.length) loadPickJobs().then(render); return loadLoadouts(); }
   }
   async function refreshAll() {
-    await Promise.all([loadFlags(), loadTasks(), loadTypes(), S.tab === "issues" ? null : loadIssues()]);
+    await Promise.all([loadFlags(), loadTasks(), loadTypes(), S.tab === "issues" ? null : loadIssues(), loadInvLists()]);
     await loadTab();
   }
 
@@ -1654,7 +1697,9 @@ if (typeof document !== "undefined") (function () {
     const atArrow = (S.arrow || []).filter(a => a.at_vendor).length;
     const count = { issues: openHere, supplies: toReceive, loadout: openLo, arrow: atArrow };
     // a routine task due (or overdue) shows as a ! on Tasks, instead of pinning it over every screen
+    const inv = invListFor(S.invLists, S.dept), invWaiting = inv && !inv.sent_at && !Object.values(S.logbox).some(e => e.fn === "send_inventory_count" && e.args.p_list === inv.list_key);
     const mark = (t) => t === "tasks" ? (dueHere ? `<span class="due" aria-label="${dueHere} due">!</span>` : "")
+                      : t === "inventory" ? (invWaiting ? `<span class="due" aria-label="count due">!</span>` : "")
                                       : count[t] ? `<span class="c">${count[t]}</span>` : "";
     return `<nav class="subtabs" aria-label="${esc(DEPT_NAME[S.dept])}">${tabs().map(t =>
       `<button class="subtab" data-tab="${t}" aria-current="${S.tab === t}">${TAB_NAME[t]}${mark(t)}</button>`).join("")}</nav>`;
@@ -1675,6 +1720,39 @@ if (typeof document !== "undefined") (function () {
 
   function missingNote(part) {
     return S.missing[part] ? `<div class="banner warn">This part isn't set up in the database yet. Tell Luke — its SQL file needs running.</div>` : "";
+  }
+
+  // ---------- Inventory: the month-end count ----------
+  function invDraft(l) { const k = l.list_key + "_" + l.month_end; return S.invDrafts[k] || (S.invDrafts[k] = {}); }
+  function inventoryScreen() {
+    const l = invListFor(S.invLists, S.dept);
+    if (!l) return `<div class="empty"><b>No count due</b>The Inventory tab shows on the last day of the month.</div>`;
+    const queued = Object.values(S.logbox).some(e => e.fn === "send_inventory_count" && e.args.p_list === l.list_key);
+    const sent = !!l.sent_at, d = invDraft(l), items = S.invItems.filter(i => i.list_key === l.list_key);
+    const month = new Date(l.month_end + "T12:00:00").toLocaleString("en-US", { month: "long" });
+    const quarterly = l.every_months === 3;
+    let n = 0, filled = 0, sec = null, body = "";
+    for (const it of items) {
+      n++;
+      const v = sent ? { n: it.qty ?? "", sticks: it.sticks ?? "", loose: it.loose_ft ?? "" } : (d[it.item_id] || {});
+      const steel = !!it.std_length_ft;
+      const has = steel ? ((v.sticks ?? "") !== "" || (v.loose ?? "") !== "") : (v.n ?? "") !== "";
+      if (has) filled++;
+      if (it.section !== sec) { sec = it.section; body += `<div class="invgroup">${esc(sec || l.name)}</div>`; }
+      const last = it.last_qty === null || it.last_qty === undefined ? "" : ` · last ${quarterly ? "count" : "month"} ${Number(it.last_qty).toLocaleString("en-US")}${steel ? " ft" : ""}`;
+      const shown = it.section && it.name.toLowerCase().startsWith(it.section.toLowerCase() + ", ") ? it.name.slice(it.section.length + 2) : it.name;
+      body += `<div class="invitem"><div class="nm">${esc(shown)}<small>${steel ? `${Number(it.std_length_ft)}' sticks` : esc(it.unit)}${esc(last)}</small></div>` + (steel
+        ? `<input type="number" inputmode="numeric" min="0" value="${esc(v.sticks ?? "")}" data-inv="${esc(it.item_id)}|sticks" aria-label="${esc(it.name)} full sticks" ${sent || queued ? "disabled" : ""}><span class="u">sticks +</span>
+           <input type="number" inputmode="decimal" min="0" value="${esc(v.loose ?? "")}" data-inv="${esc(it.item_id)}|loose" aria-label="${esc(it.name)} loose feet" ${sent || queued ? "disabled" : ""}><span class="u">ft</span>
+           <span class="eq" data-inveq="${esc(it.item_id)}">${has ? "= " + invFeet(it, v).toLocaleString("en-US") + " ft" : ""}</span>`
+        : `<input type="number" inputmode="decimal" min="0" value="${esc(v.n ?? "")}" data-inv="${esc(it.item_id)}|n" aria-label="${esc(it.name)} count" ${sent || queued ? "disabled" : ""}><span class="u">${esc(it.unit)}</span>`) + `</div>`;
+    }
+    const head = sent ? `<div class="banner ok"><b>${esc(l.name)} count sent</b> — by ${esc(l.sent_by_name)}. The office has it. This tab goes away when the office closes ${esc(month)}.</div>`
+      : queued ? `<div class="banner info"><b>Waiting to send.</b> Your count is saved on this tablet and sends itself when the Wi-Fi is back.</div>`
+      : `<div class="banner warn"><b>${esc(l.name)} count for ${esc(month)}.</b> Count what's on the shelves and racks. Leave out anything already set aside for a job in production.${items.some(i => i.std_length_ft) ? " Steel: full sticks, plus the loose feet." : ""}</div>`;
+    return `${missingNote("invitems")}${head}<div class="invlist">${body || `<div class="empty"><b>Nothing on the list</b>Ask the office to add the items.</div>`}</div>
+      <div class="invbar"><span class="invcount">${filled} of ${n} counted${!sent && filled < n ? " — blanks count as 0" : ""}</span>
+        ${sent ? `<button class="go ghost" data-invreopen="${esc(l.list_key)}">Change the count</button>` : queued ? "" : `<button class="go" data-invsend="${esc(l.list_key)}">Send the count</button>`}</div>`;
   }
 
   // ---------- Work orders ----------
@@ -2500,7 +2578,7 @@ if (typeof document !== "undefined") (function () {
     else if (S.tab === "work" && S.view.screen === "sheet") body = sheetScreen();
     else if (S.tab === "work" && S.view.screen === "job") body = jobScreen();
     else {
-      const top = S.tab === "issues" ? issuesScreen() : S.tab === "tasks" ? tasksScreen() : S.tab === "qc" ? qcScreen() : S.tab === "arrow" ? arrowSection() : S.tab === "supplies" ? suppliesScreen()
+      const top = S.tab === "issues" ? issuesScreen() : S.tab === "tasks" ? tasksScreen() : S.tab === "qc" ? qcScreen() : S.tab === "arrow" ? arrowSection() : S.tab === "supplies" ? suppliesScreen() : S.tab === "inventory" ? inventoryScreen()
                 : S.tab === "loadout" ? loadoutScreen() : queueScreen();
       body = subTabs() + top;
     }
@@ -2993,6 +3071,40 @@ if (typeof document !== "undefined") (function () {
       send("record_qc", { p_job: m.jobId, p_sheet: m.sheet, p_result: "fail", p_note: m.text.trim(), p_client_id: null }, "QC");
     });
 
+    // ---- Inventory ----
+    app.querySelectorAll("[data-inv]").forEach(el => el.oninput = () => {
+      const l = invListFor(S.invLists, S.dept); if (!l) return;
+      const [id, part] = el.dataset.inv.split("|"), d = invDraft(l);
+      d[id] = { ...(d[id] || {}), [part]: el.value };
+      store.set("invdrafts", S.invDrafts);
+      const it = S.invItems.find(i => i.item_id === id), eq = app.querySelector(`[data-inveq="${id}"]`);
+      if (eq && it) eq.textContent = (d[id].sticks ?? "") !== "" || (d[id].loose ?? "") !== "" ? "= " + invFeet(it, d[id]).toLocaleString("en-US") + " ft" : "";
+      const items = S.invItems.filter(i => i.list_key === l.list_key), c = app.querySelector(".invcount");
+      const f = items.filter(i => { const x = d[i.item_id] || {}; return i.std_length_ft ? (x.sticks ?? "") !== "" || (x.loose ?? "") !== "" : (x.n ?? "") !== ""; }).length;
+      if (c) c.textContent = `${f} of ${items.length} counted${f < items.length ? " — blanks count as 0" : ""}`;
+    });
+    on("[data-invsend]", (b) => {
+      const l = invListFor(S.invLists, S.dept); if (!l) return;
+      const items = S.invItems.filter(i => i.list_key === l.list_key), payload = invPayload(items, invDraft(l));
+      const blanks = items.length - payload.length;
+      S.modal = { kind: "confirm", title: `Send the ${l.name} count?`, text: blanks ? `${blanks} item${blanks === 1 ? " is" : "s are"} blank and will count as 0.` : "Every item has a number.", yes: "Send it",
+                  run: () => send("send_inventory_count", { p_list: l.list_key, p_counts: payload, p_client_id: null }, `${l.name} count`) };
+      render();
+    });
+    on("[data-invreopen]", async (b) => {
+      const l = invListFor(S.invLists, S.dept); if (!l) return;
+      b.disabled = true;
+      await loadInvItems();                              // the numbers as sent, straight from the database
+      const d = invDraft(l);
+      for (const it of S.invItems.filter(i => i.list_key === l.list_key)) {
+        const had = it.qty !== null && it.qty !== undefined;
+        d[it.item_id] = !it.std_length_ft ? { n: had ? it.qty : "" }
+          : it.sticks !== null && it.sticks !== undefined ? { sticks: it.sticks, loose: it.loose_ft ?? "" } : { sticks: "", loose: had ? it.qty : "" };
+      }
+      store.set("invdrafts", S.invDrafts);
+      send("reopen_inventory_count", { p_list: l.list_key }, "Change the count");
+    });
+
     // ---- Supplies ----
     app.querySelectorAll("[data-sfield]").forEach(el => el.oninput = () => {
       S.supplyForm[el.dataset.sfield] = el.value;
@@ -3058,7 +3170,7 @@ if (typeof document !== "undefined") (function () {
     render();
     await loadRows(); render();
     flush();
-    await Promise.all([loadFlags(), loadTasks(), loadTypes(), S.tab === "issues" ? null : loadIssues()]);
+    await Promise.all([loadFlags(), loadTasks(), loadTypes(), S.tab === "issues" ? null : loadIssues(), loadInvLists()]);
     if (S.tab !== "work") await loadTab();
     render();
     flushLog();
@@ -3089,7 +3201,7 @@ if (typeof module !== "undefined") module.exports = { withFinishBy, finishWords,
   problemState, splitProblems, defectState, splitIssues, withReady, readyOf, readyKnown, waitingText, HAS_UPSTREAM, defectCounts, supplyLine, filterJobs, sheetsText, isNetworkError, friendlyError, DEPTS,
   fitSize, photoPath, photoError, flushPhotobox, loadoutSheets, sizeLabel, loadoutPieces, missingText,
   supplyItemsFor, supplyMissing, supplyText, deliveryPlan, isFreshShot, fmtWhen, deliveryLine,
-  CHAIN, canAdvance, advJobs, advSheets, advShown, advBefore, advHere, advTidy, advChanges, withAdvPending };
+  CHAIN, canAdvance, advJobs, advSheets, advShown, advBefore, advHere, advTidy, advChanges, withAdvPending, invListFor, tabsWithInventory, invPayload, invFeet };
 </script>
 </body>
 </html>
