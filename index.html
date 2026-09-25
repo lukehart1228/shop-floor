@@ -86,6 +86,9 @@
   .jname{color:var(--ink2); flex:1 1 0; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .due{color:var(--ink2); font-size:16px; white-space:nowrap}
   .due b{color:var(--midnight)}
+  .due.fb{display:inline-flex; flex-direction:column; align-items:flex-end; line-height:1.3}
+  .due .deliv{font-size:13px; color:var(--ink2)}
+  .head .hsub.wrap{white-space:normal; overflow:visible}
   .tally{display:flex; align-items:center; gap:12px; margin-top:10px}
   .tally .big{font-size:40px; font-weight:700; line-height:.9}
   .tally .of{color:var(--ink2); white-space:nowrap}
@@ -456,6 +459,30 @@ function withReady(rows, ready) {
     return x ? { ...r, available: x.available, waiting_on: x.waiting_on || [], at_arrow: !!x.at_arrow } : r;
   });
 }
+/* Finish-by dates (finish_by.sql): each department works to its own date, Monday's delivery
+   date minus its days, worked out in the database. Merged onto the rows like "ready" above;
+   rows the view didn't return keep the old delivery-date line. */
+function withFinishBy(rows, fb) {
+  const by = new Map((fb || []).map(f => [f.job_id, f]));
+  return (rows || []).map(r => {
+    const x = by.get(r.job_id);
+    return x ? { ...r, finish_by: x.finish_by || null, fb_label: x.label } : r;
+  });
+}
+/** Before the date "n days left", on it "today", after it "n days past". Words only: no colour. */
+function finishWords(n) {
+  if (n === null || n === undefined) return "";
+  if (n > 0) return `${n} day${n === 1 ? "" : "s"} left`;
+  if (n === 0) return "today";
+  return `${-n} day${n === -1 ? "" : "s"} past`;
+}
+/** What a card or job header says about dates, or null when the finish-by date isn't known (then the old line shows). */
+function dateLine(j, allDone, today = new Date()) {
+  if (!j || !j.fb_label) return null;
+  if (!j.delivery_date || !j.finish_by) return { main: "No delivery date", when: "", delivery: "" };
+  return { main: `${j.fb_label} ${fmtDate(j.finish_by)}`, when: allDone ? "Done" : finishWords(daysLeft(j.finish_by, today)),
+           delivery: `Delivery ${fmtDate(j.delivery_date)}` };
+}
 const readyKnown = (rows) => (rows || []).length > 0 && rows.every(r => typeof r.available === "number");
 /** Pieces this department could pick up on a sheet right now. Worked out from the current count, so it moves as you count. */
 function readyOf(r) {
@@ -511,6 +538,7 @@ function buildQueue(rows, flags = [], dept = null) {
     if (!jobs.has(r.job_id)) jobs.set(r.job_id, {
       job_id: r.job_id, project_id: r.project_id, name: r.job_name,
       delivery_date: r.delivery_date, materials_ordered: r.materials_ordered, is_test: !!r.is_test,
+      finish_by: r.finish_by, fb_label: r.fb_label,
       done: 0, total: 0, sheets: 0, sheetsDone: 0, ready: null });
     const j = jobs.get(r.job_id);
     const rd = readyOf(r);
@@ -1214,6 +1242,18 @@ if (typeof document !== "undefined") (function () {
       try { rr = await db.from("v_ready_to_work").select("sheet_id, available, waiting_on, at_arrow").eq("department", S.dept); } catch (e) { rr = { error: e }; }
       if (rr && !rr.error && Array.isArray(rr.data)) rows = withReady(rows, rr.data);
     }
+    // each job's finish-by date for this department (finish_by.sql). If it can't be read this time,
+    // keep the dates this tablet last had; if it never could, cards keep the delivery date.
+    if (rows.length) {
+      let fb;
+      try { fb = await db.from("v_finish_by").select("job_id, finish_by, label").eq("department", S.dept).in("job_id", [...new Set(rows.map(r => r.job_id))]); }
+      catch (e) { fb = { error: e }; }
+      if (fb && !fb.error && Array.isArray(fb.data)) rows = withFinishBy(rows, fb.data);
+      else {
+        const before = (store.get("rows_" + S.dept, null) || { rows: [] }).rows.filter(r => r.fb_label);
+        rows = withFinishBy(rows, before.map(r => ({ job_id: r.job_id, finish_by: r.finish_by, label: r.fb_label })));
+      }
+    }
     S.rows = rows; S.rowsAt = new Date().toISOString(); S.fromCache = false;
     store.set("rows_" + S.dept, { rows: S.rows, at: S.rowsAt });
     prefetchPages();
@@ -1662,11 +1702,14 @@ if (typeof document !== "undefined") (function () {
     return head + q.map(j => {
       const pct = j.total ? Math.round(j.done / j.total * 100) : 0;
       const dl = daysLeft(j.delivery_date);
+      const fb = dateLine(j, j.done >= j.total);
+      const due = fb ? `<span class="due fb"><span>${esc(fb.main)}${fb.when ? ` · <b>${esc(fb.when)}</b>` : ""}</span>${fb.delivery ? `<small class="deliv">${esc(fb.delivery)}</small>` : ""}</span>`
+                     : `<span class="due">Due ${esc(fmtDate(j.delivery_date))}${dl === null ? "" : ` · <b>${esc(daysText(dl))}</b>`}</span>`;
       const marks = [flagTag(j.flag)].filter(Boolean);
       if (split) marks.push(j.ready > 0 ? `<span class="rchip">${j.ready} piece${j.ready === 1 ? "" : "s"} ready</span>` : `<span class="why">Nothing ready yet</span>`);
       return `<button class="job${j.flag && j.flag.level !== "watch" ? " f-" + j.flag.level : ""}" data-job="${esc(j.job_id)}">
         <div class="job-top"><span class="pid">${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</span><span class="jname" title="${esc(j.name)}">${esc(j.name)}</span>
-          <span class="due">Due ${esc(fmtDate(j.delivery_date))}${dl === null ? "" : ` · <b>${esc(daysText(dl))}</b>`}</span></div>
+          ${due}</div>
         <div class="tally"><span class="big num">${j.done}</span><span class="of num">/ ${j.total} pieces</span>
           <span class="bar"><i style="width:${pct}%"></i></span></div>
         ${marks.length ? `<div class="marks">${marks.join("")}</div>` : ""}
@@ -1680,9 +1723,12 @@ if (typeof document !== "undefined") (function () {
     const j = list[0];
     const done = list.reduce((a, r) => a + Math.min(r.qty_done, r.qty_required), 0);
     const total = list.reduce((a, r) => a + r.qty_required, 0);
+    const fb = dateLine(j, done >= total);
+    const when = fb ? [fb.main + (fb.when ? " · " + fb.when : ""), `${done} of ${total} pieces done`, fb.delivery].filter(Boolean).join(" · ")
+                    : `due ${fmtDate(j.delivery_date)} · ${done} of ${total} pieces done`;
     return `<div class="head"><button class="back" data-back="queue">← ${esc(DEPT_NAME[S.dept])}</button>
       <h1>${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</h1>
-      <span class="hsub">${esc(j.job_name)} · due ${esc(fmtDate(j.delivery_date))} · ${done} of ${total} pieces done</span></div>
+      <span class="hsub${fb ? " wrap" : ""}">${esc(j.job_name)} · ${esc(when)}</span></div>
       ${flagBand(flagFor(S.flags, j.job_id, S.dept))}
       ${list.map(r => {
         const full = r.qty_done >= r.qty_required;
@@ -3038,7 +3084,7 @@ if (typeof document !== "undefined") (function () {
 })();
 
 /* lets the core be tested outside a browser */
-if (typeof module !== "undefined") module.exports = { keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
+if (typeof module !== "undefined") module.exports = { withFinishBy, finishWords, dateLine, keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
   daysLeft, daysText, fmtDate, localISO, daysSince, agoText, setPending, flushOutbox, newId, queueEntry, flushLogbox, dueForMe, taskWhen,
   problemState, splitProblems, defectState, splitIssues, withReady, readyOf, readyKnown, waitingText, HAS_UPSTREAM, defectCounts, supplyLine, filterJobs, sheetsText, isNetworkError, friendlyError, DEPTS,
   fitSize, photoPath, photoError, flushPhotobox, loadoutSheets, sizeLabel, loadoutPieces, missingText,
