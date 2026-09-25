@@ -721,7 +721,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "25 Sep 2026 · finish-by";
+const OFFICE_VERSION = "25 Sep 2026 · inventory";
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -835,13 +835,15 @@ if (typeof document !== "undefined") (function () {
     catch (e) { if (/does not exist|schema cache|could not find/i.test(String(e.message))) S.missing = true; else S.notice = friendlyError(e); return null; }
   }
   async function loadCounts() {
-    const [probs, flags, sup, arr, set, defs, metal] = await Promise.all([
+    const [probs, flags, sup, arr, set, defs, metal, inv] = await Promise.all([
       soft(db.from("v_problems").select("*")), soft(db.from("v_flags").select("*").eq("is_open", true)),
       soft(db.from("v_supply_requests").select("*").eq("is_open", true)), soft(db.from("v_outside_jobs").select("*").eq("at_vendor", true)),
       soft(db.from("app_settings").select("*")), soft(db.from("v_defects").select("*").eq("voided", false)),
-      quiet(db.from("v_metal_cut_sheets").select("*"))]);      // ready_issues.sql; quiet if it hasn't been run
+      quiet(db.from("v_metal_cut_sheets").select("*")),       // ready_issues.sql; quiet if it hasn't been run
+      quiet(db.from("v_inv_needs").select("*"))]);             // inventory.sql; quiet if it hasn't been run
     if (probs) S.problems = probs;
     if (defs) S.defects = defs;
+    S.inv = inv || [];
     S.metal = (metal || []).slice().sort((a, b) => String(a.delivery_date || "9999").localeCompare(String(b.delivery_date || "9999")));
     if (flags) S.flags = flags.concat((S.flags || []).filter(f => !f.is_open));
     if (sup) S.supplies = sup.concat((S.supplies || []).filter(r => !r.is_open));
@@ -948,6 +950,7 @@ if (typeof document !== "undefined") (function () {
       handoffs: S.tasks.length,
       problems: officeIssues(S.problems, S.defects).open.length,
       metal: (S.metal || []).length,
+      inventory: (S.inv || []).length,
       flags: staleFlags(S.flags).length,
       ordering: needToOrder(S.supplies).reduce((a, g) => a + g.lines.length, 0),
       arrow: (S.arrow || []).filter(a => a.at_vendor && a.days_out > S.arrowDays).length,
@@ -955,7 +958,7 @@ if (typeof document !== "undefined") (function () {
     };
     // everything that needs the office is on one tab, so only that tab carries a number
     c.sync = syncProblem() ? 1 : 0;
-    c.tasks = c.handoffs + c.problems + c.metal + c.flags + c.ordering + c.arrow + c.photos + c.sync;
+    c.tasks = c.handoffs + c.problems + c.metal + c.flags + c.ordering + c.arrow + c.photos + c.sync + c.inventory;
     return c;
   }
   function topBar() {
@@ -990,6 +993,7 @@ if (typeof document !== "undefined") (function () {
         <a href="office.html" aria-current="page">Office<small>You're here</small></a>
         <a href="upload.html">Upload a work order<small>The generator's upload file</small></a>
         <a href="delivery.html">Deliveries<small>Schedule, signed tickets</small></a>
+        <a href="inventory.html">Inventory<small>Month-end counts, scrap rate</small></a>
         <a href="index.html">Tablet app<small>What the floor sees, as your login</small></a>
         <div class="mline"></div>
         <button class="mitem" data-tab="setup" aria-current="${S.tab === "setup" && !S.jobView}">Setup<small>Monday, catch-up, test jobs, TV link, lists</small></button>
@@ -1341,6 +1345,9 @@ if (typeof document !== "undefined") (function () {
         : ps.building ? `Photo archive ${esc(ps.building)} was started but hasn't been saved yet.`
         : `${ps.eligible} photo${ps.eligible === 1 ? " is" : "s are"} ready to archive${ps.last_batch ? ` — the last archive was ${ps.days_since_last} days ago` : ""}.`}</p>
         <button class="go" data-tab="photos">Open Photos</button></div>`));
+
+    if ((S.inv || []).length) parts.push(sec("inventory", "Inventory", S.inv.length, `<div class="panel">${S.inv.map(n => `
+        <div class="task"><div class="what">${esc(n.text)}</div><div class="detail"><a href="inventory.html">Open the Inventory page</a></div></div>`).join("")}</div>`));
 
     if ((S.metal || []).length) parts.push(sec("metal", "Needs metal cut sheets", S.metal.length, `<p class="sub">Jobs where Monday's Metal Status says “Not Ready”. Each clears by itself within 15 minutes of Metal Status changing in Monday.</p>
       <div class="panel">${S.metal.map(t => { const d = daysLeft(t.delivery_date); return `
