@@ -111,6 +111,12 @@
   @media (max-width: 1000px){ .jobcols{grid-template-columns:minmax(0,1fr)} }
   .grid{display:grid; gap:6px; font-size:15px; min-width:min-content}
   .grid .gh{font-weight:700; text-align:center; padding:4px 2px; line-height:1.15; align-self:end}
+  .grid .gh .fbd{display:block; font-weight:400; font-size:12px; color:var(--ink2); margin-top:3px}
+  .grid .gh .fbd b{color:var(--midnight); font-weight:600}
+  .fbrow{display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--line); flex-wrap:wrap}
+  .fbrow .nm{flex:0 0 140px; font-weight:600; white-space:nowrap}
+  .panel .fbrow input.in{width:84px; flex:none; text-align:center}
+  .fbrow .who{flex:1 1 200px; color:var(--ink2); font-size:13px}
   .grid .gs{padding:6px 0; line-height:1.15; white-space:nowrap}
   .grid .gs small{display:block; color:var(--ink2); font-size:14px}
   .grid .c{font-family:'Barlow Condensed',sans-serif; font-variant-numeric:tabular-nums; text-align:center; border-radius:8px; padding:9px 4px; font-weight:700; font-size:18px}
@@ -715,7 +721,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "25 Sep 2026";
+const OFFICE_VERSION = "25 Sep 2026 · finish-by";
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -752,6 +758,15 @@ function jobMatches(jobs, text, max = 8) {
   return jobs.filter(hit)
     .sort((a, b) => (b.is_active - a.is_active) || (a.is_test - b.is_test) || String(b.project_id).localeCompare(String(a.project_id)))
     .slice(0, max);
+}
+
+// finish-by dates (finish_by.sql): what a department's column says under its name. Words only, no colour.
+function finishByLabel(f) {
+  if (!f) return null;
+  if (!f.finish_by) return { main: "No delivery date", when: "" };
+  const n = f.days_left;
+  const when = f.all_done ? "Done" : n > 0 ? `${n} day${n === 1 ? "" : "s"} left` : n === 0 ? "today" : `${-n} day${n === -1 ? "" : "s"} past`;
+  return { main: `${f.label} ${fmtDate(f.finish_by)}`, when };
 }
 
 // the job page's grid: a row per sheet, a column per department that touches the job
@@ -906,6 +921,9 @@ if (typeof document !== "undefined") (function () {
         try { S.supItems = await q(db.from("supply_items").select("*")) || []; S.supMissing = false; }
         catch (e) { if (/does not exist|schema cache|could not find/i.test(String(e.message))) S.supMissing = true; else S.notice = friendlyError(e); }
         if (set) { const t = set.find(s => s.key === "tv_link_made"); S.tvMade = t || null; }
+        const [fbd, fbh] = await Promise.all([quiet(db.from("v_finish_by_days").select("*")),
+          quiet(db.from("finish_by_days").select("*").order("set_at", { ascending: false }))]);   // finish_by.sql
+        S.fbMissing = !fbd; if (fbd) { S.fbDays = fbd.sort((a, b) => a.sort_order - b.sort_order); S.fbHist = fbh || []; }
         S.columns = await q(db.from("monday_columns").select("*"));
         const log = await q(db.from("monday_sync_log").select("run_at, ok, summary, problems").order("run_at", { ascending: false }).limit(1));
         S.lastSync = (log || [])[0] || null;
@@ -1005,9 +1023,10 @@ if (typeof document !== "undefined") (function () {
       quiet(db.from("v_defects").select("*").eq("job_id", id).eq("voided", false)),
       quiet(db.from("v_loadouts").select("*").eq("job_id", id)),
       quiet(db.from("v_photos").select("id").eq("job_id", id).eq("voided", false))]);
+    const finishBy = await quiet(db.from("v_finish_by").select("*").eq("job_id", id));   // finish_by.sql; the grid goes without if it isn't there
     if (S.jobView !== id) return;                     // they moved on while it loaded
     S.job = { id, job, wo: cur, sheets, progress: progress || [], flags: flags || [], problems: problems || [], arrow: arrow || [],
-              defects: defects || [], loadouts: loadouts || [], photoCount: photos ? photos.length : null };
+              defects: defects || [], loadouts: loadouts || [], photoCount: photos ? photos.length : null, finishBy: finishBy || [] };
   }
   async function openJob(id) {
     S.jobBack = S.jobView ? S.jobBack : S.tab;
@@ -1038,7 +1057,8 @@ if (typeof document !== "undefined") (function () {
       : `<div class="gkey" style="margin-bottom:10px"><span><i style="background:var(--teal)"></i>Complete</span><span><i style="background:var(--sawdust); border:1px solid var(--gray)"></i>Started</span>
            <span><i style="background:#fff; border:1px solid var(--gray)"></i>Not started</span><span>— not this department</span></div>
          <div class="scroll"><div class="grid" style="${cols}">
-           <div></div>${g.depts.map(d => `<div class="gh">${esc(DEPT_NAME[d])}</div>`).join("")}
+           <div></div>${g.depts.map(d => { const f = finishByLabel(J.finishBy.find(x => x.department === d));
+             return `<div class="gh">${esc(DEPT_NAME[d])}${f ? `<small class="fbd">${esc(f.main)}${f.when ? `<br><b>${esc(f.when)}</b>` : ""}</small>` : ""}</div>`; }).join("")}
            <div class="gs tot"><b>Whole job</b><small>${pieces} pieces</small></div>
            ${g.totals.map(t => `<div class="tot"><div class="c">${t.done}/${t.req}</div><div class="tbar"><i class="${t.done >= t.req ? "full" : ""}" style="width:${t.pct}%"></i></div></div>`).join("")}
            ${g.rows.map(r => `<div class="gs"><b>Sheet ${r.n}</b><small>${esc(r.code)}</small></div>${r.cells.map(c => `<div class="c ${c.kind}">${esc(c.text)}</div>`).join("")}`).join("")}
@@ -1465,6 +1485,21 @@ if (typeof document !== "undefined") (function () {
       </section>
 
       <section class="panel">
+        <h2>Finish-by days</h2>
+        <p class="sub">How many days before Monday's delivery date each department's <b>last piece</b> must be done. Each supervisor's job cards show their own date. Calendar days; a date on a weekend stays there. Delivery keeps the delivery date. Every change is kept.</p>
+        ${S.fbMissing ? `<div class="banner warn" style="margin:0">Finish-by dates aren't set up in the database yet. Run <b>finish_by.sql</b> in the SQL Editor, wait a minute, then reload.</div>`
+          : (S.msg && S.msgFrom === "fb" ? `<div class="banner ${S.msg.ok ? "ok" : "warn"}" style="margin:0 0 8px">${esc(S.msg.text)}</div>` : "")
+            + (S.fbDays || []).map(f => `<div class="fbrow"><span class="nm">${esc(f.department_name)}</span>
+                <input class="in num" type="number" min="0" max="90" step="1" inputmode="numeric" value="${f.days}" data-fbdays="${esc(f.department)}" aria-label="${esc(f.department_name)}: days before delivery">
+                <span>days before</span>
+                <button class="plain" data-fbsave="${esc(f.department)}" ${S.busy ? "disabled" : ""}>Save</button>
+                <span class="who">${f.changes ? `Changed by ${esc(f.set_by_name)}, ${esc(ago(f.set_at))}` : "Starting number"}</span></div>`).join("")
+            + ((S.fbHist || []).some(h => h.set_by_name !== "Starting number") ? `<details class="more"><summary>Every change</summary>
+                ${(S.fbHist || []).filter(h => h.set_by_name !== "Starting number").map(h => `<div class="typ"><span>${esc(DEPT_NAME[h.department] || h.department)}: ${h.days} days</span>
+                  <span class="meta2">${esc(h.set_by_name)}, ${esc(fmtWhen(h.set_at))}</span></div>`).join("")}</details>` : "")}
+      </section>
+
+      <section class="panel">
         <h2>Supply lists</h2>
         <p class="sub">What each department taps on its tablet's Supplies tab. An item can have up to two sets of choices, like the wood and the thickness; the tablet won't send it until each is picked, and the office sees the full wording ("Plywood — White Oak, 3/4 MDF"). Anything not on the list can still be typed. Retiring takes an item off the tablets; past requests keep it.</p>
         ${S.supMissing ? `<div class="banner warn" style="margin:0">Supply lists aren't set up in the database yet. Run <b>supply_lists.sql</b> in the SQL Editor, wait a minute, then reload.</div>`
@@ -1870,6 +1905,9 @@ if (typeof document !== "undefined") (function () {
       act("not_ordering_supply", { p_request: b.dataset.nosave, p_reason: reason }, () => { S.notOrdering = null; S.oticked.delete(b.dataset.nosave); }); });
     on("[data-oreceive]", (b) => { if (confirm("Mark this received? It leaves every list.")) act("receive_supply", { p_request: b.dataset.oreceive }); });
 
+    on("[data-fbsave]", (b) => { const d = b.dataset.fbsave, box = app.querySelector(`[data-fbdays="${d}"]`);
+      const v = box && box.value.trim() !== "" && /^\d+$/.test(box.value.trim()) ? Number(box.value) : null;
+      act("set_finish_by_days", { p_department: d, p_days: v }, null, "fb"); });
     on("[data-ardays]", () => act("set_arrow_alert_days", { p_days: Number((app.querySelector("#arDays") || {}).value) }));
     on("[data-arret]", (b) => { if (confirm("Mark this back from Arrow today?")) act("return_from_arrow", { p_item: b.dataset.arret, p_returned_on: null }); });
     on("[data-arvoid]", (b) => { if (confirm("Mark this entered by mistake? It comes off the lists and stays in history.")) act("void_arrow", { p_item: b.dataset.arvoid, p_reason: null }); });
@@ -2079,7 +2117,7 @@ if (typeof document !== "undefined") (function () {
 })();
 
 /* lets the core be tested outside a browser */
-if (typeof module !== "undefined") module.exports = { keyProblem, isManager, daysLeft, fmtDate, daysText, ago, buildTasks, lastChanges, groupRules, ruleDepartments, catchUpTotals, pinHash, validPin, isNetworkError, friendlyError,
+if (typeof module !== "undefined") module.exports = { finishByLabel, keyProblem, isManager, daysLeft, fmtDate, daysText, ago, buildTasks, lastChanges, groupRules, ruleDepartments, catchUpTotals, pinHash, validPin, isNetworkError, friendlyError,
   localISO, daysSince, problemState, officeProblems, defectOfficeState, officeIssues, staleFlags, openFlags, needToOrder, orderedNotReceived, defectSummary, tvLink, taskWhen,
   crc32, makeZip, photoCsv, csvCell, fmtBytes, normProject, BATCH_STATE,
   fileCsv, filingItem, atDate, buildSignedTicket, pdfText, wrapText, signedFileName, fmtWhen, shopDate,
