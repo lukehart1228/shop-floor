@@ -121,6 +121,24 @@
   .drawer{position:fixed; inset:0; z-index:40; background:rgba(24,29,46,.35); display:flex; justify-content:flex-end}
   .drawer .pane{background:#fff; width:min(620px,100%); height:100%; overflow:auto; padding:18px 18px 40px}
   .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--midnight); color:var(--sawdust); padding:12px 20px; border-radius:10px; font-weight:600; z-index:60; max-width:90vw}
+  /* department counts: laid out like the tablet's Inventory tab */
+  .seg{display:flex; gap:6px; flex-wrap:wrap; margin:0 2px 14px}
+  .seg button{background:#fff; border:1px solid var(--gray); border-radius:10px; padding:8px 14px; min-height:46px; font-weight:700}
+  .seg button[aria-pressed="true"]{background:var(--midnight); color:var(--sawdust); border-color:var(--midnight)}
+  .seg button .mk{margin-left:6px; font-weight:700}
+  .seg button .mk.ok{color:var(--teal)}
+  .invlist{background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:12px}
+  .invgroup{background:var(--paper); font-weight:700; color:var(--ink2); padding:8px 16px; font-size:14px; text-transform:uppercase; letter-spacing:.04em}
+  .invitem{display:flex; align-items:center; gap:8px; padding:10px 16px; border-top:1px solid var(--line); flex-wrap:wrap}
+  .invgroup+.invitem{border-top:none}
+  .invitem .nm{flex:1 1 240px; font-weight:600}
+  .invitem .nm small{display:block; font-weight:500; color:var(--ink2); font-size:14px}
+  .invitem input{width:92px; min-height:46px; border:1px solid var(--gray); border-radius:8px; padding:6px 10px; font-size:20px; text-align:right; background:#fff}
+  .invitem input:disabled{background:var(--paper); color:var(--midnight); opacity:1}
+  .invitem .u{color:var(--ink2); font-size:14px; min-width:40px}
+  .invitem .eq{color:var(--ink2); font-size:14px; min-width:70px}
+  .invbar{position:sticky; bottom:0; background:var(--paper); display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:10px 2px}
+  .invbar .invcount{flex:1; font-weight:600}
   @media (max-width:700px){ .brand{display:none} h2{font-size:22px} .bundle .lbl{width:100%} }
 </style>
 </head>
@@ -221,6 +239,19 @@ function currentMatches(rows) {
   return by;
 }
 const norm = (s) => String(s || "").toLowerCase().replace(/[\s\-_]+/g, " ").trim();
+/** Department counts from the office: every item typed, as absolute numbers (steel as full sticks + loose feet).
+ *  The same shape the tablet sends. Items left blank aren't sent; the database counts them as 0. */
+function deptPayload(items, draft) {
+  const out = [];
+  for (const it of items || []) {
+    const d = (draft || {})[it.id]; if (!d) continue;
+    if (it.std_length_ft) { if ((d.sticks ?? "") === "" && (d.loose ?? "") === "") continue; out.push({ item_id: it.id, sticks: d.sticks === "" || d.sticks === undefined ? null : Number(d.sticks), loose_ft: d.loose === "" || d.loose === undefined ? null : Number(d.loose) }); }
+    else { if ((d.n ?? "") === "") continue; out.push({ item_id: it.id, qty: Number(d.n) }); }
+  }
+  return out;
+}
+const deptFeet = (it, d) => (Number((d || {}).sticks) || 0) * Number(it.std_length_ft || 0) + (Number((d || {}).loose) || 0);
+const deptHas = (it, d) => it.std_length_ft ? ((d || {}).sticks ?? "") !== "" || ((d || {}).loose ?? "") !== "" : ((d || {}).n ?? "") !== "";
 
 /* ---- end core ---- */
 
@@ -243,13 +274,14 @@ if (typeof document !== "undefined") (function () {
     return;
   }
   const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  const TABS = [["month", "This month"], ["lumber", "Lumber count"], ["deliveries", "Deliveries in"], ["rollover", "Month-end"], ["scrap", "Scrap rate"], ["values", "Values"], ["setup", "Setup"]];
+  const TABS = [["month", "This month"], ["lumber", "Lumber count"], ["dept", "Department counts"], ["deliveries", "Deliveries in"], ["rollover", "Month-end"], ["scrap", "Scrap rate"], ["values", "Values"], ["setup", "Setup"]];
   const S = {
     me: null, tab: store.get("tab", "month"), loaded: false, missing: false, msg: null, toast: null,
     month: null, status: [], months: [], items: [], prices: new Map(), curLines: [], prevLines: [], lines: new Map(),
     closeByMonth: [], receipts: [], pool: [], scrap: [], values: [], rules: [], matches: [],
     open: store.get("open", {}), pickMonth: null, drill: null, setupList: "lumber", editItem: null,
     pending: store.get("pending_lines", {}), saving: false,
+    counts: [], deptList: store.get("deptlist", "plywood"), deptDrafts: store.get("deptdrafts", {}),
   };
 
   // ---------- data ----------
@@ -259,7 +291,7 @@ if (typeof document !== "undefined") (function () {
       const status = await q(db.from("v_inv_status").select("*"));
       S.status = status; S.month = status[0] ? status[0].month_end : null;
       const prev = S.month ? prevMonthEnd(S.month) : null;
-      const [months, items, prices, lines, close, rec, pool, scrap, values, rules, matches] = await Promise.all([
+      const [months, items, prices, lines, close, rec, pool, scrap, values, rules, matches, counts] = await Promise.all([
         q(db.from("inv_months").select("*").order("month_end", { ascending: false })),
         q(db.from("inv_items").select("*")),
         q(db.from("v_inv_prices").select("*")),
@@ -271,8 +303,9 @@ if (typeof document !== "undefined") (function () {
         q(db.from("v_inv_values").select("*")),
         q(db.from("inv_thickness_rules").select("*").order("from_in")),
         q(db.from("inv_species_matches").select("*")),
+        S.month ? q(db.from("inv_counts").select("month_end,item_id,qty,sticks,loose_ft").lte("month_end", S.month)) : [],
       ]);
-      Object.assign(S, { months, items, closeByMonth: close, receipts: rec, pool, scrap, values, rules, matches });
+      Object.assign(S, { months, items, closeByMonth: close, receipts: rec, pool, scrap, values, rules, matches, counts });
       S.prices = new Map(prices.map(p => [p.item_id, p]));
       S.curLines = lines.filter(l => l.month_end === S.month); S.prevLines = lines.filter(l => l.month_end === prev);
       rebuildLines();
@@ -367,7 +400,7 @@ if (typeof document !== "undefined") (function () {
       k === "rollover" && !monthRow().rollover_done_at && !closed() ? `<span class="badge">!</span>` : ""}${k === "setup" && probs ? `<span class="badge">${probs}</span>` : ""}</button>`).join("");
     const head = (S.msg ? `<div class="banner ${S.msg.ok ? "ok" : ""}">${esc(S.msg.text)}</div>` : "")
       + (closed() ? `<div class="banner ok">${esc(monthName(S.month))} is closed<small>Closed by ${esc(monthRow().closed_by_name || "")}. Its numbers and prices are saved as they were.</small></div>` : "");
-    const body = { month: viewMonth, lumber: viewLumber, deliveries: viewDeliveries, rollover: viewRollover, scrap: viewScrap, values: viewValues, setup: viewSetup }[S.tab] || viewMonth;
+    const body = { month: viewMonth, lumber: viewLumber, dept: viewDept, deliveries: viewDeliveries, rollover: viewRollover, scrap: viewScrap, values: viewValues, setup: viewSetup }[S.tab] || viewMonth;
     app.innerHTML = `<main>${head}${body()}</main>${S.drill ? drillPane() : ""}${S.toast ? `<div class="toast" role="status">${esc(S.toast)}</div>` : ""}`;
     wire();
     showSaving();
@@ -382,7 +415,7 @@ if (typeof document !== "undefined") (function () {
       return `<div class="stat ${due ? (s.done ? "done" : "") : "off"}"><div class="t">${esc(s.name)}</div>
         <div class="o">${esc(s.department_name || "Office")} · ${s.every_months === 1 ? "monthly" : "every three months"}</div>
         ${s.list_key === "lumber" ? `<div class="num" style="font-size:26px;font-weight:700;margin-top:6px">${f0(lumberTot)} bd ft</div>` : ""}
-        <div class="s">${esc(st)}</div></div>`;
+        <div class="s">${esc(st)}</div>${s.list_key !== "lumber" && due ? `<button class="link" data-golist="${esc(s.list_key)}">${s.done ? "See the count" : "Open the list"}</button>` : ""}</div>`;
     }).join("");
     const probs = S.pool.filter(p => p.problem && !p.rolled).length;
     const allIn = S.status.every(s => !s.due || s.done);
@@ -401,6 +434,49 @@ if (typeof document !== "undefined") (function () {
           ${closed() ? `<span class="muted">Closed.</span>` : `<button class="btn or" data-close ${canClose ? "" : "disabled"}>Close ${esc(monthShort(m))}</button>
           <span class="note">Closing saves the counts, the sheets and today's prices for good. It can't be done before ${esc(dayShort(m))}.</span>`}
         </div></div>`;
+  }
+
+  // ---- a department's list, as its tablet shows it; the office can count and send it on their behalf ----
+  const DEPT_LISTS = () => S.status.filter(s => s.list_key !== "lumber");
+  function deptDraft(key) { const k = key + "_" + S.month; return S.deptDrafts[k] || (S.deptDrafts[k] = {}); }
+  const deptItems = (key) => S.items.filter(i => i.list_key === key && !i.retired).sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+  function lastCount(itemId) { let best = null; for (const c of S.counts) if (c.item_id === itemId && c.month_end < S.month && (!best || c.month_end > best.month_end)) best = c; return best; }
+  const curCount = (itemId) => S.counts.find(c => c.item_id === itemId && c.month_end === S.month) || null;
+  function viewDept() {
+    const lists = DEPT_LISTS();
+    if (!lists.some(l => l.list_key === S.deptList)) S.deptList = lists[0] ? lists[0].list_key : null;
+    const s = statusOf(S.deptList); if (!s.list_key) return `<h2>Department counts</h2><p class="sub">No department lists yet.</p>`;
+    const dept = s.department_name || s.name, m = monthShort(S.month), sent = !!s.done, locked = sent || closed();
+    const canSend = s.due && !sent && !closed() && s.count_day_reached;
+    const quarterly = s.every_months === 3, items = deptItems(s.list_key), d = deptDraft(s.list_key);
+    let filled = 0, sec = null, body = "";
+    for (const it of items) {
+      const cur = curCount(it.id), steel = !!it.std_length_ft;
+      const v = locked ? (cur ? (steel && cur.sticks !== null && cur.sticks !== undefined ? { sticks: cur.sticks, loose: cur.loose_ft ?? "" } : steel ? { sticks: "", loose: cur.qty } : { n: cur.qty }) : {}) : (d[it.id] || {});
+      const has = deptHas(it, v); if (has) filled++;
+      if (it.section !== sec) { sec = it.section; body += `<div class="invgroup">${esc(sec || s.name)}</div>`; }
+      const lc = lastCount(it.id);
+      const last = lc ? ` · last ${quarterly ? "count" : "month"} ${Number(lc.qty).toLocaleString("en-US")}${steel ? " ft" : ""}` : "";
+      const shown = it.section && it.name.toLowerCase().startsWith(it.section.toLowerCase() + ", ") ? it.name.slice(it.section.length + 2) : it.name;
+      const dis = locked || !s.due ? "disabled" : "";
+      body += `<div class="invitem"><div class="nm">${esc(shown)}<small>${steel ? `${Number(it.std_length_ft)}' sticks` : esc(it.unit)}${esc(last)}</small></div>` + (steel
+        ? `<input type="number" inputmode="numeric" min="0" value="${esc(v.sticks ?? "")}" data-dinv="${esc(it.id)}|sticks" aria-label="${esc(it.name)} full sticks" ${dis}><span class="u">sticks +</span>
+           <input type="number" inputmode="decimal" min="0" value="${esc(v.loose ?? "")}" data-dinv="${esc(it.id)}|loose" aria-label="${esc(it.name)} loose feet" ${dis}><span class="u">ft</span>
+           <span class="eq" data-deq="${esc(it.id)}">${has ? "= " + deptFeet(it, v).toLocaleString("en-US") + " ft" : ""}</span>`
+        : `<input type="number" inputmode="decimal" min="0" value="${esc(v.n ?? "")}" data-dinv="${esc(it.id)}|n" aria-label="${esc(it.name)} count" ${dis}><span class="u">${esc(it.unit)}</span>`) + `</div>`;
+    }
+    const head = !s.due ? `<div class="banner">Not due in ${esc(m)}<small>${esc(s.name)} is counted every three months — March, June, September and December. This is the list as it stands.</small></div>`
+      : sent ? `<div class="banner ok">${esc(s.name)} count sent ${esc(dayShort(s.done_at))} by ${esc(s.done_by)}<small>These are the numbers as sent.${closed() ? "" : " \"Change the count\" opens it again — on this page and on the tablet — until the month closes."}</small></div>`
+      : closed() ? `<div class="banner">${esc(m)} is closed<small>This list wasn't sent.</small></div>`
+      : !s.count_day_reached ? `<div class="banner">Preview — this is the list ${esc(dept)} sees on their tablet from ${esc(dayShort(S.month))}<small>You can type numbers to try it; nothing is sent. From ${esc(dayShort(S.month))} the office can send it here if ${esc(dept)} can't.</small></div>`
+      : `<div class="banner">Waiting for ${esc(dept)}'s tablet<small>If they're out, count it here and send it. It's recorded as sent by you, and their tablet shows it as sent.</small></div>`;
+    return `<h2>Department counts</h2><p class="sub">Each department's list, laid out the way their tablet shows it.</p>
+      <div class="seg" role="group" aria-label="Which list">${lists.map(l => `<button data-dlist="${esc(l.list_key)}" aria-pressed="${l.list_key === s.list_key}">${esc(l.name)}${l.department_name && l.department_name !== l.name ? `<span class="note"> · ${esc(l.department_name)}</span>` : ""}${
+        !l.due ? `<span class="mk">–</span>` : l.done ? `<span class="mk ok">✓</span>` : ""}</button>`).join("")}</div>
+      ${head}<div class="invlist">${body || `<div class="invitem">Nothing on the list. Add items in Setup → Count lists.</div>`}</div>
+      ${s.due ? `<div class="invbar"><span class="invcount">${filled} of ${items.length} counted${!locked && filled < items.length ? " — blanks count as 0" : ""}</span>
+        ${sent && !closed() ? `<button class="btn ghost" data-dreopen="${esc(s.list_key)}">Change the count</button>`
+          : locked ? "" : `<button class="btn or" data-dsend="${esc(s.list_key)}" ${canSend ? "" : "disabled"}>Send for ${esc(dept)}</button>${canSend ? "" : `<span class="note">Opens ${esc(dayShort(S.month))}</span>`}`}</div>` : ""}`;
   }
 
   function viewLumber() {
@@ -644,6 +720,37 @@ if (typeof document !== "undefined") (function () {
     });
     on("[data-addkey]", () => { const id = document.getElementById("newkey").value; if (!id) return; S.open["add_" + id] = true; S.open[id] = true;
       if (!(S.lines.get(id) || []).length) S.lines.set(id, [{ item_id: id, length_in: 114, width_in: ROW_W, bundles: [null] }]); render(); });
+    on("[data-golist]", (el) => { S.deptList = el.dataset.golist; store.set("deptlist", S.deptList); S.tab = "dept"; store.set("tab", "dept"); render(); scrollTo(0, 0); });
+    on("[data-dlist]", (el) => { S.deptList = el.dataset.dlist; store.set("deptlist", S.deptList); S.msg = null; render(); });
+    on("[data-dinv]", (el) => {
+      const [id, part] = el.dataset.dinv.split("|"), d = deptDraft(S.deptList);
+      d[id] = { ...(d[id] || {}), [part]: el.value }; store.set("deptdrafts", S.deptDrafts);
+      const it = itemById(id), eq = app.querySelector(`[data-deq="${id}"]`);
+      if (eq && it) eq.textContent = deptHas(it, d[id]) ? "= " + deptFeet(it, d[id]).toLocaleString("en-US") + " ft" : "";
+      const items = deptItems(S.deptList), f = items.filter(i => deptHas(i, d[i.id])).length, c = app.querySelector(".invcount");
+      if (c) c.textContent = `${f} of ${items.length} counted${f < items.length ? " — blanks count as 0" : ""}`;
+    }, "input");
+    on("[data-dsend]", async (el) => {
+      const key = el.dataset.dsend, s = statusOf(key), items = deptItems(key), payload = deptPayload(items, deptDraft(key)), blanks = items.length - payload.length;
+      if (!confirm(`Send the ${s.name} count for ${s.department_name || s.name}?\n\n${blanks ? `${blanks} item${blanks === 1 ? " is" : "s are"} blank and will count as 0.` : "Every item has a number."}\nIt's recorded as sent by ${S.me.name}.`)) return;
+      el.disabled = true;
+      const r = await rpc("send_inventory_count", { p_list: key, p_counts: payload, p_client_id: newId() });
+      if (r) { delete S.deptDrafts[key + "_" + S.month]; store.set("deptdrafts", S.deptDrafts); render(); }
+    });
+    on("[data-dreopen]", async (el) => {
+      const key = el.dataset.dreopen, s = statusOf(key);
+      if (!confirm(`Open the ${s.name} count again? It goes back to "not sent" — here and on ${s.department_name || "the"} tablet — until someone sends it again.`)) return;
+      el.disabled = true;
+      await load();                                        // the numbers as sent, straight from the database
+      const d = deptDraft(key);
+      for (const it of deptItems(key)) {
+        const c = curCount(it.id);
+        d[it.id] = !it.std_length_ft ? { n: c ? c.qty : "" }
+          : c && c.sticks !== null && c.sticks !== undefined ? { sticks: c.sticks, loose: c.loose_ft ?? "" } : { sticks: "", loose: c ? c.qty : "" };
+      }
+      store.set("deptdrafts", S.deptDrafts);
+      rpc("reopen_inventory_count", { p_list: key });
+    });
     on("[data-lumdone]", (el) => rpc("set_lumber_done", { p_done: el.dataset.lumdone === "1" }));
     on("[data-rodone]", (el) => rpc("set_rollover_done", { p_done: el.dataset.rodone === "1" }));
     on("[data-roll]", (el) => { const [job, n] = el.dataset.roll.split("|"); rpc("set_rollover", { p_job: job, p_sheet_number: Number(n), p_rolled: el.checked }); }, "change");
