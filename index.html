@@ -382,6 +382,20 @@
   .signin input{width:100%; font:inherit; padding:14px; border:1px solid var(--gray); border-radius:10px}
   .signin .go{width:100%; margin-top:18px; background:var(--orange); color:#fff; border:none; border-radius:10px; padding:16px; font-weight:700}
   .signin .go:disabled{opacity:.45}
+  /* while the sign-in box shows, no pinch or double-tap zoom (the rest of the app keeps zoom: supervisors zoom into pages) */
+  html.nozoom, html.nozoom body{touch-action:pan-x pan-y}
+  /* send routes */
+  .sendto{background:#fff; border:1.5px solid var(--midnight); border-radius:12px; padding:12px 14px 2px; margin-bottom:12px}
+  .sendto .sendbtn{background:var(--midnight); color:var(--sawdust); border:none}
+  .sent{display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--teal-bg); color:var(--teal-ink);
+        border-radius:12px; padding:12px 16px; margin-bottom:12px; font-size:18px}
+  .sent small{display:block; font-size:14px; color:var(--ink2); font-weight:500}
+  .sent button{background:#fff; border:1px solid var(--gray); border-radius:10px; padding:10px 18px; font-weight:700; min-height:48px}
+  .sendbar{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; background:#fff; border:1.5px solid var(--midnight);
+           border-radius:12px; padding:10px 14px; margin-bottom:12px; font-weight:600}
+  .sendbar .go{background:var(--midnight); color:var(--sawdust); border:none; border-radius:10px; padding:12px 18px; font-weight:700; min-height:48px}
+  .pastline{display:flex; flex-wrap:wrap; gap:4px 12px; color:var(--ink2); font-size:15px; margin-top:6px}
+  .donechip{background:var(--teal); color:#fff; border-radius:8px; padding:3px 10px; font-weight:700; font-size:14px}
   .alarm{max-width:560px; margin:8vh auto 0; background:var(--midnight); color:var(--sawdust); border-radius:14px; padding:24px}
   .alarm h1{color:var(--bright)}
   .foot{text-align:center; margin-top:30px}
@@ -421,13 +435,15 @@ const DEPTS = [
   ["milling", "Milling"], ["cnc", "CNC"], ["sanding", "Sanding"], ["finishing", "Finishing"],
   ["full_custom", "Full Custom"], ["metal", "Metal"], ["assembly_qc", "Assembly / QC"], ["delivery", "Delivery"],
 ];
-const DEPT_NAME = Object.fromEntries(DEPTS);
+const DEPT_NAME = { ...Object.fromEntries(DEPTS), metal_paint: "Metal paint" };   // Metal paint: Finishing's second list (send_routes.sql)
 /* Delivery is log-only for now: no work orders to count, no supplies tab. */
 const LOG_ONLY = ["delivery"];
 const ARROW_DEPTS = ["metal", "assembly_qc", "delivery"];
-const TAB_NAME = { work: "Work orders", arrow: "Arrow", qc: "QC", tasks: "Tasks", issues: "Issues", supplies: "Supplies", loadout: "Load-out", inventory: "Inventory" };
+const TAB_NAME = { work: "Work orders", paint: "Metal to paint", past: "Past", arrow: "Arrow", qc: "QC", tasks: "Tasks", issues: "Issues", supplies: "Supplies", loadout: "Load-out", inventory: "Inventory" };
 /* Departments with a stage before them get Ready / All on their queue. The rest can start any time. */
-const HAS_UPSTREAM = ["cnc", "sanding", "finishing", "assembly_qc"];
+const HAS_UPSTREAM = ["cnc", "sanding", "finishing", "assembly_qc", "metal_paint"];
+/** Departments with a Past tab: jobs they've finished, until Monday says 100% Complete (past_work.sql). */
+const PAST_DEPTS = ["full_custom"];
 /* Tabs from before the 25 Sep build, for a tablet that remembers one */
 const OLD_TAB = { problems: "issues", log: "tasks" };
 const PHOTO_MAX_EACH = 3;          // photos on one defect, problem or reply, from the tablet
@@ -458,7 +474,51 @@ function tabsFor(dept) {
   const arrow = ARROW_DEPTS.includes(dept) ? ["arrow"] : [];
   if (dept === "delivery") return ["loadout", ...arrow, "tasks", "issues"];
   if (isLogOnly(dept)) return [...arrow, "tasks", "issues"];
-  return ["work", ...arrow, ...(dept === "assembly_qc" ? ["qc"] : []), "tasks", "issues", "supplies"];
+  return ["work", ...(dept === "finishing" ? ["paint"] : []), ...(PAST_DEPTS.includes(dept) ? ["past"] : []), ...arrow, ...(dept === "assembly_qc" ? ["qc"] : []), "tasks", "issues", "supplies"];
+}
+
+/* ---- Send routes (send_routes.sql): Full Custom and Metal send each finished sheet on ---- */
+const SEND_DEPTS = ["full_custom", "metal"];
+const ROUTES = {
+  full_custom: [["sanding", "Send to Sanding"], ["finishing", "Send straight to Finishing"]],
+  metal: [["paint", "Send to paint"], ["arrow", "Send to Arrow"]],
+};
+/** "to Sanding", "straight to Finishing", "to paint", "to Arrow" */
+function routeWords(route) {
+  return { sanding: "to Sanding", finishing: "straight to Finishing", paint: "to paint", arrow: "to Arrow", before: "before send routes started" }[route] || "";
+}
+/** Each row gets its sheet's send for the department (from v_sheet_routes), and Sanding learns which of its counts aren't needed. */
+function withSends(rows, routes, dept) {
+  const by = new Map((routes || []).map(r => [r.sheet_id, r]));
+  const k = dept === "metal" ? "metal" : "fc";
+  return (rows || []).map(r => {
+    const x = by.get(r.sheet_id);
+    if (!x) return r;
+    const out = { ...r, sendKnown: true, not_needed: !!x.sanding_not_needed && r.department === "sanding" };
+    if (SEND_DEPTS.includes(dept)) out.send = x[k + "_route"] ? { id: x[k + "_send_id"], route: x[k + "_route"], at: x[k + "_sent_at"], by: x[k + "_sent_by"], can_undo: !!x[k + "_can_undo"] } : null;
+    return out;
+  });
+}
+/** A finished sheet that still has to be sent on. */
+const toSend = (r) => r.sendKnown && SEND_DEPTS.includes(r.department) && r.qty_done >= r.qty_required && !r.send;
+
+/* ---- Past (past_work.sql): jobs this department has finished ---- */
+/** The Past list from v_past_work rows: one entry per job, most recently finished first. */
+function buildPast(rows) {
+  const jobs = new Map();
+  for (const r of rows || []) {
+    if (!jobs.has(r.job_id)) jobs.set(r.job_id, { job_id: r.job_id, project_id: r.project_id, name: r.job_name, is_test: !!r.is_test,
+      phase: r.phase, delivery_date: r.delivery_date, done_at: r.done_at, sheets: 0, pieces: 0 });
+    const j = jobs.get(r.job_id);
+    j.sheets += 1; j.pieces += r.qty_required;
+    if (String(r.done_at || "") > String(j.done_at || "")) j.done_at = r.done_at;
+  }
+  return [...jobs.values()].sort((a, b) => String(b.done_at || "").localeCompare(String(a.done_at || ""))
+                                        || String(a.project_id).localeCompare(String(b.project_id)));
+}
+/** "Done Sep 26 · 4 sheets · Monday: Delivery" */
+function pastLine(j) {
+  return [j.done_at ? "Done " + fmtDate(localISO(j.done_at)) : "Done", `${j.sheets} sheet${j.sheets === 1 ? "" : "s"}`, j.phase ? "Monday: " + j.phase : null].filter(Boolean).join(" · ");
 }
 
 /* ---- Inventory (inventory.sql): a department's month-end count ---- */
@@ -569,7 +629,7 @@ function buildQueue(rows, flags = [], dept = null) {
       job_id: r.job_id, project_id: r.project_id, name: r.job_name,
       delivery_date: r.delivery_date, materials_ordered: r.materials_ordered, is_test: !!r.is_test,
       finish_by: r.finish_by, fb_label: r.fb_label,
-      done: 0, total: 0, sheets: 0, sheetsDone: 0, ready: null });
+      done: 0, total: 0, sheets: 0, sheetsDone: 0, ready: null, toSend: 0 });
     const j = jobs.get(r.job_id);
     const rd = readyOf(r);
     if (rd !== null) j.ready = (j.ready || 0) + rd;
@@ -577,11 +637,12 @@ function buildQueue(rows, flags = [], dept = null) {
     j.total += r.qty_required;
     j.sheets += 1;
     if (r.qty_done >= r.qty_required) j.sheetsDone += 1;
+    if (toSend(r)) j.toSend += 1;
   }
   const pin = (j) => (j.flag && j.flag.level !== "watch") ? FLAG_RANK[j.flag.level] : 0;
   return [...jobs.values()]
     .map(j => ({ ...j, flag: flagFor(flags, j.job_id, dept) }))
-    .filter(j => j.done < j.total)
+    .filter(j => j.done < j.total || j.toSend > 0)
     .sort((a, b) => pin(b) - pin(a)
                  || (a.delivery_date || "9999").localeCompare(b.delivery_date || "9999")
                  || String(a.project_id).localeCompare(String(b.project_id)));
@@ -1090,6 +1151,7 @@ if (typeof document !== "undefined") (function () {
   const S = {
     me: null, depts: [], dept: store.get("dept", null), tab: OLD_TAB[store.get("tab", "work")] || store.get("tab", "work"), queueMode: "ready",
     rows: [], rowsAt: null, fromCache: false,
+    past: [], pastAt: null, pastLoaded: false,      // the Past tab (past_work.sql)
     outbox: store.get("outbox", {}), logbox: store.get("logbox", {}),
     view: { screen: "queue", jobId: null, progressId: null },
     online: navigator.onLine, notice: null, loading: false,
@@ -1235,6 +1297,11 @@ if (typeof document !== "undefined") (function () {
   }
 
   function rowsNow() { return withPending(S.rows, S.outbox); }
+  /** The rows the screen is showing: the Past list's on Past, otherwise Work orders' (with counts not yet sent). */
+  function rowsHere() { return S.tab === "past" ? S.past : rowsNow(); }
+  /** The department being counted: Metal paint on Finishing's Metal to paint tab, otherwise the tablet's department. */
+  function wd() { return S.tab === "paint" && S.dept === "finishing" ? "metal_paint" : S.dept; }
+  const onCountTab = () => S.tab === "work" || S.tab === "paint";
   function tabs() { return tabsWithInventory(S.dept, S.me && S.me.is_test ? [] : S.invLists); }
   function myDepts() { return S.depts; }
   const owns = (d) => S.me && (S.me.role === "manager" || S.me.role === "admin" || (S.me.departments || []).includes(d));
@@ -1258,35 +1325,40 @@ if (typeof document !== "undefined") (function () {
   async function loadRows() {
     if (!S.dept || isLogOnly(S.dept)) return;
     S.loading = true;
-    const { data, error } = await db.from("v_floor_sheets").select("*").eq("department", S.dept);
+    const dept = wd();
+    const { data, error } = await db.from("v_floor_sheets").select("*").eq("department", dept);
     S.loading = false;
+    if (dept !== wd()) return;                               // moved to another tab while it loaded
     if (error) {
-      const cached = store.get("rows_" + S.dept, null);
+      const cached = store.get("rows_" + dept, null);
       if (cached) { S.rows = cached.rows; S.rowsAt = cached.at; S.fromCache = true; }
       if (!isNetworkError(error)) S.notice = friendlyError(error);
       return;
     }
     let rows = data || [];
     // what the stage before has cleared (ready_issues.sql). If it can't be read, the queue works exactly as before.
-    if (HAS_UPSTREAM.includes(S.dept) && rows.length) {
+    if (HAS_UPSTREAM.includes(dept) && rows.length) {
       let rr;
-      try { rr = await db.from("v_ready_to_work").select("sheet_id, available, waiting_on, at_arrow").eq("department", S.dept); } catch (e) { rr = { error: e }; }
+      try { rr = await db.from("v_ready_to_work").select("sheet_id, available, waiting_on, at_arrow").eq("department", dept); } catch (e) { rr = { error: e }; }
       if (rr && !rr.error && Array.isArray(rr.data)) rows = withReady(rows, rr.data);
     }
+    // each sheet's send (send_routes.sql). If it can't be read, the list works as before.
+    if ((SEND_DEPTS.includes(dept) || dept === "sanding") && rows.length) rows = await withRoutes(rows, dept);
     // each job's finish-by date for this department (finish_by.sql). If it can't be read this time,
     // keep the dates this tablet last had; if it never could, cards keep the delivery date.
     if (rows.length) {
       let fb;
-      try { fb = await db.from("v_finish_by").select("job_id, finish_by, label").eq("department", S.dept).in("job_id", [...new Set(rows.map(r => r.job_id))]); }
+      try { fb = await db.from("v_finish_by").select("job_id, finish_by, label").eq("department", dept).in("job_id", [...new Set(rows.map(r => r.job_id))]); }
       catch (e) { fb = { error: e }; }
       if (fb && !fb.error && Array.isArray(fb.data)) rows = withFinishBy(rows, fb.data);
       else {
-        const before = (store.get("rows_" + S.dept, null) || { rows: [] }).rows.filter(r => r.fb_label);
+        const before = (store.get("rows_" + dept, null) || { rows: [] }).rows.filter(r => r.fb_label);
         rows = withFinishBy(rows, before.map(r => ({ job_id: r.job_id, finish_by: r.finish_by, label: r.fb_label })));
       }
     }
+    if (dept !== wd()) return;                               // switched department or tab while it loaded: this list isn't on screen
     S.rows = rows; S.rowsAt = new Date().toISOString(); S.fromCache = false;
-    store.set("rows_" + S.dept, { rows: S.rows, at: S.rowsAt });
+    store.set("rows_" + dept, { rows: S.rows, at: S.rowsAt });
     prefetchPages();
   }
 
@@ -1491,9 +1563,24 @@ if (typeof document !== "undefined") (function () {
   }
   const advNow = () => advSheets(withAdvPending(withPending(S.advRows, S.outbox), S.logbox));
 
+  async function withRoutes(rows, dept) {
+    const ids = [...new Set(rows.map(r => r.sheet_id))];
+    const data = await read("routes", db.from("v_sheet_routes").select("*").in("sheet_id", ids));
+    return data ? withSends(rows, data, dept) : rows;
+  }
+  async function loadPast() {
+    if (!PAST_DEPTS.includes(S.dept)) return;
+    const dept = S.dept;
+    let data = await read("past", db.from("v_past_work").select("*").eq("department", dept));
+    if (data && data.length) data = await withRoutes(data, dept);
+    if (S.dept !== dept) return;                             // switched department while it loaded
+    if (data) { S.past = data; S.pastAt = new Date().toISOString(); S.pastLoaded = true; store.set("past_" + dept, { rows: data, at: S.pastAt }); }
+    else { const c = store.get("past_" + dept, null); if (c) { S.past = c.rows; S.pastAt = c.at; } S.pastLoaded = true; }
+  }
   async function loadTab() {
     if (S.tab !== "arrow" && ARROW_DEPTS.includes(S.dept)) loadArrow().then(render);   // keeps the Arrow tab's count current
-    if (S.tab === "work") return loadRows();
+    if (S.tab === "work" || S.tab === "paint") return loadRows();
+    if (S.tab === "past") return loadPast();
     if (S.tab === "issues") return Promise.all([loadIssues(), S.types.length ? null : loadTypes()]);
     if (S.tab === "tasks") return loadTasks();
     if (S.tab === "qc") { if (!S.pickJobs.length) loadPickJobs().then(render); return S.qcJob ? loadQc(S.qcJob) : null; }
@@ -1539,7 +1626,7 @@ if (typeof document !== "undefined") (function () {
       if (said) showToast(said);
       await refreshAll();
       if (S.adv && S.advJob) await loadAdvRows(S.advJob);
-      if (S.view.screen === "sheet") { const cur = rowsNow().find(x => x.progress_id === S.view.progressId); if (cur) await loadPiece(cur); }
+      if (S.view.screen === "sheet") { const cur = rowsHere().find(x => x.progress_id === S.view.progressId); if (cur) await loadPiece(cur); }
     }
     render();
     if (!r.offline && Object.keys(S.logbox).length) return flushLog();   // entries made while that was sending (photos follow them)
@@ -1564,7 +1651,7 @@ if (typeof document !== "undefined") (function () {
       showToast(r.sent.length === 1 ? (r.sent[0].data && r.sent[0].data.summary) || "Photo saved." : `${r.sent.length} photos saved.`);
       if (S.tab === "loadout") await loadLoadouts();
       else if (S.tab === "issues") await loadIssues();
-      if (S.view.screen === "sheet") { const cur = rowsNow().find(x => x.progress_id === S.view.progressId); if (cur) await loadPiece(cur); }
+      if (S.view.screen === "sheet") { const cur = rowsHere().find(x => x.progress_id === S.view.progressId); if (cur) await loadPiece(cur); }
     }
     render();
   }
@@ -1761,7 +1848,7 @@ if (typeof document !== "undefined") (function () {
     const all = buildQueue(rows, S.flags, S.dept);
     const pieces = all.reduce((a, j) => a + (j.total - j.done), 0);
     // Ready / All: departments with a stage before them, once the database says what's cleared
-    const split = HAS_UPSTREAM.includes(S.dept) && readyKnown(rows);
+    const split = HAS_UPSTREAM.includes(wd()) && readyKnown(rows);
     const ready = split ? all.filter(j => j.ready > 0) : all;
     const onReady = split && S.queueMode !== "all";
     const q = onReady ? ready : all;
@@ -1769,12 +1856,12 @@ if (typeof document !== "undefined") (function () {
     const sub = split
       ? `${ready.length} job${ready.length === 1 ? "" : "s"} ready · ${readyPieces} piece${readyPieces === 1 ? "" : "s"} ready now · ${pieces} left in all`
       : `${all.length} job${all.length === 1 ? "" : "s"} · ${pieces} piece${pieces === 1 ? "" : "s"} left`;
-    const head = `<div class="qhead"><div><h1>${esc(DEPT_NAME[S.dept])}</h1><p class="sub">${sub}</p></div>
+    const head = `<div class="qhead"><div><h1>${esc(wd() === "metal_paint" ? "Metal to paint" : DEPT_NAME[wd()])}</h1><p class="sub">${sub}</p></div>
       ${split ? `<div class="seg qseg" role="group" aria-label="Which jobs">
         <button data-qmode="ready" aria-pressed="${onReady}">Ready<span class="num">${ready.length}</span></button>
         <button data-qmode="all" aria-pressed="${!onReady}">All<span class="num">${all.length}</span></button></div>` : ""}</div>`;
     if (!S.rows.length && S.loading) return head + `<div class="empty">Loading…</div>`;
-    if (!all.length) return head + `<div class="empty"><b>Nothing waiting</b>Every sheet for ${esc(DEPT_NAME[S.dept])} is finished. New work appears here by itself.</div>`;
+    if (!all.length) return head + `<div class="empty"><b>Nothing waiting</b>${wd() === "metal_paint" ? "Nothing to paint right now. Metal sent to paint appears here by itself." : `Every sheet for ${esc(DEPT_NAME[S.dept])} is finished. New work appears here by itself.`}</div>`;
     if (!q.length) return head + `<div class="empty"><b>Nothing ready right now</b>${all.length} job${all.length === 1 ? " is" : "s are"} on the way from the stage before. A job shows here as soon as any of its pieces are.
       <div class="rowbtns" style="justify-content:center"><button data-qmode="all">See all ${all.length}</button></div></div>`;
     return head + q.map(j => {
@@ -1784,6 +1871,7 @@ if (typeof document !== "undefined") (function () {
       const due = fb ? `<span class="due fb"><span>${esc(fb.main)}${fb.when ? ` · <b>${esc(fb.when)}</b>` : ""}</span>${fb.delivery ? `<small class="deliv">${esc(fb.delivery)}</small>` : ""}</span>`
                      : `<span class="due">Due ${esc(fmtDate(j.delivery_date))}${dl === null ? "" : ` · <b>${esc(daysText(dl))}</b>`}</span>`;
       const marks = [flagTag(j.flag)].filter(Boolean);
+      if (j.toSend) marks.push(`<span class="rchip">${j.toSend} sheet${j.toSend === 1 ? "" : "s"} to send</span>`);
       if (split) marks.push(j.ready > 0 ? `<span class="rchip">${j.ready} piece${j.ready === 1 ? "" : "s"} ready</span>` : `<span class="why">Nothing ready yet</span>`);
       return `<button class="job${j.flag && j.flag.level !== "watch" ? " f-" + j.flag.level : ""}" data-job="${esc(j.job_id)}">
         <div class="job-top"><span class="pid">${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</span><span class="jname" title="${esc(j.name)}">${esc(j.name)}</span>
@@ -1804,15 +1892,21 @@ if (typeof document !== "undefined") (function () {
     const fb = dateLine(j, done >= total);
     const when = fb ? [fb.main + (fb.when ? " · " + fb.when : ""), `${done} of ${total} pieces done`, fb.delivery].filter(Boolean).join(" · ")
                     : `due ${fmtDate(j.delivery_date)} · ${done} of ${total} pieces done`;
-    return `<div class="head"><button class="back" data-back="queue">← ${esc(DEPT_NAME[S.dept])}</button>
+    const unsent = list.filter(toSend);
+    return `<div class="head"><button class="back" data-back="queue">← ${esc(DEPT_NAME[wd()])}</button>
       <h1>${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</h1>
       <span class="hsub${fb ? " wrap" : ""}">${esc(j.job_name)} · ${esc(when)}</span></div>
       ${flagBand(flagFor(S.flags, j.job_id, S.dept))}
+      ${unsent.length ? `<div class="sendbar"><span>${unsent.length} finished sheet${unsent.length === 1 ? "" : "s"} to send on</span>
+        <button class="go" data-sendall="${esc(j.job_id)}">${unsent.length === 1 ? "Send it on" : `Send all ${unsent.length} the same way`}</button></div>` : ""}
       ${list.map(r => {
         const full = r.qty_done >= r.qty_required;
         const size = [r.width, r.length, r.thickness].filter(Boolean).join(" × ");
-        const rd = HAS_UPSTREAM.includes(S.dept) && !full ? readyOf(r) : null;
-        const status = rd === null ? "" : rd > 0 ? `<span class="rchip">${rd} ready</span>` : `<span class="why">${esc(waitingText(r))}</span>`;
+        const rd = HAS_UPSTREAM.includes(wd()) && !full ? readyOf(r) : null;
+        const status = r.not_needed ? `<span class="why">Not needed — sent straight to Finishing</span>`
+                     : toSend(r) ? `<span class="rchip">To send</span>`
+                     : full && r.send ? `<span class="why">Sent ${esc(routeWords(r.send.route))}</span>`
+                     : rd === null ? "" : rd > 0 ? `<span class="rchip">${rd} ready</span>` : `<span class="why">${esc(waitingText(r))}</span>`;
         return `<button class="sheet${full ? " done" : ""}" data-sheet="${esc(r.progress_id)}">
           <span class="no num">${r.sheet_number}</span>
           <span class="meta"><span class="code">${esc(r.item_code || "Sheet " + r.sheet_number)}</span>
@@ -1839,16 +1933,18 @@ if (typeof document !== "undefined") (function () {
       ${pager}
       ${flagBand(flagFor(S.flags, r.job_id, S.dept))}
       ${stopped.length ? `<div class="band stop">Work is stopped on this sheet — ${esc(stopped[0].body)}<small>Raised by ${esc(stopped[0].raised_by_name)}, ${esc(agoText(stopped[0].raised_at))}. It clears when the office answers.</small></div>` : ""}
-      ${(() => { const rd = HAS_UPSTREAM.includes(S.dept) && !full ? readyOf(r) : null;
+      ${r.not_needed ? `<div class="band watch">Not needed here — Full Custom sent this cabinet straight to Finishing.</div>` : ""}
+      ${(() => { const rd = HAS_UPSTREAM.includes(wd()) && !full ? readyOf(r) : null;
                  return rd === null ? "" : `<div class="band watch">${rd > 0 ? `${rd} piece${rd === 1 ? "" : "s"} ready from the stage before` : esc(waitingText(r))}</div>`; })()}
       <div class="counter">
         <div class="count-row">
           <button class="step" data-step="-1" ${r.qty_done <= 0 ? "disabled" : ""} aria-label="One fewer">−</button>
-          <div class="readout"><div class="n num">${r.qty_done}</div><div class="l">of ${r.qty_required} done<small>${esc(DEPT_NAME[S.dept])}</small></div></div>
+          <div class="readout"><div class="n num">${r.qty_done}</div><div class="l">of ${r.qty_required} done<small>${esc(DEPT_NAME[wd()])}</small></div></div>
           <button class="step" data-step="1" ${full ? "disabled" : ""} aria-label="One more">+</button>
           ${full ? `<div class="complete">Sheet complete</div>` : `<button class="all" data-all="${r.qty_required}">Mark all ${r.qty_required} done</button>`}
         </div>
       </div>
+      ${sendBlock(r)}
       <div class="page" id="page">${r.png_path && r.pages_ready ? `<div class="missing">Loading the page…</div>` : `<div class="missing">This sheet's page hasn't been uploaded yet.</div>`}</div>
       <div class="actions">
         <button data-print="1" ${r.png_path && r.pages_ready ? "" : "disabled"}>Print this sheet</button>
@@ -1858,6 +1954,76 @@ if (typeof document !== "undefined") (function () {
         <button data-report="here">Report a defect or issue</button>
         ${S.dept === "assembly_qc" ? `<button data-qcsheet="${r.sheet_number}" data-qcjob="${esc(r.job_id)}">Record QC</button>` : ""}
       </div>
+      ${pager}
+      ${pieceSection(r)}`;
+  }
+
+  /** On a Full Custom or Metal sheet that's done: where to send it, or where it went (with Undo while it can be). */
+  function sendBlock(r) {
+    if (!SEND_DEPTS.includes(r.department) || !r.sendKnown || r.qty_done < r.qty_required) return "";
+    if (r.send) {
+      const who = [r.send.at && r.send.route !== "before" ? fmtDate(localISO(r.send.at)) : null, r.send.by && r.send.route !== "before" ? r.send.by : null].filter(Boolean).join(" · ");
+      return `<div class="sent"><div><b>Sent ${esc(routeWords(r.send.route))}</b>${who ? `<small>${esc(who)}${r.send.pending ? " · waiting to send" : ""}</small>` : r.send.pending ? "<small>waiting to send</small>" : ""}</div>
+        ${r.send.can_undo && !r.send.pending ? `<button data-unsend="${esc(r.send.id)}">Undo</button>` : ""}</div>`;
+    }
+    return `<div class="sendto"><div class="sub" style="margin:0 2px 8px">Done — where does it go next?</div>
+      <div class="actions" style="margin-top:0">${(ROUTES[r.department] || []).map(([k, label]) =>
+        `<button class="sendbtn" data-send="${k}">${esc(label)}</button>`).join("")}</div></div>`;
+  }
+
+  // ---------- Past: jobs this department has finished, read only ----------
+  function pastScreen() {
+    const list = buildPast(S.past);
+    const head = `<div class="qhead"><div><h1>${esc(DEPT_NAME[S.dept])} · Past</h1>
+      <p class="sub">Jobs you've finished. Each stays here until Monday says 100% Complete.</p></div></div>${missingNote("past")}`;
+    if (!list.length && !S.pastLoaded) return head + `<div class="empty">Loading…</div>`;
+    if (!list.length) return head + (S.missing.past ? "" : `<div class="empty"><b>Nothing here yet</b>When every sheet on a job is done and sent on, the job moves here from Work orders.</div>`);
+    return head + list.map(j => `<button class="job" data-job="${esc(j.job_id)}">
+        <div class="job-top"><span class="pid">${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</span><span class="jname" title="${esc(j.name)}">${esc(j.name)}</span>
+          <span class="donechip">Done</span></div>
+        <div class="pastline">${esc(pastLine(j))}</div>
+      </button>`).join("");
+  }
+
+  function pastJobScreen() {
+    const list = jobSheets(S.past, S.view.jobId);
+    if (!list.length) { S.view = { screen: "queue" }; return subTabs() + pastScreen(); }
+    const j = buildPast(list)[0];
+    return `<div class="head"><button class="back" data-back="queue">← Past</button>
+      <h1>${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</h1>
+      <span class="hsub wrap">${esc(j.name)} · ${esc(pastLine(j))}</span></div>
+      ${list.map(r => {
+        const size = [r.width, r.length, r.thickness].filter(Boolean).join(" × ");
+        return `<button class="sheet done" data-sheet="${esc(r.progress_id)}">
+          <span class="no num">${r.sheet_number}</span>
+          <span class="meta"><span class="code">${esc(r.item_code || "Sheet " + r.sheet_number)}</span>
+            <span class="desc">${esc([r.species, r.shape, size].filter(Boolean).join(" · "))}</span>${r.send ? `<span class="why">Sent ${esc(routeWords(r.send.route))}</span>` : ""}</span>
+          <span class="cnt num">${r.qty_done} / ${r.qty_required}</span></button>`;
+      }).join("")}`;
+  }
+
+  function pastSheetScreen() {
+    const r = S.past.find(x => x.progress_id === S.view.progressId);
+    if (!r) { S.view = { screen: "job", jobId: S.view.jobId }; return pastJobScreen(); }
+    const p = pagerFor(S.past, r.job_id, r.progress_id);
+    const pager = `<div class="pager">
+      <button data-goto="${p.prev ? esc(p.prev.progress_id) : ""}" ${p.prev ? "" : "disabled"}>← ${p.prev ? `Sheet ${p.prev.sheet_number} · ${esc(p.prev.item_code || "")}` : "Previous"}</button>
+      <span class="pos num">${p.at + 1} / ${p.count}</span>
+      <button data-goto="${p.next ? esc(p.next.progress_id) : ""}" ${p.next ? "" : "disabled"}>${p.next ? `Sheet ${p.next.sheet_number} · ${esc(p.next.item_code || "")}` : "Next"} →</button>
+    </div>`;
+    return `<div class="head"><button class="back" data-back="job">← ${r.is_test ? "TEST " : ""}${esc(r.project_id)}</button>
+      <h1>Sheet ${r.sheet_number} · ${esc(r.item_code || "")}</h1>
+      <span class="hsub">${esc(r.job_name)}</span></div>
+      ${pager}
+      <div class="complete">Sheet complete · ${r.qty_done} of ${r.qty_required} · ${esc(DEPT_NAME[S.dept])}</div>
+      <p class="sub" style="margin:8px 2px 12px">Finished work, to look back at. Counts can't be changed here.</p>
+      ${sendBlock(r)}
+      <div class="page" id="page">${r.png_path && r.pages_ready ? `<div class="missing">Loading the page…</div>` : `<div class="missing">This sheet's page hasn't been uploaded yet.</div>`}</div>
+      <div class="actions">
+        <button data-print="1" ${r.png_path && r.pages_ready ? "" : "disabled"}>Print this sheet</button>
+        <button data-pdf="1" ${r.pdf_path && r.pages_ready ? "" : "disabled"}>Open the PDF</button>
+      </div>
+      <div class="actions"><button data-report="here">Report a defect or issue</button></div>
       ${pager}
       ${pieceSection(r)}`;
   }
@@ -2397,13 +2563,21 @@ if (typeof document !== "undefined") (function () {
     const m = S.modal;
     if (!m) return "";
     const jobLine = () => {
-      const j = S.pickJobs.find(x => x.job_id === m.jobId) || rowsNow().find(x => x.job_id === m.jobId) || {};
-      return `${esc(j.project_id || "")}${m.sheet !== null && m.sheet !== undefined ? ` · sheet ${m.sheet}` : " · whole job"} · ${esc(DEPT_NAME[S.dept])}`;
+      const j = S.pickJobs.find(x => x.job_id === m.jobId) || rowsHere().find(x => x.job_id === m.jobId) || {};
+      return `${esc(j.project_id || "")}${m.sheet !== null && m.sheet !== undefined ? ` · sheet ${m.sheet}` : " · whole job"} · ${esc(DEPT_NAME[m.dept || S.dept])}`;
     };
     const picker = m.pick ? `<label class="f" style="margin-top:0">Job</label>${jobPicker(m.jobId, m.filter)}
         ${m.jobId ? `<label class="f">Sheet</label>${sheetChips(m.jobId, m.sheet, false, { allowNone: true })}` : ""}` : "";
     let inner = "";
-    if (m.kind === "report") {                // one button on the floor: then a defect, or an issue for the office
+    if (m.kind === "sendall") {               // send every finished sheet on a job the same way
+      const n = rowsHere().filter(r => r.job_id === m.jobId && toSend(r)).length;
+      inner = `<h3>Send ${n} sheet${n === 1 ? "" : "s"} on</h3>
+        <div class="sub">${esc((rowsHere().find(r => r.job_id === m.jobId) || {}).project_id || "")} · every finished sheet not sent yet. Where do they go?</div>
+        <div class="choice">${(ROUTES[S.dept] || []).map(([k, label]) => `<button data-sendallroute="${k}"><b>${esc(label)}</b><span>${
+          { sanding: "Sanding sees them next, then Finishing.", finishing: "Finishing sees them next. With no top, Sanding's count is marked Not needed.",
+            paint: "Finishing's Metal to paint list gets them.", arrow: "An Arrow item is made for each. Assembly / QC sees them once they're back." }[k]}</span></button>`).join("")}</div>
+        <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button></div>`;
+    } else if (m.kind === "report") {                // one button on the floor: then a defect, or an issue for the office
       inner = `<h3>Report</h3>
         <div class="sub">${m.pick ? "" : jobLine() + ". "}Which is it?</div>
         <div class="choice">
@@ -2412,11 +2586,11 @@ if (typeof document !== "undefined") (function () {
         </div>
         <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button></div>`;
     } else if (m.kind === "defect") {
-      const types = S.types.filter(t => t.department === S.dept).sort((a, b) => a.sort_order - b.sort_order);
+      const types = S.types.filter(t => t.department === (m.dept || S.dept)).sort((a, b) => a.sort_order - b.sort_order);
       inner = `<h3>Log a defect</h3>
         <div class="sub">${m.pick ? "" : jobLine() + ". "}Counted in the numbers. Nobody is interrupted${m.ask ? " — this one goes to the office too" : ""}.</div>
         ${picker}${!m.pick || m.jobId ? `<label class="f">What happened</label>
-        ${types.map(t => `<button class="pick" data-picktype="${esc(t.id)}" aria-pressed="${m.type === t.id}">${esc(t.label)}</button>`).join("") || `<div class="meta2">No defect list for ${esc(DEPT_NAME[S.dept])} yet.</div>`}
+        ${types.map(t => `<button class="pick" data-picktype="${esc(t.id)}" aria-pressed="${m.type === t.id}">${esc(t.label)}</button>`).join("") || `<div class="meta2">No defect list for ${esc(DEPT_NAME[m.dept || S.dept])} yet.</div>`}
         <textarea class="in" data-mfield="note" placeholder="${m.ask ? "What do you need from the office?" : "Anything worth adding (optional)"}">${esc(m.note || "")}</textarea>
         <label class="chk"><input type="checkbox" data-mask ${m.ask ? "checked" : ""}>
           <span>Ask the office about this<small>It waits on the office's Needs you until they answer, like an issue.</small></span></label>
@@ -2575,14 +2749,16 @@ if (typeof document !== "undefined") (function () {
     if (!S.me) return;
     let body;
     if (S.adv) body = advScreen();
-    else if (S.tab === "work" && S.view.screen === "sheet") body = sheetScreen();
-    else if (S.tab === "work" && S.view.screen === "job") body = jobScreen();
+    else if (onCountTab() && S.view.screen === "sheet") body = sheetScreen();
+    else if (onCountTab() && S.view.screen === "job") body = jobScreen();
+    else if (S.tab === "past" && S.view.screen === "sheet") body = pastSheetScreen();
+    else if (S.tab === "past" && S.view.screen === "job") body = pastJobScreen();
     else {
       const top = S.tab === "issues" ? issuesScreen() : S.tab === "tasks" ? tasksScreen() : S.tab === "qc" ? qcScreen() : S.tab === "arrow" ? arrowSection() : S.tab === "supplies" ? suppliesScreen() : S.tab === "inventory" ? inventoryScreen()
-                : S.tab === "loadout" ? loadoutScreen() : queueScreen();
+                : S.tab === "loadout" ? loadoutScreen() : S.tab === "past" ? pastScreen() : queueScreen();
       body = subTabs() + top;
     }
-    const topLevel = S.adv ? !S.advJob : !(S.tab === "work" && S.view.screen !== "queue");
+    const topLevel = S.adv ? !S.advJob : !((onCountTab() || S.tab === "past") && S.view.screen !== "queue");
     const foot = topLevel ? `<div class="foot"><button class="link" data-signout="1">Sign out</button></div>` : "";
     const scroll = S.modal ? (document.querySelector(".mdl") || {}).scrollTop : null;
     app.innerHTML = topBar() + deptMenu() + `<main>${banners()}${body}${foot}</main>` + modalHtml()
@@ -2591,13 +2767,13 @@ if (typeof document !== "undefined") (function () {
     wire();
     fillPhotos();
     if (S.adv) { if (S.advJob && S.advSheet) advShowPage(); }
-    else if (S.tab === "work" && S.view.screen === "sheet") showPage();
+    else if ((onCountTab() || S.tab === "past") && S.view.screen === "sheet") showPage();
     if (S.tab === "loadout" && S.loWo && !S.adv) showLoPage();
     if (S.tab === "loadout" && !S.loWo && !S.adv && S.loView) initSigPad();
   }
 
   async function showPage() {
-    const r = rowsNow().find(x => x.progress_id === S.view.progressId);
+    const r = rowsHere().find(x => x.progress_id === S.view.progressId);
     const el = document.getElementById("page");
     if (!r || !el || !r.png_path || !r.pages_ready) return;
     try {
@@ -2624,7 +2800,7 @@ if (typeof document !== "undefined") (function () {
   async function openSheet(progressId) {
     S.view = { screen: "sheet", jobId: S.view.jobId, progressId };
     render(); scrollTo(0, 0);
-    const r = rowsNow().find(x => x.progress_id === progressId);
+    const r = rowsHere().find(x => x.progress_id === progressId);
     if (r) { await loadPiece(r); if (S.view.progressId === progressId) render(); }
   }
 
@@ -2650,13 +2826,14 @@ if (typeof document !== "undefined") (function () {
     S.adv = false; store.set("adv", false);
     S.dept = dept; store.set("dept", S.dept);
     if (!tabs().includes(S.tab)) S.tab = tabs()[0];
-    S.view = { screen: "queue" }; S.rows = (store.get("rows_" + S.dept, { rows: [] })).rows; S.problems = []; S.defects = []; S.supplies = []; S.qcJob = null;
+    const pc = store.get("past_" + S.dept, null); S.past = pc ? pc.rows : []; S.pastAt = pc ? pc.at : null; S.pastLoaded = false;
+    S.view = { screen: "queue" }; S.rows = (store.get("rows_" + wd(), { rows: [] })).rows; S.problems = []; S.defects = []; S.supplies = []; S.qcJob = null;
     S.supplyItems = store.get("supplyitems_" + S.dept, []) || []; S.supplyForm = { ...S.supplyForm, pick: null, picked: {} };
     render();
     await loadTab(); render();
   }
 
-  const projectOf = (jobId) => (S.pickJobs.find(x => x.job_id === jobId) || rowsNow().find(x => x.job_id === jobId) || {}).project_id;
+  const projectOf = (jobId) => (S.pickJobs.find(x => x.job_id === jobId) || rowsHere().find(x => x.job_id === jobId) || {}).project_id;
   function wire() {
     const on = (sel, fn) => app.querySelectorAll(sel).forEach(el => el.onclick = (ev) => fn(el, ev));
     on("[data-dept]", (b) => { S.deptMenu = false; advLeave(() => pickDept(b.dataset.dept)); render(); });
@@ -2726,8 +2903,11 @@ if (typeof document !== "undefined") (function () {
       render();
     });
     on("[data-tab]", async (b) => {
-      S.tab = b.dataset.tab; store.set("tab", S.tab); S.view = { screen: "queue" }; S.notice = null; render(); scrollTo(0, 0);
-      if (S.tab !== "work" && !S.pickJobs.length) loadPickJobs();
+      const was = wd();
+      S.tab = b.dataset.tab; store.set("tab", S.tab); S.view = { screen: "queue" }; S.notice = null;
+      if (onCountTab() && wd() !== was) { const c = store.get("rows_" + wd(), null); S.rows = c ? c.rows : []; S.rowsAt = c ? c.at : null; }
+      render(); scrollTo(0, 0);
+      if (!onCountTab() && !S.pickJobs.length) loadPickJobs();
       await loadTab(); render();
     });
     on("[data-qmode]", (b) => { S.queueMode = b.dataset.qmode; render(); scrollTo(0, 0); });
@@ -2737,9 +2917,9 @@ if (typeof document !== "undefined") (function () {
     on("[data-back]", async (b) => {
       S.view = b.dataset.back === "queue" ? { screen: "queue" } : { screen: "job", jobId: S.view.jobId };
       render();
-      if (b.dataset.back === "queue") { await loadRows(); render(); }
+      if (b.dataset.back === "queue") { await (S.tab === "past" ? loadPast() : loadRows()); render(); }
     });
-    const current = () => rowsNow().find(x => x.progress_id === S.view.progressId);
+    const current = () => rowsHere().find(x => x.progress_id === S.view.progressId);
     on("[data-step]", (b) => { const r = current(); if (r) setCount(r, r.qty_done + Number(b.dataset.step)); });
     on("[data-all]", () => {
       const r = current(); if (!r) return;
@@ -2748,6 +2928,41 @@ if (typeof document !== "undefined") (function () {
       if (prev < r.qty_required) offerUndo(r, prev);
     });
     on("[data-print]", () => window.print());
+    // ---- send routes: a finished Full Custom or Metal sheet goes on; shown as sent at once, sent when the connection allows
+    const markSent = (ids, route) => {
+      const upd = (rows) => rows.map(r => ids.includes(r.progress_id) ? { ...r, send: { route, pending: true, at: new Date().toISOString() } } : r);
+      S.rows = upd(S.rows); S.past = upd(S.past);
+      store.set("rows_" + wd(), { rows: S.rows, at: S.rowsAt });
+    };
+    const queueSend = (r, route) => {
+      const q = queueEntry(S.logbox, "send_sheet", { p_sheet: r.sheet_id, p_from: r.department, p_route: route, p_client_id: null },
+                           `Sheet ${r.sheet_number} ${routeWords(route)}`);
+      S.logbox = q.box;
+    };
+    on("[data-send]", async (b) => {
+      const r = current(); if (!r || !toSend(r)) return;
+      queueSend(r, b.dataset.send); store.set("logbox", S.logbox);
+      markSent([r.progress_id], b.dataset.send); S.notice = null; render();
+      await flushLog();
+      if (Object.keys(S.logbox).length) showToast("Saved on this tablet — it will send when the connection is back.");
+    });
+    on("[data-sendall]", (b) => { S.modal = { kind: "sendall", jobId: b.dataset.sendall }; render(); });
+    on("[data-sendallroute]", async (b) => {
+      const m = S.modal; if (!m) return;
+      const list = rowsHere().filter(r => r.job_id === m.jobId && toSend(r));
+      for (const r of list) queueSend(r, b.dataset.sendallroute);
+      store.set("logbox", S.logbox);
+      markSent(list.map(r => r.progress_id), b.dataset.sendallroute);
+      S.modal = null; S.notice = null; render();
+      await flushLog();
+      if (Object.keys(S.logbox).length) showToast("Saved on this tablet — it will send when the connection is back.");
+    });
+    on("[data-unsend]", (b) => {
+      const r = current();
+      S.modal = { kind: "confirm", title: "Undo this send?", text: `Sheet ${r ? r.sheet_number : ""} goes back to not sent. The send stays in the history, marked undone.`, yes: "Undo it",
+                  run: () => send("undo_sheet_send", { p_send: b.dataset.unsend }, "Undo send") };
+      render();
+    });
     on("[data-pdf]", async () => {
       const r = current(); if (!r) return;
       const { data, error } = await db.storage.from("work-orders").createSignedUrl(r.pdf_path, 600);
@@ -2777,7 +2992,7 @@ if (typeof document !== "undefined") (function () {
     });
 
     // ---- defects and problems ----
-    const fromSheet = () => { const r = current(); return r ? { jobId: r.job_id, sheet: r.sheet_number, pick: false } : null; };
+    const fromSheet = () => { const r = current(); return r ? { jobId: r.job_id, sheet: r.sheet_number, pick: false, dept: wd() } : null; };
     on("[data-defect]", (b) => {
       const at = b.dataset.defect === "here" ? fromSheet() : { jobId: null, sheet: null, pick: true, filter: "" };
       S.modal = { kind: "defect", type: null, note: "", ...at }; render();
@@ -2803,7 +3018,7 @@ if (typeof document !== "undefined") (function () {
     on("[data-picktype]", (b) => { S.modal.type = b.dataset.picktype; render(); });
     on("[data-savedefect]", () => {
       const m = S.modal, t = S.types.find(x => x.id === m.type);
-      const args = { p_job: m.jobId, p_department: S.dept, p_type: m.type, p_sheet: m.sheet ?? null, p_note: (m.note || "").trim() || null, p_client_id: newId() };
+      const args = { p_job: m.jobId, p_department: m.dept || S.dept, p_type: m.type, p_sheet: m.sheet ?? null, p_note: (m.note || "").trim() || null, p_client_id: newId() };
       send(m.ask ? "report_defect" : "log_defect", m.ask ? { ...args, p_ask: true } : args,
            t ? t.label : "Defect", null, m.shots, { kind: "defect", projectId: projectOf(m.jobId), label: "Defect photo" });
     });
@@ -2820,7 +3035,7 @@ if (typeof document !== "undefined") (function () {
     });
     on("[data-saveproblem]", () => {
       const m = S.modal;
-      send("flag_problem", { p_job: m.jobId, p_department: S.dept, p_body: m.text.trim(), p_sheet: m.sheet ?? null, p_work_stopped: !!m.stops, p_client_id: newId() },
+      send("flag_problem", { p_job: m.jobId, p_department: m.dept || S.dept, p_body: m.text.trim(), p_sheet: m.sheet ?? null, p_work_stopped: !!m.stops, p_client_id: newId() },
            "Problem", null, m.shots, { kind: "problem", projectId: projectOf(m.jobId), label: "Problem photo" });
     });
     on("[data-reply]", (b) => {
@@ -3141,7 +3356,17 @@ if (typeof document !== "undefined") (function () {
     on("[data-sreceive]", (b) => send("receive_supply", { p_request: b.dataset.sreceive }, "Received"));
   }
 
+  /* No zoom while the sign-in box shows (the phone or tablet asks to be left at normal size, which also puts back
+     any zoom already there); the moment someone is signed in, zoom works again for reading the pages. */
+  function zoomLock(on) {
+    const vp = document.querySelector('meta[name="viewport"]');
+    const want = "width=device-width, initial-scale=1" + (on ? ", maximum-scale=1, user-scalable=no" : "") + ", viewport-fit=cover";
+    if (vp && vp.getAttribute("content") !== want) vp.setAttribute("content", want);
+    document.documentElement.classList.toggle("nozoom", !!on);
+  }
+
   function signIn(message) {
+    zoomLock(true);
     app.innerHTML = `<form class="signin" id="f">
         <h1>Shop Floor</h1><p class="sub" style="margin:0">Sign in once — this tablet remembers you.</p>
         <label for="e">Email</label><input id="e" type="email" autocomplete="username" required>
@@ -3160,12 +3385,15 @@ if (typeof document !== "undefined") (function () {
   }
 
   async function start(user) {
+    zoomLock(false);
     let me;
     try { me = await loadMe(user); } catch (e) { return signIn(friendlyError(e)); }
     if (!me) return signIn("This login has no role yet. In Supabase, give it one (walkthrough 1, step 8).");
     if (!S.depts.length) return signIn("This login isn't assigned to a department yet. In Supabase, add one to its profile.");
-    const cached = store.get("rows_" + S.dept, null);
+    const cached = store.get("rows_" + wd(), null);
     if (cached) { S.rows = cached.rows; S.rowsAt = cached.at; }
+    const pastCached = store.get("past_" + S.dept, null);
+    if (pastCached) { S.past = pastCached.rows; S.pastAt = pastCached.at; }
     await refreshPending();
     render();
     await loadRows(); render();
@@ -3196,7 +3424,7 @@ if (typeof document !== "undefined") (function () {
 })();
 
 /* lets the core be tested outside a browser */
-if (typeof module !== "undefined") module.exports = { withFinishBy, finishWords, dateLine, keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
+if (typeof module !== "undefined") module.exports = { withSends, routeWords, toSend, ROUTES, SEND_DEPTS, DEPT_NAME, buildPast, pastLine, PAST_DEPTS, withFinishBy, finishWords, dateLine, keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
   daysLeft, daysText, fmtDate, localISO, daysSince, agoText, setPending, flushOutbox, newId, queueEntry, flushLogbox, dueForMe, taskWhen,
   problemState, splitProblems, defectState, splitIssues, withReady, readyOf, readyKnown, waitingText, HAS_UPSTREAM, defectCounts, supplyLine, filterJobs, sheetsText, isNetworkError, friendlyError, DEPTS,
   fitSize, photoPath, photoError, flushPhotobox, loadoutSheets, sizeLabel, loadoutPieces, missingText,
