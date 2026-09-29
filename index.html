@@ -401,14 +401,24 @@
   .foot{text-align:center; margin-top:30px}
   .link{background:none; border:none; color:var(--ink2); text-decoration:underline; padding:10px}
 
-  /* printing: only the sheet page */
+  /* printing: only the sheet page, on one sheet of paper, as big as the paper allows.
+     The picture is sized to the paper (never taller), so nothing spills onto a second, blank page.
+     Landscape paper: printed as it is. Portrait paper (the tablets' default): the picture is turned
+     a quarter to fill the page, so it comes out the same size either way. No @page size: when a page
+     asks for landscape, Chrome still reads the paper as portrait and the turn would go wrong. */
   #printArea{display:none}
   @media print{
-    @page{size:landscape; margin:.25in}
-    body{background:#fff}
+    @page{margin:0}
+    html, body{margin:0!important; padding:0!important; background:#fff; height:auto!important; min-height:0!important; overflow:visible!important}
     body > *:not(#printArea){display:none!important}
-    #printArea{display:block!important}
-    #printArea img{width:100%; height:auto}
+    #printArea{display:flex!important; align-items:center; justify-content:center; box-sizing:border-box;
+               width:100vw; height:100vh; padding:.25in; overflow:hidden; break-after:avoid; page-break-after:avoid}
+    #printArea img{display:block; max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain;
+                   break-inside:avoid; page-break-inside:avoid}
+  }
+  @media print and (orientation: portrait){
+    #printArea{padding:0}
+    #printArea img{max-width:none; max-height:none; width:calc(100vh - .5in); height:calc(100vw - .5in); transform:rotate(90deg)}
   }
 </style>
 </head>
@@ -474,7 +484,7 @@ function tabsFor(dept) {
   const arrow = ARROW_DEPTS.includes(dept) ? ["arrow"] : [];
   if (dept === "delivery") return ["loadout", ...arrow, "tasks", "issues"];
   if (isLogOnly(dept)) return [...arrow, "tasks", "issues"];
-  return ["work", ...(dept === "finishing" ? ["paint"] : []), ...(PAST_DEPTS.includes(dept) ? ["past"] : []), ...arrow, ...(dept === "assembly_qc" ? ["qc"] : []), "tasks", "issues", "supplies"];
+  return ["work", ...(dept === "finishing" ? ["paint"] : []), ...(PAST_DEPTS.includes(dept) ? ["past"] : []), ...arrow, "tasks", "issues", "supplies"];
 }
 
 /* ---- Send routes (send_routes.sql): Full Custom and Metal send each finished sheet on ---- */
@@ -579,10 +589,11 @@ function readyOf(r) {
   if (typeof r.available !== "number") return null;
   return Math.max(Math.min(r.available, r.qty_required) - r.qty_done, 0);
 }
-/** Why nothing is ready on a sheet, in plain words: "Waiting on Metal", "At Arrow". Empty when something is. */
-function waitingText(r) {
+/** Why nothing is ready on a sheet, in plain words: "Waiting on Metal", "At Arrow". Empty when something is.
+ *  `arrow` (the Arrow list, optional) tells "Waiting to go to Arrow" apart from "At Arrow". */
+function waitingText(r, arrow) {
   if (readyOf(r) !== 0 || r.qty_done >= r.qty_required) return "";
-  if (r.at_arrow) return "At Arrow";
+  if (r.at_arrow) return arrowWaitFor(arrow, r.job_id, r.sheet_number) ? "Waiting to go to Arrow" : "At Arrow";
   const w = (r.waiting_on || []).map(d => DEPT_NAME[d] || d);
   return w.length ? "Waiting on " + w.join(" and ") : "Waiting on the stage before";
 }
@@ -857,6 +868,18 @@ function filterJobs(jobs, text) {
   return (jobs || []).filter(j => !t || String(j.project_id).toLowerCase().includes(t) || String(j.job_name || "").toLowerCase().includes(t))
     .sort((a, b) => (b.is_active - a.is_active) || (a.delivery_date || "9999").localeCompare(b.delivery_date || "9999")
                  || String(a.project_id).localeCompare(String(b.project_id)));
+}
+/** The Arrow pick-up list: items waiting to go, oldest first. */
+function arrowWaiting(arrow) {
+  return (arrow || []).filter(a => a.waiting && !a.voided).sort((a, b) => String(a.queued_on || a.sent_on).localeCompare(String(b.queued_on || b.sent_on)) || String(a.project_id).localeCompare(String(b.project_id)));
+}
+/** The waiting Arrow item that holds this sheet, if any. */
+function arrowWaitFor(arrow, jobId, sheet) {
+  return arrowWaiting(arrow).find(a => a.job_id === jobId && (a.sheet_numbers || []).includes(sheet)) || null;
+}
+/** At Arrow now: gone, not back. (Pages from before the pick-up list have no `waiting`: everything open is at Arrow.) */
+function arrowOut(arrow) {
+  return (arrow || []).filter(a => a.at_vendor && !a.waiting);
 }
 function sheetsText(nums) {
   const n = (nums || []).slice().sort((a, b) => a - b);
@@ -1906,7 +1929,7 @@ if (typeof document !== "undefined") (function () {
         const status = r.not_needed ? `<span class="why">Not needed — sent straight to Finishing</span>`
                      : toSend(r) ? `<span class="rchip">To send</span>`
                      : full && r.send ? `<span class="why">Sent ${esc(routeWords(r.send.route))}</span>`
-                     : rd === null ? "" : rd > 0 ? `<span class="rchip">${rd} ready</span>` : `<span class="why">${esc(waitingText(r))}</span>`;
+                     : rd === null ? "" : rd > 0 ? `<span class="rchip">${rd} ready</span>` : `<span class="why">${esc(waitingText(r, S.arrow))}</span>`;
         return `<button class="sheet${full ? " done" : ""}" data-sheet="${esc(r.progress_id)}">
           <span class="no num">${r.sheet_number}</span>
           <span class="meta"><span class="code">${esc(r.item_code || "Sheet " + r.sheet_number)}</span>
@@ -1935,7 +1958,7 @@ if (typeof document !== "undefined") (function () {
       ${stopped.length ? `<div class="band stop">Work is stopped on this sheet — ${esc(stopped[0].body)}<small>Raised by ${esc(stopped[0].raised_by_name)}, ${esc(agoText(stopped[0].raised_at))}. It clears when the office answers.</small></div>` : ""}
       ${r.not_needed ? `<div class="band watch">Not needed here — Full Custom sent this cabinet straight to Finishing.</div>` : ""}
       ${(() => { const rd = HAS_UPSTREAM.includes(wd()) && !full ? readyOf(r) : null;
-                 return rd === null ? "" : `<div class="band watch">${rd > 0 ? `${rd} piece${rd === 1 ? "" : "s"} ready from the stage before` : esc(waitingText(r))}</div>`; })()}
+                 return rd === null ? "" : `<div class="band watch">${rd > 0 ? `${rd} piece${rd === 1 ? "" : "s"} ready from the stage before` : esc(waitingText(r, S.arrow))}</div>`; })()}
       <div class="counter">
         <div class="count-row">
           <button class="step" data-step="-1" ${r.qty_done <= 0 ? "disabled" : ""} aria-label="One fewer">−</button>
@@ -1952,7 +1975,6 @@ if (typeof document !== "undefined") (function () {
       </div>
       <div class="actions">
         <button data-report="here">Report a defect or issue</button>
-        ${S.dept === "assembly_qc" ? `<button data-qcsheet="${r.sheet_number}" data-qcjob="${esc(r.job_id)}">Record QC</button>` : ""}
       </div>
       ${pager}
       ${pieceSection(r)}`;
@@ -1963,7 +1985,8 @@ if (typeof document !== "undefined") (function () {
     if (!SEND_DEPTS.includes(r.department) || !r.sendKnown || r.qty_done < r.qty_required) return "";
     if (r.send) {
       const who = [r.send.at && r.send.route !== "before" ? fmtDate(localISO(r.send.at)) : null, r.send.by && r.send.route !== "before" ? r.send.by : null].filter(Boolean).join(" · ");
-      return `<div class="sent"><div><b>Sent ${esc(routeWords(r.send.route))}</b>${who ? `<small>${esc(who)}${r.send.pending ? " · waiting to send" : ""}</small>` : r.send.pending ? "<small>waiting to send</small>" : ""}</div>
+      const pick = r.send.route === "arrow" && arrowWaitFor(S.arrow, r.job_id, r.sheet_number) ? " · on the Arrow pick-up list" : "";
+      return `<div class="sent"><div><b>Sent ${esc(routeWords(r.send.route))}</b>${who ? `<small>${esc(who)}${pick}${r.send.pending ? " · waiting to send" : ""}</small>` : r.send.pending ? "<small>waiting to send</small>" : pick ? `<small>${esc(pick.slice(3))}</small>` : ""}</div>
         ${r.send.can_undo && !r.send.pending ? `<button data-unsend="${esc(r.send.id)}">Undo</button>` : ""}</div>`;
     }
     return `<div class="sendto"><div class="sub" style="margin:0 2px 8px">Done — where does it go next?</div>
@@ -2150,7 +2173,8 @@ if (typeof document !== "undefined") (function () {
 
   function arrowSection() {
     const f = S.arrowForm;
-    const out = S.arrow.filter(a => a.at_vendor).sort((a, b) => b.days_out - a.days_out);
+    const out = arrowOut(S.arrow).sort((a, b) => b.days_out - a.days_out);
+    const wait = arrowWaiting(S.arrow);
     const back = S.arrow.filter(a => !a.at_vendor && a.returned_on && daysSince(a.returned_on) <= 92)
       .sort((a, b) => String(b.returned_on).localeCompare(String(a.returned_on)));
     const what = (a) => [sheetsText(a.sheet_numbers), a.description].filter(Boolean).join(" — ");
@@ -2168,10 +2192,18 @@ if (typeof document !== "undefined") (function () {
         <div class="mdl-btns"><button class="btn" data-arcancel="1">Cancel</button>
           <button class="go" data-arsend="1" ${f.jobId && (f.sheets.length || f.description.trim()) ? "" : "disabled"}>Send to Arrow</button></div>
       </div>` : `<button class="btn wide" data-aropen="1">Send something to Arrow</button>`;
-    return `${missingNote("arrow")}${form}
+    const pickup = wait.length ? `<h2 class="sec" style="margin-top:4px">Waiting to go to Arrow</h2>
+      <p class="sub" style="margin:0 2px 10px">Done by Metal, not taken over yet. Tap Gone to Arrow when it leaves.</p>
+      ${wait.map(a => `<div class="li"><div class="li-top"><b>${a.is_test ? `<span class="tag">TEST</span>` : ""}${esc(a.project_id)}</b>
+          <span class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent on ${esc(fmtDate(a.queued_on || a.sent_on))} by ${esc(a.queued_by_name || a.sent_by_name)}</span>
+          <span class="st">${a.days_out ? `waiting ${a.days_out} day${a.days_out === 1 ? "" : "s"}` : "since today"}</span></div>
+        <div>${esc(what(a))}</div>
+        <div class="rowbtns"><button class="go" data-argone="${esc(a.id)}">Gone to Arrow</button></div></div>`).join("")}
+      ${wait.length > 1 ? `<button class="btn wide" style="margin:4px 0 8px" data-argoneall="1">All ${wait.length} gone to Arrow</button>` : ""}` : "";
+    return `${missingNote("arrow")}${pickup}${form}
       <h2 class="sec">At Arrow now</h2>
       ${out.length ? out.map(a => `<div class="li"><div class="li-top"><b>${a.is_test ? `<span class="tag">TEST</span>` : ""}${esc(a.project_id)}</b>
-          <span class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent ${esc(fmtDate(a.sent_on))} by ${esc(a.sent_by_name)}</span>
+          <span class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent ${esc(fmtDate(a.sent_on))} by ${esc(a.sent_by_name)}${a.gone_by_name ? ` · taken by ${esc(a.gone_by_name)}` : ""}</span>
           <span class="st">${a.days_out} day${a.days_out === 1 ? "" : "s"} out</span></div>
         <div>${esc(what(a))}</div>
         <div class="rowbtns"><button data-arreturn="${esc(a.id)}">Mark returned</button>
@@ -2575,7 +2607,7 @@ if (typeof document !== "undefined") (function () {
         <div class="sub">${esc((rowsHere().find(r => r.job_id === m.jobId) || {}).project_id || "")} · every finished sheet not sent yet. Where do they go?</div>
         <div class="choice">${(ROUTES[S.dept] || []).map(([k, label]) => `<button data-sendallroute="${k}"><b>${esc(label)}</b><span>${
           { sanding: "Sanding sees them next, then Finishing.", finishing: "Finishing sees them next. With no top, Sanding's count is marked Not needed.",
-            paint: "Finishing's Metal to paint list gets them.", arrow: "An Arrow item is made for each. Assembly / QC sees them once they're back." }[k]}</span></button>`).join("")}</div>
+            paint: "Finishing's Metal to paint list gets them.", arrow: "Each goes on the Arrow pick-up list until it's taken over. Assembly / QC sees them once they're back." }[k]}</span></button>`).join("")}</div>
         <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button></div>`;
     } else if (m.kind === "report") {                // one button on the floor: then a defect, or an issue for the office
       inner = `<h3>Report</h3>
@@ -3268,6 +3300,15 @@ if (typeof document !== "undefined") (function () {
                   yes: "Mark returned", run: () => send("return_from_arrow", { p_item: b.dataset.arreturn }, "Arrow return") };
       render();
     });
+    const goneAsk = (items) => {
+      const what = items.map(a => `${a.project_id}${(a.sheet_numbers || []).length ? " " + sheetsText(a.sheet_numbers) : ""}`).join(", ");
+      S.modal = { kind: "confirm", title: items.length === 1 ? "Gone to Arrow?" : `All ${items.length} gone to Arrow?`,
+                  text: `${what}. Moves ${items.length === 1 ? "it" : "them"} to At Arrow today, under your name. The days-out count starts today.`,
+                  yes: "Gone to Arrow", run: () => send("arrow_gone", { p_items: items.map(a => a.id), p_gone_on: localISO(new Date()) }, "Arrow") };
+      render();
+    };
+    on("[data-argone]", (b) => { const a = S.arrow.find(x => x.id === b.dataset.argone); if (a) goneAsk([a]); });
+    on("[data-argoneall]", () => { const w = arrowWaiting(S.arrow); if (w.length) goneAsk(w); });
     on("[data-arvoid]", (b) => {
       S.modal = { kind: "confirm", title: "Entered by mistake?", text: "It comes off the Arrow lists and stays in history.", yes: "Yes, a mistake",
                   run: () => send("void_arrow", { p_item: b.dataset.arvoid }, "Arrow") };
@@ -3400,6 +3441,7 @@ if (typeof document !== "undefined") (function () {
     flush();
     await Promise.all([loadFlags(), loadTasks(), loadTypes(), S.tab === "issues" ? null : loadIssues(), loadInvLists()]);
     if (S.tab !== "work") await loadTab();
+    else if (ARROW_DEPTS.includes(S.dept)) loadArrow().then(render);    // the Arrow tab's number, and "Waiting to go to Arrow" on sheets
     render();
     flushLog();
     loadPickJobs().then(() => { if (S.adv) render(); });
@@ -3424,7 +3466,7 @@ if (typeof document !== "undefined") (function () {
 })();
 
 /* lets the core be tested outside a browser */
-if (typeof module !== "undefined") module.exports = { withSends, routeWords, toSend, ROUTES, SEND_DEPTS, DEPT_NAME, buildPast, pastLine, PAST_DEPTS, withFinishBy, finishWords, dateLine, keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
+if (typeof module !== "undefined") module.exports = { arrowWaiting, arrowWaitFor, arrowOut, waitingText, withSends, routeWords, toSend, ROUTES, SEND_DEPTS, DEPT_NAME, buildPast, pastLine, PAST_DEPTS, withFinishBy, finishWords, dateLine, keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
   daysLeft, daysText, fmtDate, localISO, daysSince, agoText, setPending, flushOutbox, newId, queueEntry, flushLogbox, dueForMe, taskWhen,
   problemState, splitProblems, defectState, splitIssues, withReady, readyOf, readyKnown, waitingText, HAS_UPSTREAM, defectCounts, supplyLine, filterJobs, sheetsText, isNetworkError, friendlyError, DEPTS,
   fitSize, photoPath, photoError, flushPhotobox, loadoutSheets, sizeLabel, loadoutPieces, missingText,

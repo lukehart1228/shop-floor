@@ -970,7 +970,7 @@ if (typeof document !== "undefined") (function () {
       flags: staleFlags(S.flags).length,
       routine: overdueRoutine(S.routine).length,
       ordering: needToOrder(S.supplies).reduce((a, g) => a + g.lines.length, 0),
-      arrow: (S.arrow || []).filter(a => a.at_vendor && a.days_out > S.arrowDays).length,
+      arrow: (S.arrow || []).filter(a => a.at_vendor && !a.waiting && a.days_out > S.arrowDays).length,
       photos: S.photoStatus && S.photoStatus.due ? 1 : 0,
     };
     // everything that needs the office is on one tab, so only that tab carries a number
@@ -1070,7 +1070,8 @@ if (typeof document !== "undefined") (function () {
                    J.wo ? `work order version ${J.wo.version} · ${J.sheets.length} sheet${J.sheets.length === 1 ? "" : "s"}` : "no work order uploaded"];
     const openP = J.problems.filter(p => p.status === "open"), answeredP = J.problems.filter(p => p.status !== "open");
     const askedD = J.defects.filter(d => d.office_status === "open");
-    const atArrow = J.arrow.filter(a => a.at_vendor), back2 = J.arrow.filter(a => !a.at_vendor);
+    const atArrow = J.arrow.filter(a => a.at_vendor && !a.waiting), back2 = J.arrow.filter(a => !a.at_vendor);
+    const toGo = J.arrow.filter(a => a.at_vendor && a.waiting);
     const defectGroups = {}; J.defects.forEach(d => { defectGroups[d.defect_type] = (defectGroups[d.defect_type] || 0) + 1; });
     const what = (a) => [a.sheet_numbers && a.sheet_numbers.length ? `sheet${a.sheet_numbers.length === 1 ? "" : "s"} ${a.sheet_numbers.join(", ")}` : "", a.description].filter(Boolean).join(" — ");
     const cols = `grid-template-columns: minmax(110px, auto) repeat(${Math.max(1, g.depts.length)}, minmax(76px, 1fr))`;
@@ -1096,8 +1097,9 @@ if (typeof document !== "undefined") (function () {
         ${answeredP.length ? `<p class="meta2" style="margin:8px 0 0">${answeredP.length} answered</p>` : ""}
         ${openP.length + askedD.length ? `<button class="link" data-tab="tasks" style="padding-left:0">Answer on Needs you</button>` : ""}</section>
       <section class="panel"><h2>Arrow</h2>
+        ${toGo.map(a => `<div class="row"><b>${esc(what(a))}</b><div class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · <b>waiting to go</b> · sent on ${esc(fmtDate(a.queued_on || a.sent_on))} by ${esc(a.queued_by_name || a.sent_by_name)}</div></div>`).join("")}
         ${atArrow.map(a => `<div class="row"><b>${esc(what(a))}</b><div class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent ${esc(fmtDate(a.sent_on))} by ${esc(a.sent_by_name)} · <b>${a.days_out} day${a.days_out === 1 ? "" : "s"} out</b></div></div>`).join("")
-          || `<p class="sub" style="margin:0">Nothing at Arrow.</p>`}
+          || (toGo.length ? "" : `<p class="sub" style="margin:0">Nothing at Arrow.</p>`)}
         ${back2.length ? `<p class="meta2" style="margin:8px 0 0">${back2.length} returned</p>` : ""}</section>
       <section class="panel"><h2>Defects ${J.defects.length ? `<span class="cnt num" style="color:var(--ink2)">${J.defects.length}</span>` : ""}</h2>
         ${Object.entries(defectGroups).sort((a, b) => b[1] - a[1]).map(([t, n]) => `<div class="row">${esc(t)} <span class="num" style="float:right">${n}</span></div>`).join("")
@@ -1257,20 +1259,29 @@ if (typeof document !== "undefined") (function () {
 
   // ---------- Arrow ----------
   function arrowScreen() {
-    const out = (S.arrow || []).filter(a => a.at_vendor).sort((a, b) => b.days_out - a.days_out);
+    const out = (S.arrow || []).filter(a => a.at_vendor && !a.waiting).sort((a, b) => b.days_out - a.days_out);
+    const wait = (S.arrow || []).filter(a => a.at_vendor && a.waiting).sort((a, b) => String(a.queued_on || a.sent_on).localeCompare(String(b.queued_on || b.sent_on)));
     const back = (S.arrow || []).filter(a => !a.at_vendor).sort((a, b) => String(b.returned_on).localeCompare(String(a.returned_on)));
     const what = (a) => [a.sheet_numbers && a.sheet_numbers.length ? `sheet${a.sheet_numbers.length === 1 ? "" : "s"} ${a.sheet_numbers.join(", ")}` : "", a.description].filter(Boolean).join(" — ");
     return `<h1>Arrow</h1>
-      <p class="sub">Everything at Arrow now, from every department. Anything out longer than the number below shows on the TV's attention strip.</p>
+      <p class="sub">Everything waiting to go to Arrow and at Arrow now, from every department. Anything out longer than the number below shows on the TV's attention strip; the count starts when it goes.</p>
       ${missingNote()}${msgBanner()}
       <div class="btns" style="margin:0 0 16px"><label for="arDays" style="font-weight:600">Show on the TV after</label>
         <input class="in" id="arDays" type="number" min="1" max="90" value="${esc(S.arrowDays)}" style="width:90px"> <span>days</span>
         <button class="plain" data-ardays="1">Save</button></div>
+      ${wait.length ? `<section class="panel"><h2>Waiting to go to Arrow <span class="cnt num" style="color:var(--ink2)">${wait.length}</span></h2>
+        <p class="sub" style="margin:0 0 8px">Done by Metal and sent on, not taken over yet. Whoever takes it taps Gone to Arrow on their tablet.</p>
+        ${wait.map(a => `<div class="line"><span class="qty">${a.days_out}</span>
+          <span class="body"><b>${testTag(a)}${esc(a.project_id)}</b> <span class="meta2">· ${esc(a.job_name)}</span>
+            <div>${esc(what(a))}</div>
+            <div class="meta2">${a.service === "paint" ? "Paint" : "Powdercoat"} · sent on ${esc(fmtDay(a.queued_on || a.sent_on))} by ${esc(a.queued_by_name || a.sent_by_name)} · waiting ${a.days_out} day${a.days_out === 1 ? "" : "s"}</div></span>
+          <span class="btns" style="margin:0"><button class="plain" data-argone="${esc(a.id)}">Gone to Arrow</button></span></div>`).join("")}
+      </section>` : ""}
       <section class="panel"><h2>At Arrow now</h2>
         ${out.length ? out.map(a => `<div class="line"><span class="qty">${a.days_out}</span>
           <span class="body"><b>${testTag(a)}${esc(a.project_id)}</b> <span class="meta2">· ${esc(a.job_name)}</span>
             <div>${esc(what(a))}</div>
-            <div class="meta2">${a.service === "paint" ? "Paint" : "Powdercoat"} · sent ${esc(fmtDay(a.sent_on))} by ${esc(a.sent_by_name)} (${esc(a.department_name)}) · ${a.days_out} day${a.days_out === 1 ? "" : "s"} out${a.days_out > S.arrowDays ? " — <b>over " + S.arrowDays + " days</b>" : ""}</div></span>
+            <div class="meta2">${a.service === "paint" ? "Paint" : "Powdercoat"} · sent ${esc(fmtDay(a.sent_on))} by ${esc(a.sent_by_name)} (${esc(a.department_name)})${a.gone_by_name ? ` · taken by ${esc(a.gone_by_name)}` : ""} · ${a.days_out} day${a.days_out === 1 ? "" : "s"} out${a.days_out > S.arrowDays ? " — <b>over " + S.arrowDays + " days</b>" : ""}</div></span>
           <span class="btns" style="margin:0"><button class="plain" data-arret="${esc(a.id)}">Mark returned</button><button class="link" data-arvoid="${esc(a.id)}">Entered by mistake</button></span></div>`).join("")
           : `<p class="sub" style="margin:0">Nothing at Arrow.</p>`}
       </section>
@@ -1323,7 +1334,7 @@ if (typeof document !== "undefined") (function () {
     const ordered = orderedNotReceived(S.supplies);
     const closed = (S.supplies || []).filter(r => !r.is_open).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
     const stale = staleFlags(S.flags);
-    const late = (S.arrow || []).filter(a => a.at_vendor && a.days_out > S.arrowDays).sort((a, b) => b.days_out - a.days_out);
+    const late = (S.arrow || []).filter(a => a.at_vendor && !a.waiting && a.days_out > S.arrowDays).sort((a, b) => b.days_out - a.days_out);
     const ps = S.photoStatus;
     const ho = S.columns.find(c => c.key === "handed_off");
     const connected = ho && ho.column_id && (ho.col_type === "checkbox" || ho.yes_label);
@@ -1952,6 +1963,7 @@ if (typeof document !== "undefined") (function () {
       act("set_finish_by_days", { p_department: d, p_days: v }, null, "fb"); });
     on("[data-ardays]", () => act("set_arrow_alert_days", { p_days: Number((app.querySelector("#arDays") || {}).value) }));
     on("[data-arret]", (b) => { if (confirm("Mark this back from Arrow today?")) act("return_from_arrow", { p_item: b.dataset.arret, p_returned_on: null }); });
+    on("[data-argone]", (b) => { if (confirm("Mark this gone to Arrow today? Its days-out count starts today.")) act("arrow_gone", { p_items: [b.dataset.argone], p_gone_on: null }); });
     on("[data-arvoid]", (b) => { if (confirm("Mark this entered by mistake? It comes off the lists and stays in history.")) act("void_arrow", { p_item: b.dataset.arvoid, p_reason: null }); });
 
     app.querySelectorAll("[data-tf]").forEach(el => el.oninput = el.onchange = () => {
