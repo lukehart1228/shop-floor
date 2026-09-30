@@ -82,7 +82,13 @@
   .empty b{display:block; color:var(--midnight); margin-bottom:4px}
   ol.steps{list-style:none; padding:0; margin:10px 0 0}
   ol.steps li{padding:4px 0}
-  @media (max-width: 600px){ .row2, .drops{grid-template-columns:1fr} main{padding:14px 12px 50px} }
+  .kinds{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px}
+  .kinds button{text-align:left; font-weight:500; padding:10px 12px}
+  .kinds button b{display:block; font-weight:700}
+  .kinds button span{display:block; color:var(--ink2); font-size:14px; line-height:1.3; margin-top:2px}
+  .kinds button[aria-pressed="true"]{background:var(--midnight); color:var(--sawdust); border-color:var(--midnight)}
+  .kinds button[aria-pressed="true"] span{color:#CFC9B8}
+  @media (max-width: 600px){ .row2, .drops, .kinds{grid-template-columns:1fr} main{padding:14px 12px 50px} }
   [hidden]{display:none!important}
 </style>
 </head>
@@ -194,12 +200,30 @@ function fmtBytes(n) {
 /** The file Julia downloads: "PROJ-00418 Signed ticket 2026-10-14.pdf". */
 function signedFileName(d) { return `${d.project_id} Signed ticket ${shopDate(d.completed_at || d.scheduled_for || new Date())}.pdf`; }
 
-/** Coming up (scheduled, not done: soonest first) and completed (newest first). */
+/** What each kind of trip is called (delivery_types.sql). The database's name for a BOL pickup is "shipping". */
+const TRIP_KINDS = [["delivery", "White glove", "Our truck, a date and time, signed at the site"],
+                    ["shipping", "BOL pickup", "A carrier collects pallets. No date: ready for pickup"],
+                    ["customer_pickup", "Customer pickup", "The customer collects and signs. No date: ready for pickup"]];
+const tripName = (kind) => (TRIP_KINDS.find(k => k[0] === (kind || "delivery")) || TRIP_KINDS[0])[1];
+const isPickup = (d) => !!d && !!d.kind && d.kind !== "delivery";
+/** Coming up (scheduled, not done: soonest first), ready for pickup (oldest first) and completed (newest first). */
 function splitDeliveries(list) {
-  const up = (list || []).filter(d => !d.is_done).sort((a, b) => String(a.scheduled_for).localeCompare(String(b.scheduled_for)));
+  const open = (list || []).filter(d => !d.is_done);
+  const up = open.filter(d => !isPickup(d)).sort((a, b) => String(a.scheduled_for).localeCompare(String(b.scheduled_for)));
+  const ready = open.filter(isPickup).sort((a, b) => String(a.ready_at).localeCompare(String(b.ready_at)));
   const done = (list || []).filter(d => d.is_done).sort((a, b) => String(b.completed_at).localeCompare(String(a.completed_at)));
-  return { up, done, fresh: done.filter(d => !d.downloaded_at).length };
+  return { up, ready, done, fresh: done.filter(d => !d.downloaded_at).length };
 }
+/** Where a pickup is, in words: "3 of 6 tables photographed · 2 pallets · BOL photographed" */
+function pickupProgress(d) {
+  const parts = [], t = d.tables_photographed || 0, bol = d.kind === "shipping";
+  if (t) parts.push(`${t}${d.pieces_total ? ` of ${d.pieces_total}` : ""} table${(d.pieces_total || t) === 1 ? "" : "s"} photographed`);
+  if (bol && d.pallets_photographed) parts.push(`${d.pallets_photographed} pallet${d.pallets_photographed === 1 ? "" : "s"}`);
+  if (bol && (d.bol_photos || []).length) parts.push("BOL photographed");
+  return parts.join(" · ");
+}
+/** The BOL pickup's download: "PROJ-00418 BOL pickup 2026-10-14.pdf". */
+function bolFileName(d) { return `${d.project_id} BOL pickup ${shopDate(d.completed_at || d.ready_at || new Date())}.pdf`; }
 /** Where a scheduled delivery is, in words. */
 function tripLine(d) {
   const parts = [];
@@ -250,7 +274,8 @@ async function buildSignedTicket(PDFLib, d, ticket, signature) {
       pg.drawImage(img, { x: (612 - img.width * s) / 2, y: (792 - img.height * s) / 2, width: img.width * s, height: img.height * s });
     }
   }
-  doc.setTitle(pdfText(`${d.project_id} delivery ticket, signed`));
+  const pk = d.kind === "customer_pickup";
+  doc.setTitle(pdfText(`${d.project_id} ${pk ? "pickup" : "delivery"} ticket, signed`));
   const font = await doc.embedFont(StandardFonts.Helvetica), bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const ink = rgb(0.094, 0.114, 0.18), grey = rgb(0.42, 0.44, 0.51), orange = rgb(0.93, 0.37, 0.06);
   const page = doc.addPage([612, 792]);
@@ -258,13 +283,18 @@ async function buildSignedTicket(PDFLib, d, ticket, signature) {
   let y = 738;
   const text = (t, x, yy, size, f = font, color = ink) => page.drawText(pdfText(t), { x, y: yy, size, font: f, color });
   text("PURPOSEFUL DESIGN", L, y, 10, bold, orange);
-  y -= 26; text("Delivery record", L, y, 22, bold);
-  y -= 16; text(ticket ? "Added by the shop floor system after the delivery ticket, which is as it was issued." : "No delivery ticket was attached, so this record stands on its own.", L, y, 10, font, grey);
+  y -= 26; text(pk ? "Customer pickup record" : "Delivery record", L, y, 22, bold);
+  y -= 16; text(ticket ? `Added by the shop floor system after the ${pk ? "" : "delivery "}ticket, which is as it was issued.` : `No ${pk ? "" : "delivery "}ticket was attached, so this record stands on its own.`, L, y, 10, font, grey);
   y -= 28;
-  const rows = [["Project", `${d.project_id} — ${d.job_name || ""}`],
-                ["Scheduled for", d.scheduled_for ? fmtWhen(d.scheduled_for, true) : "Not scheduled"],
-                ["Delivered", `${fmtWhen(d.completed_at, true)}${d.completed_by_name ? ` by ${d.completed_by_name}` : ""}`],
-                ["At the site", d.pieces_total ? `${d.site_photographed || 0} of ${d.pieces_total} table${d.pieces_total === 1 ? "" : "s"} photographed` : `${d.site_photographed || 0} photographed`]];
+  const n = pk ? d.tables_photographed : d.site_photographed;
+  const rows = pk ? [["Project", `${d.project_id} — ${d.job_name || ""}`],
+                     ["Ready from", d.ready_at ? fmtWhen(d.ready_at, true) : "Not set up ahead"],
+                     ["Picked up", `${fmtWhen(d.completed_at, true)}${d.completed_by_name ? ` · handed over by ${d.completed_by_name}` : ""}`],
+                     ["Handed over", d.pieces_total ? `${n || 0} of ${d.pieces_total} table${d.pieces_total === 1 ? "" : "s"} photographed` : `${n || 0} photographed`]]
+                  : [["Project", `${d.project_id} — ${d.job_name || ""}`],
+                     ["Scheduled for", d.scheduled_for ? fmtWhen(d.scheduled_for, true) : "Not scheduled"],
+                     ["Delivered", `${fmtWhen(d.completed_at, true)}${d.completed_by_name ? ` by ${d.completed_by_name}` : ""}`],
+                     ["At the site", d.pieces_total ? `${n || 0} of ${d.pieces_total} table${d.pieces_total === 1 ? "" : "s"} photographed` : `${n || 0} photographed`]];
   if (d.complete_lat !== null && d.complete_lat !== undefined)
     rows.push(["Where", `${Number(d.complete_lat).toFixed(6)}, ${Number(d.complete_lng).toFixed(6)}${d.complete_accuracy ? ` (within ${Math.round(d.complete_accuracy)} m)` : ""}`]);
   for (const [k, v] of rows) {
@@ -294,7 +324,51 @@ async function buildSignedTicket(PDFLib, d, ticket, signature) {
     text("The customer's note", L, y, 11, bold); y -= 16;
     for (const ln of wrapText(d.customer_note, W, (s) => font.widthOfTextAtSize(s, 12))) { text(ln, L, y, 12); y -= 16; if (y < 70) break; }
   }
-  text(`${d.project_id} · delivery record`, L, 40, 9, font, grey);
+  text(`${d.project_id} · ${pk ? "pickup" : "delivery"} record`, L, 40, 9, font, grey);
+  return await doc.save();
+}
+/**
+ * A BOL pickup's record: the ticket as issued (if any), a page per BOL photo, then one record page.
+ * bols = [{ bytes, mime }] (JPEG photos). Returns the PDF's bytes.
+ */
+async function buildBolRecord(PDFLib, d, ticket, bols) {
+  const { PDFDocument, StandardFonts, rgb } = PDFLib;
+  let doc;
+  if (ticket && ticket.mime === "application/pdf") doc = await PDFDocument.load(ticket.bytes, { ignoreEncryption: true });
+  else doc = await PDFDocument.create();
+  const fit = async (img) => { const pg = doc.addPage([612, 792]); const s = Math.min(560 / img.width, 740 / img.height, 1);
+    pg.drawImage(img, { x: (612 - img.width * s) / 2, y: (792 - img.height * s) / 2, width: img.width * s, height: img.height * s }); };
+  if (ticket && ticket.mime !== "application/pdf") await fit(ticket.mime === "image/png" ? await doc.embedPng(ticket.bytes) : await doc.embedJpg(ticket.bytes));
+  for (const b of bols || []) await fit(b.mime === "image/png" ? await doc.embedPng(b.bytes) : await doc.embedJpg(b.bytes));
+  doc.setTitle(pdfText(`${d.project_id} BOL pickup`));
+  const font = await doc.embedFont(StandardFonts.Helvetica), bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const ink = rgb(0.094, 0.114, 0.18), grey = rgb(0.42, 0.44, 0.51), orange = rgb(0.93, 0.37, 0.06);
+  const page = doc.addPage([612, 792]);
+  const L = 54, W = 504;
+  let y = 738;
+  const text = (t, x, yy, size, f = font, color = ink) => page.drawText(pdfText(t), { x, y: yy, size, font: f, color });
+  const nb = (bols || []).length;
+  text("PURPOSEFUL DESIGN", L, y, 10, bold, orange);
+  y -= 26; text("BOL pickup record", L, y, 22, bold);
+  y -= 16; text(`${ticket ? "The ticket as issued, then " : ""}${nb ? `the BOL (${nb} photo${nb === 1 ? "" : "s"}), then this page.` : "No BOL photo was taken."}`, L, y, 10, font, grey);
+  y -= 28;
+  const rows = [["Project", `${d.project_id} — ${d.job_name || ""}`],
+                ["Ready from", d.ready_at ? fmtWhen(d.ready_at, true) : "Not set up ahead"],
+                ["Picked up", `${fmtWhen(d.completed_at, true)}${d.completed_by_name ? ` · handed over by ${d.completed_by_name}` : ""}`],
+                ["Carrier", d.carrier || "Not written down"],
+                ["BOL number", d.tracking || "Not written down"],
+                ["Pallets", `${d.pallets_photographed || 0} photographed wrapped`],
+                ["Tables", d.pieces_total ? `${d.tables_photographed || 0} of ${d.pieces_total} photographed before wrapping` : `${d.tables_photographed || 0} photographed`]];
+  for (const [k, v] of rows) {
+    text(k, L, y, 11, font, grey);
+    for (const ln of wrapText(v, W - 110, (s) => font.widthOfTextAtSize(s, 12))) { text(ln, L + 110, y, 12); y -= 16; }
+    y -= 4;
+  }
+  if (d.customer_note) {
+    y -= 10; text("Note", L, y, 11, bold); y -= 16;
+    for (const ln of wrapText(d.customer_note, W, (s) => font.widthOfTextAtSize(s, 12))) { text(ln, L, y, 12); y -= 16; if (y < 70) break; }
+  }
+  text(`${d.project_id} · BOL pickup record`, L, 40, 9, font, grey);
   return await doc.save();
 }
 
@@ -303,6 +377,7 @@ async function buildSignedTicket(PDFLib, d, ticket, signature) {
 if (typeof module !== "undefined") module.exports = {
   keyProblem, isNetworkError, friendlyError, fileKind, docPath, whenISO, whenInputs, fmtWhen, shopDate, fmtBytes, signedFileName,
   splitDeliveries, tripLine, pdfText, wrapText, buildSignedTicket, NO_SIGN_REASONS,
+  TRIP_KINDS, tripName, isPickup, pickupProgress, bolFileName, buildBolRecord,
 };
 
 
@@ -322,15 +397,20 @@ if (typeof document !== "undefined") (function () {
   const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const S = {
     me: null, allowed: null, tab: store.get("tab", "new"), list: [], cancelled: [], jobs: [], loaded: false, missing: false,
-    form: blankForm(), busy: false, msg: null, steps: null, edit: null, openAdd: null, showAll: false,
+    form: blankForm(), busy: false, msg: null, steps: null, edit: null, openAdd: null, showAll: false, pk: false,
   };
-  function blankForm() { return { jobId: null, filter: "", date: "", time: "09:00", note: "", ticket: null, files: [] }; }
+  function blankForm() { return { kind: "delivery", jobId: null, filter: "", date: "", time: "09:00", note: "", ticket: null, files: [] }; }
+  // Can Schedule go? A white glove delivery needs its date and time; a pickup only the job.
+  const formReady = () => { const f = S.form; return !!(f.jobId && (f.kind !== "delivery" || whenISO(f.date, f.time)) && !S.busy); };
 
   // ---------- data ----------
   async function load() {
-    const [d, j, c] = await Promise.all([db.from("v_deliveries").select("*"), db.from("v_pick_jobs").select("*"),
-                                         db.from("v_cancelled_deliveries").select("*").order("voided_at", { ascending: false })]);
+    const [d, j, c, k] = await Promise.all([db.from("v_deliveries").select("*"), db.from("v_pick_jobs").select("*"),
+                                            db.from("v_cancelled_deliveries").select("*").order("voided_at", { ascending: false }),
+                                            db.from("v_deliveries").select("ready_at").limit(1)]);     // pickups: delivery_types.sql
     S.cancelled = c.error ? [] : (c.data || []);        // no list until deliveries_v2.sql has run
+    S.pk = !k.error;
+    if (!S.pk) S.form.kind = "delivery";
     if (d.error) {
       S.missing = /does not exist|schema cache|could not find/i.test(String(d.error.message));
       if (!S.missing) S.msg = { ok: false, text: friendlyError(d.error) };
@@ -374,8 +454,8 @@ if (typeof document !== "undefined") (function () {
     if (error || !data) { if (w) w.close(); S.msg = { ok: false, text: friendlyError(error || "That file couldn't be opened.") }; return render(); }
     if (w) w.location = data.signedUrl; else window.open(data.signedUrl, "_blank");
   }
-  async function bytesOf(path) {
-    const { data, error } = await db.storage.from("deliveries").download(path);
+  async function bytesOf(path, bucket = "deliveries") {
+    const { data, error } = await db.storage.from(bucket).download(path);
     if (error) throw error;
     return new Uint8Array(await data.arrayBuffer());
   }
@@ -401,9 +481,9 @@ if (typeof document !== "undefined") (function () {
       <div id="err" class="banner warn" style="margin-top:14px" ${err ? "" : "hidden"}>${esc(err || "")}</div></div></main>`;
   }
   function tabsBar() {
-    const { up, fresh } = deliveries();
+    const { up, ready, fresh } = deliveries();
     const t = (k, label, n) => `<button data-tab="${k}" aria-current="${S.tab === k}">${label}${n ? `<span class="c">${n}</span>` : ""}</button>`;
-    return `<nav class="tabs">${t("new", "Schedule a delivery")}${t("up", "Coming up", up.length)}${t("done", "Completed", fresh)}</nav>`;
+    return `<nav class="tabs">${t("new", "Schedule a delivery")}${t("up", "Coming up", up.length + ready.length)}${t("done", "Completed", fresh)}</nav>`;
   }
   function msgBanner() { return S.msg ? `<div class="banner ${S.msg.ok ? "ok" : "warn"}">${esc(S.msg.text)}</div>` : ""; }
 
@@ -418,26 +498,29 @@ if (typeof document !== "undefined") (function () {
   }
   function newScreen() {
     const f = S.form, job = S.jobs.find(j => j.job_id === f.jobId);
-    const ready = f.jobId && whenISO(f.date, f.time) && !S.busy;
+    const ready = formReady(), pk = f.kind !== "delivery";
     return `${msgBanner()}
       <div class="card"><h2>Schedule a delivery</h2>
-        <p class="sub">Pick the job, set when, and add the delivery ticket and anything that helps the driver on site. It shows on Delivery's phone straight away.</p>
+        <p class="sub">${pk ? "Pick the job and add the ticket. There's no date: it goes on Ready for pickup, on Delivery's phone straight away, until someone records the pickup."
+                            : "Pick the job, set when, and add the delivery ticket and anything that helps the driver on site. It shows on Delivery's phone straight away."}</p>
+        ${S.pk ? `<label class="f">What kind?</label>
+          <div class="kinds">${TRIP_KINDS.map(([k, name, what]) => `<button data-kind="${k}" aria-pressed="${f.kind === k}"><b>${name}</b><span>${what}</span></button>`).join("")}</div>` : ""}
         <label class="f" for="jf">Job</label>
         ${job ? `<div class="picked"><span><b>${job.is_test ? "TEST " : ""}${esc(job.project_id)}</b> ${esc(job.job_name)}</span><button class="link" data-unpick="1">Change</button></div>`
               : `<input class="in" id="jf" data-field="filter" value="${esc(f.filter)}" placeholder="PROJ number or name, e.g. 418" autocomplete="off">${jobList(f.filter, f.jobId)}`}
-        <div class="row2"><div><label class="f" for="dd">Date</label><input class="in" id="dd" type="date" data-field="date" value="${esc(f.date)}"></div>
-          <div><label class="f" for="dt">Time</label><input class="in" id="dt" type="time" data-field="time" value="${esc(f.time)}"></div></div>
-        <label class="f" for="dn">Note for the driver <span class="meta">(optional)</span></label>
-        <textarea class="in" id="dn" data-field="note" maxlength="500" placeholder="e.g. Back entrance. Ask for Pat.">${esc(f.note)}</textarea>
-        <label class="f">Delivery ticket</label>
+        ${pk ? "" : `<div class="row2"><div><label class="f" for="dd">Date</label><input class="in" id="dd" type="date" data-field="date" value="${esc(f.date)}"></div>
+          <div><label class="f" for="dt">Time</label><input class="in" id="dt" type="time" data-field="time" value="${esc(f.time)}"></div></div>`}
+        <label class="f" for="dn">${pk ? "Note for whoever hands it over" : "Note for the driver"} <span class="meta">(optional)</span></label>
+        <textarea class="in" id="dn" data-field="note" maxlength="500" placeholder="${pk ? (f.kind === "shipping" ? "e.g. Estes, sometime this week. 3 pallets." : "e.g. Pat is coming Thursday with a van.") : "e.g. Back entrance. Ask for Pat."}">${esc(f.note)}</textarea>
+        <label class="f">${pk ? "Ticket" : "Delivery ticket"}</label>
         ${f.ticket ? `<ul class="files"><li><span class="nm">${esc(f.ticket.name)}</span><span class="meta">${esc(fmtBytes(f.ticket.size))}</span><button class="link" data-dropticket="1">Remove</button></li></ul>`
-                   : `<label class="drop" data-dropzone="ticket"><b>Drag the ticket here, or click to choose it</b><span>PDF (or a photo of a paper ticket). The customer's signature is added after it.</span>
+                   : `<label class="drop" data-dropzone="ticket"><b>Drag the ticket here, or click to choose it</b><span>${f.kind === "shipping" ? "PDF (or a photo of a paper ticket). The BOL photos are added after it." : "PDF (or a photo of a paper ticket). The customer's signature is added after it."}</span>
                        <input type="file" id="ticketIn" accept=".pdf,application/pdf,image/jpeg,image/png" hidden></label>`}
-        <label class="f">Site files <span class="meta">(optional: site maps, photos of where it goes)</span></label>
+        <label class="f">${pk ? "Other files" : "Site files"} <span class="meta">(optional: ${pk ? "packing lists, photos" : "site maps, photos of where it goes"})</span></label>
         ${f.files.length ? `<ul class="files">${f.files.map((x, i) => `<li><span class="nm">${esc(x.name)}</span><span class="meta">${esc(fmtBytes(x.size))}</span><button class="link" data-dropfile="${i}">Remove</button></li>`).join("")}</ul>` : ""}
         <label class="drop" data-dropzone="files"><b>${f.files.length ? "Drag more here, or click to add them" : "Drag files here, or click to choose them"}</b><span>PDF, JPEG or PNG, several at once is fine. The driver's phone keeps them for no signal.</span>
           <input type="file" id="filesIn" accept=".pdf,application/pdf,image/jpeg,image/png" multiple hidden></label>
-        <button class="go wide" data-schedule="1" ${ready ? "" : "disabled"}>${S.busy ? "Saving…" : "Schedule this delivery"}</button>
+        <button class="go wide" data-schedule="1" ${ready ? "" : "disabled"}>${S.busy ? "Saving…" : pk ? `Put it on Ready for pickup (${esc(tripName(f.kind))})` : "Schedule this delivery"}</button>
         ${S.steps ? `<ol class="steps">${S.steps.map(s => `<li>${s.done ? "✓" : s.failed ? "✗" : "…"} ${esc(s.text)}</li>`).join("")}</ol>` : ""}
       </div>`;
   }
@@ -451,9 +534,27 @@ if (typeof document !== "undefined") (function () {
              ${x.in_cloud === false ? `<span class="meta">archived</span>` : `<button class="link" data-open="${esc(x.path)}">Open</button>`}
              ${editable ? `<button class="link" data-retire="${esc(x.id)}">Take off</button>` : ""}</li>`).join("")}</ul>`;
   }
+  function readyCard(d) {
+    const ed = S.edit && S.edit.id === d.id, line = pickupProgress(d);
+    return `<div class="card" data-card="${esc(d.id)}">
+        <div class="top"><span class="when">${esc(tripName(d.kind))}</span>
+          <span class="pid">${d.is_test ? `<span class="tag">TEST</span>` : ""}${esc(d.project_id)}</span><span>${esc(d.job_name)}</span></div>
+        <div class="meta" style="margin-top:4px">Ready since ${esc(fmtWhen(d.ready_at))}</div>
+        ${d.schedule_note ? `<div class="meta" style="margin-top:4px">Note: ${esc(d.schedule_note)}</div>` : ""}
+        ${line ? `<div class="meta" style="margin-top:4px">${esc(line)}</div>` : ""}
+        ${filesBlock(d, true)}
+        ${ed ? `<label class="f" for="en">Note for whoever hands it over</label><textarea class="in" id="en" data-edit="note" maxlength="500">${esc(S.edit.note)}</textarea>
+               <div class="btns"><button class="go" data-savenote="${esc(d.id)}" ${S.busy ? "disabled" : ""}>Save</button><button data-canceledit="1">Cancel</button></div>`
+             : `<div class="drops"><button class="drop sm" data-addticket="${esc(d.id)}" data-dropzone="ticket" data-for="${esc(d.id)}" ${S.busy ? "disabled" : ""}>${d.ticket ? "Replace the ticket" : "Add the ticket"}<span>Drag it here, or click</span></button>
+                 <button class="drop sm" data-addfiles="${esc(d.id)}" data-dropzone="files" data-for="${esc(d.id)}" ${S.busy ? "disabled" : ""}>Add other files<span>Drag them here, or click</span></button></div>
+               <div class="btns"><button data-editnote="${esc(d.id)}">Change the note</button>
+                 <button class="link" data-cancel="${esc(d.id)}">Cancel this pickup</button></div>`}
+        <div class="meta" style="margin-top:8px">Set up by ${esc(d.scheduled_by_name || d.started_by_name || "")}</div></div>`;
+  }
   function upScreen() {
-    const { up } = deliveries();
-    return `${msgBanner()}${up.length ? up.map(d => {
+    const { up, ready } = deliveries();
+    return `${msgBanner()}${ready.length ? `<h3 class="sec" style="margin-top:0">Ready for pickup</h3>${ready.map(readyCard).join("")}
+        ${up.length ? `<h3 class="sec">Scheduled deliveries</h3>` : ""}` : ""}${up.length ? up.map(d => {
       const ed = S.edit && S.edit.id === d.id;
       const line = tripLine(d);
       return `<div class="card" data-card="${esc(d.id)}">
@@ -471,7 +572,7 @@ if (typeof document !== "undefined") (function () {
                <div class="btns"><button data-editwhen="${esc(d.id)}">Change date, time or note</button>
                  <button class="link" data-cancel="${esc(d.id)}">Cancel this delivery</button></div>`}
         <div class="meta" style="margin-top:8px">Scheduled by ${esc(d.scheduled_by_name || d.started_by_name || "")}</div></div>`; }).join("")
-      : `<div class="empty"><b>Nothing scheduled</b>Schedule a delivery and it shows here, and on Delivery's phone.</div>`}${cancelledList()}`;
+      : ready.length ? "" : `<div class="empty"><b>Nothing scheduled</b>Schedule a delivery${S.pk ? " or set up a pickup" : ""} and it shows here, and on Delivery's phone.</div>`}${cancelledList()}`;
   }
   const keptLine = (d) => { const k = [d.has_ticket ? "the ticket" : null, d.site_files ? `${d.site_files} site file${d.site_files === 1 ? "" : "s"}` : null].filter(Boolean);
     return k.length ? `${k.join(" and ")} kept` : "nothing was attached"; };
@@ -479,7 +580,7 @@ if (typeof document !== "undefined") (function () {
     if (!S.cancelled.length) return "";
     return `<h3 class="sec">Cancelled in the last 60 days</h3>` + S.cancelled.map(d => `<div class="card off">
         <div class="top"><span class="pid">${d.is_test ? `<span class="tag">TEST</span>` : ""}${esc(d.project_id)}</span><span>${esc(d.job_name)}</span>
-          <span class="meta">was ${esc(fmtWhen(d.scheduled_for))}</span></div>
+          <span class="meta">${isPickup(d) ? `was ready for ${esc(tripName(d.kind).toLowerCase())}` : `was ${esc(fmtWhen(d.scheduled_for))}`}</span></div>
         <div class="meta" style="margin-top:4px">Cancelled ${esc(fmtWhen(d.voided_at))}${d.voided_by_name ? ` by ${esc(d.voided_by_name)}` : ""}${d.void_reason && d.void_reason !== "Delivery cancelled" ? ` (${esc(d.void_reason)})` : ""}
           · ${esc(keptLine(d))}</div>
         <div class="btns"><button data-restore="${esc(d.id)}" ${S.busy ? "disabled" : ""}>Put it back</button></div></div>`).join("");
@@ -487,18 +588,35 @@ if (typeof document !== "undefined") (function () {
   function doneScreen() {
     const { done } = deliveries();
     const shown = S.showAll ? done : done.slice(0, 40);
-    return `${msgBanner()}${shown.length ? shown.map(d => `<div class="card">
-        <div class="top">${d.downloaded_at ? "" : `<span class="tag new">New</span>`}<span class="pid">${d.is_test ? `<span class="tag">TEST</span>` : ""}${esc(d.project_id)}</span><span>${esc(d.job_name)}</span></div>
+    return `${msgBanner()}${shown.length ? shown.map(d => d.kind === "shipping" ? bolDoneCard(d) : `<div class="card">
+        <div class="top">${d.downloaded_at ? "" : `<span class="tag new">New</span>`}<span class="pid">${d.is_test ? `<span class="tag">TEST</span>` : ""}${esc(d.project_id)}</span><span>${esc(d.job_name)}</span>${isPickup(d) ? `<span class="meta">${esc(tripName(d.kind))}</span>` : ""}</div>
         <dl class="dl">
-          <dt>Delivered</dt><dd>${esc(fmtWhen(d.completed_at, true))}${d.completed_by_name ? ` · ${esc(d.completed_by_name)}` : ""}</dd>
+          <dt>${isPickup(d) ? "Picked up" : "Delivered"}</dt><dd>${esc(fmtWhen(d.completed_at, true))}${d.completed_by_name ? ` · ${esc(d.completed_by_name)}` : ""}</dd>
           <dt>Signature</dt><dd>${d.signed_name ? `<span class="done">Signed</span> by ${esc(d.signed_name)}` : `<b>Not signed</b> — ${esc(d.no_sign_reason || "")}${d.no_sign_note ? `: ${esc(d.no_sign_note)}` : ""}`}</dd>
           ${d.customer_note ? `<dt>Customer's note</dt><dd>${esc(d.customer_note)}</dd>` : ""}
-          <dt>At the site</dt><dd>${esc(d.pieces_total ? `${d.site_photographed} of ${d.pieces_total} tables photographed` : `${d.site_photographed} photographed`)}</dd>
+          ${isPickup(d) ? `<dt>Handed over</dt><dd>${esc(d.pieces_total ? `${d.tables_photographed || 0} of ${d.pieces_total} tables photographed` : `${d.tables_photographed || 0} photographed`)}</dd>`
+                        : `<dt>At the site</dt><dd>${esc(d.pieces_total ? `${d.site_photographed} of ${d.pieces_total} tables photographed` : `${d.site_photographed} photographed`)}</dd>`}
         </dl>
         <div class="btns"><button class="go" data-download="${esc(d.id)}" ${S.busy ? "disabled" : ""}>Download signed ticket</button>
           <span class="meta">${d.downloaded_at ? `Downloaded ${esc(fmtWhen(d.downloaded_at))}${d.downloaded_by_name ? ` by ${esc(d.downloaded_by_name)}` : ""}` : "Not downloaded yet"}${d.ticket ? "" : " · no ticket was attached, so it's the signature page on its own"}</span></div>
       </div>`).join("") + (done.length > shown.length ? `<p style="text-align:center"><button data-showall="1">Show all ${done.length}</button></p>` : "")
       : `<div class="empty"><b>No deliveries done yet</b>Once a driver marks one delivered, it shows here with its signed ticket.</div>`}`;
+  }
+  function bolDoneCard(d) {
+    const nb = (d.bol_photos || []).length;
+    return `<div class="card">
+        <div class="top">${d.downloaded_at ? "" : `<span class="tag new">New</span>`}<span class="pid">${d.is_test ? `<span class="tag">TEST</span>` : ""}${esc(d.project_id)}</span><span>${esc(d.job_name)}</span><span class="meta">BOL pickup</span></div>
+        <dl class="dl">
+          <dt>Picked up</dt><dd>${esc(fmtWhen(d.completed_at, true))}${d.completed_by_name ? ` · ${esc(d.completed_by_name)}` : ""}</dd>
+          <dt>Carrier</dt><dd>${esc(d.carrier || "Not written down")}${d.tracking ? ` · BOL ${esc(d.tracking)}` : ""}</dd>
+          <dt>BOL</dt><dd>${nb ? `<span class="done">Photographed</span> (${nb} photo${nb === 1 ? "" : "s"})` : "<b>No BOL photo</b>"}</dd>
+          <dt>Pallets</dt><dd>${esc(`${d.pallets_photographed || 0} photographed wrapped`)}</dd>
+          <dt>Tables</dt><dd>${esc(d.pieces_total ? `${d.tables_photographed || 0} of ${d.pieces_total} photographed before wrapping` : `${d.tables_photographed || 0} photographed`)}</dd>
+          ${d.customer_note ? `<dt>Note</dt><dd>${esc(d.customer_note)}</dd>` : ""}
+        </dl>
+        <div class="btns"><button class="go" data-download="${esc(d.id)}" ${S.busy ? "disabled" : ""}>Download the BOL</button>
+          <span class="meta">${d.downloaded_at ? `Downloaded ${esc(fmtWhen(d.downloaded_at))}${d.downloaded_by_name ? ` by ${esc(d.downloaded_by_name)}` : ""}` : "Not downloaded yet"} · ${d.ticket ? "the ticket, " : ""}the BOL photos and a record page, in one PDF</span></div>
+      </div>`;
   }
   function render() {
     if (!S.me) return;
@@ -553,8 +671,9 @@ if (typeof document !== "undefined") (function () {
         const box = app.querySelector(".jobs, .empty"); const html = jobList(S.form.filter, S.form.jobId);
         if (box) { box.outerHTML = html; on("[data-pickjob]", pickJob); }
       }
-      const btn = app.querySelector("[data-schedule]"); if (btn) btn.disabled = !(S.form.jobId && whenISO(S.form.date, S.form.time) && !S.busy);
+      const btn = app.querySelector("[data-schedule]"); if (btn) btn.disabled = !formReady();
     });
+    on("[data-kind]", (b) => { S.form.kind = b.dataset.kind; render(); });
     const pickJob = (b) => {
       S.form.jobId = b.dataset.pickjob;
       const j = S.jobs.find(x => x.job_id === S.form.jobId);
@@ -573,6 +692,16 @@ if (typeof document !== "undefined") (function () {
     // coming up
     on("[data-editwhen]", (b) => { const d = S.list.find(x => x.id === b.dataset.editwhen); S.edit = { id: d.id, ...whenInputs(d.scheduled_for), note: d.schedule_note || "" }; render(); });
     on("[data-canceledit]", () => { S.edit = null; render(); });
+    on("[data-editnote]", (b) => { const d = S.list.find(x => x.id === b.dataset.editnote); S.edit = { id: d.id, note: d.schedule_note || "" }; render(); });
+    on("[data-savenote]", async (b) => {
+      const d = S.list.find(x => x.id === b.dataset.savenote); if (!d) return;
+      S.busy = true; render();
+      const r = await db.rpc("schedule_pickup", { p_job: d.job_id, p_kind: d.kind, p_note: S.edit.note, p_loadout: d.client_id, p_client_id: null });
+      S.busy = false;
+      S.msg = r.error ? { ok: false, text: friendlyError(r.error) } : { ok: true, text: r.data.summary };
+      if (!r.error) S.edit = null;
+      await refresh();
+    });
     app.querySelectorAll("[data-edit]").forEach(el => el.oninput = el.onchange = () => {
       S.edit[el.dataset.edit] = el.value;
       const btn = app.querySelector("[data-savewhen]"); if (btn) btn.disabled = !whenISO(S.edit.date, S.edit.time);
@@ -639,9 +768,10 @@ if (typeof document !== "undefined") (function () {
     });
     on("[data-cancel]", async (b) => {
       const d = S.list.find(x => x.id === b.dataset.cancel); if (!d) return;
-      if (!confirm(`Cancel the ${fmtWhen(d.scheduled_for)} delivery of ${d.project_id}? It comes off Delivery's phone and stays in history.`)) return;
+      const what = isPickup(d) ? `the ${tripName(d.kind).toLowerCase()} of ${d.project_id}` : `the ${fmtWhen(d.scheduled_for)} delivery of ${d.project_id}`;
+      if (!confirm(`Cancel ${what}? It comes off Delivery's phone and stays in history.`)) return;
       const r = await db.rpc("void_loadout", { p_loadout: d.client_id, p_reason: "Delivery cancelled" });
-      S.msg = r.error ? { ok: false, text: friendlyError(r.error) } : { ok: true, text: `The ${fmtWhen(d.scheduled_for)} delivery of ${d.project_id} is cancelled.` };
+      S.msg = r.error ? { ok: false, text: friendlyError(r.error) } : { ok: true, text: `${what.charAt(0).toUpperCase() + what.slice(1)} is cancelled.` };
       await refresh();
     });
 
@@ -649,29 +779,39 @@ if (typeof document !== "undefined") (function () {
     on("[data-showall]", () => { S.showAll = true; render(); });
     on("[data-download]", async (b) => {
       const d = S.list.find(x => x.id === b.dataset.download); if (!d) return;
-      S.busy = true; S.msg = { ok: true, text: `Putting together the signed ticket for ${d.project_id}…` }; render();
+      const bol = d.kind === "shipping";
+      S.busy = true; S.msg = { ok: true, text: `Putting together the ${bol ? "BOL" : "signed ticket"} for ${d.project_id}…` }; render();
       try {
         const lib = await pdfLib();
         const ticket = d.ticket && d.ticket.in_cloud !== false ? { bytes: await bytesOf(d.ticket.path), mime: d.ticket.mime } : null;
-        const sig = d.signature_path ? await bytesOf(d.signature_path) : null;
-        const pdf = await buildSignedTicket(lib, d, ticket, sig);
-        saveBlob(new Blob([pdf], { type: "application/pdf" }), signedFileName(d));
+        let pdf, name;
+        if (bol) {
+          const bols = [];
+          for (const x of (d.bol_photos || []).filter(x => x.in_cloud !== false)) bols.push({ bytes: await bytesOf(x.path, "photos"), mime: "image/jpeg" });
+          pdf = await buildBolRecord(lib, d, ticket, bols); name = bolFileName(d);
+        } else {
+          const sig = d.signature_path ? await bytesOf(d.signature_path) : null;
+          pdf = await buildSignedTicket(lib, d, ticket, sig); name = signedFileName(d);
+        }
+        saveBlob(new Blob([pdf], { type: "application/pdf" }), name);
         const r = await db.rpc("mark_ticket_downloaded", { p_loadout: d.client_id });
-        S.msg = { ok: true, text: `${signedFileName(d)} has downloaded.${r.error ? " (It couldn't be marked downloaded: " + friendlyError(r.error) + ")" : ""}` };
+        S.msg = { ok: true, text: `${name} has downloaded.${r.error ? " (It couldn't be marked downloaded: " + friendlyError(r.error) + ")" : ""}` };
       } catch (e) { S.msg = { ok: false, text: friendlyError(e) }; }
       S.busy = false; await refresh();
     });
   }
 
   async function scheduleIt() {
-    const f = S.form, job = S.jobs.find(j => j.job_id === f.jobId), when = whenISO(f.date, f.time);
-    if (!job || !when) return;
+    const f = S.form, job = S.jobs.find(j => j.job_id === f.jobId), pk = S.pk && f.kind !== "delivery", when = pk ? null : whenISO(f.date, f.time);
+    if (!job || (!pk && !when)) return;
     const cid = newId();
     S.busy = true; S.msg = null;
-    S.steps = [{ text: `Schedule ${job.project_id} for ${fmtWhen(when)}` }, ...(f.ticket ? [{ text: `Delivery ticket: ${f.ticket.name}` }] : []),
+    S.steps = [{ text: pk ? `Put ${job.project_id} on Ready for pickup (${tripName(f.kind)})` : `Schedule ${job.project_id} for ${fmtWhen(when)}` },
+               ...(f.ticket ? [{ text: `${pk ? "Ticket" : "Delivery ticket"}: ${f.ticket.name}` }] : []),
                ...f.files.map(x => ({ text: x.name }))];
     render();
-    const r = await db.rpc("schedule_delivery", { p_job: job.job_id, p_when: when, p_note: f.note || null, p_loadout: null, p_client_id: cid });
+    const r = pk ? await db.rpc("schedule_pickup", { p_job: job.job_id, p_kind: f.kind, p_note: f.note || null, p_loadout: null, p_client_id: cid })
+                 : await db.rpc("schedule_delivery", { p_job: job.job_id, p_when: when, p_note: f.note || null, p_loadout: null, p_client_id: cid });
     if (r.error) { S.busy = false; S.steps[0].failed = true; S.msg = { ok: false, text: `${friendlyError(r.error)} Nothing was saved.` }; return render(); }
     S.steps[0].done = true; render();
     const d = { project_id: job.project_id, client_id: cid };
@@ -682,7 +822,7 @@ if (typeof document !== "undefined") (function () {
       i++; render();
     }
     S.busy = false;
-    S.msg = bad.length ? { ok: false, text: `The delivery is scheduled, but ${bad.length === 1 ? "a file" : bad.length + " files"} didn't go: ${bad.join(" · ")} Add ${bad.length === 1 ? "it" : "them"} from Coming up.` }
+    S.msg = bad.length ? { ok: false, text: `The ${pk ? "pickup is set up" : "delivery is scheduled"}, but ${bad.length === 1 ? "a file" : bad.length + " files"} didn't go: ${bad.join(" · ")} Add ${bad.length === 1 ? "it" : "them"} from Coming up.` }
                        : { ok: true, text: `${r.data.summary} It's on Delivery's phone now.` };
     S.form = blankForm();
     await load();

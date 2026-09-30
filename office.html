@@ -658,14 +658,15 @@ async function buildSignedTicket(PDFLib, d, ticket, signature) {
   if (ticket && ticket.mime === "application/pdf") doc = await PDFDocument.load(ticket.bytes, { ignoreEncryption: true });
   else {
     doc = await PDFDocument.create();
-    if (ticket) {
+    if (ticket) {                                       // a photo or scan of a paper ticket: one page, fitted to Letter
       const img = ticket.mime === "image/png" ? await doc.embedPng(ticket.bytes) : await doc.embedJpg(ticket.bytes);
       const pg = doc.addPage([612, 792]);
       const s = Math.min(540 / img.width, 720 / img.height, 1);
       pg.drawImage(img, { x: (612 - img.width * s) / 2, y: (792 - img.height * s) / 2, width: img.width * s, height: img.height * s });
     }
   }
-  doc.setTitle(pdfText(`${d.project_id} delivery ticket, signed`));
+  const pk = d.kind === "customer_pickup";
+  doc.setTitle(pdfText(`${d.project_id} ${pk ? "pickup" : "delivery"} ticket, signed`));
   const font = await doc.embedFont(StandardFonts.Helvetica), bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const ink = rgb(0.094, 0.114, 0.18), grey = rgb(0.42, 0.44, 0.51), orange = rgb(0.93, 0.37, 0.06);
   const page = doc.addPage([612, 792]);
@@ -673,18 +674,24 @@ async function buildSignedTicket(PDFLib, d, ticket, signature) {
   let y = 738;
   const text = (t, x, yy, size, f = font, color = ink) => page.drawText(pdfText(t), { x, y: yy, size, font: f, color });
   text("PURPOSEFUL DESIGN", L, y, 10, bold, orange);
-  y -= 26; text("Delivery record", L, y, 22, bold);
-  y -= 16; text(ticket ? "Added by the shop floor system after the delivery ticket, which is as it was issued." : "No delivery ticket was attached, so this record stands on its own.", L, y, 10, font, grey);
+  y -= 26; text(pk ? "Customer pickup record" : "Delivery record", L, y, 22, bold);
+  y -= 16; text(ticket ? `Added by the shop floor system after the ${pk ? "" : "delivery "}ticket, which is as it was issued.` : `No ${pk ? "" : "delivery "}ticket was attached, so this record stands on its own.`, L, y, 10, font, grey);
   y -= 28;
-  const rows = [["Project", `${d.project_id} — ${d.job_name || ""}`],
-                ["Scheduled for", d.scheduled_for ? fmtWhen(d.scheduled_for, true) : "Not scheduled"],
-                ["Delivered", `${fmtWhen(d.completed_at, true)}${d.completed_by_name ? ` by ${d.completed_by_name}` : ""}`],
-                ["At the site", d.pieces_total ? `${d.site_photographed || 0} of ${d.pieces_total} table${d.pieces_total === 1 ? "" : "s"} photographed` : `${d.site_photographed || 0} photographed`]];
+  const n = pk ? d.tables_photographed : d.site_photographed;
+  const rows = pk ? [["Project", `${d.project_id} — ${d.job_name || ""}`],
+                     ["Ready from", d.ready_at ? fmtWhen(d.ready_at, true) : "Not set up ahead"],
+                     ["Picked up", `${fmtWhen(d.completed_at, true)}${d.completed_by_name ? ` · handed over by ${d.completed_by_name}` : ""}`],
+                     ["Handed over", d.pieces_total ? `${n || 0} of ${d.pieces_total} table${d.pieces_total === 1 ? "" : "s"} photographed` : `${n || 0} photographed`]]
+                  : [["Project", `${d.project_id} — ${d.job_name || ""}`],
+                     ["Scheduled for", d.scheduled_for ? fmtWhen(d.scheduled_for, true) : "Not scheduled"],
+                     ["Delivered", `${fmtWhen(d.completed_at, true)}${d.completed_by_name ? ` by ${d.completed_by_name}` : ""}`],
+                     ["At the site", d.pieces_total ? `${n || 0} of ${d.pieces_total} table${d.pieces_total === 1 ? "" : "s"} photographed` : `${n || 0} photographed`]];
   if (d.complete_lat !== null && d.complete_lat !== undefined)
     rows.push(["Where", `${Number(d.complete_lat).toFixed(6)}, ${Number(d.complete_lng).toFixed(6)}${d.complete_accuracy ? ` (within ${Math.round(d.complete_accuracy)} m)` : ""}`]);
   for (const [k, v] of rows) {
     text(k, L, y, 11, font, grey);
-    for (const ln of wrapText(v, W - 110, (s) => font.widthOfTextAtSize(s, 12))) { text(ln, L + 110, y, 12); y -= 16; }
+    const lines = wrapText(v, W - 110, (s) => font.widthOfTextAtSize(s, 12));
+    for (const ln of lines) { text(ln, L + 110, y, 12); y -= 16; }
     y -= 4;
   }
   y -= 10;
@@ -708,7 +715,7 @@ async function buildSignedTicket(PDFLib, d, ticket, signature) {
     text("The customer's note", L, y, 11, bold); y -= 16;
     for (const ln of wrapText(d.customer_note, W, (s) => font.widthOfTextAtSize(s, 12))) { text(ln, L, y, 12); y -= 16; if (y < 70) break; }
   }
-  text(`${d.project_id} · delivery record`, L, 40, 9, font, grey);
+  text(`${d.project_id} · ${pk ? "pickup" : "delivery"} record`, L, 40, 9, font, grey);
   return await doc.save();
 }
 
@@ -1108,8 +1115,8 @@ if (typeof document !== "undefined") (function () {
         ${J.photoCount ? `<button class="plain" data-jobphotos="${esc(j.project_id)}">See them on Photos</button>` : `<p class="sub" style="margin:0">None yet.</p>`}</section>
       <section class="panel"><h2>Load-outs and deliveries</h2>
         ${J.loadouts.slice().sort((a, b) => String(b.scheduled_for || b.started_at).localeCompare(String(a.scheduled_for || a.started_at))).map(l => `<div class="row">
-            <b>${l.kind === "shipment" ? "Shipment" : "Delivery"}</b> · ${l.completed_at ? `delivered ${esc(fmtWhen(l.completed_at))}${l.signed_name ? ` · signed by ${esc(l.signed_name)}` : ""}`
-              : l.scheduled_for ? `scheduled ${esc(fmtWhen(l.scheduled_for))}` : l.is_open ? `started ${esc(fmtWhen(l.started_at))}` : `finished ${esc(fmtWhen(l.finished_at || l.started_at))}`}
+            <b>${esc(tripWord(l))}</b> · ${l.completed_at ? `${l.kind === "delivery" ? "delivered" : "picked up"} ${esc(fmtWhen(l.completed_at))}${l.signed_name ? ` · signed by ${esc(l.signed_name)}` : ""}`
+              : l.scheduled_for ? `scheduled ${esc(fmtWhen(l.scheduled_for))}` : l.ready_at ? `ready for pickup since ${esc(fmtWhen(l.ready_at))}` : l.is_open ? `started ${esc(fmtWhen(l.started_at))}` : `finished ${esc(fmtWhen(l.finished_at || l.started_at))}`}
             ${l.pieces_total ? `<div class="meta2">${l.pieces_here || 0} of ${l.pieces_total} pieces${l.scheduled_by_name ? ` · scheduled by ${esc(l.scheduled_by_name)}` : ""}</div>` : ""}</div>`).join("")
           || `<p class="sub" style="margin:0">None yet.</p>`}</section>`;
 
@@ -1589,7 +1596,8 @@ if (typeof document !== "undefined") (function () {
       catch (e) { const b = img.closest(".ph"); if (b) { b.classList.add("nofile"); b.textContent = "Photo not available"; } }
     });
   }
-  const photoWhat = (p) => p.kind === "loadout" ? (p.truck ? `Truck ${p.truck}, loaded` : p.pallet ? `Pallet ${p.pallet}, wrapped` : p.sheet_number !== null ? `Sheet ${p.sheet_number}${p.piece ? ` · table ${p.piece}` : ""}${p.stage === "site" ? " · at the site" : ""}` : p.note || "")
+  const tripWord = (l) => l.kind === "shipping" ? (l.pickup_steps ? "BOL pickup" : "Shipment") : l.kind === "customer_pickup" ? "Customer pickup" : "Delivery";
+  const photoWhat = (p) => p.kind === "loadout" ? (p.truck ? `Truck ${p.truck}, loaded` : p.stage === "bol" ? (p.note || "BOL") : p.pallet ? `Pallet ${p.pallet}, wrapped` : p.sheet_number !== null ? `Sheet ${p.sheet_number}${p.piece ? ` · table ${p.piece}` : ""}${p.stage === "site" ? " · at the site" : ""}` : p.note || "")
                                                 : `${p.department_name}${p.sheet_number !== null ? " · sheet " + p.sheet_number : ""}`;
   /** Thumbnails; an archived photo says which batch holds it. */
   function photoStrip(list, caption = false) {
@@ -1638,17 +1646,20 @@ if (typeof document !== "undefined") (function () {
         ${j.loadouts.length ? `<div class="deptname">What left the building</div>` + j.loadouts.map(l => { const mine = live.filter(p => p.loadout_id === l.id);
             const dl = (j.deliveries || []).find(x => x.id === l.id);
             const done = new Set([...(l.sheets_here || []), ...(l.sheets_earlier || [])]).size;
-            const ship = l.kind === "shipping", v2 = l.pieces_total !== undefined;
+            const ship = l.kind === "shipping", pk = l.kind === "customer_pickup" || (ship && l.pickup_steps), v2 = l.pieces_total !== undefined;
             const tables = v2 ? new Set([...(l.pieces_here || []), ...(l.pieces_earlier || [])]).size : 0;
-            return `<div class="li"><div class="li-top"><b>${l.is_test ? `<span class="tag">TEST</span> ` : ""}${ship ? "Shipment · " : v2 ? "Delivery · " : ""}${l.finished_at ? `${ship ? "Picked up" : "Left"} ${esc(time(l.finished_at))}` : `${ship ? "Shipment" : "Load-out"} still open`}</b>
+            return `<div class="li"><div class="li-top"><b>${l.is_test ? `<span class="tag">TEST</span> ` : ""}${pk ? `${esc(tripWord(l))} · ` : ship ? "Shipment · " : v2 ? "Delivery · " : ""}${pk ? (l.completed_at ? `Picked up ${esc(time(l.completed_at))}` : l.ready_at ? `Ready since ${esc(time(l.ready_at))}` : "Not picked up yet")
+                  : l.finished_at ? `${ship ? "Picked up" : "Left"} ${esc(time(l.finished_at))}` : `${ship ? "Shipment" : "Load-out"} still open`}</b>
               <span class="meta2">started ${esc(time(l.started_at))} by ${esc(l.started_by_name)}</span></div>
-              ${ship && (l.carrier || l.tracking) ? `<div class="meta2">${esc([l.carrier, l.tracking ? `tracking ${l.tracking}` : ""].filter(Boolean).join(" · "))}</div>` : ""}
+              ${ship && (l.carrier || l.tracking) ? `<div class="meta2">${esc([l.carrier, l.tracking ? `${pk ? "BOL" : "tracking"} ${l.tracking}` : ""].filter(Boolean).join(" · "))}</div>` : ""}
+              ${l.ready_at && l.scheduled_by_name ? `<div class="meta2">Set up by ${esc(l.scheduled_by_name)}</div>` : ""}
               ${l.scheduled_for ? `<div class="meta2">Scheduled for ${esc(fmtWhen(l.scheduled_for))}${l.scheduled_by_name ? ` by ${esc(l.scheduled_by_name)}` : ""}</div>` : ""}
-              ${l.completed_at ? `<div><b>Delivered ${esc(fmtWhen(l.completed_at))}</b> · ${l.signed_name ? `signed by ${esc(l.signed_name)}` : `not signed (${esc(l.no_sign_reason || "")})`}${(l.site_here || []).length ? ` · ${(l.site_here || []).length} of ${l.pieces_total} tables photographed at the site` : ""}
+              ${l.completed_at && pk && ship ? `<div><b>Picked up ${esc(fmtWhen(l.completed_at))}</b>${l.completed_by_name ? ` · ${esc(l.completed_by_name)}` : ""} · BOL photos: ${l.bol_here || 0}</div>`
+                : l.completed_at ? `<div><b>${pk ? "Picked up" : "Delivered"} ${esc(fmtWhen(l.completed_at))}</b> · ${l.signed_name ? `signed by ${esc(l.signed_name)}` : `not signed (${esc(l.no_sign_reason || "")})`}${(l.site_here || []).length ? ` · ${(l.site_here || []).length} of ${l.pieces_total} tables photographed at the site` : ""}
                   ${dl ? ` <button class="link" data-signedpdf="${esc(l.id)}">Signed ticket</button>` : ""}</div>
                   ${dl && dl.customer_note ? `<div class="meta2">Customer's note: ${esc(dl.customer_note)}</div>` : ""}` : ""}
-              ${v2 && l.site_steps && !ship ? `<div class="meta2">Truck photos: ${(l.trucks_here || []).length}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}</div>`
-                : v2 ? `<div class="meta2">${l.pieces_total ? `Tables on this ${ship ? "shipment" : "truck"}: ${(l.pieces_here || []).length} · ${tables} of ${l.pieces_total} photographed so far` : `${(l.pieces_here || []).length} photographed`}${ship ? ` · ${(l.pallets_here || []).length} wrapped pallet${(l.pallets_here || []).length === 1 ? "" : "s"}` : ""}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}</div>` : `<div class="meta2">On this truck: ${(l.sheets_here || []).length ? `sheet${l.sheets_here.length === 1 ? "" : "s"} ${esc(l.sheets_here.join(", "))}` : "no sheets"}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}${l.sheets_total ? ` · ${done} of ${l.sheets_total} sheets photographed so far` : ""}</div>`}
+              ${v2 && l.site_steps && l.kind === "delivery" ? `<div class="meta2">Truck photos: ${(l.trucks_here || []).length}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}</div>`
+                : v2 ? `<div class="meta2">${l.pieces_total ? `Tables on this ${pk ? "pickup" : ship ? "shipment" : "truck"}: ${(l.pieces_here || []).length} · ${tables} of ${l.pieces_total} photographed so far` : `${(l.pieces_here || []).length} photographed`}${ship ? ` · ${(l.pallets_here || []).length} wrapped pallet${(l.pallets_here || []).length === 1 ? "" : "s"}` : ""}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}</div>` : `<div class="meta2">On this truck: ${(l.sheets_here || []).length ? `sheet${l.sheets_here.length === 1 ? "" : "s"} ${esc(l.sheets_here.join(", "))}` : "no sheets"}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}${l.sheets_total ? ` · ${done} of ${l.sheets_total} sheets photographed so far` : ""}</div>`}
               ${photoStrip(mine, true)}</div>`; }).join("") : ""}
         ${onEntries.length ? `<div class="deptname">On defects and issues</div>${photoStrip(onEntries, true)}` : ""}
         ${archived.length ? `<p class="sub" style="margin-top:12px">Some of this job's photos have been archived: ${archived.map(b => `photo-archive-${esc(b)}.zip, folder ${esc(j.project)}`).join("; ")}.</p>` : ""}
