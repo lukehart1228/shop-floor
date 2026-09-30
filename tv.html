@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#181D2E">
 <meta name="robots" content="noindex">
 <title>Floor · Shop Floor</title>
@@ -11,99 +11,132 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{ --midnight:#181D2E; --panel:#222941; --line:#39415C; --line2:#2C3348; --orange:#ED5E0F; --bright:#F0A721;
-         --teal:#00B4B2; --sawdust:#FFF4D5; --gray:#C2BAA0; --ink2:#9AA0B4; --soft:#CFC9B8; }
+  /* 1rem = 1% of the screen height on a 16:9 screen (the page sets it; see sizeUnits).
+     On a 75" TV that's about 3/8 of an inch. Written for older smart-TV browsers:
+     no flex gap, no min(), no aspect-ratio. */
+  :root{ --midnight:#181D2E; --panel:#222941; --line:#39415C; --track:#2C3348;
+         --orange:#ED5E0F; --teal:#00B4B2; --sawdust:#FFF4D5; --gray:#C2BAA0; --ink2:#A3A9BC;
+         box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
   *{box-sizing:border-box}
-  html,body{margin:0; background:var(--midnight); color:var(--sawdust); height:100%; overflow:hidden}
-  body{font-family:'Barlow',system-ui,sans-serif; font-size:clamp(15px,1.25vw,26px); line-height:1.3; cursor:none}
-  .num{font-family:'Barlow Condensed',sans-serif; font-variant-numeric:tabular-nums}
-  #app{padding:1.6vh 1.8vw; height:100vh; display:flex; flex-direction:column; gap:1.4vh; transition:transform 2s}
-  .head{display:flex; align-items:baseline; gap:1.2em; border-bottom:2px solid var(--line); padding-bottom:.8vh}
-  .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.18em; color:var(--orange); font-size:1.1em}
-  .brand span{color:var(--sawdust)}
-  .head h1{margin:0; font-size:1.6em; font-weight:600}
-  .showing{color:var(--ink2); font-size:1.05em}
-  .showing b{color:var(--sawdust); font-weight:600}
-  .clock{margin-left:auto; color:var(--ink2); font-size:1.1em}
-  .state{font-size:.8em; color:var(--bright)}
-  .crit{background:var(--orange); color:#fff; border-radius:12px; padding:1vh 1.4vw; display:flex; gap:1em; align-items:baseline; font-size:1.25em; font-weight:600}
-  .crit b{letter-spacing:.08em; font-size:.8em; white-space:nowrap}
-  .crit .t{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:1vw}
-  .kpi{background:var(--panel); border-radius:12px; padding:1.2vh 1.2vw; border-left:6px solid var(--orange)}
-  .kpi:nth-child(2){border-left-color:var(--bright)} .kpi:nth-child(3){border-left-color:var(--teal)} .kpi:nth-child(4){border-left-color:var(--gray)}
-  .kv{font-family:'Barlow Condensed',sans-serif; font-size:3.2em; font-weight:700; line-height:.95}
-  .kl{color:var(--ink2); font-size:.95em}
-  .mid{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr); gap:1vw; min-height:0}
-  .panel{background:var(--panel); border-radius:12px; padding:1.2vh 1.3vw; min-height:0}
-  .panel h3{margin:0 0 .8vh; font-size:.95em; color:var(--ink2); font-weight:600}
-  .donutwrap{display:flex; align-items:center; gap:1.4vw}
-  .donut{position:relative; width:min(15vw,24vh); aspect-ratio:1; flex-shrink:0}
+  html{font-size:10.8px}
+  html,body{margin:0; height:100%; background:#181D2E; color:#FFF4D5; overflow:hidden}
+  body{font-family:'Barlow',Arial,sans-serif; font-size:3.4rem; line-height:1.2; cursor:none}
+  body.moving{cursor:auto}
+  .cond{font-family:'Barlow Condensed','Arial Narrow',Arial,sans-serif}
+
+  #app{position:absolute; top:0; left:0; right:0; bottom:0; padding:2.8rem 3.4rem; display:flex; flex-direction:column; transition:transform 2s}
+  #app > * + *{margin-top:1.8rem}
+
+  .head{display:flex; align-items:baseline}
+  .brand{font-size:2.8rem; color:#C2BAA0; font-weight:600; letter-spacing:.04em}
+  .title{font-size:4.2rem; font-weight:600; margin-left:2.4rem}
+  .clock{margin-left:auto; font-size:6.4rem; font-weight:700; line-height:1}
+  .date{font-size:3rem; color:#A3A9BC; margin-left:2rem}
+
+  .band{display:flex; align-items:baseline; border-radius:1.2rem; padding:1.4rem 2.4rem; font-size:4.2rem; font-weight:600}
+  .band b{font-size:.78em; font-weight:700; white-space:nowrap; margin-right:2.4rem}
+  .band span{overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.15}
+  .band.critical{background:#ED5E0F; color:#fff}
+  .band.stopped{background:#FFF4D5; color:#181D2E}
+
+  .main{flex:1 1 auto; min-height:0; display:flex}
+  .panel{background:#222941; border-radius:1.6rem}
+
+  /* the floor donut */
+  .floor{flex:0 0 50rem; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2.4rem}
+  .floor h2{margin:0 0 1.6rem; font-size:3.4rem; font-weight:600; color:#C2BAA0}
+  .donut{position:relative; width:36rem; height:36rem}
   .donut svg{width:100%; height:100%; display:block}
-  .dc{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center}
-  .dn{font-family:'Barlow Condensed',sans-serif; font-size:3.2em; font-weight:700; line-height:1}
+  .dc{position:absolute; top:0; left:0; right:0; bottom:0; display:flex; flex-direction:column; align-items:center; justify-content:center}
+  .dn{font-size:11rem; font-weight:700; line-height:1}
   .dn small{font-size:.45em}
-  .dl{color:var(--ink2); font-size:.85em}
-  .legend{display:flex; flex-direction:column; gap:.6vh; color:var(--soft); font-size:.95em}
-  .legend i{display:inline-block; width:.8em; height:.8em; border-radius:3px; margin-right:.5em; vertical-align:-1px}
-  .rbar{display:flex; align-items:center; gap:1vw; padding:.5vh 0}
-  .rn{flex:0 0 9em; font-size:1.05em}
-  .rt{display:block; flex:1 1 auto; background:var(--line); height:1.1em; border-radius:99px; overflow:hidden}
-  .rt i{display:block; height:100%; background:var(--bright); border-radius:99px}
-  .rv{flex:0 0 2.6em; text-align:right; font-size:1.9em; font-weight:700}
-  .rs{flex:0 0 9em; color:var(--ink2); font-size:.9em}
-  .tablep{flex:1 1 auto; min-height:0; overflow:hidden}
-  table{width:100%; border-collapse:collapse; font-size:1.05em}
-  th{text-align:left; color:var(--ink2); font-size:.75em; font-weight:600; letter-spacing:.04em; padding:0 .6em .5vh; border-bottom:1px solid var(--line)}
-  td{padding:.55vh .6em; border-bottom:1px solid var(--line2); white-space:nowrap}
-  tr:last-child td{border-bottom:none}
-  .pid{color:var(--bright); font-weight:700}
-  .jn{overflow:hidden; text-overflow:ellipsis; max-width:26vw}
-  .dd{display:flex; align-items:center; gap:.6em}
-  .dd .rt{height:.7em; width:5.5em; flex:0 0 5.5em}
-  .dd .rt i{background:var(--orange)}
-  .dd.done .rt i{background:var(--teal)}
-  .fl{font-size:.7em; font-weight:700; padding:.1em .5em; border-radius:5px; margin-left:.6em; vertical-align:.15em}
-  .fl.critical{background:var(--orange); color:#fff} .fl.priority{background:var(--bright); color:var(--midnight)} .fl.watch{border:1.5px solid var(--soft); color:var(--soft)}
-  .attn{display:flex; align-items:center; gap:1.4em; background:#2C2018; border-left:6px solid var(--bright); border-radius:10px; padding:1vh 1.3vw; color:#FFE3B8; overflow:hidden}
-  .attn b{color:var(--bright); flex-shrink:0}
-  .attn span{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-  .msgscreen{margin:18vh auto 0; max-width:52em; text-align:center}
-  .msgscreen h1{font-size:2.2em; color:var(--bright); margin:0 0 .6em}
-  .msgscreen p{font-size:1.25em; color:var(--soft)}
-  .full{position:fixed; right:1vw; bottom:1vh; background:none; border:1px solid var(--line); color:var(--ink2); border-radius:8px; padding:.4em .8em; font:inherit; font-size:.8em; cursor:pointer; opacity:.7}
-  body.idle .full{opacity:0}
-  @media (max-width:900px){ body{overflow:auto; cursor:auto} #app{height:auto} .kpis{grid-template-columns:repeat(2,1fr)} .mid{grid-template-columns:1fr} }
+  .dl{font-size:3rem; color:#A3A9BC}
+  .legend{margin-top:2.2rem; font-size:3.1rem; color:#FFF4D5; width:36rem}
+  .legend div{display:flex; align-items:center; padding:.4rem 0}
+  .legend i{display:inline-block; width:2.4rem; height:2.4rem; border-radius:.5rem; margin-right:1.2rem; flex:0 0 auto}
+  .legend span{margin-left:auto; font-weight:600}
+
+  /* one row per department */
+  .depts{flex:1 1 auto; margin-left:2rem; padding:1.6rem 2.8rem 1.2rem; display:flex; flex-direction:column; min-width:0}
+  .dh{display:flex; align-items:flex-end; white-space:nowrap; font-size:2.8rem; color:#A3A9BC; padding-bottom:1rem; border-bottom:.2rem solid #39415C}
+  .row{flex:1 1 0; display:flex; align-items:center; min-height:0; border-bottom:.2rem solid #2C3348}
+  .row:last-child{border-bottom:0}
+  .c-name{flex:0 0 27rem; min-width:0}
+  .c-ready{flex:0 0 21rem; text-align:right; padding-right:4rem}
+  .c-bar{flex:1 1 auto; min-width:0}
+  .c-pace{flex:0 0 25rem; text-align:right}
+  .name{font-size:4.8rem; font-weight:600; white-space:nowrap; overflow:hidden}
+  .ready{font-size:8rem; font-weight:700; line-height:1}
+  .ready.zero{color:#A3A9BC}
+  .pnum{font-size:4.8rem; font-weight:600; line-height:1}
+  .pnum small{font-size:.6em; font-weight:500; color:#C2BAA0}
+  .psub{font-size:2.7rem; color:#A3A9BC; white-space:nowrap}
+
+  /* this week against a usual week: the Gray line is a usual week, in the same place on every row */
+  .track{position:relative; height:4.2rem; background:#2C3348; border-radius:.8rem}
+  .fill{position:absolute; left:0; top:0; bottom:0; background:#ED5E0F; border-radius:.8rem}
+  .usual{position:absolute; top:-1rem; bottom:-1rem; width:.6rem; margin-left:-.3rem; background:#C2BAA0; border-radius:.3rem}
+  .keyline{display:inline-block; width:.6rem; height:3rem; background:#C2BAA0; border-radius:.3rem; vertical-align:-.6rem; margin:0 .8rem 0 1.6rem}
+
+  /* going out */
+  .out{display:flex; align-items:center; padding:1.3rem 2.4rem; flex:0 0 auto; white-space:nowrap}
+  .out > b{font-size:3.4rem; color:#C2BAA0; margin-right:2.6rem}
+  .trips{flex:1 1 auto; min-width:0; overflow:hidden; white-space:normal; line-height:1.3}
+  .trip{display:inline-block; white-space:nowrap; font-size:3.4rem; margin-right:4rem}
+  .trip .t{font-weight:700; margin-right:1rem}
+  .trip .p{color:#A3A9BC; margin-right:1rem}
+  .trip.gone .t{color:#00B4B2}
+  .more{flex:0 0 auto; color:#A3A9BC; font-size:3rem; margin-left:2rem}
+
+  .msgscreen{margin:22vh auto 0; max-width:60%; text-align:center}
+  .msgscreen h1{font-size:7rem; color:#F0A721; margin:0 0 .5em}
+  .msgscreen p{font-size:3.6rem; color:#C2BAA0}
+
+  /* when bands are up they win the space: smaller donut; with two, one line each and Going out steps aside */
+  .row{min-height:8rem}
+  .b1 .donut, .b2 .donut{width:27rem; height:27rem}
+  .b1 .dn, .b2 .dn{font-size:8.5rem}
+  .b1 .floor h2, .b2 .floor h2{margin-bottom:1rem}
+  .b1 .legend, .b2 .legend{margin-top:1.4rem; font-size:2.8rem; width:32rem}
+  .b1 .band, .b2 .band{font-size:3.8rem; padding:1.1rem 2.4rem}
+  .b2 .band span{-webkit-line-clamp:1; display:block; white-space:nowrap; text-overflow:ellipsis}
+  .b2 .out{display:none}
+  .full{position:fixed; right:1.2%; bottom:1.2%; background:#2C3348; border:1px solid #39415C; color:#A3A9BC; border-radius:8px; padding:.4em .8em; font:inherit; font-size:15px; cursor:pointer; opacity:0; transition:opacity .3s}
+  body.moving .full{opacity:.8}
+  .empty{color:#A3A9BC; font-size:3.4rem; margin:auto 0}
+  @media (prefers-reduced-motion:reduce){ #app{transition:none} }
 </style>
 </head>
 <body>
 <div id="app"></div>
 <button class="full" id="full" hidden>Full screen</button>
 
-<!-- the Supabase library, checked: the browser refuses it if even one byte differs from the published file -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
 <script>
 /* =====================================================================
    THE TWO SETTINGS — the same two lines as upload.html.
    Publishable key only. NEVER the secret key — this file is public.
    The TV needs no login: it's opened with the TV link from the office
    page (Setup → TV link). Without that link it shows nothing.
-   ===================================================================== */
-const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
-const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 
-const REFRESH_SECONDS = 30;     // how often the numbers are fetched
-const HIDE_AFTER_SECONDS = 90;  // with no connection this long, the numbers are hidden rather than shown stale
+   This page makes one request to the database and needs no library,
+   so it runs on older smart-TV browsers.
+   ===================================================================== */
+var SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
+var SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
+
+var TV_VERSION = "2026-10-01.2";
+var REFRESH_SECONDS = 30;     // how often the numbers are fetched
+var HIDE_AFTER_SECONDS = 90;  // with no connection this long, the numbers are hidden rather than shown stale
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
 
 function keyProblem(url, key) {
-  if (!url || !key || url.includes("PASTE-") || key.includes("PASTE-"))
+  if (!url || !key || url.indexOf("PASTE-") >= 0 || key.indexOf("PASTE-") >= 0)
     return { secret: false, text: "The project address and key haven't been filled in yet. Copy the two SUPABASE lines from upload.html into this file." };
-  const secret = { secret: true, text: "This is the SECRET key, not the publishable one. Take it out of the file now and use the publishable key. If this file was already put on GitHub with it, create a new secret key in Supabase so the old one stops working." };
-  if (key.startsWith("sb_secret_")) return secret;
-  const parts = key.split(".");
+  var secret = { secret: true, text: "This is the SECRET key, not the publishable one. Take it out of the file now and use the publishable key. If this file was already put on GitHub with it, create a new secret key in Supabase so the old one stops working." };
+  if (key.indexOf("sb_secret_") === 0) return secret;
+  var parts = key.split(".");
   if (parts.length === 3) {
     try { if (JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))).role === "service_role") return secret; }
     catch (e) { /* not a readable token */ }
@@ -113,50 +146,109 @@ function keyProblem(url, key) {
 
 /** The TV link's secret, from "#k=…" (kept on this screen so a plain reload still works). */
 function tvKey(hash, stored) {
-  const m = /[#&]k=([A-Za-z0-9]+)/.exec(hash || "");
+  var m = /[#&]k=([A-Za-z0-9]+)/.exec(hash || "");
   return m ? m[1] : (stored || null);
 }
 
-/** What the screen shows, worked out from the database's snapshot. */
-function tvModel(s) {
-  const live = s.live || [];
-  const names = live.map(l => l.name);
-  const one = live.length === 1;
-  const d = s.donut || { finished: 0, ready: 0, total: 0 };
-  const waiting = Math.max(d.total - d.finished - d.ready, 0);
-  return {
-    showing: names.length ? names.join(" · ") : "nothing yet",
-    kpis: [
-      { v: s.kpis.jobs, l: "Jobs on the floor" },
-      { v: s.kpis.left, l: one ? `Pieces left in ${names[0]}` : "Pieces left, across live departments" },
-      { v: s.kpis.ready, l: "Ready to work on now" },
-      { v: s.kpis.due14, l: "Due inside 14 days" },
-    ],
-    donut: { finished: d.finished, ready: d.ready, waiting, total: d.total,
-             pct: d.total ? Math.round(d.finished / d.total * 100) : 0 },
-    bars: live.map(l => ({ name: l.name, ready: l.ready, left: l.left, jobs: l.jobs })),
-    maxReady: Math.max(1, ...live.map(l => l.ready)),
-    rows: (s.table || []).map(r => ({ ...r, depts: (r.depts || []).map(x => ({ ...x, name: (live.find(l => l.key === x.key) || {}).name,
-                                                                                  pct: x.total ? Math.round(x.done / x.total * 100) : 0,
-                                                                                  done_all: x.total > 0 && x.done >= x.total })) })),
-    columns: live.map(l => l.name),
-    critical: s.critical || [],
-    attention: s.attention || [],
-  };
-}
-
 /** Numbers are hidden once the last good snapshot is too old — a stale TV is worse than a blank one. */
-function freshness(lastOkAt, now, failing, hideAfter = 90) {
+function freshness(lastOkAt, now, failing, hideAfter) {
+  if (hideAfter == null) hideAfter = 90;
   if (!lastOkAt) return failing ? "lost" : "loading";
-  const age = (now - lastOkAt) / 1000;
-  if (age > hideAfter) return "lost";
+  if ((now - lastOkAt) / 1000 > hideAfter) return "lost";
   return failing ? "reconnecting" : "ok";
 }
 
-function fmtDate(iso) {
-  if (!iso) return "no date";
-  const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number);
-  return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m - 1] + " " + d;
+var MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+var DAY = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+function dayNumber(iso) { var p = String(iso).slice(0, 10).split("-"); return Date.UTC(+p[0], +p[1] - 1, +p[2]) / 86400000; }
+
+/** "Today", "Tomorrow", "Fri", or "Oct 22" — counted from the shop's date, not the TV's. */
+function whenWords(iso, todayIso) {
+  if (!iso) return "No date";
+  var n = Math.round(dayNumber(iso) - dayNumber(todayIso));
+  var p = String(iso).slice(0, 10).split("-");
+  if (n === 0) return "Today";
+  if (n === 1) return "Tomorrow";
+  if (n > 1 && n < 7) return DAY[new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).getUTCDay()];
+  return MON[+p[1] - 1] + " " + (+p[2]);
+}
+
+/** How far into the working week: "day 3 of 4", "all 4 work days done", "no work days yet". days: 1 = Monday … 7 = Sunday. */
+function weekCaption(days, todayIso) {
+  if (!days || !days.length) return "";
+  var dow = ((new Date(dayNumber(todayIso) * 86400000).getUTCDay() + 6) % 7) + 1;
+  var k = 0; for (var i = 0; i < days.length; i++) if (days[i] <= dow) k++;
+  if (days.indexOf(dow) >= 0) return "day " + k + " of " + days.length;
+  if (k === days.length) return "all " + days.length + " work days done";
+  if (k === 0) return "no work days yet";
+  return k + " of " + days.length + " work days done";
+}
+
+/** the schedule most live departments share (Mon–Thu), for the one caption */
+function commonDays(pace) {
+  var seen = {}, best = null, bestN = 0;
+  for (var i = 0; i < pace.length; i++) {
+    if (!pace[i].days) continue;
+    var k = pace[i].days.join(","); seen[k] = (seen[k] || 0) + 1;
+    if (seen[k] > bestN) { bestN = seen[k]; best = pace[i].days; }
+  }
+  return best;
+}
+
+function short(pid) { return String(pid == null ? "" : pid).replace(/^PROJ-/, ""); }
+function fmt(n) { return String(Math.round(+n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+
+// a usual week sits at 75% of the bar, so a week up to a third better than usual still fits
+var USUAL_AT = 75;
+function barWidth(week, usual) { return usual > 0 ? Math.min(100, Math.round(week / usual * USUAL_AT)) : 0; }
+
+function tripText(t, todayIso) {
+  var pickup = t.kind === "customer_pickup" || t.kind === "shipping";
+  if (t.done_at) return { t: (pickup ? "Picked up " : "Delivered ") + t.done_at, gone: true };
+  if (pickup) return { t: (t.kind === "shipping" ? "BOL pickup" : "Customer pickup") + ", ready now" };
+  return { t: whenWords(t.date, todayIso) + (t.time ? " " + t.time : "") };
+}
+
+/** What the screen shows, worked out from the database's snapshot. Works with the older snapshot too (no pace, trips or stopped). */
+function tvModel(s) {
+  var today = s.today || new Date().toISOString().slice(0, 10);
+  var live = s.live || [];
+  var pace = s.pace || null;
+  var paceByKey = {};
+  if (pace) for (var i = 0; i < pace.length; i++) paceByKey[pace[i].key] = pace[i];
+
+  var bands = [];
+  (s.critical || []).forEach(function (c) {
+    bands.push({ cls: "critical", label: "Critical flag",
+                 text: short(c.project_id) + " " + (c.job_name || "") + (c.department ? " (" + c.department + ")" : "") + ": " + (c.note || "") });
+  });
+  if (s.stopped) s.stopped.forEach(function (x) {
+    bands.push({ cls: "stopped", label: "Work stopped",
+                 text: x.department + ", " + short(x.project_id) + (x.sheet_number != null ? " sheet " + x.sheet_number : "") + ": " + x.body });
+  });
+  else (s.attention || []).forEach(function (a) {       // the older snapshot: stopped issues come as a line of text
+    if (a.kind === "stopped") bands.push({ cls: "stopped", label: "Work stopped", text: String(a.text).replace(/^PROJ-/, "") });
+  });
+
+  var d = s.donut || { finished: 0, ready: 0, total: 0 };
+  return {
+    today: today,
+    bands: bands,
+    donut: { finished: d.finished, ready: d.ready, waiting: Math.max(d.total - d.finished - d.ready, 0), total: d.total,
+             pct: d.total ? Math.round(d.finished / d.total * 100) : 0 },
+    hasPace: !!pace,
+    caption: pace ? weekCaption(commonDays(pace), today) : "",
+    rows: live.map(function (l) {
+      var p = paceByKey[l.key];
+      return { key: l.key, name: l.name, ready: l.ready || 0,
+               week: p ? +p.this_week || 0 : null,
+               usual: p && p.usual != null ? +p.usual : null,
+               unit: p ? (p.measure === "pieces" ? (Math.round(+p.this_week) === 1 ? "piece" : "pieces") : "sq ft") : "" };
+    }),
+    hasTrips: !!s.trips,
+    trips: (s.trips || []).map(function (t) { var x = tripText(t, today); x.p = short(t.project_id); x.name = t.job_name; return x; }),
+  };
 }
 
 /* ---- end core ---- */
@@ -164,101 +256,165 @@ function fmtDate(iso) {
 
 /* ---- the screen ---- */
 if (typeof document !== "undefined") (function () {
-  const app = document.getElementById("app");
-  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const store = {
-    get(k) { try { return localStorage.getItem("sftv_" + k); } catch (e) { return null; } },
-    set(k, v) { try { v === null ? localStorage.removeItem("sftv_" + k) : localStorage.setItem("sftv_" + k, v); } catch (e) {} },
+  var app = document.getElementById("app");
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  var store = {
+    get: function (k) { try { return localStorage.getItem("sftv_" + k); } catch (e) { return null; } },
+    set: function (k, v) { try { if (v === null) localStorage.removeItem("sftv_" + k); else localStorage.setItem("sftv_" + k, v); } catch (e) {} },
   };
-  const msg = (title, text) => { app.innerHTML = `<div class="msgscreen"><h1>${esc(title)}</h1><p>${esc(text)}</p></div>`; };
+  function msg(title, text) { app.className = ""; app.innerHTML = '<div class="msgscreen"><h1>' + esc(title) + '</h1><p>' + esc(text) + '</p></div>'; }
 
-  const problem = keyProblem(SUPABASE_URL, SUPABASE_KEY);
+  // 1rem = 1% of the height of a 16:9 picture that fits the screen
+  function sizeUnits() {
+    var u = Math.min(window.innerHeight / 100, window.innerWidth * 0.5625 / 100);
+    document.documentElement.style.fontSize = u.toFixed(2) + "px";
+  }
+  sizeUnits();
+
+  var problem = keyProblem(SUPABASE_URL, SUPABASE_KEY);
   if (problem) return msg(problem.secret ? "Stop — wrong key in this file" : "This page isn't set up yet", problem.text);
 
-  const key = tvKey(location.hash, store.get("key"));
+  var key = tvKey(location.hash, store.get("key"));
   if (!key) return msg("This screen needs the TV link", "On the office page, go to Setup → TV link, and open that link here. Then bookmark it.");
   store.set("key", key);
-  if (location.hash) history.replaceState(null, "", location.pathname);   // keep the secret out of sight on screen
+  if (location.hash && window.history && history.replaceState) history.replaceState(null, "", location.pathname);   // keep the secret out of sight on screen
 
-  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-  let snap = null, lastOkAt = null, failing = false, attnAt = 0;
+  var snap = null, lastOkAt = null, failing = false, busy = false;
 
-  function clock() {
-    const d = new Date();
-    return d.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" }) + " · " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  // the one request: the same one supabase-js makes for db.rpc("tv_snapshot", { p_key })
+  function fetchSnapshot(done) {
+    var x = new XMLHttpRequest();
+    x.open("POST", SUPABASE_URL + "/rest/v1/rpc/tv_snapshot", true);
+    x.setRequestHeader("Content-Type", "application/json");
+    x.setRequestHeader("apikey", SUPABASE_KEY);
+    x.setRequestHeader("Authorization", "Bearer " + SUPABASE_KEY);
+    x.timeout = 20000;
+    x.onload = function () {
+      var data = null;
+      try { data = JSON.parse(x.responseText); } catch (e) {}
+      if (x.status >= 200 && x.status < 300 && data) done(null, data); else done(new Error("HTTP " + x.status));
+    };
+    x.onerror = x.ontimeout = function () { done(new Error("no connection")); };
+    x.send(JSON.stringify({ p_key: key }));
+  }
+
+  function clockParts() {
+    var d = new Date();
+    return { t: d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+             d: d.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" }) };
   }
 
   function draw() {
-    const f = freshness(lastOkAt, Date.now(), failing, HIDE_AFTER_SECONDS);
+    var f = freshness(lastOkAt, Date.now(), failing, HIDE_AFTER_SECONDS);
     if (f === "loading") return msg("Loading the floor…", "");
-    if (f === "lost") return msg("Lost connection", `The numbers are hidden until the connection is back${lastOkAt ? " (last update " + new Date(lastOkAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + ")" : ""}. It reconnects by itself.`);
-    const m = tvModel(snap);
-    const C = 2 * Math.PI * 86, tot = Math.max(m.donut.total, 1);
-    const seg = (v, off, col) => `<circle cx="110" cy="110" r="86" fill="none" stroke="${col}" stroke-width="30" stroke-dasharray="${(v / tot) * C} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 110 110)"/>`;
-    const att = m.attention;
-    if (att.length > 3 && Date.now() - attnAt > 10000) attnAt = Date.now();
-    const start = att.length > 3 ? Math.floor(Date.now() / 10000) % att.length : 0;
-    const shown = att.length > 3 ? [0, 1, 2].map(i => att[(start + i) % att.length]) : att;
-    const lvl = { critical: "Critical", priority: "Priority", watch: "Watch" };
-    app.innerHTML = `
-      <div class="head"><span class="brand">PURPOSEFUL <span>DESIGN</span></span><h1>Production Floor</h1>
-        <span class="showing">Showing: <b>${esc(m.showing)}</b></span>
-        ${f === "reconnecting" ? `<span class="state">Reconnecting…</span>` : ""}
-        <span class="clock">${esc(clock())}</span></div>
-      ${m.critical.map(c => `<div class="crit"><b>CRITICAL</b><span class="t">${esc(c.project_id)} — ${esc(c.note)}${c.department ? ` (${esc(c.department)})` : ""}</span></div>`).join("")}
-      <div class="kpis">${m.kpis.map(k => `<div class="kpi"><div class="kv num">${k.v}</div><div class="kl">${esc(k.l)}</div></div>`).join("")}</div>
-      <div class="mid">
-        <div class="panel"><h3>All work on the floor · ${esc(m.showing)}</h3>
-          <div class="donutwrap"><div class="donut"><svg viewBox="0 0 220 220" role="img" aria-label="${m.donut.pct} percent finished">
-              <circle cx="110" cy="110" r="86" fill="none" stroke="#39415C" stroke-width="30"/>
-              ${seg(m.donut.ready, (m.donut.finished / tot) * C, "#ED5E0F")}${seg(m.donut.finished, 0, "#00B4B2")}</svg>
-            <div class="dc"><div class="dn num">${m.donut.pct}<small>%</small></div><div class="dl">finished</div></div></div>
-          <div class="legend"><span><i style="background:#00B4B2"></i>Finished ${m.donut.finished}</span>
-            <span><i style="background:#ED5E0F"></i>Ready now ${m.donut.ready}</span>
-            <span><i style="background:#39415C"></i>Not ready yet ${m.donut.waiting}</span></div></div></div>
-        <div class="panel"><h3>Ready to work on, by department</h3>
-          ${m.bars.map(b => `<div class="rbar"><span class="rn">${esc(b.name)}</span>
-            <span class="rt"><i style="width:${Math.round(b.ready / m.maxReady * 100)}%"></i></span>
-            <span class="rv num">${b.ready}</span><span class="rs">${b.left} left · ${b.jobs} job${b.jobs === 1 ? "" : "s"}</span></div>`).join("")
-            || `<p class="dl">No department is live yet.</p>`}</div>
-      </div>
-      <div class="panel tablep"><h3>Next ${m.rows.length || 15} by delivery date</h3>
-        ${m.rows.length ? `<table><thead><tr><th>Due</th><th>Days</th><th>Project</th><th>Job</th>${m.columns.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead>
-          <tbody>${m.rows.map(r => `<tr><td class="num">${esc(fmtDate(r.delivery_date))}</td><td class="num">${r.days === null || r.days === undefined ? "" : r.days}</td>
-            <td class="num pid">${esc(String(r.project_id).replace(/^PROJ-/, ""))}</td>
-            <td class="jn">${esc(r.job_name)}${r.flag ? `<span class="fl ${r.flag}">${lvl[r.flag]}</span>` : ""}</td>
-            ${r.depts.map(x => x.total ? `<td><span class="dd${x.done_all ? " done" : ""}"><span class="num">${x.done} / ${x.total}</span><span class="rt"><i style="width:${x.pct}%"></i></span></span></td>` : `<td></td>`).join("")}</tr>`).join("")}</tbody></table>`
-          : `<p class="dl">Nothing waiting in ${esc(m.showing)}.</p>`}
-      </div>
-      ${shown.length ? `<div class="attn"><b>Needs attention</b>${shown.map(a => `<span>${esc(a.text)}</span>`).join("")}</div>` : ""}`;
+    if (f === "lost") return msg("Lost connection", "The numbers are hidden until the connection is back" +
+      (lastOkAt ? " (last update " + new Date(lastOkAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + ")" : "") + ". It reconnects by itself.");
+    var m = tvModel(snap), c = clockParts();
+
+    // bands: at most two at a time; with more, they take turns every 10 seconds
+    var bands = m.bands;
+    if (bands.length > 2) { var turn = Math.floor(Date.now() / 10000); bands = [bands[(turn * 2) % bands.length], bands[(turn * 2 + 1) % bands.length]]; }
+    app.className = bands.length ? "b" + Math.min(bands.length, 2) : "";
+
+    var d = m.donut, tot = Math.max(d.total, 1), C = 2 * Math.PI * 86;
+    function seg(v, off, col) { return '<circle cx="110" cy="110" r="86" fill="none" stroke="' + col + '" stroke-width="30" stroke-dasharray="' + (v / tot * C) + ' ' + C + '" stroke-dashoffset="' + (-off) + '" transform="rotate(-90 110 110)"/>'; }
+
+    app.innerHTML =
+      '<div class="head"><span class="brand">Purposeful Design</span><span class="title">Production Floor</span>' +
+        (f === "reconnecting" ? '<span class="status" style="margin-left:2.4rem; font-size:2.8rem; color:#F0A721">Reconnecting…</span>' : "") +
+        '<span class="clock cond">' + esc(c.t) + '</span><span class="date">' + esc(c.d) + '</span></div>' +
+      bands.map(function (b) { return '<div class="band ' + b.cls + '"><b>' + esc(b.label) + '</b><span>' + esc(b.text) + '</span></div>'; }).join("") +
+      '<div class="main">' +
+        '<div class="panel floor"><h2>All work on the floor</h2>' +
+          '<div class="donut"><svg viewBox="0 0 220 220" role="img" aria-label="' + d.pct + ' percent finished"><circle cx="110" cy="110" r="86" fill="none" stroke="#39415C" stroke-width="30"/>' +
+            seg(d.ready, d.finished / tot * C, "#ED5E0F") + seg(d.finished, 0, "#00B4B2") + '</svg>' +
+            '<div class="dc"><div class="dn cond">' + d.pct + '<small>%</small></div><div class="dl">finished</div></div></div>' +
+          '<div class="legend"><div><i style="background:#00B4B2"></i>Finished<span class="cond">' + fmt(d.finished) + '</span></div>' +
+            '<div><i style="background:#ED5E0F"></i>Ready to work on<span class="cond">' + fmt(d.ready) + '</span></div>' +
+            '<div><i style="background:#39415C"></i>Not ready yet<span class="cond">' + fmt(d.waiting) + '</span></div></div>' +
+        '</div>' +
+        '<div class="panel depts">' +
+          (m.rows.length ?
+            '<div class="dh"><span class="c-name"></span><span class="c-ready">Pieces ready</span>' +
+              (m.hasPace ? '<span class="c-bar">This week so far' + (m.caption ? ", " + esc(m.caption) : "") + '</span><span class="c-pace"><i class="keyline"></i>A usual week</span>' : "") + '</div>' +
+            m.rows.map(function (x) {
+              return '<div class="row">' +
+                '<span class="c-name"><span class="name cond">' + esc(x.name) + '</span></span>' +
+                '<span class="c-ready"><span class="ready cond' + (x.ready ? "" : " zero") + '">' + fmt(x.ready) + '</span></span>' +
+                (m.hasPace ?
+                  '<span class="c-bar"><span class="track" style="display:block"><span class="fill" style="width:' + barWidth(x.week, x.usual) + '%"></span>' +
+                    (x.usual > 0 ? '<span class="usual" style="left:' + USUAL_AT + '%"></span>' : "") + '</span></span>' +
+                  '<span class="c-pace"><div class="pnum cond">' + fmt(x.week) + ' <small>' + esc(x.unit) + '</small></div>' +
+                    '<div class="psub">' + (x.usual > 0 ? "usually " + fmt(x.usual) : "no usual week yet") + '</div></span>' : "") +
+              '</div>';
+            }).join("")
+            : '<p class="empty">No department is live yet. Switch one on in the office: Setup → Departments.</p>') +
+        '</div>' +
+      '</div>' +
+      (m.hasTrips ? '<div class="panel out"><b>Going out</b><div class="trips" id="trips">' +
+        (m.trips.map(function (t) {
+          return '<span class="trip' + (t.gone ? " gone" : "") + '"><span class="t">' + esc(t.t) + '</span><span class="p cond">' + esc(t.p) + '</span><span>' + esc(t.name) + '</span></span>'; }).join("")
+          || '<span class="trip"><span class="p">Nothing scheduled in the next 7 days</span></span>') +
+        '</div><span class="more" id="more"></span></div>' : "");
+    fit();
   }
 
-  async function refresh() {
-    let res;
-    try { res = await db.rpc("tv_snapshot", { p_key: key }); } catch (e) { res = { error: e }; }
-    if (res.error || !res.data) { failing = true; return draw(); }
-    if (res.data.ok === false) { store.set("key", null); return msg("This TV link doesn't work any more", res.data.reason); }
-    snap = res.data; lastOkAt = Date.now(); failing = false;
-    draw();
+  // department names and big numbers shrink to fit; trips that don't fit whole become "and n more"
+  function fit() {
+    var els = app.querySelectorAll(".name, .ready");
+    for (var i = 0; i < els.length; i++) {
+      var t = els[i]; t.style.fontSize = ""; var f = parseFloat(getComputedStyle(t).fontSize);
+      while (t.scrollWidth > t.parentNode.clientWidth + 1 && f > 10) { f -= 1; t.style.fontSize = f + "px"; }
+    }
+    var trips = document.getElementById("trips"), more = document.getElementById("more");
+    if (!trips) return;
+    // trips stay in order: from the first one that doesn't fit, the rest become "and n more".
+    // Two lines when there's room; one while a flag or stopped band is up.
+    var kids = trips.children, lines = /\bb1\b/.test(app.className) ? 1 : 2, hidden = -1;
+    for (var pass = 0; pass < 3; pass++) {
+      for (var k = 0; k < kids.length; k++) kids[k].style.display = "";
+      var box = trips.getBoundingClientRect(), lineH = kids.length ? kids[0].getBoundingClientRect().height : 0;
+      var bottom = box.top + lineH * lines + 2, n = 0, cut = false;
+      for (k = 0; k < kids.length; k++) {
+        var r = kids[k].getBoundingClientRect();
+        if (cut || r.bottom > bottom || r.right > box.right + 1) { cut = true; kids[k].style.display = "none"; n++; }
+      }
+      if (n === hidden) break;
+      hidden = n; more.textContent = n ? "and " + n + " more this week" : "";
+    }
   }
 
-  // burn-in: shift everything a few pixels every few minutes
-  let shift = 0;
-  setInterval(() => { shift = (shift + 1) % 4; app.style.transform = `translate(${[0, 3, 3, 0][shift]}px, ${[0, 0, 3, 3][shift]}px)`; }, 180000);
+  function refresh() {
+    if (busy) return; busy = true;
+    fetchSnapshot(function (err, data) {
+      busy = false;
+      if (err || !data) { failing = true; return draw(); }
+      if (data.ok === false) { store.set("key", null); return msg("This TV link doesn't work any more", data.reason); }
+      snap = data; lastOkAt = Date.now(); failing = false;
+      draw();
+    });
+  }
+
+  var shift = 0;   // burn-in: shift everything a few pixels every few minutes
+  setInterval(function () { shift = (shift + 1) % 4; app.style.transform = "translate(" + [0, 3, 3, 0][shift] + "px," + [0, 0, 3, 3][shift] + "px)"; }, 180000);
   setInterval(refresh, REFRESH_SECONDS * 1000);
-  setInterval(() => { if (snap) draw(); }, 10000);     // the clock, the attention strip, and hiding stale numbers
+  setInterval(function () { if (snap || lastOkAt || failing) draw(); }, 10000);   // the clock, the bands' turns, and hiding stale numbers
+  window.addEventListener("resize", function () { sizeUnits(); if (snap) draw(); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (snap) draw(); });
 
-  const full = document.getElementById("full");
+  var full = document.getElementById("full");
   if (document.documentElement.requestFullscreen) {
     full.hidden = false;
-    full.onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+    full.onclick = function () { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} };
   }
-  let idle; document.addEventListener("mousemove", () => { document.body.classList.remove("idle"); clearTimeout(idle); idle = setTimeout(() => document.body.classList.add("idle"), 5000); });
+  var idle;
+  document.addEventListener("mousemove", function () { document.body.className = "moving"; clearTimeout(idle); idle = setTimeout(function () { document.body.className = ""; }, 5000); });
   refresh();
 })();
 
 /* lets the core be tested outside a browser */
-if (typeof module !== "undefined") module.exports = { keyProblem, tvKey, tvModel, freshness, fmtDate };
+if (typeof module !== "undefined") module.exports = { keyProblem: keyProblem, tvKey: tvKey, tvModel: tvModel, freshness: freshness,
+  whenWords: whenWords, weekCaption: weekCaption, barWidth: barWidth, tripText: tripText, TV_VERSION: TV_VERSION };
 </script>
 </body>
 </html>
