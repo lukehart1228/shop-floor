@@ -46,5 +46,6 @@ On the live database these have all run. The order matters only when building a 
 | 28 | `arrow_pickup.sql` | |
 | 29 | `delivery_types.sql` | |
 | 30 | `install_log.sql` | The install log, guards, `check_everything()`, `devices()` |
+| 31 | `tv_pace.sql` | The floor TV with pace, work stopped and going out. Replaces `tv.sql`'s TV function. Run `install_log.sql` again after it |
 
 Not here on purpose: **`set_up_logins.sql`**, which has everyone's login addresses. Keep it on your own computer, not on GitHub.
