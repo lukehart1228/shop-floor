@@ -439,6 +439,9 @@
    ===================================================================== */
 const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
+// This page's version. Change it with every edit (date, then .1, .2 … for more than one that day).
+// Each device reports it when it opens; see  select * from devices();  in the SQL Editor.
+const PAGE_VERSION = "2026-09-30.3";
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -3605,12 +3608,24 @@ if (typeof document !== "undefined") (function () {
     };
   }
 
+  // tells the database which page this device is running. Never waits, never shows anything, never fails the app.
+  function reportDevice() {
+    try {
+      let dev = store.get("device", null);
+      if (!dev) { dev = newId(); store.set("device", dev); }
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      db.rpc("report_device", { p_device: dev, p_page: "index", p_version: PAGE_VERSION, p_agent: String(navigator.userAgent || "").slice(0, 300) })
+        .then(() => {}, () => {});
+    } catch (e) {}
+  }
+
   async function start(user) {
     zoomLock(false);
     let me;
     try { me = await loadMe(user); } catch (e) { return signIn(friendlyError(e)); }
     if (!me) return signIn("This login has no role yet. In Supabase, give it one (walkthrough 1, step 8).");
     if (!S.depts.length) return signIn("This login isn't assigned to a department yet. In Supabase, add one to its profile.");
+    reportDevice();
     const cached = store.get("rows_" + wd(), null);
     if (cached) { S.rows = cached.rows; S.rowsAt = cached.at; }
     const pastCached = store.get("past_" + S.dept, null);
@@ -3646,7 +3661,7 @@ if (typeof document !== "undefined") (function () {
 })();
 
 /* lets the core be tested outside a browser */
-if (typeof module !== "undefined") module.exports = { arrowWaiting, arrowWaitFor, arrowOut, waitingText, withSends, routeWords, toSend, ROUTES, SEND_DEPTS, DEPT_NAME, buildPast, pastLine, PAST_DEPTS, withFinishBy, finishWords, dateLine, keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
+if (typeof module !== "undefined") module.exports = { PAGE_VERSION, arrowWaiting, arrowWaitFor, arrowOut, waitingText, withSends, routeWords, toSend, ROUTES, SEND_DEPTS, DEPT_NAME, buildPast, pastLine, PAST_DEPTS, withFinishBy, finishWords, dateLine, keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
   daysLeft, daysText, fmtDate, localISO, daysSince, agoText, setPending, flushOutbox, newId, queueEntry, flushLogbox, dueForMe, taskWhen,
   problemState, splitProblems, defectState, splitIssues, withReady, readyOf, readyKnown, waitingText, HAS_UPSTREAM, defectCounts, supplyLine, filterJobs, sheetsText, isNetworkError, friendlyError, DEPTS,
   fitSize, photoPath, photoError, flushPhotobox, loadoutSheets, sizeLabel, loadoutPieces, missingText,
