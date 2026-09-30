@@ -225,6 +225,8 @@
   .lokind button small{display:block; font-weight:500; font-size:13px; color:var(--ink2)}
   .lokind button[aria-pressed="true"]{background:var(--midnight); color:var(--sawdust); border-color:var(--midnight)}
   .lokind button[aria-pressed="true"] small{color:#CFC9B8}
+  .lokind3{flex-wrap:wrap}
+  .lokind3 button{flex:1 1 150px; padding:10px 12px}
   .lopages{border:1.5px solid var(--gray); border-radius:10px; padding:10px 14px; margin:0 0 14px; font-weight:600; color:var(--ink2); background:#fff}
   .lopages.ready{border-color:var(--teal); color:var(--teal-ink)}
   .lostep{font-size:17px; font-weight:700; margin:18px 2px 8px}
@@ -1008,7 +1010,7 @@ async function flushPhotobox(store, db, isPending = () => false) {
   let offline = false;
   const list = (await store.list()).sort((a, b) => String(a.at).localeCompare(String(b.at)));
   for (const rec of list) {
-    const done = rec.kind === "delivery_done";          // a delivery marked done: the signature (if signed), then the record
+    const done = rec.kind === "delivery_done" || rec.kind === "pickup_done";   // a delivery or pickup marked done: the signature (if signed), then the record
     let up = null;
     try {
       if (!done) up = await db.storage.from("photos").upload(photoPath(rec.projectId, rec.id), rec.blob, { contentType: "image/jpeg", upsert: false });
@@ -1021,7 +1023,13 @@ async function flushPhotobox(store, db, isPending = () => false) {
     }
     let res;
     try {
-      res = done
+      res = rec.kind === "pickup_done"                             // a pickup: BOL (no signature) or the customer's
+        ? await db.rpc("complete_pickup", { p_client_id: rec.id, p_loadout: rec.parent, p_signed_name: rec.signed ? rec.signedName : null,
+                                            p_customer_note: rec.customerNote || null, p_no_sign_reason: rec.signed || rec.bol ? null : rec.reason,
+                                            p_no_sign_note: rec.signed || rec.bol ? null : (rec.reasonNote || null), p_signed_at: rec.signed ? rec.at : null })
+        : rec.stage === "bol"                                        // a page of a BOL pickup's BOL
+        ? await db.rpc("add_bol_photo", { p_client_id: rec.id, p_loadout: rec.parent, p_shot_at: rec.shotAt || null, p_width: rec.width || null, p_height: rec.height || null })
+        : done
         ? await db.rpc("complete_delivery", { p_client_id: rec.id, p_loadout: rec.parent, p_signed_name: rec.signed ? rec.signedName : null,
                                               p_customer_note: rec.customerNote || null, p_no_sign_reason: rec.signed ? null : rec.reason,
                                               p_no_sign_note: rec.signed ? null : (rec.reasonNote || null), p_signed_at: rec.signed ? rec.at : null,
@@ -1152,6 +1160,38 @@ function deliveryLine(lo, plan) {
                           : plan.waitingDone ? "delivered, waiting to send" : null].filter(Boolean).join(" · ");
 }
 
+/* ---- pickups (delivery_types.sql): a BOL pickup (kind "shipping") or a customer pickup ---- */
+
+/** What each kind is called, and what it's for. */
+const TRIP_KINDS = [["delivery", "White glove", "Our truck, signed at the site"],
+                    ["shipping", "BOL pickup", "A carrier collects pallets"],
+                    ["customer_pickup", "Customer pickup", "The customer collects"]];
+const tripName = (kind) => (TRIP_KINDS.find(k => k[0] === kind) || TRIP_KINDS[0])[1];
+/** A pickup, step by step: every table (photographed here, waiting, or gone on an earlier trip), the wrapped pallets and the BOL
+ *  (a BOL pickup), and whether it's done. `ready` says whether it can be marked picked up yet (the database asks the same). */
+function pickupPlan(sheets, lo, pending = [], plannedPallets = 1) {
+  const bol = (lo && lo.kind) === "shipping";
+  const tables = loadoutPieces(sheets, lo, pending.filter(p => !p.stage && p.kind !== "pickup_done"), plannedPallets);
+  const bolWaiting = pending.filter(p => p.stage === "bol").length;
+  const bolHere = ((lo && lo.bol_here) || 0) + bolWaiting;
+  const waitingDone = pending.find(p => p.kind === "pickup_done") || null;
+  const done = !!(lo && lo.completed_at) || !!waitingDone;
+  return { bol, tables, bolHere, bolWaiting, pallets: tables.pallets, palletsHere: tables.palletsHere, palletsMissing: bol ? tables.palletsMissing : [],
+           done, waitingDone, ready: bol ? bolHere > 0 && tables.palletsHere.length > 0 : true };
+}
+/** A pickup on the list, in words: "BOL pickup · 4 of 6 tables · 2 pallets · BOL photographed · picked up" */
+function pickupLine(lo, plan) {
+  const total = plan.tables.total || lo.pieces_total || 0;
+  const done = plan.tables.total ? plan.tables.done : new Set([...(lo.pieces_here || []), ...(lo.pieces_earlier || [])]).size;
+  const w = plan.waitingDone;
+  return [tripName(lo.kind),
+          total ? `${done} of ${total} table${total === 1 ? "" : "s"} photographed` : null,
+          plan.bol ? `${plan.palletsHere.length} pallet${plan.palletsHere.length === 1 ? "" : "s"}` : null,
+          plan.bol ? (plan.bolHere ? "BOL photographed" : "no BOL photo yet") : null,
+          lo.completed_at ? (plan.bol ? "picked up" : lo.signed_name ? `signed by ${lo.signed_name}` : `not signed (${String(lo.no_sign_reason || "").toLowerCase()})`)
+                          : w ? "picked up, waiting to send" : null].filter(Boolean).join(" · ");
+}
+
 /* ---- end core ---- */
 
 
@@ -1192,6 +1232,7 @@ if (typeof document !== "undefined") (function () {
     loSheets: {}, loWo: null, loPallets: store.get("lo_pallets", {}), loPages: {}, loDet: {},
     // deliveries: scheduled trips (tickets, site files), trucks planned, the customer step per delivery
     deliveries: store.get("deliveries", []), dlReady: !!store.get("deliveries", null), dlTrucks: store.get("dl_trucks", {}), dlSig: {}, dlFiles: {},
+    pkReady: store.get("pk_ready", false), pkBolMore: {},
     // Advance (managers only): a job, a sheet on it, and unsaved changes to that sheet
     adv: store.get("adv", false), advJob: null, advSheet: null, advRows: [], advAt: null, advCached: false,
     advEdit: {}, advFilter: "", advLoading: false,
@@ -1448,13 +1489,17 @@ if (typeof document !== "undefined") (function () {
     st.busy = false; render();
   }
   async function loadLoadouts() {
-    const [d, dl] = await Promise.all([read("loadouts", db.from("v_loadouts").select("*"), "loadouts"),
-                                       read("deliveries", db.from("v_deliveries").select("*"), "deliveries")]);
+    const [d, dl, pk] = await Promise.all([read("loadouts", db.from("v_loadouts").select("*"), "loadouts"),
+                                           read("deliveries", db.from("v_deliveries").select("*"), "deliveries"),
+                                           read("pickups", db.from("v_deliveries").select("ready_at").limit(1), null)]);   // is delivery_types.sql in?
     if (dl) { S.deliveries = dl; S.dlReady = true; } else if (S.missing.deliveries) S.dlReady = false;
+    if (pk) S.pkReady = true; else if (S.missing.pickups) S.pkReady = false;
+    store.set("pk_ready", S.pkReady);
     if (d) {
-      // open ones; deliveries still on the road (the truck left, not yet delivered); the last two weeks
+      // open ones; deliveries still on the road (the truck left, not yet delivered); pickups not yet picked up; the last two weeks
       S.loadouts = d.filter(l => l.is_open || daysSince(l.finished_at) <= 14
-                              || (l.site_steps && l.kind !== "shipping" && !l.completed_at && daysSince(l.started_at) <= 30));
+                              || (l.site_steps && l.kind === "delivery" && !l.completed_at && daysSince(l.started_at) <= 30)
+                              || (l.ready_at && !l.completed_at));
       const onServer = new Set(d.map(l => l.client_id));
       S.localLoadouts = S.localLoadouts.filter(l => !onServer.has(l.client_id));
       store.set("loadouts_local", S.localLoadouts);
@@ -1462,7 +1507,7 @@ if (typeof document !== "undefined") (function () {
     const lo = currentLoadout();
     if (lo) {
       const jobs = [loadPickSheets(lo.job_id), loadLoSheets(lo.job_id).then(() => { if (!S.loPages[lo.job_id] || (!S.loPages[lo.job_id].busy && S.loPages[lo.job_id].saved < S.loPages[lo.job_id].total)) saveLoPages(lo.job_id); })];
-      if (isDl(lo)) saveDlFiles(lo);
+      if (isDl(lo) || isPk(lo)) saveDlFiles(lo);
       if (lo.id) jobs.push(read("photos", db.from("v_photos").select("*").eq("loadout_id", lo.id), null).then(p => { if (p) S.loPhotos = p.filter(x => !x.voided); }));
       await Promise.all(jobs);
     }
@@ -1473,7 +1518,10 @@ if (typeof document !== "undefined") (function () {
   }
   // ---------- deliveries (deliveries.sql): dock, site, customer ----------
   /** A white-glove delivery with the dock, site and signature steps (shipments, and load-outs from before, keep the old screen). */
-  const isDl = (lo) => !!lo && S.dlReady && lo2() && lo.kind !== "shipping" && (lo.site_steps === true || (lo.site_steps === undefined && !lo.id));
+  const isDl = (lo) => !!lo && S.dlReady && lo2() && lo.kind !== "shipping" && lo.kind !== "customer_pickup" && (lo.site_steps === true || (lo.site_steps === undefined && !lo.id));
+  /** A pickup with its own steps (delivery_types.sql): a customer pickup, or a BOL pickup started since (older shipments keep the old screen). */
+  const isPk = (lo) => !!lo && S.pkReady && lo2() && (lo.kind === "customer_pickup" || (lo.kind === "shipping" && (lo.pickup_steps === true || (lo.pickup_steps === undefined && !lo.id))));
+  const pkPlan = (lo) => pickupPlan(S.loSheets[lo.job_id] || [], lo, dlPend(lo), loPlanned(lo));
   const dlOf = (lo) => (S.deliveries || []).find(d => d.client_id === lo.client_id) || null;
   const dlPend = (lo) => S.pending.filter(x => x.parent === lo.client_id);
   const dlPlan = (lo) => deliveryPlan(S.loSheets[lo.job_id] || [], lo, dlPend(lo), S.dlTrucks[lo.client_id] || 1);
@@ -1745,13 +1793,14 @@ if (typeof document !== "undefined") (function () {
 
   function syncBadge() {
     const n = Object.keys(S.outbox).length, m = Object.keys(S.logbox).length;
-    const dd = S.pending.filter(p => p.kind === "delivery_done").length, k = S.pending.length - dd;
-    if (n || m || k || dd) {
+    const dd = S.pending.filter(p => p.kind === "delivery_done").length, pd = S.pending.filter(p => p.kind === "pickup_done").length, k = S.pending.length - dd - pd;
+    if (n || m || k || dd || pd) {
       const parts = [];
       if (n) parts.push(`${n} count${n === 1 ? "" : "s"}`);
       if (m) parts.push(`${m} entr${m === 1 ? "y" : "ies"}`);
       if (k) parts.push(`${k} photo${k === 1 ? "" : "s"}`);
       if (dd) parts.push(`${dd} deliver${dd === 1 ? "y" : "ies"}`);
+      if (pd) parts.push(`${pd} pickup${pd === 1 ? "" : "s"}`);
       return `<span class="sync waiting">${parts.join(" and ")} waiting to send</span>`;
     }
     if (!S.online || S.fromCache) return `<span class="sync offline">Offline</span>`;
@@ -2279,11 +2328,12 @@ if (typeof document !== "undefined") (function () {
   // Every item or pallet is photographed against its sheet before the truck leaves,
   // so the photos double as a check that everything's on board.
   function loadoutLine(lo) {
+    if (isPk(lo)) return pickupLine(lo, pkPlan(lo));
     if (lo.pieces_total !== undefined || (lo.local && lo2())) {
       const pend = S.pending.filter(x => x.parent === lo.client_id);
       const p = loadoutPieces(S.loSheets[lo.job_id] || [], lo, pend, 1);
       const total = lo.pieces_total ?? p.total;
-      return [lo.kind === "shipping" ? "Shipment" : "Delivery",
+      return [lo.kind === "shipping" ? (S.pkReady ? "BOL pickup" : "Shipment") : "Delivery",
               total ? `${p.done} of ${total} table${total === 1 ? "" : "s"} photographed` : `${p.onTruck} photographed`,
               lo.kind === "shipping" ? `${p.palletsHere.length} pallet${p.palletsHere.length === 1 ? "" : "s"}` : null,
               p.other ? `${p.other} other item${p.other === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ");
@@ -2297,6 +2347,7 @@ if (typeof document !== "undefined") (function () {
   }
   function loadoutScreen() {
     const lo = currentLoadout();
+    if (lo && isPk(lo)) return S.loWo ? loadoutWo(lo) : pickupDetail(lo);
     if (lo && isDl(lo)) return S.loWo ? loadoutWo(lo) : deliveryDetail(lo);
     if (lo && lo2()) return S.loWo ? loadoutWo(lo) : loadoutDetail2(lo);
     if (lo) return loadoutDetail(lo);
@@ -2324,6 +2375,8 @@ if (typeof document !== "undefined") (function () {
           <div class="meta2">Left ${esc(fmtDate(localISO(l.finished_at)))}${l.finished_by_name ? ` · ${esc(l.finished_by_name)}` : ""} · ${esc(loadoutLine(l))}</div></div>`).join("") : ""}`;
   }
   function kindButtons(kind, attr) {
+    if (S.pkReady) return `<div class="lokind lokind3">${TRIP_KINDS.map(([k, name, what]) =>
+      `<button data-${attr}="${k}" aria-pressed="${(kind || "delivery") === k}">${name}<small>${what}</small></button>`).join("")}</div>`;
     return `<div class="lokind"><button data-${attr}="delivery" aria-pressed="${kind !== "shipping"}">Delivery<small>White glove, our truck</small></button>
       <button data-${attr}="shipping" aria-pressed="${kind === "shipping"}">Shipping<small>Palletized, a carrier</small></button></div>`;
   }
@@ -2385,34 +2438,41 @@ if (typeof document !== "undefined") (function () {
   function loCard(l) {
     return `<button class="job" data-loopen="${esc(l.client_id)}">
       <div class="job-top"><span class="pid">${l.is_test ? `<span class="tag">TEST</span>` : ""}${esc(l.project_id)}</span><span class="jname">${esc(l.job_name)}</span>
-        <span class="due">${l.scheduled_for ? esc(fmtWhen(l.scheduled_for)) : `started ${esc(agoText(l.started_at))}${l.started_by_name ? ` by ${esc(l.started_by_name)}` : ""}`}</span></div>
+        <span class="due">${l.scheduled_for ? esc(fmtWhen(l.scheduled_for)) : l.ready_at ? `ready since ${esc(fmtDate(localISO(l.ready_at)))}` : `started ${esc(agoText(l.started_at))}${l.started_by_name ? ` by ${esc(l.started_by_name)}` : ""}`}</span></div>
       <div class="meta2" style="margin-top:6px">${l.local ? "Waiting to send · " : ""}${esc(isDl(l) ? deliveryLine(l, dlPlan(l)) : loadoutLine(l))}</div></button>`;
   }
   function deliveriesList() {
     const all = [...S.localLoadouts.map(l => ({ ...l, local: true, is_open: true })), ...S.loadouts];
     const open = all.filter(l => l.is_open);
+    const ready = all.filter(l => l.ready_at && isPk(l) && !l.completed_at && !pkPlan(l).done)
+      .sort((a, b) => String(a.ready_at).localeCompare(String(b.ready_at)));
     const scheduled = open.filter(l => l.scheduled_for).sort((a, b) => String(a.scheduled_for).localeCompare(String(b.scheduled_for)));
-    const others = open.filter(l => !l.scheduled_for);
+    const pkDone = (l) => isPk(l) && pkPlan(l).done;           // picked up (maybe still waiting to send)
+    const others = open.filter(l => !l.scheduled_for && !ready.includes(l) && !pkDone(l));
     const road = all.filter(l => !l.is_open && isDl(l) && !l.completed_at);
-    const done = all.filter(l => !l.is_open && !(isDl(l) && !l.completed_at) && daysSince(l.completed_at || l.finished_at) <= 14)
-      .sort((a, b) => String(b.completed_at || b.finished_at).localeCompare(String(a.completed_at || a.finished_at)));
+    const done = all.filter(l => !ready.includes(l) && ((!l.is_open && !(isDl(l) && !l.completed_at)) || pkDone(l))
+                              && (!(l.completed_at || l.finished_at) || daysSince(l.completed_at || l.finished_at) <= 14))
+      .sort((a, b) => String(b.completed_at || b.finished_at || "~").localeCompare(String(a.completed_at || a.finished_at || "~")));
     const f = S.loForm;
     const already = f.jobId && open.find(l => l.job_id === f.jobId);
+    const doneWhen = (l) => l.completed_at ? `${isPk(l) ? "Picked up" : "Delivered"} ${esc(fmtWhen(l.completed_at))}`
+                          : isPk(l) ? "Picked up · waiting to send" : `Left ${esc(fmtDate(localISO(l.finished_at)))}`;
     return `${missingNote("loadouts")}
-      ${scheduled.length ? `<h2 class="sec" style="margin-top:4px">Scheduled deliveries</h2>${scheduled.map(loCard).join("")}` : ""}
+      ${ready.length ? `<h2 class="sec" style="margin-top:4px">Ready for pickup</h2>${ready.map(loCard).join("")}` : ""}
+      ${scheduled.length ? `<h2 class="sec"${ready.length ? "" : ` style="margin-top:4px"`}>Scheduled deliveries</h2>${scheduled.map(loCard).join("")}` : ""}
       ${road.length ? `<h2 class="sec">On the road</h2>${road.map(loCard).join("")}` : ""}
-      <div class="card"${scheduled.length || road.length ? ` style="margin-top:22px"` : ""}><h3 style="margin:0 0 4px">Start a load-out</h3>
-        <p class="sub" style="margin:0 0 6px">For a trip that isn't scheduled above, or a shipment. Pick the job going on the truck.</p>
+      <div class="card"${ready.length || scheduled.length || road.length ? ` style="margin-top:22px"` : ""}><h3 style="margin:0 0 4px">Start a load-out</h3>
+        <p class="sub" style="margin:0 0 6px">${S.pkReady ? "For a trip that isn't listed above. Pick the kind, then the job." : "For a trip that isn't scheduled above, or a shipment. Pick the job going on the truck."}</p>
         ${kindButtons(f.kind, "lostartkind")}
         ${jobPicker(f.jobId, f.filter)}
-        ${already ? `<div class="banner info" style="margin:12px 0 0">${esc(already.project_id)} already has ${already.scheduled_for ? `a delivery scheduled for ${esc(fmtWhen(already.scheduled_for))}` : `a load-out open, started ${esc(agoText(already.started_at))}`}. Carry on with it, or start another for a second truck.
+        ${already ? `<div class="banner info" style="margin:12px 0 0">${esc(already.project_id)} already has ${already.scheduled_for ? `a delivery scheduled for ${esc(fmtWhen(already.scheduled_for))}` : already.ready_at ? `a ${esc(tripName(already.kind).toLowerCase())} ready` : `a load-out open, started ${esc(agoText(already.started_at))}`}. Carry on with it, or start another for a second trip.
             <div class="rowbtns"><button data-loopen="${esc(already.client_id)}">Carry on with it</button></div></div>` : ""}
         <button class="go wide" style="margin-top:14px" data-lostart="1" ${f.jobId ? "" : "disabled"}>Start load-out</button></div>
       ${others.length ? `<h2 class="sec">Open load-outs</h2>${others.map(loCard).join("")}`
-        : !scheduled.length && !road.length ? `<h2 class="sec">Open load-outs</h2><div class="empty"><b>No load-out open</b>Start one above when a truck is being loaded.</div>` : ""}
+        : !scheduled.length && !road.length && !ready.length ? `<h2 class="sec">Open load-outs</h2><div class="empty"><b>No load-out open</b>Start one above when a truck is being loaded.</div>` : ""}
       ${done.length ? `<h2 class="sec">Done in the last two weeks</h2>` + done.map(l => `<div class="li">
           <div class="li-top"><b>${l.is_test ? `<span class="tag">TEST</span>` : ""}${esc(l.project_id)}</b><span class="meta2">${esc(l.job_name)}</span></div>
-          <div class="meta2">${l.completed_at ? `Delivered ${esc(fmtWhen(l.completed_at))}` : `Left ${esc(fmtDate(localISO(l.finished_at)))}`}${(l.completed_by_name || l.finished_by_name) ? ` · ${esc(l.completed_by_name || l.finished_by_name)}` : ""} · ${esc(isDl(l) ? deliveryLine(l, dlPlan(l)) : loadoutLine(l))}</div></div>`).join("") : ""}`;
+          <div class="meta2">${doneWhen(l)}${(l.completed_by_name || l.finished_by_name) ? ` · ${esc(l.completed_by_name || l.finished_by_name)}` : ""} · ${esc(isDl(l) ? deliveryLine(l, dlPlan(l)) : loadoutLine(l))}</div></div>`).join("") : ""}`;
   }
   function siteSlots(s) {
     return `<div class="loslots">${s.slots.map(x => `<button class="loslot${x.here ? " here" : x.earlier ? " earlier" : ""}" data-dlsite="${s.sheet_number}" data-piece="${x.piece}">
@@ -2490,6 +2550,94 @@ if (typeof document !== "undefined") (function () {
         : lo.scheduled_for ? `<p class="meta2" style="text-align:center">Delivery called off or moved? ${esc(lo.scheduled_by_name || "Whoever scheduled it")} changes it on the Deliveries page. A wrong photo: tap it and mark it entered by mistake.</p>`
         : lo.started_by === S.me.id || !lo.id ? `<p style="text-align:center"><button class="linkish" data-lovoid="1">This load-out was started by mistake</button></p>` : ""}`;
   }
+  // ---------- pickups: a BOL pickup (tables, pallets, the BOL) or a customer pickup (tables, the signature) ----------
+  const PK_NO_SIGN = ["Customer refused", "Other"];
+  function pickupDetail(lo) {
+    const d = dlOf(lo), plan = pkPlan(lo), p = plan.tables, sheets = S.loSheets[lo.job_id], bol = plan.bol;
+    const pend = dlPend(lo).filter(x => x.kind !== "pickup_done"), photos = S.loPhotos.filter(x => x.loadout_id === lo.id);
+    const pg = S.loPages[lo.job_id];
+    const cap = (x) => x.stage === "bol" ? (x.note || "BOL") : x.pallet ? `Pallet ${x.pallet}`
+                     : (x.sheet ?? x.sheet_number) != null ? `Sheet ${x.sheet ?? x.sheet_number}${x.piece ? ` · table ${x.piece}` : ""}` : x.note;
+    const g = S.dlSig[lo.client_id] || (S.dlSig[lo.client_id] = { name: "", note: "", noSign: false, reason: null, reasonNote: "", strokes: [], aspect: 2 });
+    const det = S.loDet[lo.client_id] || { carrier: lo.carrier || "", tracking: lo.tracking || "" };
+    const changed = (det.carrier || "") !== (lo.carrier || "") || (det.tracking || "") !== (lo.tracking || "");
+    const w = plan.waitingDone, done = plan.done;
+    const slots = (s) => `<div class="loslots">${s.slots.map(x => `<button class="loslot${x.here ? " here" : x.earlier ? " earlier" : ""}" data-loshoot="${s.sheet_number}" data-piece="${x.piece}">
+      ${s.qty === 1 ? "The table" : `Table ${x.piece}`}<small>${x.waiting ? "Waiting to send" : x.here ? "Photographed · tap for another" : x.earlier ? "Went on an earlier trip" : "Tap to photograph"}</small></button>`).join("")}</div>`;
+    const tablesStep = `<div class="lostep">1 · ${bol ? "Every table, before it's wrapped" : "Each table as it's handed over"} <span>— ${p.done} of ${p.total}</span></div>
+      ${sheets === undefined ? `<div class="meta2">Loading the sheets…</div>` : ""}
+      ${p.list.length ? p.list.map(s => `<div class="locard${s.complete ? " done" : ""}">
+          <div class="lotop"><span class="no num">${s.sheet_number}</span><span class="size">${esc(sizeLabel(s) || s.item_code || "Sheet " + s.sheet_number)}</span><span class="cnt">${s.done} of ${s.qty}</span></div>
+          ${done ? "" : slots(s)}
+          ${s.png_path && s.pages_ready ? `<button class="lowo" data-lowo="${s.sheet_number}">Work order</button>` : ""}</div>`).join("")
+        : sheets ? `<div class="meta2">No work order uploaded, so there are no tables to tick off. Photograph each item below, with a few words.</div>` : ""}`;
+    const palletStep = bol ? `<div class="lostep">2 · Each pallet, once it's wrapped <span>— ${plan.palletsHere.length} of ${plan.pallets}</span></div>
+      ${Array.from({ length: plan.pallets }, (_, i) => i + 1).map(n => { const has = plan.palletsHere.includes(n);
+        return `<div class="locard${has ? " done" : ""}"><div class="lotop"><span class="no num">P${n}</span><span class="size">Pallet ${n}</span><span class="cnt">${has ? "Photographed" : "Not yet"}</span></div>
+          ${done ? "" : `<div class="loslots"><button class="loslot${has ? " here" : ""}" data-lopallet="${n}">${has ? "Wrapped ✓" : "Photograph it wrapped"}<small>${has ? "Tap for another photo" : "Once it's wrapped"}</small></button></div>`}</div>`; }).join("")}
+      ${done ? "" : `<button class="btn" data-loaddpallet="1">Add another pallet</button>`}` : "";
+    const bolPages = Math.max(1, plan.bolHere + (S.pkBolMore[lo.client_id] || 0));
+    const bolStep = bol ? `<div class="lostep">3 · The BOL — a photo of each page <span>— ${plan.bolHere ? `${plan.bolHere} photographed` : "not yet"}</span></div>
+      <div class="locard${plan.bolHere ? " done" : ""}"><div class="lotop"><span class="no num">B</span><span class="size">Bill of lading</span><span class="cnt">${plan.bolHere ? "Photographed" : "Not yet"}</span></div>
+        ${done ? "" : `<div class="loslots">${Array.from({ length: bolPages }, (_, i) => i + 1).map(n => { const has = n <= plan.bolHere;
+            return `<button class="loslot${has ? " here" : ""}" data-pkbol="${n}">${bolPages === 1 ? "The BOL" : `Page ${n}`}<small>${has ? (n > plan.bolHere - plan.bolWaiting ? "Waiting to send" : "Photographed · tap for another") : "Signed by the driver"}</small></button>`; }).join("")}</div>`}</div>
+      ${done ? "" : `<button class="btn" data-pkbolmore="1">Add another page</button>`}
+      <div class="card" style="margin-top:14px"><div class="lodet">
+        <div><label class="f" style="margin-top:0" for="loCarrier">Carrier <span class="meta2">(optional)</span></label>
+          <input class="in" id="loCarrier" data-lodet="carrier" value="${esc(det.carrier)}" placeholder="e.g. Estes" maxlength="80" ${done ? "disabled" : ""}></div>
+        <div><label class="f" style="margin-top:0" for="loTracking">BOL number <span class="meta2">(optional)</span></label>
+          <input class="in" id="loTracking" data-lodet="tracking" value="${esc(det.tracking)}" placeholder="e.g. 44812" maxlength="80" ${done ? "disabled" : ""}></div></div>
+        ${done ? "" : `<button class="btn" style="margin-top:10px" data-losavedet="1" ${changed ? "" : "disabled"}>Save carrier and BOL number</button>`}</div>` : "";
+    const finish = done
+      ? `<div class="dldone"><b>${lo.completed_at ? (bol ? "Picked up" : lo.signed_name ? `Picked up · signed by ${esc(lo.signed_name)}` : `Picked up · not signed (${esc(lo.no_sign_reason)})`)
+                                                 : bol ? "Picked up" : w.signed ? `Picked up · signed by ${esc(w.signedName)}` : `Picked up · not signed (${esc(w.reason)})`}</b>
+          ${lo.completed_at ? `${esc(fmtWhen(lo.completed_at))}${lo.completed_by_name ? ` · ${esc(lo.completed_by_name)}` : ""}` : "Waiting to send — it goes by itself when there's signal."}</div>`
+      : bol ? `<div class="card">
+          <label class="f" style="margin-top:0" for="dlNote">A note <span class="meta2">(optional)</span></label>
+          <textarea class="in" id="dlNote" data-dlsig="note" maxlength="1000" placeholder="e.g. 3 pallets, the driver counted them">${esc(g.note)}</textarea>
+          ${plan.ready ? "" : `<p class="meta2" style="margin:10px 0 0">Needs ${[plan.palletsHere.length ? null : "a photo of a wrapped pallet", plan.bolHere ? null : "a photo of the BOL"].filter(Boolean).join(" and ")} first.</p>`}
+          <button class="go wide" style="margin-top:14px" data-pkdone="1" ${plan.ready ? "" : "disabled"}>Picked up — BOL pickup done</button></div>`
+      : `<div class="lostep">2 · The customer</div><div class="card">
+          <label class="f" style="margin-top:0" for="dlNote">The customer's note <span class="meta2">(optional — anything they want written down)</span></label>
+          <textarea class="in" id="dlNote" data-dlsig="note" maxlength="1000" placeholder="e.g. Scuff on the leg of table 3">${esc(g.note)}</textarea>
+          ${g.noSign ? `<label class="f">Why is there no signature?</label>
+              ${PK_NO_SIGN.map(r => `<button class="pick" data-dlreason="${esc(r)}" aria-pressed="${g.reason === r}">${esc(r)}</button>`).join("")}
+              <textarea class="in" data-dlsig="reasonNote" maxlength="1000" placeholder="${g.reason === "Other" ? "Say why (needed)" : "Anything to add (optional)"}">${esc(g.reasonNote)}</textarea>
+              <button class="go wide" style="margin-top:14px" data-dldone="1" ${dlCanFinish(g) ? "" : "disabled"}>Picked up — not signed</button>
+              <p style="text-align:center"><button class="linkish" data-dlnosign="0">Get a signature after all</button></p>`
+            : `<label class="f" for="dlName">The customer's name</label>
+              <input class="in" id="dlName" data-dlsig="name" value="${esc(g.name)}" maxlength="80" autocomplete="off" placeholder="Who is signing">
+              <label class="f">Signature</label>
+              <div class="sigwrap"><canvas id="sigpad" class="sigpad" aria-label="Sign here"></canvas>
+                <button class="linkish sigclear" data-dlclear="1">Clear</button><span class="sighint">${g.strokes.length ? "" : "Sign here with a finger"}</span></div>
+              <button class="go wide" style="margin-top:14px" data-dldone="1" ${dlCanFinish(g) ? "" : "disabled"}>Picked up — signed</button>
+              <p style="text-align:center"><button class="linkish" data-dlnosign="1">Can't get a signature?</button></p>`}
+        </div>`;
+    return `<button class="back" data-loback="1">← Load-outs</button>
+      <h1>${lo.is_test ? `<span class="tag">TEST</span>` : ""}${esc(lo.project_id)}</h1>
+      <p class="sub">${esc(lo.job_name)}${lo.ready_at ? "" : ` · started ${esc(agoText(lo.started_at))}${lo.started_by_name ? ` by ${esc(lo.started_by_name)}` : ""}`}${lo.id ? "" : " · waiting to send"}</p>
+      ${lo.ready_at ? `<div class="dlwhen">${esc(tripName(lo.kind))} · ready since ${esc(fmtDate(localISO(lo.ready_at)))}</div>`
+                    : done ? "" : kindButtons(lo.kind, "lokind")}
+      ${pg && pg.total ? `<div class="lopages${pg.saved === pg.total ? " ready" : ""}">${pg.saved === pg.total ? `✓ Ready for no signal · ${pg.total} work order page${pg.total === 1 ? "" : "s"} saved on this device`
+          : pg.busy ? `Saving the work order pages for no signal… ${pg.saved} of ${pg.total}` : `${pg.saved} of ${pg.total} work order pages saved on this device.`}</div>` : ""}
+      ${d && (d.schedule_note || d.ticket || (d.files || []).length) ? `<div class="dlinfo">${d.schedule_note ? `<div style="margin-bottom:8px"><b>Note${d.scheduled_by_name ? ` from ${esc(d.scheduled_by_name)}` : ""}:</b> ${esc(d.schedule_note)}</div>` : ""}
+          <div class="loslots">${d.ticket ? `<button class="lowo" data-dlopen="${esc(d.ticket.path)}" data-mime="${esc(d.ticket.mime)}" data-name="Ticket">Ticket</button>` : `<span class="meta2">No ticket attached.</span>`}
+            ${(d.files || []).filter(x => x.in_cloud !== false).map(x => `<button class="lowo" data-dlopen="${esc(x.path)}" data-mime="${esc(x.mime)}" data-name="${esc(x.name)}">${esc(x.name)}</button>`).join("")}</div></div>` : ""}
+      ${tablesStep}
+      ${palletStep}
+      ${bolStep}
+      ${finish}
+      ${done ? "" : `<div class="card"><label class="f" style="margin-top:0" for="loItem">Something with no sheet</label>
+        <input class="in" id="loItem" data-loitem="1" value="${esc(S.loItem)}" placeholder="e.g. hardware box, 2 of 2">
+        <button class="addph" data-loshootitem="1" ${S.loItem.trim() ? "" : "disabled"}>Photograph it</button></div>`}
+      ${photos.length || pend.length ? `<h2 class="sec">Photos on this pickup</h2>
+        <div class="phs">${photos.map(x => `<button class="ph" data-viewphoto="${esc(x.id)}"><img alt="" data-photopath="${esc(x.storage_path)}"><span class="cap">${esc(cap(x))}</span></button>`).join("")}
+          ${pend.map(x => `<span class="ph"><img alt="" src="${esc(x.url)}"><span class="cap">${esc(cap(x))} · waiting</span></span>`).join("")}</div>` : ""}
+      ${done ? ""
+        : lo.ready_at ? `<p class="meta2" style="text-align:center">Pickup called off? ${esc(lo.scheduled_by_name || "Whoever set it up")} cancels it on the Deliveries page. A wrong photo: tap it and mark it entered by mistake.</p>`
+        : lo.started_by === S.me.id || !lo.id ? `<p style="text-align:center"><button class="linkish" data-lovoid="1">This load-out was started by mistake</button></p>` : ""}`;
+  }
+
   // the signature pad: strokes are kept (0–1 across and down), so a redraw of the screen doesn't lose them
   function initSigPad() {
     const c = document.getElementById("sigpad"), lo = currentLoadout();
@@ -2530,13 +2678,13 @@ if (typeof document !== "undefined") (function () {
   // one sheet's work order page, from the load-out (saved on the device, so it shows with no signal)
   function loadoutWo(lo) {
     const s = (S.loSheets[lo.job_id] || []).find(x => x.sheet_number === S.loWo);
-    if (!s) { S.loWo = null; return isDl(lo) ? deliveryDetail(lo) : loadoutDetail2(lo); }
-    const dl = isDl(lo);
+    if (!s) { S.loWo = null; return isPk(lo) ? pickupDetail(lo) : isDl(lo) ? deliveryDetail(lo) : loadoutDetail2(lo); }
+    const dl = isDl(lo), pk = isPk(lo);
     const row = dl ? deliveryPlan([s], lo, dlPend(lo)).site.list[0] : loadoutPieces([s], lo, loPend(lo), 1).list[0];
-    return `<button class="back" data-lowoback="1">← ${dl ? "Delivery" : "Load-out"}</button>
+    return `<button class="back" data-lowoback="1">← ${dl ? "Delivery" : pk ? tripName(lo.kind) : "Load-out"}</button>
       <h1>Sheet ${s.sheet_number}</h1>
       <p class="sub">${esc(lo.project_id)} · ${esc(sizeLabel(s) || s.item_code || "")} · ${s.qty} table${s.qty === 1 ? "" : "s"}</p>
-      ${dl ? (dlPlan(lo).delivered ? "" : siteSlots(row)) : loSlots(row)}
+      ${dl ? (dlPlan(lo).delivered ? "" : siteSlots(row)) : pk && pkPlan(lo).done ? "" : loSlots(row)}
       <div class="lopage" id="lopage"><div class="missing">Loading the page…</div></div>
       <p class="meta2" style="text-align:center">Pinch to zoom.</p>`;
   }
@@ -3153,7 +3301,7 @@ if (typeof document !== "undefined") (function () {
       if (!S.pickSheets[j.job_id]) loadPickSheets(j.job_id).then(render);
       if (lo2()) loadLoSheets(j.job_id).then(() => { render(); saveLoPages(j.job_id); });
       send("start_loadout", { p_job: j.job_id, p_client_id: cid }, "Load-out");
-      if (kind === "shipping") send("set_loadout_details", { p_loadout: cid, p_kind: "shipping", p_carrier: null, p_tracking: null }, "Load-out");
+      if (kind !== "delivery") send("set_loadout_details", { p_loadout: cid, p_kind: kind, p_carrier: null, p_tracking: null }, "Load-out");
     });
     on("[data-lokind]", (b) => {
       if (!lo || lo.kind === b.dataset.lokind) return;
@@ -3163,7 +3311,7 @@ if (typeof document !== "undefined") (function () {
     on("[data-lowo]", (b) => { S.loWo = Number(b.dataset.lowo); render(); scrollTo(0, 0); });
     on("[data-lowoback]", () => { S.loWo = null; render(); });
     on("[data-loaddpallet]", () => { if (!lo) return; S.loPallets[lo.client_id] = loadoutPieces([], lo, loPend(lo), loPlanned(lo)).pallets + 1; store.set("lo_pallets", S.loPallets); render(); });
-    on("[data-lopallet]", (b) => { const n = Number(b.dataset.lopallet); shootFor(null, null, `Pallet ${n}`, { pallet: n }); });
+    on("[data-lopallet]", (b) => { const n = Number(b.dataset.lopallet); shootFor(null, null, `Pallet ${n}`, { pallet: n }, isPk(lo)); });
     app.querySelectorAll("[data-lodet]").forEach(el => el.oninput = () => {
       if (!lo) return;
       const d = S.loDet[lo.client_id] = S.loDet[lo.client_id] || { carrier: lo.carrier || "", tracking: lo.tracking || "" };
@@ -3179,13 +3327,14 @@ if (typeof document !== "undefined") (function () {
     on("[data-losavedet]", () => { saveDet(); render(); });
     on("[data-loopen]", async (b) => { S.loView = b.dataset.loopen; S.loWo = null; S.loPhotos = []; S.loItem = ""; render(); scrollTo(0, 0); await loadLoadouts(); render(); });
     on("[data-loback]", async () => { S.loView = null; S.loWo = null; render(); await loadLoadouts(); render(); });
-    const shootFor = (sheet, note, label, extra = {}) => takePhoto(async (shot) => {
+    // a pickup's photos come straight from the camera, like a delivery's
+    const shootFor = (sheet, note, label, extra = {}, fresh = false) => takePhoto(async (shot) => {
       if (!lo) return;
       await queuePhotos([shot], { kind: "loadout", parent: lo.client_id, projectId: lo.project_id, sheet, note, label, ...extra });
       render(); flushPhotos();
-    });
+    }, { fresh });
     on("[data-loshoot]", (b) => lo2() && b.dataset.piece
-      ? shootFor(Number(b.dataset.loshoot), null, `Sheet ${b.dataset.loshoot}, table ${b.dataset.piece}`, { piece: Number(b.dataset.piece) })
+      ? shootFor(Number(b.dataset.loshoot), null, `Sheet ${b.dataset.loshoot}, table ${b.dataset.piece}`, { piece: Number(b.dataset.piece) }, isPk(lo))
       : shootFor(Number(b.dataset.loshoot), null, `Sheet ${b.dataset.loshoot}`));
     app.querySelectorAll("[data-loitem]").forEach(el => el.oninput = () => {
       S.loItem = el.value; const btn = app.querySelector("[data-loshootitem]"); if (btn) btn.disabled = !S.loItem.trim();
@@ -3262,6 +3411,7 @@ if (typeof document !== "undefined") (function () {
     on("[data-dlclear]", () => { const g = sig(); if (!g) return; g.strokes = []; render(); });
     on("[data-dldone]", () => {
       const g = sig(); if (!dlCanFinish(g)) return;
+      if (isPk(lo)) return pickupDone(g);
       const plan = dlPlan(lo);
       const gaps = plan.site.missing.length ? `Not photographed at the site — ${missingText(plan.site.missing)}. ` : "";
       S.modal = { kind: "confirm", title: g.noSign ? "Delivered, not signed?" : `Delivered, signed by ${g.name.trim()}?`,
@@ -3279,6 +3429,36 @@ if (typeof document !== "undefined") (function () {
         } };
       render();
     });
+
+    // ---- pickups: the BOL, and picked up ----
+    on("[data-pkbol]", () => { if (!lo) return;
+      takePhoto(async (shot) => {
+        await queuePhotos([shot], { kind: "loadout", parent: lo.client_id, projectId: lo.project_id, stage: "bol", sheet: null, note: null,
+                                    label: "BOL", shotAt: shot.shotAt });
+        if (S.pkBolMore[lo.client_id]) S.pkBolMore[lo.client_id]--;
+        render(); flushPhotos();
+      }, { fresh: true }); });
+    on("[data-pkbolmore]", () => { if (!lo) return; S.pkBolMore[lo.client_id] = (S.pkBolMore[lo.client_id] || 0) + 1; render(); });
+    on("[data-pkdone]", () => { const g = sig(); if (lo && pkPlan(lo).ready) pickupDone(g || { note: "" }); });
+    const pickupDone = (g) => {
+      const plan = pkPlan(lo), bol = plan.bol;
+      const gaps = [plan.tables.missing.length ? `Not photographed — ${missingText(plan.tables.missing)}.` : "",
+                    bol && plan.palletsMissing.length ? `No wrapped photo of pallet${plan.palletsMissing.length === 1 ? "" : "s"} ${plan.palletsMissing.join(", ")}.` : ""].filter(Boolean).join(" ");
+      S.modal = { kind: "confirm",
+        title: bol ? `${lo.project_id} picked up?` : g.noSign ? "Picked up, not signed?" : `Picked up, signed by ${g.name.trim()}?`,
+        text: `${gaps ? gaps + " " : ""}This marks ${lo.project_id} picked up now.${gaps ? " Finish anyway? That's fine if something is going later." : ""} It can't be changed afterwards.`,
+        yes: "Mark it picked up",
+        run: async () => {
+          if (S.loDet[lo.client_id]) saveDet();
+          const blob = bol || g.noSign ? null : await signaturePng(g.strokes, g.aspect);
+          await photoStore.put({ id: newId(), kind: "pickup_done", parent: lo.client_id, projectId: lo.project_id, label: "Pickup",
+                                 at: new Date().toISOString(), tries: 0, blob, type: "image/png", bol, signed: !bol && !g.noSign, signedName: (g.name || "").trim(),
+                                 customerNote: (g.note || "").trim(), reason: !bol && g.noSign ? g.reason : null, reasonNote: (g.reasonNote || "").trim() });
+          delete S.dlSig[lo.client_id];
+          await refreshPending(); render(); flushPhotos();
+        } };
+      render();
+    };
 
     // ---- Arrow ----
     on("[data-aropen]", () => { S.arrowForm = { jobId: null, filter: "", sheets: [], description: "", service: "powdercoat", sentOn: localISO(new Date()) }; render();
@@ -3470,7 +3650,7 @@ if (typeof module !== "undefined") module.exports = { arrowWaiting, arrowWaitFor
   daysLeft, daysText, fmtDate, localISO, daysSince, agoText, setPending, flushOutbox, newId, queueEntry, flushLogbox, dueForMe, taskWhen,
   problemState, splitProblems, defectState, splitIssues, withReady, readyOf, readyKnown, waitingText, HAS_UPSTREAM, defectCounts, supplyLine, filterJobs, sheetsText, isNetworkError, friendlyError, DEPTS,
   fitSize, photoPath, photoError, flushPhotobox, loadoutSheets, sizeLabel, loadoutPieces, missingText,
-  supplyItemsFor, supplyMissing, supplyText, deliveryPlan, isFreshShot, fmtWhen, deliveryLine,
+  supplyItemsFor, supplyMissing, supplyText, deliveryPlan, isFreshShot, fmtWhen, deliveryLine, TRIP_KINDS, tripName, pickupPlan, pickupLine,
   CHAIN, canAdvance, advJobs, advSheets, advShown, advBefore, advHere, advTidy, advChanges, withAdvPending, invListFor, tabsWithInventory, invPayload, invFeet };
 </script>
 </body>
