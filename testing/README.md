@@ -1,6 +1,6 @@
 # Testing kit — Shop Floor Production System
 
-*For build chats. Luke doesn't need to read this.* This one file replaces the sixteen `testing-kit*.md` parts (they're kept in `history/` for their feature test scripts). Updated 30 Sep 2026.
+*For build chats. Luke doesn't need to read this.* This one file replaces the sixteen `testing-kit*.md` parts (they're kept in `history/` for their feature test scripts). Updated 2 Oct 2026.
 
 Every change is tested in Claude's sandbox against stand-ins for Supabase, Monday and the browser before Luke gets it. **Re-run the relevant tests before handing Luke any changed file,** and say plainly what the stand-ins can't cover: the real SQL Editor, GitHub Pages, the real Monday API, a real tablet's camera, signature and zoom, and jsDelivr in a real browser.
 
@@ -16,7 +16,7 @@ This installs Postgres 16 with `pg_cron` and the `http` extension, downloads the
 
 - `/home/claude/sf/repo`: the live pages at the top, plus `sql/` and `testing/`. This *is* what's live, byte for byte.
 - `/home/claude/sf/out`: put new and changed files here while building.
-- `/home/claude/sf/base`: `load.sh`, `fresh.sh`, `checks.sh`, `overlaps.py`, the seeds and stubs, and `test_guards.sh`, `test_devices.sh`.
+- `/home/claude/sf/base`: `load.sh` (now also loads `tv_pace.sql` and `handoff_recent.sql`), `fresh.sh`, `checks.sh`, `overlaps.py`, the seeds and stubs, and `test_guards.sh`, `test_devices.sh`.
 - `/home/claude/sf/t`: `pgsupa.js`, the fake Supabase client that talks to the real test database as a real login, and the browser tests.
 
 ## 2. Daily moves
@@ -24,7 +24,8 @@ This installs Postgres 16 with `pg_cron` and the `http` extension, downloads the
 - `bash /home/claude/sf/base/fresh.sh [/abs/path/new.sql …]` gives a fresh `sync` from `sync_base`, plus your files (each twice, one transaction each), plus the seed (PROJ-00099, 00325, 00362, 00418 with real-shaped sheets; PROJ-00501 due soon; 00502 with no date; Shawn on Delivery). It needs absolute paths. It loads files before the seed, so a one-time go-live step finds an empty floor; to test go-live, seed first, then load the file.
 - `bash base/checks.sh` prints every live check as `n/m`. `select * from check_everything()` does the same inside the database, but its three Monday checks always fail here.
 - Browser tests: `cd /home/claude/sf/t && TZ=America/Indiana/Indianapolis node test_x.js`. **Always use shop time**: after 8 pm Eastern the sandbox (UTC) is on tomorrow.
-- `test_same.js`: every supervisor's screens (Mike, Donnie, Willie, KP, Jim, Eric, Shawn) on the new `index.html` (`/home/claude/sf/out/index.html`) compared with the live one, ids blanked. **Run it on every tablet-page change.** It also checks the version report.
+- `test_same.js`: every supervisor's screens (Mike, Donnie, Willie, KP, Jim, Eric, Shawn) on the new `index.html` (`/home/claude/sf/out/index.html`) compared with the live one, ids blanked. **Run it on every tablet-page change.** It also checks the version report. For a build that adds a tab, `NAV=ignore` sets the tab strip aside and `SKIP_TABS=past` skips a named tab; then read every remaining difference.
+- `test_handoff_recent.js` (2 Oct): started jobs stay on Ready, the handoff hold, and Recently completed. Seed, load `scenario_handoff_recent.sql`, then run with `MODE=new` (with `handoff_recent.sql`) or `MODE=old` (without). On the live page it fails, which proves it tests something.
 - `test_guards.sh` and `test_devices.sh` cover the install log, the guards, `check_everything()` and device versions (`install_log.sql`).
 - Older feature tests (Advance, deliveries, pickups, pace, inventory, routes…) are in `history/`. Pull one out with `python3 base/kx.py history/testing-kit-deliveries.md "test_deliveries.js" t/test_deliveries.js`. They were written against the helpers of their day, so they may need the paths above, and a few are stale (see §6).
 
@@ -86,6 +87,7 @@ Supabase's API connects as `authenticator`, then switches role and sets the JWT 
 - `pgrep -f` matches itself; use `"[s]erver.py"`.
 - Two things in one transaction share `now()`. Undo in send routes uses `events_mark`, and `check_loadouts` backdates one load-out.
 - **`check_ready_issues()` exists in two files.** `send_routes.sql` carries the current one.
+- **`v_ready_to_work` belongs to `handoff_recent.sql`** since 2 Oct, with an extra last column (`held_for_handoff`). An older file can't put the old view back without `drop view v_ready_to_work cascade` first (Postgres won't drop a column with `create or replace`), so a rollback of `ready_issues.sql` or `send_routes.sql` is a chat job. `test_guards.sh` now demonstrates the rollback path on `tablet.sql`.
 - `sheet_progress.qty_required > 0`, so a skipped Sanding count is marked done, never zeroed.
 - The change-order trigger is deferred; checks use `set constraints all immediate`.
 
