@@ -102,7 +102,8 @@ insert into sql_file_catalog (file, run_order, fingerprint, replaces) values
   ('arrow_pickup.sql',     28, 'check_arrow_pickup',     '{arrow_qc.sql}'),
   ('delivery_types.sql',   29, 'check_delivery_types',   '{photos.sql,loadouts_v2.sql,deliveries.sql,deliveries_v2.sql}'),
   ('install_log.sql',      30, 'sql_file_start',         '{}'),
-  ('tv_pace.sql',          31, 'check_tv',               '{tv.sql}')
+  ('tv_pace.sql',          31, 'check_tv',               '{tv.sql}'),
+  ('handoff_recent.sql',   32, 'check_handoff_recent',   '{schema.sql,ready_issues.sql,send_routes.sql}')
 on conflict (file) do update set run_order = excluded.run_order, fingerprint = excluded.fingerprint, replaces = excluded.replaces;
 
 -- does the database already have this file's fingerprint?
@@ -296,7 +297,7 @@ declare
                       'check_floor', 'check_photos', 'check_advance', 'check_supply_lists', 'check_loadouts',
                       'check_deliveries', 'check_deliveries_v2', 'check_ready_issues', 'check_finish_by',
                       'check_inventory', 'check_pace', 'check_send_routes', 'check_arrow_pickup', 'check_delivery_types',
-                      'check_tv'];
+                      'check_tv', 'check_handoff_recent'];
   fn    text;
   rows  jsonb;
   total int; passed int; firstbad text;
