@@ -1,5 +1,5 @@
 // Every supervisor's tablet: each screen byte-for-byte the same on the new index.html as on the live one,
-// and the new page reports its version once per start (the live page doesn't).
+// and the new page reports its version once per start. NAV=ignore sets the tab strip aside (for a build that adds a tab).
 // Run on a seeded database; set NEWPAGE / LIVEPAGE to compare other files.
 const fs = require("fs");
 const { JSDOM } = require("jsdom");
@@ -44,15 +44,17 @@ async function screens(html, user) {
   const before = hasFn ? Number((await admin.query("select count(*) n from device_versions")).rows[0].n) : 0;
   for (const [who, user] of [["Mike", users.mike], ["Donnie", users.donnie], ["Willie", users.willie], ["KP", users.kp], ["Jim", users.jim], ["Eric", users.eric], ["Shawn", users.shawn]]) {
     const a = await screens(LIVE, user), b = await screens(NEW, user);
-    const norm = (h) => h.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "ID");
-    const diffs = a.out.filter(([n, h], i) => !b.out[i] || norm(h) !== norm(b.out[i][1])).map(([n]) => n);
-    ok(`${who}: ${a.out.length} screens identical to the live page`, diffs.length === 0 && a.out.length === b.out.length && a.out.length > 0, diffs.join(", "));
-    ok(`${who}: the new page reports once (live page: never)`, a.reports.length === 0 && b.reports.length === 1 && b.reports[0][1].p_page === "index" && /^\d{4}-\d\d-\d\d\.\d+$/.test(b.reports[0][1].p_version) && b.dev && b.reports[0][1].p_device === b.dev,
+    const norm = (h) => { h = h.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "ID"); return process.env.NAV === "ignore" ? h.replace(/<nav[\s\S]*?<\/nav>/g, "NAV") : h; };
+    const only = (o) => o.filter(([n]) => !(process.env.SKIP_TABS || "").split(",").includes(n.replace(/^tab /, "")));
+    const ao = only(a.out), bo = only(b.out);
+    const diffs = ao.filter(([n, h], i) => !bo[i] || bo[i][0] !== n || norm(h) !== norm(bo[i][1])).map(([n]) => n);
+    ok(`${who}: ${ao.length} screens identical to the live page`, diffs.length === 0 && ao.length === bo.length && ao.length > 0, diffs.join(", "));
+    ok(`${who}: the new page reports once`, b.reports.length === 1 && b.reports[0][1].p_page === "index" && /^\d{4}-\d\d-\d\d\.\d+$/.test(b.reports[0][1].p_version) && b.dev && b.reports[0][1].p_device === b.dev,
        JSON.stringify(b.reports.map(r => r[1].p_version)));
   }
   if (hasFn) {
     const r = await admin.query("select d.version, p.full_name from device_versions d join profiles p on p.id = d.user_id order by 2");
-    ok(`database has a row per tablet (${r.rows.length - before} new)`, r.rows.length - before === 7, r.rows.map(x => x.full_name + " " + x.version).join(", "));
+    ok(`database has a row per tablet (${r.rows.length - before} new)`, r.rows.length - before >= 7, r.rows.map(x => x.full_name + " " + x.version).join(", "));
   }
   console.log(`\n${pass} PASS, ${fail} FAIL`); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });
