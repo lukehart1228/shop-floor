@@ -441,7 +441,7 @@ const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 // This page's version. Change it with every edit (date, then .1, .2 … for more than one that day).
 // Each device reports it when it opens; see  select * from devices();  in the SQL Editor.
-const PAGE_VERSION = "2026-09-30.3";
+const PAGE_VERSION = "2026-10-02.1";
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -454,11 +454,14 @@ const DEPT_NAME = { ...Object.fromEntries(DEPTS), metal_paint: "Metal paint" }; 
 /* Delivery is log-only for now: no work orders to count, no supplies tab. */
 const LOG_ONLY = ["delivery"];
 const ARROW_DEPTS = ["metal", "assembly_qc", "delivery"];
-const TAB_NAME = { work: "Work orders", paint: "Metal to paint", past: "Past", arrow: "Arrow", qc: "QC", tasks: "Tasks", issues: "Issues", supplies: "Supplies", loadout: "Load-out", inventory: "Inventory" };
+const TAB_NAME = { work: "Work orders", paint: "Metal to paint", past: "Recently completed", arrow: "Arrow", qc: "QC", tasks: "Tasks", issues: "Issues", supplies: "Supplies", loadout: "Load-out", inventory: "Inventory" };
 /* Departments with a stage before them get Ready / All on their queue. The rest can start any time. */
 const HAS_UPSTREAM = ["cnc", "sanding", "finishing", "assembly_qc", "metal_paint"];
-/** Departments with a Past tab: jobs they've finished, until Monday says 100% Complete (past_work.sql). */
-const PAST_DEPTS = ["full_custom"];
+/** Departments with a Recently completed tab: jobs they finished in the last 3 weeks (handoff_recent.sql).
+ *  Its internal name stays "past", so a tablet that remembers the old Past tab opens it. */
+const PAST_DEPTS = ["milling", "cnc", "sanding", "finishing", "full_custom", "metal", "assembly_qc"];
+/** Departments that don't get a job until Monday says it's handed off, unless they've already counted on it (handoff_recent.sql). */
+const HANDOFF_DEPTS = ["milling", "metal", "full_custom"];
 /* Tabs from before the 25 Sep build, for a tablet that remembers one */
 const OLD_TAB = { problems: "issues", log: "tasks" };
 const PHOTO_MAX_EACH = 3;          // photos on one defect, problem or reply, from the tablet
@@ -514,11 +517,16 @@ function withSends(rows, routes, dept) {
     return out;
   });
 }
+/** The rows left once jobs held for handoff are taken out. */
+function withoutHeld(rows, held) {
+  const h = new Set(held || []);
+  return h.size ? (rows || []).filter(r => !h.has(r.job_id)) : (rows || []);
+}
 /** A finished sheet that still has to be sent on. */
 const toSend = (r) => r.sendKnown && SEND_DEPTS.includes(r.department) && r.qty_done >= r.qty_required && !r.send;
 
-/* ---- Past (past_work.sql): jobs this department has finished ---- */
-/** The Past list from v_past_work rows: one entry per job, most recently finished first. */
+/* ---- Recently completed (handoff_recent.sql; the old Past tab): jobs this department has finished ---- */
+/** The list from v_recent_work rows: one entry per job, most recently finished first. */
 function buildPast(rows) {
   const jobs = new Map();
   for (const r of rows || []) {
@@ -1409,6 +1417,17 @@ if (typeof document !== "undefined") (function () {
       try { rr = await db.from("v_ready_to_work").select("sheet_id, available, waiting_on, at_arrow").eq("department", dept); } catch (e) { rr = { error: e }; }
       if (rr && !rr.error && Array.isArray(rr.data)) rows = withReady(rows, rr.data);
     }
+    // jobs not handed off yet (handoff_recent.sql). If it can't be read this time, the jobs held last time stay
+    // hidden; if the database doesn't have it yet, nothing is hidden.
+    if (HANDOFF_DEPTS.includes(dept) && rows.length) {
+      let hh;
+      try { hh = await db.from("v_ready_to_work").select("job_id").eq("department", dept).eq("held_for_handoff", true); } catch (e) { hh = { error: e }; }
+      const held = hh && !hh.error && Array.isArray(hh.data) ? [...new Set(hh.data.map(r => r.job_id))]
+                 : hh && hh.error && !isNetworkError(hh.error) && /does not exist|schema cache|could not find/i.test(String(hh.error.message)) ? []
+                 : store.get("held_" + dept, []);
+      store.set("held_" + dept, held);
+      rows = withoutHeld(rows, held);
+    }
     // each sheet's send (send_routes.sql). If it can't be read, the list works as before.
     if ((SEND_DEPTS.includes(dept) || dept === "sanding") && rows.length) rows = await withRoutes(rows, dept);
     // each job's finish-by date for this department (finish_by.sql). If it can't be read this time,
@@ -1645,7 +1664,7 @@ if (typeof document !== "undefined") (function () {
   async function loadPast() {
     if (!PAST_DEPTS.includes(S.dept)) return;
     const dept = S.dept;
-    let data = await read("past", db.from("v_past_work").select("*").eq("department", dept));
+    let data = await read("past", db.from("v_recent_work").select("*").eq("department", dept));
     if (data && data.length) data = await withRoutes(data, dept);
     if (S.dept !== dept) return;                             // switched department while it loaded
     if (data) { S.past = data; S.pastAt = new Date().toISOString(); S.pastLoaded = true; store.set("past_" + dept, { rows: data, at: S.pastAt }); }
@@ -1918,26 +1937,34 @@ if (typeof document !== "undefined") (function () {
   }
 
   // ---------- Work orders ----------
+  /** What a started job is waiting on, from its unfinished sheets: "Started · waiting on CNC". */
+  function jobWaiting(rows, jobId) {
+    const w = [...new Set(jobSheets(rows, jobId).map(r => waitingText(r, S.arrow)).filter(Boolean))];
+    return "Started · " + (w.length ? w.map(x => x.charAt(0).toLowerCase() + x.slice(1)).join(" · ") : "nothing ready yet");
+  }
   function queueScreen() {
     const rows = rowsNow();
     const all = buildQueue(rows, S.flags, S.dept);
     const pieces = all.reduce((a, j) => a + (j.total - j.done), 0);
     // Ready / All: departments with a stage before them, once the database says what's cleared
     const split = HAS_UPSTREAM.includes(wd()) && readyKnown(rows);
-    const ready = split ? all.filter(j => j.ready > 0) : all;
+    // 2 Oct: a job this department has started stays on Ready until it's done, even while nothing is ready on it
+    const ready = split ? all.filter(j => j.ready > 0 || j.done > 0) : all;
+    const readyNow = ready.filter(j => j.ready > 0).length, waitingN = ready.length - readyNow;
+    const heldN = HANDOFF_DEPTS.includes(wd()) ? (store.get("held_" + wd(), []) || []).length : 0;
     const onReady = split && S.queueMode !== "all";
     const q = onReady ? ready : all;
     const readyPieces = ready.reduce((a, j) => a + (j.ready || 0), 0);
     const sub = split
-      ? `${ready.length} job${ready.length === 1 ? "" : "s"} ready · ${readyPieces} piece${readyPieces === 1 ? "" : "s"} ready now · ${pieces} left in all`
-      : `${all.length} job${all.length === 1 ? "" : "s"} · ${pieces} piece${pieces === 1 ? "" : "s"} left`;
+      ? `${readyNow} job${readyNow === 1 ? "" : "s"} ready${waitingN ? ` · ${waitingN} started, waiting` : ""} · ${readyPieces} piece${readyPieces === 1 ? "" : "s"} ready now · ${pieces} left in all`
+      : `${all.length} job${all.length === 1 ? "" : "s"} · ${pieces} piece${pieces === 1 ? "" : "s"} left${heldN ? ` · ${heldN} not handed off yet` : ""}`;
     const head = `<div class="qhead"><div><h1>${esc(wd() === "metal_paint" ? "Metal to paint" : DEPT_NAME[wd()])}</h1><p class="sub">${sub}</p></div>
       ${split ? `<div class="seg qseg" role="group" aria-label="Which jobs">
         <button data-qmode="ready" aria-pressed="${onReady}">Ready<span class="num">${ready.length}</span></button>
         <button data-qmode="all" aria-pressed="${!onReady}">All<span class="num">${all.length}</span></button></div>` : ""}</div>`;
     if (!S.rows.length && S.loading) return head + `<div class="empty">Loading…</div>`;
     if (!all.length) return head + `<div class="empty"><b>Nothing waiting</b>${wd() === "metal_paint" ? "Nothing to paint right now. Metal sent to paint appears here by itself." : `Every sheet for ${esc(DEPT_NAME[S.dept])} is finished. New work appears here by itself.`}</div>`;
-    if (!q.length) return head + `<div class="empty"><b>Nothing ready right now</b>${all.length} job${all.length === 1 ? " is" : "s are"} on the way from the stage before. A job shows here as soon as any of its pieces are.
+    if (!q.length) return head + `<div class="empty"><b>Nothing ready right now</b>${all.length} job${all.length === 1 ? " is" : "s are"} on the way from the stage before. A job shows here as soon as any of its pieces are, and stays once you've started it.
       <div class="rowbtns" style="justify-content:center"><button data-qmode="all">See all ${all.length}</button></div></div>`;
     return head + q.map(j => {
       const pct = j.total ? Math.round(j.done / j.total * 100) : 0;
@@ -1947,7 +1974,8 @@ if (typeof document !== "undefined") (function () {
                      : `<span class="due">Due ${esc(fmtDate(j.delivery_date))}${dl === null ? "" : ` · <b>${esc(daysText(dl))}</b>`}</span>`;
       const marks = [flagTag(j.flag)].filter(Boolean);
       if (j.toSend) marks.push(`<span class="rchip">${j.toSend} sheet${j.toSend === 1 ? "" : "s"} to send</span>`);
-      if (split) marks.push(j.ready > 0 ? `<span class="rchip">${j.ready} piece${j.ready === 1 ? "" : "s"} ready</span>` : `<span class="why">Nothing ready yet</span>`);
+      if (split) marks.push(j.ready > 0 ? `<span class="rchip">${j.ready} piece${j.ready === 1 ? "" : "s"} ready</span>`
+                          : j.done > 0 ? `<span class="why">${esc(jobWaiting(rows, j.job_id))}</span>` : `<span class="why">Nothing ready yet</span>`);
       return `<button class="job${j.flag && j.flag.level !== "watch" ? " f-" + j.flag.level : ""}" data-job="${esc(j.job_id)}">
         <div class="job-top"><span class="pid">${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</span><span class="jname" title="${esc(j.name)}">${esc(j.name)}</span>
           ${due}</div>
@@ -2046,13 +2074,13 @@ if (typeof document !== "undefined") (function () {
         `<button class="sendbtn" data-send="${k}">${esc(label)}</button>`).join("")}</div></div>`;
   }
 
-  // ---------- Past: jobs this department has finished, read only ----------
+  // ---------- Recently completed (the old Past tab): jobs this department finished in the last 3 weeks, read only ----------
   function pastScreen() {
     const list = buildPast(S.past);
-    const head = `<div class="qhead"><div><h1>${esc(DEPT_NAME[S.dept])} · Past</h1>
-      <p class="sub">Jobs you've finished. Each stays here until Monday says 100% Complete.</p></div></div>${missingNote("past")}`;
+    const head = `<div class="qhead"><div><h1>${esc(DEPT_NAME[S.dept])} · Recently completed</h1>
+      <p class="sub">Jobs you've finished in the last 3 weeks, newest first.</p></div></div>${missingNote("past")}`;
     if (!list.length && !S.pastLoaded) return head + `<div class="empty">Loading…</div>`;
-    if (!list.length) return head + (S.missing.past ? "" : `<div class="empty"><b>Nothing here yet</b>When every sheet on a job is done and sent on, the job moves here from Work orders.</div>`);
+    if (!list.length) return head + (S.missing.past ? "" : `<div class="empty"><b>Nothing here yet</b>When every sheet on a job is done${SEND_DEPTS.includes(S.dept) ? " and sent on" : ""}, the job moves here from Work orders and stays for 3 weeks.</div>`);
     return head + list.map(j => `<button class="job" data-job="${esc(j.job_id)}">
         <div class="job-top"><span class="pid">${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</span><span class="jname" title="${esc(j.name)}">${esc(j.name)}</span>
           <span class="donechip">Done</span></div>
@@ -2064,7 +2092,7 @@ if (typeof document !== "undefined") (function () {
     const list = jobSheets(S.past, S.view.jobId);
     if (!list.length) { S.view = { screen: "queue" }; return subTabs() + pastScreen(); }
     const j = buildPast(list)[0];
-    return `<div class="head"><button class="back" data-back="queue">← Past</button>
+    return `<div class="head"><button class="back" data-back="queue">← Recently completed</button>
       <h1>${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</h1>
       <span class="hsub wrap">${esc(j.name)} · ${esc(pastLine(j))}</span></div>
       ${list.map(r => {
