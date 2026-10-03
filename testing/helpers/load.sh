@@ -16,6 +16,9 @@ $P -d sync -c "select set_person('test@pdindy.com','Test Supervisor','supervisor
 two check_floor photos check_photos advance supply_lists loadouts_v2 deliveries deliveries_v2 ready_issues
 two finish_by inventory pace send_routes arrow_pickup pace delivery_types
 [ -f $L/install_log.sql ] && two install_log
+# then the files that came after the install log, in the live order, and the install log again for its catalog
+for f in tv_pace handoff_recent; do [ -f $L/$f.sql ] && two $f; done
+[ -f $L/install_log.sql ] && two install_log
 $P -d sync -c "select cron.unschedule(jobname) from cron.job" >/dev/null 2>&1 || true
 for f in "$@"; do echo "== loading $f (twice)"; $P -d sync -f "$f" >/dev/null; $P -d sync -f "$f" > /tmp/last_load.out; done
 $P -d postgres -c "select pg_terminate_backend(pid) from pg_stat_activity where datname='sync' and pid<>pg_backend_pid()" -c "create database sync_base template sync" >/dev/null
