@@ -33,6 +33,9 @@
   .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.14em; color:var(--orange); font-size:16px; white-space:nowrap}
   .who{text-align:right; font-size:14px; line-height:1.2; white-space:nowrap; color:#CFC9B8}
   .who b{font-size:16px; color:var(--sawdust)}
+  .fbbtn{display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:5px 12px; border-radius:99px; border:1.5px solid #5A6178;
+         background:transparent; color:var(--sawdust); font:inherit; font-size:14px; font-weight:600; white-space:nowrap; cursor:pointer}
+  @media (max-width:560px){ .fbbtn span{display:none} .fbbtn{padding:5px 9px} }
   .sync{margin-left:auto; font-size:13px; padding:3px 9px; border-radius:99px; background:#2C3348; color:#CFC9B8; white-space:nowrap}
   .sync.waiting{background:var(--bright); color:var(--midnight); font-weight:700}
   .sync.offline{background:#5A3A1A; color:var(--sawdust)}
@@ -250,6 +253,7 @@
   .lopage{background:#fff; border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-top:12px; min-height:200px}
   .lopage img{display:block; width:100%; height:auto}
   .lopage .missing{padding:24px; color:var(--ink2)}
+  .lopage .pdfgap{height:10px; background:var(--line)}
   /* deliveries: the ticket and site files, the customer's signature */
   .dlinfo{background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:14px}
   .dlinfo .loslots button{margin-top:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
@@ -441,7 +445,7 @@ const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 // This page's version. Change it with every edit (date, then .1, .2 … for more than one that day).
 // Each device reports it when it opens; see  select * from devices();  in the SQL Editor.
-const PAGE_VERSION = "2026-10-02.1";
+const PAGE_VERSION = "2026-10-05.2";
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -1045,6 +1049,9 @@ async function flushPhotobox(store, db, isPending = () => false) {
                                               p_customer_note: rec.customerNote || null, p_no_sign_reason: rec.signed ? null : rec.reason,
                                               p_no_sign_note: rec.signed ? null : (rec.reasonNote || null), p_signed_at: rec.signed ? rec.at : null,
                                               p_lat: rec.lat ?? null, p_lng: rec.lng ?? null, p_accuracy: rec.accuracy ?? null })
+        : rec.kind === "task"                                        // a photo on one of Delivery's tasks (trip_types.sql)
+        ? await db.rpc("add_task_photo", { p_client_id: rec.id, p_task: rec.parent, p_shot_at: rec.shotAt || null,
+                                           p_lat: rec.lat ?? null, p_lng: rec.lng ?? null, p_accuracy: rec.accuracy ?? null })
         : rec.stage                                                  // a delivery's truck (dock) or a table in its final spot (site)
         ? await db.rpc("add_delivery_photo", { p_client_id: rec.id, p_loadout: rec.parent, p_stage: rec.stage, p_sheet: rec.sheet ?? null,
                                                p_piece: rec.piece || null, p_truck: rec.truck || null, p_lat: rec.lat ?? null, p_lng: rec.lng ?? null,
@@ -1145,7 +1152,8 @@ function deliveryPlan(sheets, lo, pending = [], plannedTrucks = 1) {
   const site = loadoutPieces(sheets, { pieces_here: (lo && lo.site_here) || [], pieces_earlier: (lo && lo.site_earlier) || [] },
                              pending.filter(p => p.stage === "site"), 1);
   const waitingDone = pending.find(p => p.kind === "delivery_done") || null;
-  return { trucks, trucksHere: [...trucksHere].sort((a, b) => a - b),
+  const dock = loadoutPieces(sheets, lo || {}, pending.filter(p => !p.stage && p.kind === "loadout" && p.piece), 1);   // dock to dock: each table before it leaves
+  return { dock, trucks, trucksHere: [...trucksHere].sort((a, b) => a - b),
            trucksMissing: Array.from({ length: trucks }, (_, i) => i + 1).filter(i => !trucksHere.has(i)),
            site, delivered: !!(lo && lo.completed_at) || !!waitingDone, waitingDone };
 }
@@ -1162,6 +1170,13 @@ function fmtWhen(ts) {
 }
 /** A delivery on the list, in words: "Delivery · truck photographed · 4 of 6 tables at the site · signed" */
 function deliveryLine(lo, plan) {
+  if (lo && lo.kind === "dock") {
+    const t = plan.dock.total || lo.pieces_total || 0, d = plan.dock.total ? plan.dock.done : new Set(lo.pieces_here || []).size;
+    return ["Dock to dock", t ? `${d} of ${t} table${t === 1 ? "" : "s"} photographed at our dock` : null,
+            plan.trucksHere.length ? `${plan.trucksHere.length === 1 ? "truck" : plan.trucksHere.length + " trucks"} photographed` : "no truck photo yet",
+            lo.completed_at ? (lo.signed_name ? `signed by ${lo.signed_name}` : `not signed (${String(lo.no_sign_reason || "").toLowerCase()})`)
+                            : plan.waitingDone ? "dropped, waiting to send" : null].filter(Boolean).join(" · ");
+  }
   return ["Delivery",
           plan.trucksHere.length ? `${plan.trucksHere.length === 1 ? "truck" : plan.trucksHere.length + " trucks"} photographed` : "no truck photo yet",
           (() => { const total = plan.site.total || lo.pieces_total || 0;          // on the list the sheets may not be loaded yet
@@ -1177,7 +1192,7 @@ function deliveryLine(lo, plan) {
 const TRIP_KINDS = [["delivery", "White glove", "Our truck, signed at the site"],
                     ["shipping", "BOL pickup", "A carrier collects pallets"],
                     ["customer_pickup", "Customer pickup", "The customer collects"]];
-const tripName = (kind) => (TRIP_KINDS.find(k => k[0] === kind) || TRIP_KINDS[0])[1];
+const tripName = (kind) => kind === "dock" ? "Dock to dock" : (TRIP_KINDS.find(k => k[0] === kind) || TRIP_KINDS[0])[1];   // dock to dock: scheduled by Julia, never picked here
 /** A pickup, step by step: every table (photographed here, waiting, or gone on an earlier trip), the wrapped pallets and the BOL
  *  (a BOL pickup), and whether it's done. `ready` says whether it can be marked picked up yet (the database asks the same). */
 function pickupPlan(sheets, lo, pending = [], plannedPallets = 1) {
@@ -1239,8 +1254,8 @@ if (typeof document !== "undefined") (function () {
     photos: [],                 // photos on what's on screen (the piece, the problems list), from the database
     pending: [],                // photos still on this tablet, waiting to send (no image bytes kept here)
     loadouts: [], localLoadouts: store.get("loadouts_local", []), loView: null,
-    loForm: { jobId: null, filter: "", kind: "delivery" }, loItem: "", loPhotos: [], viewer: null,
-    loSheets: {}, loWo: null, loPallets: store.get("lo_pallets", {}), loPages: {}, loDet: {},
+    loForm: { jobId: null, filter: "", kind: "delivery" }, loItem: "", loPhotos: [], viewer: null, dtasks: store.get("dtasks", []) || [], taskView: null, taskNote: store.get("task_notes", {}) || {},
+    loSheets: {}, loWo: null, loDoc: null, loPallets: store.get("lo_pallets", {}), loPages: {}, loDet: {},
     // deliveries: scheduled trips (tickets, site files), trucks planned, the customer step per delivery
     deliveries: store.get("deliveries", []), dlReady: !!store.get("deliveries", null), dlTrucks: store.get("dl_trucks", {}), dlSig: {}, dlFiles: {},
     pkReady: store.get("pk_ready", false), pkBolMore: {},
@@ -1517,10 +1532,12 @@ if (typeof document !== "undefined") (function () {
     if (dl) { S.deliveries = dl; S.dlReady = true; } else if (S.missing.deliveries) S.dlReady = false;
     if (pk) S.pkReady = true; else if (S.missing.pickups) S.pkReady = false;
     store.set("pk_ready", S.pkReady);
+    const tk = await read("dtasks", db.from("v_delivery_tasks").select("*"), "dtasks");          // trip_types.sql
+    if (tk) S.dtasks = tk;
     if (d) {
       // open ones; deliveries still on the road (the truck left, not yet delivered); pickups not yet picked up; the last two weeks
       S.loadouts = d.filter(l => l.is_open || daysSince(l.finished_at) <= 14
-                              || (l.site_steps && l.kind === "delivery" && !l.completed_at && daysSince(l.started_at) <= 30)
+                              || (l.site_steps && (l.kind === "delivery" || l.kind === "dock") && !l.completed_at && daysSince(l.started_at) <= 30)
                               || (l.ready_at && !l.completed_at));
       const onServer = new Set(d.map(l => l.client_id));
       S.localLoadouts = S.localLoadouts.filter(l => !onServer.has(l.client_id));
@@ -1568,6 +1585,7 @@ if (typeof document !== "undefined") (function () {
   async function saveDlFiles(lo) {
     const d = dlOf(lo); if (!d) return;
     const list = [d.ticket, ...(d.files || [])].filter(x => x && x.in_cloud !== false);
+    if (list.some(x => isPdfFile(x.path, x.mime)) && Date.now() - pdfjsFailedAt > 60000) loadPdfViewer().catch(() => {});   // the viewer, for no signal
     const st = S.dlFiles[lo.client_id];
     if (st && (st.busy || st.saved === list.length)) return;
     const s = S.dlFiles[lo.client_id] = { total: list.length, saved: 0, busy: true, offline: false };
@@ -1829,6 +1847,30 @@ if (typeof document !== "undefined") (function () {
     return `<span class="sync">All saved</span>`;
   }
 
+  function screenLabel() {
+    try {
+      const parts = [];
+      if (S.adv) {
+        parts.push("Advance");
+        const j = S.advJob && (S.pickJobs || []).find(x => x.job_id === S.advJob);
+        if (j) parts.push(j.project_id);
+        return parts.join(" › ");
+      }
+      parts.push(DEPT_NAME[S.dept] || S.dept, TAB_NAME[S.tab] || S.tab);
+      if (S.tab === "loadout" && S.taskView) { const t = S.dtasks.find(x => x.id === S.taskView); if (t) parts.push("task: " + t.what.slice(0, 40)); }
+      else if (S.tab === "loadout") {
+        const lo = currentLoadout();
+        if (lo) { parts.push(`${lo.project_id} ${lo.kind ? tripName(lo.kind).toLowerCase() : "load-out"}`);
+                  if (S.loDoc) parts.push(S.loDoc.name); else if (S.loWo) parts.push("sheet " + S.loWo); }
+      } else if (S.view && S.view.screen !== "queue" && S.view.jobId) {
+        const r = (S.rows || []).find(x => x.job_id === S.view.jobId);
+        if (r) parts.push(r.project_id);
+        if (S.view.screen === "sheet") { const c = (S.rows || []).find(x => x.progress_id === S.view.progressId); if (c) parts.push("sheet " + c.sheet_number); }
+      }
+      return parts.filter(Boolean).join(" › ");
+    } catch (e) { return TAB_NAME[S.tab] || ""; }
+  }
+
   function topBar() {
     const adv = canAdvance(S.me);
     // managers and the Test Supervisor get one Department ▾ button; supervisors keep their tabs exactly as before
@@ -1840,6 +1882,7 @@ if (typeof document !== "undefined") (function () {
     return `<header class="top"><div class="top-row">
         <span class="brand">SHOP FLOOR</span>${tabs}${syncBadge()}
         <span class="who"><b>${esc(S.me.name)}</b>${S.depts.length === 1 && !adv ? ` · ${esc(DEPT_NAME[S.dept])}` : ""}</span>
+        <button class="fbbtn" data-feedback="1" aria-label="Feedback"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h14v9H8l-4 3v-3H3z"/></svg><span>Feedback</span></button>
       </div></header>`;
   }
 
@@ -2377,9 +2420,10 @@ if (typeof document !== "undefined") (function () {
     return count + (other ? ` · ${other} other item${other === 1 ? "" : "s"}` : "");
   }
   function loadoutScreen() {
+    if (S.taskView) { const t = S.dtasks.find(x => x.id === S.taskView); if (t) return taskDetail(t); S.taskView = null; }
     const lo = currentLoadout();
-    if (lo && isPk(lo)) return S.loWo ? loadoutWo(lo) : pickupDetail(lo);
-    if (lo && isDl(lo)) return S.loWo ? loadoutWo(lo) : deliveryDetail(lo);
+    if (lo && isPk(lo)) return S.loDoc ? loadoutDoc(lo) : S.loWo ? loadoutWo(lo) : pickupDetail(lo);
+    if (lo && isDl(lo)) return S.loDoc ? loadoutDoc(lo) : S.loWo ? loadoutWo(lo) : deliveryDetail(lo);
     if (lo && lo2()) return S.loWo ? loadoutWo(lo) : loadoutDetail2(lo);
     if (lo) return loadoutDetail(lo);
     if (S.dlReady && lo2()) return deliveriesList();
@@ -2486,13 +2530,14 @@ if (typeof document !== "undefined") (function () {
       .sort((a, b) => String(b.completed_at || b.finished_at || "~").localeCompare(String(a.completed_at || a.finished_at || "~")));
     const f = S.loForm;
     const already = f.jobId && open.find(l => l.job_id === f.jobId);
+    const tasks = openTasksHere(), tasksDone = S.dtasks.filter(t => t.done_at && !t.voided_at && daysSince(t.done_at) <= 14);
     const doneWhen = (l) => l.completed_at ? `${isPk(l) ? "Picked up" : "Delivered"} ${esc(fmtWhen(l.completed_at))}`
                           : isPk(l) ? "Picked up · waiting to send" : `Left ${esc(fmtDate(localISO(l.finished_at)))}`;
     return `${missingNote("loadouts")}
       ${ready.length ? `<h2 class="sec" style="margin-top:4px">Ready for pickup</h2>${ready.map(loCard).join("")}` : ""}
       ${scheduled.length ? `<h2 class="sec"${ready.length ? "" : ` style="margin-top:4px"`}>Scheduled deliveries</h2>${scheduled.map(loCard).join("")}` : ""}
-      ${road.length ? `<h2 class="sec">On the road</h2>${road.map(loCard).join("")}` : ""}
-      <div class="card"${ready.length || scheduled.length || road.length ? ` style="margin-top:22px"` : ""}><h3 style="margin:0 0 4px">Start a load-out</h3>
+      ${road.length ? `<h2 class="sec">On the road</h2>${road.map(loCard).join("")}` : ""}${tasks.length ? `<h2 class="sec">Tasks</h2>${tasks.map(taskCard).join("")}` : ""}
+      <div class="card"${ready.length || scheduled.length || road.length || tasks.length ? ` style="margin-top:22px"` : ""}><h3 style="margin:0 0 4px">Start a load-out</h3>
         <p class="sub" style="margin:0 0 6px">${S.pkReady ? "For a trip that isn't listed above. Pick the kind, then the job." : "For a trip that isn't scheduled above, or a shipment. Pick the job going on the truck."}</p>
         ${kindButtons(f.kind, "lostartkind")}
         ${jobPicker(f.jobId, f.filter)}
@@ -2500,10 +2545,45 @@ if (typeof document !== "undefined") (function () {
             <div class="rowbtns"><button data-loopen="${esc(already.client_id)}">Carry on with it</button></div></div>` : ""}
         <button class="go wide" style="margin-top:14px" data-lostart="1" ${f.jobId ? "" : "disabled"}>Start load-out</button></div>
       ${others.length ? `<h2 class="sec">Open load-outs</h2>${others.map(loCard).join("")}`
-        : !scheduled.length && !road.length && !ready.length ? `<h2 class="sec">Open load-outs</h2><div class="empty"><b>No load-out open</b>Start one above when a truck is being loaded.</div>` : ""}
-      ${done.length ? `<h2 class="sec">Done in the last two weeks</h2>` + done.map(l => `<div class="li">
+        : !scheduled.length && !road.length && !ready.length && !tasks.length ? `<h2 class="sec">Open load-outs</h2><div class="empty"><b>No load-out open</b>Start one above when a truck is being loaded.</div>` : ""}
+      ${done.length || tasksDone.length ? `<h2 class="sec">Done in the last two weeks</h2>` + tasksDone.map(t => `<div class="li">
+          <div class="li-top"><b>${t.is_test ? `<span class="tag">TEST</span>` : ""}Task</b><span class="meta2">${esc(taskSubject(t) || t.what)}</span></div>
+          <div class="meta2">Done ${esc(fmtWhen(t.done_at))}${t.done_by_name ? ` · ${esc(t.done_by_name)}` : ""} · ${esc(t.what)}</div></div>`).join("") + done.map(l => `<div class="li">
           <div class="li-top"><b>${l.is_test ? `<span class="tag">TEST</span>` : ""}${esc(l.project_id)}</b><span class="meta2">${esc(l.job_name)}</span></div>
           <div class="meta2">${doneWhen(l)}${(l.completed_by_name || l.finished_by_name) ? ` · ${esc(l.completed_by_name || l.finished_by_name)}` : ""} · ${esc(isDl(l) ? deliveryLine(l, dlPlan(l)) : loadoutLine(l))}</div></div>`).join("") : ""}`;
+  }
+  // ---------- Delivery's tasks (trip_types.sql): what to do, when, where; Done with a note and photos if wanted ----------
+  const taskSubject = (t) => [t.project_id ? `${t.project_id}${t.job_name ? " " + t.job_name : ""}` : "", t.for_text || ""].filter(Boolean).join(" · ");
+  const taskDoneWaiting = (t) => Object.values(S.logbox).some(e => e.fn === "complete_task" && e.args && e.args.p_task === t.id);
+  const openTasksHere = () => S.dtasks.filter(t => !t.voided_at && !t.done_at).sort((a, b) => String(a.scheduled_for).localeCompare(String(b.scheduled_for)));
+  function taskCard(t) {
+    return `<button class="job" data-taskopen="${esc(t.id)}">
+      <div class="job-top"><span class="pid">${t.is_test ? `<span class="tag">TEST</span>` : ""}Task</span><span class="jname">${esc(taskSubject(t))}</span>
+        <span class="due">${esc(fmtWhen(t.scheduled_for))}</span></div>
+      <div class="meta2" style="margin-top:6px">${taskDoneWaiting(t) ? "Done · waiting to send · " : ""}${esc(t.what)}${t.where_text ? ` · ${esc(t.where_text)}` : ""}</div></button>`;
+  }
+  function taskDetail(t) {
+    const waiting = taskDoneWaiting(t), done = !!t.done_at || waiting;
+    const shots = t.photos || [], pend = S.pending.filter(x => x.kind === "task" && x.parent === t.id);
+    return `<button class="back" data-taskback="1">← Load-outs</button>
+      <h1>${t.is_test ? `<span class="tag">TEST</span>` : ""}Task</h1>
+      <p class="sub">${esc(taskSubject(t) || "No PROJ number")}</p>
+      <div class="dlwhen">${esc(fmtWhen(t.scheduled_for))}</div>
+      <div class="dlinfo"><div style="white-space:pre-wrap"><b>What to do:</b> ${esc(t.what)}</div>
+        ${t.where_text ? `<div style="margin-top:8px"><b>Where:</b> ${esc(t.where_text)}</div>` : ""}
+        ${t.scheduled_by_name ? `<div class="meta2" style="margin-top:8px">From ${esc(t.scheduled_by_name)}</div>` : ""}</div>
+      ${shots.length || pend.length ? `<h2 class="sec">Photos</h2>
+        <div class="phs">${shots.map(x => `<span class="ph"><img alt="" data-photopath="${esc(x.path)}"><span class="cap">${esc(x.by || "")}</span></span>`).join("")}
+          ${pend.map(x => `<span class="ph"><img alt="" src="${esc(x.url)}"><span class="cap">waiting</span></span>`).join("")}</div>` : ""}
+      ${done ? `<div class="dldone"><b>Done${t.done_by_name ? ` · ${esc(t.done_by_name)}` : ""}</b>${t.done_at ? esc(fmtWhen(t.done_at)) : "Waiting to send — it goes by itself when there's signal."}
+            ${t.done_note ? `<div style="margin-top:6px; white-space:pre-wrap">${esc(t.done_note)}</div>` : ""}</div>
+          ${t.done_at && daysSince(t.done_at) <= 3 ? `<button class="addph" data-taskphoto="1">Add a photo</button>` : ""}`
+        : `<div class="card">
+          <button class="addph" style="margin-top:0" data-taskphoto="1">Take a photo <span class="meta2">(optional)</span></button>
+          <label class="f" for="taskNote">Note <span class="meta2">(optional)</span></label>
+          <textarea class="in" id="taskNote" data-tasknote="1" maxlength="1000" placeholder="e.g. Chair is back in the shop, leg is cracked">${esc(S.taskNote[t.id] || "")}</textarea>
+          <button class="go wide" style="margin-top:14px" data-taskdone="1">Done</button></div>`}
+      <p class="meta2" style="text-align:center">Moved or called off? ${esc(t.scheduled_by_name || "Whoever scheduled it")} changes it on the Deliveries page.</p>`;
   }
   function siteSlots(s) {
     return `<div class="loslots">${s.slots.map(x => `<button class="loslot${x.here ? " here" : x.earlier ? " earlier" : ""}" data-dlsite="${s.sheet_number}" data-piece="${x.piece}">
@@ -2522,23 +2602,26 @@ if (typeof document !== "undefined") (function () {
         ? `✓ Ready for no signal · ${esc(what.join(", ").replace(/, ([^,]*)$/, " and $1"))} saved on this device`
         : busy ? `Saving for no signal… ${saved} of ${total}`
         : `${saved} of ${total} saved on this device. ${(pg && pg.offline) || (fs && fs.offline) ? "The rest need a connection — open this delivery again on Wi-Fi before leaving." : ""}`}</div>` : "";
-    const cap = (x) => x.truck ? `Truck ${x.truck}` : x.stage === "site" ? `Sheet ${x.sheet ?? x.sheet_number}, table ${x.piece} · at the site`
+    const cap = (x) => x.truck ? `Truck ${x.truck}` : x.stage === "site" && (x.sheet ?? x.sheet_number) == null ? "At their dock" : x.stage === "site" ? `Sheet ${x.sheet ?? x.sheet_number}, table ${x.piece} · at the site`
                      : (x.sheet ?? x.sheet_number) != null ? `Sheet ${x.sheet ?? x.sheet_number}${x.piece ? ` · table ${x.piece}` : ""}` : x.note;
     const g = S.dlSig[lo.client_id] || (S.dlSig[lo.client_id] = { name: "", note: "", noSign: false, reason: null, reasonNote: "", strokes: [], aspect: 2 });
+    const dock = lo.kind === "dock", who = dock ? "receiver" : "customer";     // dock to dock (trip_types.sql): dropped at their dock
+    const noSheet = (x) => x.sheet === null || x.sheet === undefined;
+    const drops = photos.filter(x => x.stage === "site" && (x.sheet_number === null || x.sheet_number === undefined)).length + pend.filter(x => x.stage === "site" && noSheet(x)).length;
     const w = plan.waitingDone;
     const customer = plan.delivered
       ? `<div class="dldone"><b>${lo.completed_at ? (lo.signed_name ? `Delivered · signed by ${esc(lo.signed_name)}` : `Delivered · not signed (${esc(lo.no_sign_reason)})`)
                                                  : w.signed ? `Delivered · signed by ${esc(w.signedName)}` : `Delivered · not signed (${esc(w.reason)})`}</b>
           ${lo.completed_at ? `${esc(fmtWhen(lo.completed_at))}${lo.completed_by_name ? ` · ${esc(lo.completed_by_name)}` : ""}` : "Waiting to send — it goes by itself when there's signal."}</div>`
       : `<div class="card">
-          <label class="f" style="margin-top:0" for="dlNote">The customer's note <span class="meta2">(optional — anything they want written down)</span></label>
+          <label class="f" style="margin-top:0" for="dlNote">The ${who}'s note <span class="meta2">(optional — anything they want written down)</span></label>
           <textarea class="in" id="dlNote" data-dlsig="note" maxlength="1000" placeholder="e.g. Scuff on the leg of table 3">${esc(g.note)}</textarea>
           ${g.noSign ? `<label class="f">Why is there no signature?</label>
               ${NO_SIGN.map(r => `<button class="pick" data-dlreason="${esc(r)}" aria-pressed="${g.reason === r}">${esc(r)}</button>`).join("")}
               <textarea class="in" data-dlsig="reasonNote" maxlength="1000" placeholder="${g.reason === "Other" ? "Say why (needed)" : "Anything to add (optional), e.g. left inside the gym"}">${esc(g.reasonNote)}</textarea>
               <button class="go wide" style="margin-top:14px" data-dldone="1" ${dlCanFinish(g) ? "" : "disabled"}>Delivered — not signed</button>
               <p style="text-align:center"><button class="linkish" data-dlnosign="0">Get a signature after all</button></p>`
-            : `<label class="f" for="dlName">The customer's name</label>
+            : `<label class="f" for="dlName">The ${who}'s name</label>
               <input class="in" id="dlName" data-dlsig="name" value="${esc(g.name)}" maxlength="80" autocomplete="off" placeholder="Who is signing">
               <label class="f">Signature</label>
               <div class="sigwrap"><canvas id="sigpad" class="sigpad" aria-label="Sign here"></canvas>
@@ -2549,19 +2632,28 @@ if (typeof document !== "undefined") (function () {
     return `<button class="back" data-loback="1">← Load-outs</button>
       <h1>${lo.is_test ? `<span class="tag">TEST</span>` : ""}${esc(lo.project_id)}</h1>
       <p class="sub">${esc(lo.job_name)}${lo.scheduled_for ? "" : ` · started ${esc(agoText(lo.started_at))}${lo.started_by_name ? ` by ${esc(lo.started_by_name)}` : ""}`}${lo.id ? "" : " · waiting to send"}</p>
-      ${lo.scheduled_for ? `<div class="dlwhen">Delivery ${esc(fmtWhen(lo.scheduled_for))}</div>` : ""}
+      ${lo.scheduled_for ? `<div class="dlwhen">${dock ? "Dock to dock" : "Delivery"} ${esc(fmtWhen(lo.scheduled_for))}</div>` : ""}
       ${left || lo.scheduled_for || plan.delivered ? "" : kindButtons(lo.kind, "lokind")}
       ${ready}
       ${d ? `<div class="dlinfo">${d.schedule_note ? `<div style="margin-bottom:8px"><b>Note${d.scheduled_by_name ? ` from ${esc(d.scheduled_by_name)}` : ""}:</b> ${esc(d.schedule_note)}</div>` : ""}
           <div class="loslots">${d.ticket ? `<button class="lowo" data-dlopen="${esc(d.ticket.path)}" data-mime="${esc(d.ticket.mime)}" data-name="Delivery ticket">Delivery ticket</button>` : `<span class="meta2">No delivery ticket attached.</span>`}
             ${(d.files || []).filter(x => x.in_cloud !== false).map(x => `<button class="lowo" data-dlopen="${esc(x.path)}" data-mime="${esc(x.mime)}" data-name="${esc(x.name)}">${esc(x.name)}</button>`).join("")}</div></div>` : ""}
-      <div class="lostep">1 · At the dock — a photo of each loaded truck <span>— ${plan.trucksHere.length} of ${plan.trucks}</span></div>
+      ${dock ? `<div class="lostep">1 · At our dock — each table before it leaves <span>— ${plan.dock.done} of ${plan.dock.total}</span></div>
+        ${sheets === undefined ? `<div class="meta2">Loading the sheets…</div>` : ""}
+        ${plan.dock.list.length ? plan.dock.list.map(s => `<div class="locard${s.complete ? " done" : ""}">
+            <div class="lotop"><span class="no num">${s.sheet_number}</span><span class="size">${esc(sizeLabel(s) || s.item_code || "Sheet " + s.sheet_number)}</span><span class="cnt">${s.done} of ${s.qty}</span></div>
+            ${plan.delivered || left ? "" : loSlots(s)}
+            ${s.png_path && s.pages_ready ? `<button class="lowo" data-lowo="${s.sheet_number}">Work order</button>` : ""}</div>`).join("")
+          : sheets ? `<div class="meta2">No work order uploaded, so there are no tables to tick off. Photograph each item below, with a few words.</div>` : ""}` : ""}
+      <div class="lostep">${dock ? "Then the loaded truck" : "1 · At the dock — a photo of each loaded truck"} <span>— ${plan.trucksHere.length} of ${plan.trucks}</span></div>
       ${Array.from({ length: plan.trucks }, (_, i) => i + 1).map(n => { const has = plan.trucksHere.includes(n), waiting = has && !(lo.trucks_here || []).includes(n);
           return `<div class="locard${has ? " done" : ""}"><div class="lotop"><span class="no num">T${n}</span><span class="size">Truck ${n}</span><span class="cnt">${has ? "Photographed" : "Not yet"}</span></div>
             ${plan.delivered ? "" : `<div class="loslots"><button class="loslot${has ? " here" : ""}" data-dltruck="${n}">${has ? "Loaded ✓" : "Photograph it loaded"}<small>${waiting ? "Waiting to send" : has ? "Tap for another photo" : "Once it's loaded"}</small></button></div>`}</div>`; }).join("")}
       ${left || plan.delivered ? `<div class="meta2" style="margin:6px 2px 0">${left ? `The truck left ${esc(fmtWhen(lo.finished_at))}${lo.finished_by_name ? ` · ${esc(lo.finished_by_name)}` : ""}` : ""}</div>`
         : `<button class="btn" data-dladdtruck="1">Add another truck</button>
            <button class="go wide" style="margin-top:12px" data-lofinish="1">The truck is leaving</button>`}
+      ${dock ? `<div class="lostep">2 · At their dock — a few photos of the drop <span>— ${drops} taken</span></div>
+        ${plan.delivered ? "" : `<button class="addph" data-dldrop="1">${drops ? "Another photo of the drop" : "Photograph the drop"}</button>`}` : `
       <div class="lostep">2 · At the site — each table where it ended up <span>— ${p.done} of ${p.total}</span></div>
       ${sheets === undefined ? `<div class="meta2">Loading the sheets…</div>` : ""}
       ${p.list.length ? p.list.map(s => `<div class="locard${s.complete ? " done" : ""}">
@@ -2569,7 +2661,8 @@ if (typeof document !== "undefined") (function () {
           ${plan.delivered ? "" : siteSlots(s)}
           ${s.png_path && s.pages_ready ? `<button class="lowo" data-lowo="${s.sheet_number}">Work order</button>` : ""}</div>`).join("")
         : sheets ? `<div class="meta2">No work order uploaded, so there are no tables to tick off. Photograph each item below, with a few words.</div>` : ""}
-      <div class="lostep">3 · The customer</div>
+`}
+      <div class="lostep">3 · The ${dock ? "receiver" : "customer"}</div>
       ${customer}
       ${plan.delivered ? "" : `<div class="card"><label class="f" style="margin-top:0" for="loItem">Something with no sheet</label>
         <input class="in" id="loItem" data-loitem="1" value="${esc(S.loItem)}" placeholder="e.g. hardware box, 2 of 2">
@@ -2719,6 +2812,91 @@ if (typeof document !== "undefined") (function () {
       <div class="lopage" id="lopage"><div class="missing">Loading the page…</div></div>
       <p class="meta2" style="text-align:center">Pinch to zoom.</p>`;
   }
+  // ---------- PDFs inside the app: a trip's ticket and site files (5 Oct) ----------
+  // A PDF opens on its own screen, drawn page by page as pictures, like a work order page. Nothing opens a new tab,
+  // which kiosk browsers such as Fully block. The viewer (pdf.js) loads from jsDelivr with integrity checks the first
+  // time it's needed and is kept for no signal when a trip's files are saved. Its worker runs on the page itself, so
+  // both files are checked.
+  const PDFJS_FILES = [
+    { src: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js", integrity: "sha384-sS8B4COeBqzQV9DaPpp5cbpF+xz2jPcFbN3L8FL3/dx0RMC6WLUwTUOFm0iFb1lw" },
+    { src: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js", integrity: "sha384-OemFRmhjDZwhIKuUld0HJozkF2YErsgDaCL41trxGQZt4/WgnopJQqQl2DvDZ07Z" },
+  ];
+  let pdfjsLoading = null, pdfjsFailedAt = 0;
+  async function loadPdfViewer() {                      // async: any failure comes back as a refusal, never a crash
+    if (window.sfPdfjs) return Promise.resolve(window.sfPdfjs);          // lets the tests stand in for pdf.js
+    if (window.pdfjsLib && window.pdfjsWorker) return Promise.resolve(window.pdfjsLib);
+    if (!pdfjsLoading) pdfjsLoading = PDFJS_FILES.reduce((p, f) => p.then(() => new Promise((res, rej) => {
+        const el = document.createElement("script");
+        el.src = f.src; el.integrity = f.integrity; el.crossOrigin = "anonymous";
+        el.onload = res; el.onerror = () => { el.remove(); rej(new Error("pdf viewer")); };
+        document.head.appendChild(el);
+      })), Promise.resolve())
+      .then(() => { if (!window.pdfjsLib || !window.pdfjsWorker) throw new Error("pdf viewer"); return window.pdfjsLib; })
+      .catch((e) => { pdfjsLoading = null; pdfjsFailedAt = Date.now(); throw e; });
+    return pdfjsLoading;
+  }
+  const isPdfFile = (path, mime) => /pdf/i.test(mime || "") || /\.pdf$/i.test(path || "");
+  const pdfPics = new Map();                              // path → promise of the page pictures, drawn once
+  function pdfPictures(path, mime) {
+    if (pdfPics.has(path)) return pdfPics.get(path);
+    const job = (async () => {
+      const url = await dlFile(path, mime || "application/pdf");
+      const lib = await loadPdfViewer();
+      const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+      const doc = await lib.getDocument({ data: bytes, isEvalSupported: false }).promise;
+      const pics = [];
+      for (let n = 1; n <= Math.min(doc.numPages, 40); n++) {
+        const page = await doc.getPage(n);
+        const base = page.getViewport({ scale: 1 });
+        const vp = page.getViewport({ scale: Math.min(3, Math.max(1, 1600 / base.width)) });   // about 1600 pixels wide, sharp enough to zoom
+        const c = document.createElement("canvas");
+        c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+        const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+        await page.render({ canvasContext: g, viewport: vp }).promise;
+        const blob = await new Promise((res) => c.toBlob(res, "image/png"));
+        pics.push(URL.createObjectURL(blob));
+        c.width = c.height = 0; page.cleanup();
+      }
+      const more = doc.numPages - pics.length;
+      doc.destroy();
+      return { pics, more };
+    })();
+    pdfPics.set(path, job);
+    job.catch(() => pdfPics.delete(path));                // try again next time it's opened
+    while (pdfPics.size > 4) {                            // keep a few drawn; let go of the oldest
+      const [k, old] = pdfPics.entries().next().value; pdfPics.delete(k);
+      old.then(r => r.pics.forEach(u => URL.revokeObjectURL(u))).catch(() => {});
+    }
+    return job;
+  }
+  function loadoutDoc(lo) {
+    const f = S.loDoc;
+    return `<button class="back" data-lowoback="1">← ${isDl(lo) ? "Delivery" : esc(tripName(lo.kind))}</button>
+      <h1>${esc(f.name)}</h1>
+      <p class="sub">${lo.is_test ? "TEST " : ""}${esc(lo.project_id)}</p>
+      <div class="lopage" id="lodoc"><div class="missing">Opening it…</div></div>
+      <p class="meta2" style="text-align:center">Pinch to zoom.</p>`;
+  }
+  async function showLoDoc() {
+    const f = S.loDoc;
+    if (!f || !document.getElementById("lodoc")) return;
+    let html;
+    try {
+      const { pics, more } = await pdfPictures(f.path, f.mime);
+      html = pics.map((u, i) => `<img alt="${esc(f.name)}, page ${i + 1} of ${pics.length + more}" src="${u}">`).join(`<div class="pdfgap"></div>`)
+        + (more ? `<div class="missing">${more} more page${more === 1 ? "" : "s"} not shown.</div>` : "");
+    } catch (e) {
+      const why = isNetworkError(e) ? "No connection, and this file wasn't saved on this phone before. Open the delivery on Wi-Fi to save its files."
+        : e && e.message === "pdf viewer" ? "The PDF viewer couldn't load. It needs a connection the first time: open the delivery on Wi-Fi once and it's saved on this phone."
+        : "This PDF couldn't be shown.";
+      html = `<div class="missing">${esc(why)}${isNetworkError(e) ? "" : `<p><button class="linkish" data-dlpopout="1">Try opening it in a new window</button></p>`}</div>`;
+    }
+    const now = document.getElementById("lodoc");
+    if (!now || S.loDoc !== f) return;                    // moved on while it was drawing
+    now.innerHTML = html;
+    const pop = now.querySelector("[data-dlpopout]");
+    if (pop) pop.onclick = async () => { try { window.open(await dlFile(f.path, f.mime), "_blank"); } catch (e) { S.notice = friendlyError(e); render(); } };
+  }
   async function showLoPage() {
     const lo = currentLoadout(); const el = document.getElementById("lopage");
     const s = lo && (S.loSheets[lo.job_id] || []).find(x => x.sheet_number === S.loWo);
@@ -2825,6 +3003,12 @@ if (typeof document !== "undefined") (function () {
         ${modalPhotos(m)}` : ""}
         <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button>
           <button class="go" data-saveproblem="1" ${m.jobId && (m.text || "").trim() ? "" : "disabled"}>Send it</button></div>`;
+    } else if (m.kind === "feedback") {              // the Feedback button (5 Oct): a note for the office, no reply
+      inner = `<h3>Feedback</h3>
+        <div class="sub">What's wrong, what's missing, or what would help? It goes to the office with your name and this screen: <b>${esc(m.where)}</b></div>
+        <textarea class="in" data-mfield="text" maxlength="2000" placeholder="Type it here">${esc(m.text || "")}</textarea>
+        <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button>
+          <button class="go" data-savefeedback="1" ${(m.text || "").trim() ? "" : "disabled"}>Send</button></div>`;
     } else if (m.kind === "reply") {
       inner = `<h3>Add to this issue</h3>
         <div class="sub">It goes back to the office with everything said so far.</div>
@@ -2980,7 +3164,8 @@ if (typeof document !== "undefined") (function () {
     if (S.adv) { if (S.advJob && S.advSheet) advShowPage(); }
     else if ((onCountTab() || S.tab === "past") && S.view.screen === "sheet") showPage();
     if (S.tab === "loadout" && S.loWo && !S.adv) showLoPage();
-    if (S.tab === "loadout" && !S.loWo && !S.adv && S.loView) initSigPad();
+    if (S.tab === "loadout" && S.loDoc && !S.adv) showLoDoc();
+    if (S.tab === "loadout" && !S.loWo && !S.loDoc && !S.adv && S.loView) initSigPad();
   }
 
   async function showPage() {
@@ -3244,6 +3429,11 @@ if (typeof document !== "undefined") (function () {
       send("reply_defect", { p_defect: m.id, p_body: m.text.trim(), p_client_id: null }, "Defect",
            null, m.shots, { kind: "defect", parent: m.id, projectId: d.project_id, label: "Defect photo" });
     });
+    on("[data-feedback]", () => { S.deptMenu = false; S.modal = { kind: "feedback", text: "", where: screenLabel() }; render(); });
+    on("[data-savefeedback]", () => {
+      const m = S.modal;
+      send("send_feedback", { p_client_id: null, p_page: "index", p_screen: m.where, p_version: PAGE_VERSION, p_body: m.text.trim() }, "Feedback");
+    });
     on("[data-saveproblem]", () => {
       const m = S.modal;
       send("flag_problem", { p_job: m.jobId, p_department: m.dept || S.dept, p_body: m.text.trim(), p_sheet: m.sheet ?? null, p_work_stopped: !!m.stops, p_client_id: newId() },
@@ -3295,7 +3485,7 @@ if (typeof document !== "undefined") (function () {
     app.querySelectorAll("[data-mfield]").forEach(el => el.oninput = () => {
       S.modal[el.dataset.mfield] = el.value;
       const ready = { savedefect: !!(S.modal.type && S.modal.jobId && (!S.modal.ask || (S.modal.note || "").trim())), saveproblem: !!(S.modal.jobId && (S.modal.text || "").trim()),
-                      savereply: !!(S.modal.text || "").trim(), savedreply: !!(S.modal.text || "").trim(), saveqcfail: !!(S.modal.text || "").trim() };
+                      savereply: !!(S.modal.text || "").trim(), savefeedback: !!(S.modal.text || "").trim(), savedreply: !!(S.modal.text || "").trim(), saveqcfail: !!(S.modal.text || "").trim() };
       for (const [k, v] of Object.entries(ready)) { const btn = app.querySelector(`[data-${k}]`); if (btn) btn.disabled = !v; }
     });
     app.querySelectorAll("[data-mstops]").forEach(el => el.onchange = () => { S.modal.stops = el.checked; });
@@ -3328,7 +3518,7 @@ if (typeof document !== "undefined") (function () {
       S.localLoadouts.push({ client_id: cid, job_id: j.job_id, project_id: j.project_id, job_name: j.job_name, is_test: !!j.is_test, kind,
                              started_at: new Date().toISOString(), started_by: S.me.id, started_by_name: S.me.name });
       store.set("loadouts_local", S.localLoadouts);
-      S.loView = cid; S.loWo = null; S.loPhotos = []; S.loForm = { jobId: null, filter: "", kind: "delivery" };
+      S.loView = cid; S.loWo = null; S.loDoc = null; S.loPhotos = []; S.loForm = { jobId: null, filter: "", kind: "delivery" };
       if (!S.pickSheets[j.job_id]) loadPickSheets(j.job_id).then(render);
       if (lo2()) loadLoSheets(j.job_id).then(() => { render(); saveLoPages(j.job_id); });
       send("start_loadout", { p_job: j.job_id, p_client_id: cid }, "Load-out");
@@ -3340,7 +3530,7 @@ if (typeof document !== "undefined") (function () {
       send("set_loadout_details", { p_loadout: lo.client_id, p_kind: lo.kind, p_carrier: null, p_tracking: null }, "Load-out");
     });
     on("[data-lowo]", (b) => { S.loWo = Number(b.dataset.lowo); render(); scrollTo(0, 0); });
-    on("[data-lowoback]", () => { S.loWo = null; render(); });
+    on("[data-lowoback]", () => { S.loWo = null; S.loDoc = null; render(); });
     on("[data-loaddpallet]", () => { if (!lo) return; S.loPallets[lo.client_id] = loadoutPieces([], lo, loPend(lo), loPlanned(lo)).pallets + 1; store.set("lo_pallets", S.loPallets); render(); });
     on("[data-lopallet]", (b) => { const n = Number(b.dataset.lopallet); shootFor(null, null, `Pallet ${n}`, { pallet: n }, isPk(lo)); });
     app.querySelectorAll("[data-lodet]").forEach(el => el.oninput = () => {
@@ -3356,8 +3546,8 @@ if (typeof document !== "undefined") (function () {
       delete S.loDet[lo.client_id];
     };
     on("[data-losavedet]", () => { saveDet(); render(); });
-    on("[data-loopen]", async (b) => { S.loView = b.dataset.loopen; S.loWo = null; S.loPhotos = []; S.loItem = ""; render(); scrollTo(0, 0); await loadLoadouts(); render(); });
-    on("[data-loback]", async () => { S.loView = null; S.loWo = null; render(); await loadLoadouts(); render(); });
+    on("[data-loopen]", async (b) => { S.loView = b.dataset.loopen; S.loWo = null; S.loDoc = null; S.loPhotos = []; S.loItem = ""; render(); scrollTo(0, 0); await loadLoadouts(); render(); });
+    on("[data-loback]", async () => { S.loView = null; S.loWo = null; S.loDoc = null; render(); await loadLoadouts(); render(); });
     // a pickup's photos come straight from the camera, like a delivery's
     const shootFor = (sheet, note, label, extra = {}, fresh = false) => takePhoto(async (shot) => {
       if (!lo) return;
@@ -3365,7 +3555,7 @@ if (typeof document !== "undefined") (function () {
       render(); flushPhotos();
     }, { fresh });
     on("[data-loshoot]", (b) => lo2() && b.dataset.piece
-      ? shootFor(Number(b.dataset.loshoot), null, `Sheet ${b.dataset.loshoot}, table ${b.dataset.piece}`, { piece: Number(b.dataset.piece) }, isPk(lo))
+      ? shootFor(Number(b.dataset.loshoot), null, `Sheet ${b.dataset.loshoot}, table ${b.dataset.piece}`, { piece: Number(b.dataset.piece) }, isPk(lo) || (lo && lo.kind === "dock"))
       : shootFor(Number(b.dataset.loshoot), null, `Sheet ${b.dataset.loshoot}`));
     app.querySelectorAll("[data-loitem]").forEach(el => el.oninput = () => {
       S.loItem = el.value; const btn = app.querySelector("[data-loshootitem]"); if (btn) btn.disabled = !S.loItem.trim();
@@ -3376,7 +3566,7 @@ if (typeof document !== "undefined") (function () {
       if (isDl(lo)) {                     // a delivery: the truck leaves; the site and the customer come next
         const plan = dlPlan(lo);
         S.modal = { kind: "confirm", title: "The truck is leaving?",
-          text: `${plan.trucksMissing.length ? `No photo of truck${plan.trucksMissing.length === 1 ? "" : "s"} ${plan.trucksMissing.join(", ")} yet. ` : ""}This records that the truck left now. At the site: a photo of each table where it ended up, then the customer's signature.`,
+          text: `${lo.kind === "dock" && plan.dock.total && plan.dock.done < plan.dock.total ? `Only ${plan.dock.done} of ${plan.dock.total} tables photographed. ` : ""}${plan.trucksMissing.length ? `No photo of truck${plan.trucksMissing.length === 1 ? "" : "s"} ${plan.trucksMissing.join(", ")} yet. ` : ""}This records that the truck left now. ${lo.kind === "dock" ? "At their dock: a few photos of the drop, then the receiver's signature." : "At the site: a photo of each table where it ended up, then the customer's signature."}`,
           yes: "The truck is leaving",
           run: () => send("finish_loadout", { p_loadout: lo.client_id, p_note: null }, "Load-out") };
         return render();
@@ -3390,7 +3580,7 @@ if (typeof document !== "undefined") (function () {
                             : `Everything is photographed. This records that the ${ship ? "shipment was picked up" : "truck left"} now.`,
           yes: ship ? "Finish shipment" : "Finish load-out",
           run: () => { if (S.loDet[lo.client_id]) saveDet();
-                       send("finish_loadout", { p_loadout: lo.client_id, p_note: null }, "Load-out", () => { S.loView = null; S.loWo = null; }); } };
+                       send("finish_loadout", { p_loadout: lo.client_id, p_note: null }, "Load-out", () => { S.loView = null; S.loWo = null; S.loDoc = null; }); } };
         return render();
       }
       const p = loadoutSheets(S.pickSheets[lo.job_id] || [], lo, S.pending.filter(x => x.parent === lo.client_id));
@@ -3422,10 +3612,34 @@ if (typeof document !== "undefined") (function () {
       }, { fresh: true });
     };
     on("[data-dltruck]", (b) => shootDl({ stage: "dock", truck: Number(b.dataset.dltruck), sheet: null, label: `Truck ${b.dataset.dltruck}` }));
+    on("[data-dldrop]", () => shootDl({ stage: "site", sheet: null, piece: null, label: "At their dock" }));     // dock to dock: the drop
+    // tasks
+    on("[data-taskopen]", (b) => { S.taskView = b.dataset.taskopen; S.notice = null; render(); scrollTo(0, 0); });
+    on("[data-taskback]", async () => { S.taskView = null; render(); await loadLoadouts(); render(); });
+    app.querySelectorAll("[data-tasknote]").forEach(el => el.oninput = () => { if (S.taskView) { S.taskNote[S.taskView] = el.value; store.set("task_notes", S.taskNote); } });
+    on("[data-taskphoto]", () => {
+      const t = S.dtasks.find(x => x.id === S.taskView); if (!t) return;
+      const where = whereAmI();
+      takePhoto(async (shot) => {
+        const pos = await where;
+        await queuePhotos([shot], { kind: "task", parent: t.id, projectId: t.is_test ? "TEST-TASKS" : "TASKS", label: "Task photo",
+                                    shotAt: shot.shotAt, lat: pos ? pos.lat : null, lng: pos ? pos.lng : null, accuracy: pos ? pos.accuracy : null });
+        render(); flushPhotos();
+      });
+    });
+    on("[data-taskdone]", () => {
+      const t = S.dtasks.find(x => x.id === S.taskView); if (!t) return;
+      const note = (S.taskNote[t.id] || "").trim();
+      send("complete_task", { p_client_id: null, p_task: t.id, p_note: note || null, p_lat: null, p_lng: null }, "Task",
+           () => { delete S.taskNote[t.id]; store.set("task_notes", S.taskNote); });
+    });
     on("[data-dladdtruck]", () => { if (!lo) return; S.dlTrucks[lo.client_id] = dlPlan(lo).trucks + 1; store.set("dl_trucks", S.dlTrucks); render(); });
     on("[data-dlsite]", (b) => shootDl({ stage: "site", sheet: Number(b.dataset.dlsite), piece: Number(b.dataset.piece),
                                          label: `Sheet ${b.dataset.dlsite}, table ${b.dataset.piece}, at the site` }));
     on("[data-dlopen]", async (b) => {
+      if (isPdfFile(b.dataset.dlopen, b.dataset.mime)) {             // opens inside the app, not in a new tab
+        S.loDoc = { path: b.dataset.dlopen, mime: b.dataset.mime, name: b.dataset.name }; render(); scrollTo(0, 0); return;
+      }
       try {
         const url = await dlFile(b.dataset.dlopen, b.dataset.mime);
         if (/^image\//.test(b.dataset.mime)) { S.modal = { kind: "image", url, title: b.dataset.name }; render(); }
