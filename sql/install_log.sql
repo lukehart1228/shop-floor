@@ -103,7 +103,9 @@ insert into sql_file_catalog (file, run_order, fingerprint, replaces) values
   ('delivery_types.sql',   29, 'check_delivery_types',   '{photos.sql,loadouts_v2.sql,deliveries.sql,deliveries_v2.sql}'),
   ('install_log.sql',      30, 'sql_file_start',         '{}'),
   ('tv_pace.sql',          31, 'check_tv',               '{tv.sql}'),
-  ('handoff_recent.sql',   32, 'check_handoff_recent',   '{schema.sql,ready_issues.sql,send_routes.sql}')
+  ('handoff_recent.sql',   32, 'check_handoff_recent',   '{schema.sql,ready_issues.sql,send_routes.sql}'),
+  ('feedback.sql',         33, 'check_feedback',         '{}'),
+  ('trip_types.sql',       34, 'check_trip_types',       '{deliveries.sql,deliveries_v2.sql,delivery_types.sql,tv_pace.sql}')
 on conflict (file) do update set run_order = excluded.run_order, fingerprint = excluded.fingerprint, replaces = excluded.replaces;
 
 -- does the database already have this file's fingerprint?
@@ -297,7 +299,7 @@ declare
                       'check_floor', 'check_photos', 'check_advance', 'check_supply_lists', 'check_loadouts',
                       'check_deliveries', 'check_deliveries_v2', 'check_ready_issues', 'check_finish_by',
                       'check_inventory', 'check_pace', 'check_send_routes', 'check_arrow_pickup', 'check_delivery_types',
-                      'check_tv', 'check_handoff_recent'];
+                      'check_tv', 'check_handoff_recent', 'check_feedback', 'check_trip_types'];
   fn    text;
   rows  jsonb;
   total int; passed int; firstbad text;
@@ -346,15 +348,15 @@ begin
     return next;
   end loop;
 
-  n := n + 1; step := n; check_name := 'Tablets and phones on the newest page';
+  n := n + 1; step := n; check_name := 'Every device on the newest page';     -- tablets, phones and (from 5 Oct) office computers
   select count(*) filter (where d.note <> 'Newest page'), count(*),
          string_agg(case when d.note <> 'Newest page' then d.person || ' (' || d.version || ', opened ' || d.last_opened || ')' end, '; ')
     into stale, seen, firstbad
   from devices() d;
   result := case when stale = 0 then 'PASS' else 'FAIL' end;
-  detail := case when seen = 0 then 'No device has reported yet — each one does the first time it opens the new tablet page.'
+  detail := case when seen = 0 then 'No device has reported yet — each one does the first time it opens a page.'
                  when stale = 0 then seen || ' device' || case when seen = 1 then '' else 's' end || ', all on the newest page'
-                 else stale || ' on an older page: ' || firstbad || '. Close the app fully and reopen it on Wi-Fi.  (select * from devices(); for all)' end;
+                 else stale || ' on an older page: ' || firstbad || '. Close the app fully and reopen it on Wi-Fi (on a computer, reload the page).  (select * from devices(); for all)' end;
   return next;
 end $$;
 revoke all on function check_everything() from public, anon, authenticated;

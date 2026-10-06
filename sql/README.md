@@ -48,5 +48,7 @@ On the live database these have all run. The order matters only when building a 
 | 30 | `install_log.sql` | The install log, guards, `check_everything()`, `devices()` |
 | 31 | `tv_pace.sql` | The floor TV with pace, work stopped and going out. Replaces `tv.sql`'s TV function. Run `install_log.sql` again after it |
 | 32 | `handoff_recent.sql` | Milling, Metal and Full Custom wait for Monday's Handed Off; the tablets' Recently completed tab. Replaces `send_routes.sql`'s ready view, so `send_routes.sql` now stops. Run `install_log.sql` again after it |
+| 33 | `feedback.sql` | The Feedback button's table and `send_feedback()`; the office's Feedback list reads it. Run `install_log.sql` again after it |
+| 34 | `trip_types.sql` | Dock to dock deliveries and Delivery's tasks. Replaces pieces of `deliveries.sql`, `deliveries_v2.sql`, `delivery_types.sql` and `tv_pace.sql`, so those now stop. Run `install_log.sql` again after it |
 
 Not here on purpose: **`set_up_logins.sql`**, which has everyone's login addresses. Keep it on your own computer, not on GitHub.
