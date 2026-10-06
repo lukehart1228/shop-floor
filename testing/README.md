@@ -1,6 +1,6 @@
 # Testing kit — Shop Floor Production System
 
-*For build chats. Luke doesn't need to read this.* This one file replaces the sixteen `testing-kit*.md` parts (they're kept in `history/` for their feature test scripts). Updated 6 Oct 2026 (with onedrive_save.sql).
+*For build chats. Luke doesn't need to read this.* This one file replaces the sixteen `testing-kit*.md` parts (they're kept in `history/` for their feature test scripts). Updated 6 Oct 2026 (with counts_safety.sql and the review fixes R-1, R-2, R-5, R-9, R-10, R-12).
 
 Every change is tested in Claude's sandbox against stand-ins for Supabase, Monday and the browser before Luke gets it. **Re-run the relevant tests before handing Luke any changed file,** and say plainly what the stand-ins can't cover: the real SQL Editor, GitHub Pages, the real Monday API, a real tablet's camera, signature and zoom, and jsDelivr in a real browser.
 
@@ -10,18 +10,19 @@ Every change is tested in Claude's sandbox against stand-ins for Supabase, Monda
 curl -sfL -o /tmp/setup.sh https://raw.githubusercontent.com/lukehart1228/shop-floor/main/testing/setup.sh && bash /tmp/setup.sh
 ```
 
-This installs Postgres 16 with `pg_cron` and the `http` extension, downloads the live repo to `/home/claude/sf/repo`, copies the helpers, and builds the `sync_base` database from every file in `sql/` in the live order, each run twice as one transaction. It ends with every check's score, and all should be full. It takes a few minutes the first time. After a sandbox reset, run it again; it skips what's already there. Set `KEEP_REPO=1` to keep a repo copy you've changed.
+This installs Postgres 16 with `pg_cron` and the `http` extension, downloads the live repo to `/home/claude/sf/repo`, copies the helpers, and builds the `sync_base` database from every file in `sql/` in the run order written in `sql/README.md`, each run twice as one transaction. **Nothing is listed by hand** (finding R-10, 6 Oct): the build stops if a file in `sql/` has no row in that run order, and fails unless `whats_installed()` is all PASS afterwards, so the sandbox can't fall behind live. It ends with every check's score (`checks.sh` finds the checks in the database itself), and all should be full. It takes a few minutes the first time. After a sandbox reset, run it again; it skips what's already there. Set `KEEP_REPO=1` to keep a repo copy you've changed.
 
 **Where things are afterwards:**
 
 - `/home/claude/sf/repo`: the live pages at the top, plus `sql/` and `testing/`. This *is* what's live, byte for byte.
 - `/home/claude/sf/out`: put new and changed files here while building.
-- `/home/claude/sf/base`: `load.sh` (now also loads `tv_pace.sql` and `handoff_recent.sql`), `fresh.sh`, `checks.sh`, `overlaps.py`, the seeds and stubs, and `test_guards.sh`, `test_devices.sh`.
+- `/home/claude/sf/base`: `load.sh` (reads the run order from `sql/README.md`), `fresh.sh`, `checks.sh`, `overlaps.py`, the seeds and stubs, and `test_guards.sh`, `test_devices.sh`.
 - `/home/claude/sf/t`: `pgsupa.js`, the fake Supabase client that talks to the real test database as a real login, and the browser tests.
 
 ## 2. Daily moves
 
-- `bash /home/claude/sf/base/fresh.sh [/abs/path/new.sql …]` gives a fresh `sync` from `sync_base`, plus your files (each twice, one transaction each), plus the seed (PROJ-00099, 00325, 00362, 00418 with real-shaped sheets; PROJ-00501 due soon; 00502 with no date; Shawn on Delivery). It needs absolute paths. It loads files before the seed, so a one-time go-live step finds an empty floor; to test go-live, seed first, then load the file.
+- **Old and new database, side by side.** Before building, copy today's live database: `psql -h /tmp/pg -p 5433 -U postgres -d postgres -c "create database sync_base_old template sync_base"`. After adding your file to a copy of `sql/` (and its README row), rebuild with `LIVE=/that/copy bash base/load.sh`, then `create database sync_base_new template sync_base`. `TEMPLATE=sync_base_old bash base/fresh.sh` (or `_new`) gives a seeded copy of either.
+- `bash /home/claude/sf/base/fresh.sh [/abs/path/new.sql …]` gives a fresh `sync` from `sync_base` (or `TEMPLATE=…`), plus your files (each twice, one transaction each), plus the seed (PROJ-00099, 00325, 00362, 00418 with real-shaped sheets; PROJ-00501 due soon; 00502 with no date; Shawn on Delivery). It needs absolute paths. It loads files before the seed, so a one-time go-live step finds an empty floor; to test go-live, seed first, then load the file.
 - `bash base/checks.sh` prints every live check as `n/m`. `select * from check_everything()` does the same inside the database, but its three Monday checks always fail here.
 - Browser tests: `cd /home/claude/sf/t && TZ=America/Indiana/Indianapolis node test_x.js`. **Always use shop time**: after 8 pm Eastern the sandbox (UTC) is on tomorrow.
 - `test_same.js`: every supervisor's screens (Mike, Donnie, Willie, KP, Jim, Eric, Shawn) on the new `index.html` (`/home/claude/sf/out/index.html`) compared with the live one, ids blanked. **Run it on every tablet-page change.** It also checks the version report. For a build that adds a tab, `NAV=ignore` sets the tab strip aside and `SKIP_TABS=past` skips a named tab; then read every remaining difference.
@@ -39,6 +40,11 @@ This installs Postgres 16 with `pg_cron` and the `http` extension, downloads the
 - `test_onedrive_save_chromium.js` (6 Oct): the same save in real Chromium, the folder picker pointed at the browser's private storage area (the same folder API): real writes and read-backs, a spreadsheet's leading marker surviving the "unchanged?" check, the folders remembered in real IndexedDB across a reload, then an automatic save. `OUT` must be a folder holding every page (the live pages plus the changed ones). Blob.text() drops a leading BOM, so compare bytes, never text.
 - `pgsupa.js` (6 Oct) has `range(from, to)`, and `SF_MAX_ROWS=n` caps every select at n rows like Supabase's API (1,000 by default there).
 - `test_office_sections.js`'s *Upload opens inside the office, its header hidden* is flaky: on 6 Oct it failed 2 runs in 3 on the live pages as well as the new ones (a race between the frame showing text and its header being hidden). Re-run before blaming a change. Since 6 Oct, it and `test_feedback.js` read the office's version from `office.html` instead of naming it.
+- `test_send_safety.js` (6 Oct, R-1 and R-2): the tablet's three senders against every reply the reviewer used (a schema reload, a missing function, an expired sign-in, a 503, a request with no login, a business refusal, a check violation): kept and retried, or on the *Couldn't send* list with what it was — never deleted; the live page loses them in the same run. Then on a database with `counts_safety.sql`: a change order arrives while Mike's tablets have PROJ-00418 open; an unchanged sheet's count lands on the new version and the next tap too; a changed sheet's count is refused, kept, listed, retried and dismissed; the live page's count on the replaced version is refused, on the current one saved. `OLDDB=1` on a database without `counts_safety.sql`: the new page's counts still save. **Fresh seed per run** (it makes a change order).
+- `test_csv_cell.js` (6 Oct, R-12): the office's spreadsheet cells — text starting with = + - @ gets a leading apostrophe. No database. `OUT=/home/claude/sf/repo` fails.
+- **The pgsupa stand-in reports a missing function as Postgres does** (`42883 … does not exist`); real Supabase says `PGRST202`. The tablet treats both as "not there yet".
+- Since 6 Oct `test_feedback.js` and `test_onedrive_save.js` read the tablet's and the office's version from the pages, and `test_same_office.js` takes `OUT=` (a folder with every page).
+- **Login addresses in the kit are made up** (`@example.com`, R-9). Never put a real one in a test: the repo is public.
 - `test_guards.sh` and `test_devices.sh` cover the install log, the guards, `check_everything()` and device versions (`install_log.sql`).
 - Older feature tests (Advance, deliveries, pickups, pace, inventory, routes…) are in `history/`. Pull one out with `python3 base/kx.py history/testing-kit-deliveries.md "test_deliveries.js" t/test_deliveries.js`. They were written against the helpers of their day, so they may need the paths above, and a few are stale (see §6).
 
@@ -72,16 +78,19 @@ Supabase's API connects as `authenticator`, then switches role and sets the JWT 
    end $$;
    ```
    The second argument lists the earlier files this one rewrites pieces of. Find them with `python3 base/overlaps.py /home/claude/sf/repo/sql /home/claude/sf/out/new_file.sql`. Use `'{}'` if none.
-2. **Add the file to the catalog.** Add its line to `install_log.sql`'s catalog insert (run order, fingerprint, replaces) so a fresh build knows it, and add its check to `check_everything()`'s list. Both happen in the same build.
+2. **Add the file to the catalog and the run order.** Add its line to `install_log.sql`'s catalog insert (run order, fingerprint, replaces), its check to `check_everything()`'s list, and its row to `sql/README.md`'s run order (that's what the testing kit loads from). All three in the same build; `load.sh` refuses to build without the README row.
 3. **Safe to run twice.** Test twice, each as one transaction (`psql -1`), because the SQL Editor runs a whole file as one transaction.
 4. **End with its own check**, so the editor's single visible result is the PASS/FAIL table. A `do` block at the end would hide it.
 5. **After building, run `test_guards.sh`** with the file loaded. The expected refusals change when a new file replaces something, so update the `exp=` line.
+6. **A new table revokes insert, update, delete and truncate from anon and authenticated** (`counts_safety.sql` also stops later tables getting TRUNCATE by default, and `check_counts_safety()` fails if any table has it).
 
 ## 5. Rules every page change follows
 
 1. **Bump `PAGE_VERSION`** in `index.html` (`2026-09-30.3` → `2026-10-02.1`; keep the number after the dot to one digit per day). Update `OFFICE_VERSION` in `office.html` when it changes.
 2. **Check library hashes.** Pages load supabase-js and pdf-lib with `integrity`; `index.html` also loads pdf.js 3.11.174 (`legacy/build/pdf.worker.min.js`, then `pdf.min.js`, both checked) when a trip has a PDF. A library change means a new hash: `npm pack @supabase/supabase-js@2.45.4`, then `openssl dgst -sha384 -binary dist/umd/supabase.js | openssl base64 -A`. `supabase.min.js` isn't in the package; never hash it.
-3. **Make sure the new page works on the old database and the old page on the new one.** Test both, because tablets and the database never update at the same moment.
+3. **A queued entry is only discarded when the database refuses it for a business reason** (R-1): anything else stays queued, and a refusal goes on the tablet's *Couldn't send* list with its content. Use `sendOutcome()`.
+4. **Counts go through `set_count()`** (R-2), which finds the current work order itself. Don't add another direct write to `sheet_progress`.
+5. **Make sure the new page works on the old database and the old page on the new one.** Test both, because tablets and the database never update at the same moment.
 
 ## 6. Gotchas that cost time
 
