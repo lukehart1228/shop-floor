@@ -61,7 +61,7 @@ for f in schema verify_setup upload_function monday_sync tablet office test_lane
   $P -d sync -f $L/$f.sql >/dev/null; $P -d sync -f $L/$f.sql >/dev/null; done
 $P -d sync -c "select cron.unschedule(jobname) from cron.job" >/dev/null 2>&1 || true
 $P -d sync -f people.sql
-$P -d sync -c "select set_person('test@pdindy.com','Test Supervisor','supervisor','{milling,cnc,sanding,finishing,full_custom,metal,assembly_qc,delivery}',true)" >/dev/null
+$P -d sync -c "select set_person('test@example.com','Test Supervisor','supervisor','{milling,cnc,sanding,finishing,full_custom,metal,assembly_qc,delivery}',true)" >/dev/null
 for f in check_floor photos check_photos advance supply_lists loadouts_v2 deliveries deliveries_v2 ready_issues; do
   $P -d sync -f $L/$f.sql >/dev/null; $P -d sync -f $L/$f.sql >/dev/null; done
 $P -d sync -c "select cron.unschedule(jobname) from cron.job" >/dev/null 2>&1 || true

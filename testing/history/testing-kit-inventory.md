@@ -45,7 +45,7 @@ update sheets s set shape = 'Rectangle', width = '24"', length = '48"', thicknes
 -- PROJ-00099: sheet 3 not started in Milling
 update sheet_progress sp set qty_done = 0 from sheets s join work_orders w on w.id = s.work_order_id join jobs j on j.id = w.job_id
  where sp.sheet_id = s.id and sp.department = 'milling' and j.project_id = 'PROJ-00099' and s.sheet_number = 3;
-insert into auth.users (id, email) values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','eric@pdindy.com'), ('99999999-9999-9999-9999-999999999999','jim@pdindy.com') on conflict do nothing;
+insert into auth.users (id, email) values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','eric@example.com'), ('99999999-9999-9999-9999-999999999999','jim@example.com') on conflict do nothing;
 insert into profiles (id, full_name, role, departments) values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','Eric B','supervisor','{full_custom}'),
   ('99999999-9999-9999-9999-999999999999','Jim W','supervisor','{finishing}') on conflict do nothing;
 -- PROJ-00099 sheet 2: Milling part way (1 of 3)
@@ -202,7 +202,7 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
 let pass = 0, fail = 0;
 const ok = (n, c, x = "") => { c ? pass++ : fail++; console.log(`${c ? "PASS" : "FAIL"}  ${n}${x ? "  — " + x : ""}`); };
 const one = async (sql, p = []) => (await admin.query(sql, p)).rows[0];
-users.eric = { id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", email: "eric@pdindy.com" };
+users.eric = { id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", email: "eric@example.com" };
 
 function boot(user) {
   const client = makeClient(user);
@@ -367,8 +367,8 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
 let pass = 0, fail = 0;
 const ok = (n, c, x = "") => { c ? pass++ : fail++; console.log(`${c ? "PASS" : "FAIL"}  ${n}${x ? "  — " + x : ""}`); };
 const one = async (sql, p = []) => (await admin.query(sql, p)).rows[0];
-users.eric = { id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", email: "eric@pdindy.com" };
-users.jim = { id: "99999999-9999-9999-9999-999999999999", email: "jim@pdindy.com" };
+users.eric = { id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", email: "eric@example.com" };
+users.jim = { id: "99999999-9999-9999-9999-999999999999", email: "jim@example.com" };
 
 function boot(user) {
   const client = makeClient(user);

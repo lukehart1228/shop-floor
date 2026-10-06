@@ -444,7 +444,7 @@ const SEND_ALL = `insert into sheet_sends (job_id, sheet_id, sheet_number, spec_
   await until(() => $(w, "#f"));
   ok("sign-in screen: zoom is off (the page asks for no zooming)", /maximum-scale=1/.test(vp(w)) && /user-scalable=no/.test(vp(w)) && w.document.documentElement.classList.contains("nozoom"), vp(w));
   ok("...and still fits the screen edge to edge as before", vp(w).startsWith("width=device-width, initial-scale=1") && /viewport-fit=cover/.test(vp(w)));
-  $(w, "#e").value = "eric@pdindy.com"; $(w, "#p").value = "wrong";
+  $(w, "#e").value = "eric@example.com"; $(w, "#p").value = "wrong";
   $(w, "#f").dispatchEvent(new w.Event("submit", { cancelable: true })); await until(() => !$(w, "#err").hidden);
   ok("a wrong password: still on sign-in, zoom still off", !!$(w, "#f") && /user-scalable=no/.test(vp(w)));
   $(w, "#p").value = "right";

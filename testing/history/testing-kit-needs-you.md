@@ -156,8 +156,8 @@ Claude in Chrome on the GitHub upload page: the page fetched the live files from
     bytes_all: 2097152, bytes_photos: 0, bytes_work_orders: 2097152, free_plan_bytes: 1073741824, photos_in_cloud: 0, batches: [] };
 
   const S = window.__SCENARIO || "mike";
-  const user = { mike: { id: "u-mike", email: "sanding@pdindy.com" }, luke: { id: "u-luke", email: "lukehart@pdindy.com" },
-                 lukeTablet: { id: "u-luke", email: "lukehart@pdindy.com" } }[S];
+  const user = { mike: { id: "u-mike", email: "mike@example.com" }, luke: { id: "u-luke", email: "luke@example.com" },
+                 lukeTablet: { id: "u-luke", email: "luke@example.com" } }[S];
   const empty = window.__EMPTY === true;
   window.__FIX = {
     user,

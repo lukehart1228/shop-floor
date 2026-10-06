@@ -445,7 +445,7 @@ const withSecret = base.replace("PASTE-YOUR-PROJECT-URL-HERE", "https://abc.supa
   w = page(withKeys, f); await wait(20);
   const d = w.document;
   ok("configured and signed out: shows sign-in", !d.getElementById("signIn").hidden);
-  d.getElementById("email").value = "lukehart@pdindy.com";
+  d.getElementById("email").value = "luke@example.com";
   d.getElementById("password").value = "wrong";
   d.getElementById("signInForm").dispatchEvent(new w.Event("submit", { cancelable: true })); await wait(20);
   ok("wrong password: plain message, stays on sign-in", /didn't match/.test(d.getElementById("signInError").textContent) && !d.getElementById("signIn").hidden);
@@ -468,7 +468,7 @@ const withSecret = base.replace("PASTE-YOUR-PROJECT-URL-HERE", "https://abc.supa
   ok("upload: all three progress steps ticked", d.querySelectorAll("li.done").length === 3);
 
   // 5. supervisor signed in
-  const sup = fakeClient({ session: { user: { id: "u2", email: "sanding@pdindy.com" } }, role: "supervisor" });
+  const sup = fakeClient({ session: { user: { id: "u2", email: "mike@example.com" } }, role: "supervisor" });
   w = page(withKeys, sup); await wait(30);
   ok("supervisor login: warned up front that only managers can upload", !w.document.getElementById("roleWarning").hidden);
 
@@ -537,7 +537,7 @@ for f in supabase_stub.sql supabase_stub2.sql vault_stub.sql; do $P -d sync -f $
 $P -d sync -c "create extension pg_cron;" >/dev/null
 for f in schema.sql upload_and_sync_min.sql office_min.sql test_lane.sql catch_up_min.sql; do $P -d sync -f $f; $P -d sync -f $f; done
 $P -d sync -f people.sql
-$P -d sync -c "select set_person('test@pdindy.com','Test Supervisor','supervisor','{milling,cnc,sanding,finishing,full_custom,metal,assembly_qc}',true)" >/dev/null
+$P -d sync -c "select set_person('test@example.com','Test Supervisor','supervisor','{milling,cnc,sanding,finishing,full_custom,metal,assembly_qc}',true)" >/dev/null
 for f in "$@"; do echo "== loading $f (twice)"; $P -d sync -f "$f"; $P -d sync -f "$f"; done
 echo LOADED
 ```
@@ -583,7 +583,7 @@ begin
   end loop;
 end $$;
 select make_test_job('PROJ-00418');
-select set_person('test@pdindy.com','Test Supervisor','supervisor','{milling,cnc,sanding,finishing,full_custom,metal,assembly_qc,delivery}',true);
+select set_person('test@example.com','Test Supervisor','supervisor','{milling,cnc,sanding,finishing,full_custom,metal,assembly_qc,delivery}',true);
 insert into profiles (id, full_name, role, departments) values ('77777777-7777-7777-7777-777777777777','Shawn K','supervisor','{delivery}') on conflict do nothing;
 ```
 
@@ -715,14 +715,14 @@ function makeClient(startUser = null) {
 }
 
 module.exports = { makeClient, admin, pool, setOffline: (v) => { offline = v; },
-  users: { mike: { id: "11111111-1111-1111-1111-111111111111", email: "sanding@pdindy.com" },
-           luke: { id: "22222222-2222-2222-2222-222222222222", email: "lukehart@pdindy.com" },
-           test: { id: "33333333-3333-3333-3333-333333333333", email: "test@pdindy.com" },
-           donnie: { id: "44444444-4444-4444-4444-444444444444", email: "donnie@pdindy.com" },
-           willie: { id: "55555555-5555-5555-5555-555555555555", email: "willie@pdindy.com" },
-           kp: { id: "66666666-6666-6666-6666-666666666666", email: "kp@pdindy.com" },
-           shawn: { id: "77777777-7777-7777-7777-777777777777", email: "shawn@pdindy.com" },
-           david: { id: "88888888-8888-8888-8888-888888888888", email: "ddart@pdindy.com" } } };
+  users: { mike: { id: "11111111-1111-1111-1111-111111111111", email: "mike@example.com" },
+           luke: { id: "22222222-2222-2222-2222-222222222222", email: "luke@example.com" },
+           test: { id: "33333333-3333-3333-3333-333333333333", email: "test@example.com" },
+           donnie: { id: "44444444-4444-4444-4444-444444444444", email: "donnie@example.com" },
+           willie: { id: "55555555-5555-5555-5555-555555555555", email: "willie@example.com" },
+           kp: { id: "66666666-6666-6666-6666-666666666666", email: "kp@example.com" },
+           shawn: { id: "77777777-7777-7777-7777-777777777777", email: "shawn@example.com" },
+           david: { id: "88888888-8888-8888-8888-888888888888", email: "david@example.com" } } };
 ```
 
 #### mkrows.js
@@ -1192,7 +1192,7 @@ const click = async (w, sel) => { const el = w.document.querySelector(sel); if (
   const mike = fakeClient({ profile: { full_name: "Mike B", role: "supervisor", departments: ["sanding"] } });
   w = boot(configured, mike); await wait(30);
   ok("fresh tablet: asks him to sign in", !!w.document.getElementById("f"));
-  w.document.getElementById("e").value = "sanding@pdindy.com"; w.document.getElementById("p").value = "wrong";
+  w.document.getElementById("e").value = "mike@example.com"; w.document.getElementById("p").value = "wrong";
   w.document.getElementById("f").dispatchEvent(new w.Event("submit", { cancelable: true })); await wait(30);
   ok("wrong password: plain message", /didn't match/.test(w.document.getElementById("err").textContent));
   w.document.getElementById("p").value = "right";

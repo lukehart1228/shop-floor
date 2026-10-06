@@ -7,7 +7,7 @@ This build added `advance.sql` (the function `advance_sheet()`, the table `sheet
 ## Setup
 
 - **Postgres 16, `pg_cron` and `http`.** `apt-get update` first — without it the Postgres packages 404. The `http` extension is built from source (Part 1). With both extensions present the real files load **unchanged**: no `_min.sql` trimming needed. `load.sh` unschedules the Monday timer straight after loading.
-- **One stub file**, Part 3's `stubs.sql`. Logins and seed: Part 3's `people.sql` and `seed.sql` (Mike = sanding + finishing, Luke, David, Donnie, Willie, KP, Shawn; `test@pdindy.com` becomes the Test Supervisor in `seed.sql`, since `set_person()` doesn't exist until `office.sql` has loaded). Test jobs are named `TEST-00418`, not `TEST-PROJ-00418`.
+- **One stub file**, Part 3's `stubs.sql`. Logins and seed: Part 3's `people.sql` and `seed.sql` (Mike = sanding + finishing, Luke, David, Donnie, Willie, KP, Shawn; `test@example.com` becomes the Test Supervisor in `seed.sql`, since `set_person()` doesn't exist until `office.sql` has loaded). Test jobs are named `TEST-00418`, not `TEST-PROJ-00418`.
 - Split `sql-files.md` and `sql-files-2.md` into files with a regex on the `## \`name.sql\`` headings; the test files out of Parts 1–4 the same way, taking the **latest** version of each name.
 - `npm install jsdom@24 pg fake-indexeddb playwright@1.56.0 @fontsource/barlow @fontsource/barlow-condensed`. Chromium is at `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`.
 - **The kit's `test_app_page.js` fake client** needed the chaining update Part 4 mentions but didn't save. It's below. Two expectations there and in `test_app_e2e.js` now look only at department tabs (`.tab[data-dept]`), and with `ADVANCE=1` also check that Advance is the ninth and last.

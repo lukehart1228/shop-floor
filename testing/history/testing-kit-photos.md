@@ -82,10 +82,10 @@ revoke all on schema vault from anon, authenticated;
 #### people.sql
 ```sql
 insert into auth.users (id, email) values
- ('11111111-1111-1111-1111-111111111111','sanding@pdindy.com'), ('22222222-2222-2222-2222-222222222222','lukehart@pdindy.com'),
- ('33333333-3333-3333-3333-333333333333','test@pdindy.com'), ('44444444-4444-4444-4444-444444444444','donnie@pdindy.com'),
- ('55555555-5555-5555-5555-555555555555','willie@pdindy.com'), ('66666666-6666-6666-6666-666666666666','kp@pdindy.com'),
- ('77777777-7777-7777-7777-777777777777','shawn@pdindy.com'), ('88888888-8888-8888-8888-888888888888','ddart@pdindy.com')
+ ('11111111-1111-1111-1111-111111111111','mike@example.com'), ('22222222-2222-2222-2222-222222222222','luke@example.com'),
+ ('33333333-3333-3333-3333-333333333333','test@example.com'), ('44444444-4444-4444-4444-444444444444','donnie@example.com'),
+ ('55555555-5555-5555-5555-555555555555','willie@example.com'), ('66666666-6666-6666-6666-666666666666','kp@example.com'),
+ ('77777777-7777-7777-7777-777777777777','shawn@example.com'), ('88888888-8888-8888-8888-888888888888','david@example.com')
 on conflict do nothing;
 insert into profiles (id, full_name, role, departments) values
   ('11111111-1111-1111-1111-111111111111','Mike B','supervisor','{sanding,finishing}'),
@@ -124,7 +124,7 @@ begin
   end loop;
 end $$;
 select make_test_job('PROJ-00418');
-select set_person('test@pdindy.com','Test Supervisor','supervisor','{milling,cnc,sanding,finishing,full_custom,metal,assembly_qc,delivery}',true);
+select set_person('test@example.com','Test Supervisor','supervisor','{milling,cnc,sanding,finishing,full_custom,metal,assembly_qc,delivery}',true);
 insert into profiles (id, full_name, role, departments) values ('77777777-7777-7777-7777-777777777777','Shawn K','supervisor','{delivery}') on conflict do nothing;
 ```
 
@@ -140,7 +140,7 @@ $P -d sync -f stubs.sql
 $P -d sync -c "create extension pg_cron;" >/dev/null
 for f in schema.sql upload_min.sql office_min.sql test_lane.sql catch_up_min.sql problems.sql flags.sql routine_tasks.sql supplies.sql arrow_qc.sql tv.sql; do $P -d sync -f $f; $P -d sync -f $f; done
 $P -d sync -f people.sql
-$P -d sync -c "select set_person('test@pdindy.com','Test Supervisor','supervisor','{milling,cnc,sanding,finishing,full_custom,metal,assembly_qc,delivery}',true)" >/dev/null
+$P -d sync -c "select set_person('test@example.com','Test Supervisor','supervisor','{milling,cnc,sanding,finishing,full_custom,metal,assembly_qc,delivery}',true)" >/dev/null
 $P -d sync -f check_floor.sql
 for f in "$@"; do echo "== loading $f (twice)"; $P -d sync -f "$f"; $P -d sync -f "$f"; done
 echo LOADED
@@ -335,14 +335,14 @@ function makeClient(startUser = null) {
 }
 
 module.exports = { makeClient, admin, pool, files, setOffline: (v) => { offline = v; },
-  users: { mike: { id: "11111111-1111-1111-1111-111111111111", email: "sanding@pdindy.com" },
-           luke: { id: "22222222-2222-2222-2222-222222222222", email: "lukehart@pdindy.com" },
-           test: { id: "33333333-3333-3333-3333-333333333333", email: "test@pdindy.com" },
-           donnie: { id: "44444444-4444-4444-4444-444444444444", email: "donnie@pdindy.com" },
-           willie: { id: "55555555-5555-5555-5555-555555555555", email: "willie@pdindy.com" },
-           kp: { id: "66666666-6666-6666-6666-666666666666", email: "kp@pdindy.com" },
-           shawn: { id: "77777777-7777-7777-7777-777777777777", email: "shawn@pdindy.com" },
-           david: { id: "88888888-8888-8888-8888-888888888888", email: "ddart@pdindy.com" } } };
+  users: { mike: { id: "11111111-1111-1111-1111-111111111111", email: "mike@example.com" },
+           luke: { id: "22222222-2222-2222-2222-222222222222", email: "luke@example.com" },
+           test: { id: "33333333-3333-3333-3333-333333333333", email: "test@example.com" },
+           donnie: { id: "44444444-4444-4444-4444-444444444444", email: "donnie@example.com" },
+           willie: { id: "55555555-5555-5555-5555-555555555555", email: "willie@example.com" },
+           kp: { id: "66666666-6666-6666-6666-666666666666", email: "kp@example.com" },
+           shawn: { id: "77777777-7777-7777-7777-777777777777", email: "shawn@example.com" },
+           david: { id: "88888888-8888-8888-8888-888888888888", email: "david@example.com" } } };
 ```
 
 #### test_photos_e2e.js

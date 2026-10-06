@@ -60,7 +60,7 @@ let pass = 0, fail = 0;
 const ok = (n, c, x = "") => { c ? pass++ : fail++; console.log(`${c ? "PASS" : "FAIL"}  ${n}${x ? "  — " + x : ""}`); };
 const one = async (sql, p = []) => (await admin.query(sql, p)).rows[0];
 const all = async (sql, p = []) => (await admin.query(sql, p)).rows;
-const julia = { id: "99999999-9999-9999-9999-999999999999", email: "julia@pdindy.com" };
+const julia = { id: "99999999-9999-9999-9999-999999999999", email: "julia@example.com" };
 
 function fakeCaches() {
   const stores = new Map();
