@@ -26,7 +26,7 @@ const norm = (h) => h.replace(/<div id="secs" hidden="">[\s\S]*?<\/div>/g, "").r
 (async () => {
   let bad = 0;
   for (const [page, pre] of [["office.html", { sfo_pin: JSON.stringify({ none: true }) }], ["delivery.html", {}], ["inventory.html", {}], ["pace.html", {}], ["upload.html", {}]]) {
-    const a = await draw("/home/claude/sf/repo/" + page, page, pre), b = await draw("/home/claude/sf/out/" + page, page, pre);
+    const a = await draw("/home/claude/sf/repo/" + page, page, pre), b = await draw((process.env.OUT || "/home/claude/sf/out") + "/" + page, page, pre);
     const diff = a.map((h, i) => norm(h) === norm(b[i] || "") ? null : i).filter(x => x !== null);
     console.log(`${diff.length || a.length !== b.length ? "FAIL" : "PASS"}  ${page}: ${a.length} screens the same apart from the Feedback button${diff.length ? " — differ: " + diff : ""}`);
     if (diff.length) { bad++; const i = diff[0]; const x = norm(a[i]), y = norm(b[i]); let k = 0; while (x[k] === y[k]) k++; console.log("   live: " + x.slice(k - 80, k + 120) + "\n   new:  " + y.slice(k - 80, k + 120)); }

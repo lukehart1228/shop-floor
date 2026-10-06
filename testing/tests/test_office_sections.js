@@ -61,10 +61,10 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   const base = `http://127.0.0.1:${server.address().port}/shop-floor/office.html`;
   const browser = await chromium.launch();
   // a Julia: not a manager, schedules deliveries
-  await admin.query("insert into auth.users (id, email) select gen_random_uuid(), 'julia@pdindy.com' where not exists (select 1 from auth.users where email = 'julia@pdindy.com')");
-  await admin.query("select set_person('julia@pdindy.com', 'Julia R', 'supervisor', '{finishing}')");
-  await admin.query("update profiles set schedules_deliveries = true where id = (select id from auth.users where email = 'julia@pdindy.com')");
-  const julia = { id: (await admin.query("select id from auth.users where email = 'julia@pdindy.com'")).rows[0].id, email: "julia@pdindy.com" };
+  await admin.query("insert into auth.users (id, email) select gen_random_uuid(), 'julia@example.com' where not exists (select 1 from auth.users where email = 'julia@example.com')");
+  await admin.query("select set_person('julia@example.com', 'Julia R', 'supervisor', '{finishing}')");
+  await admin.query("update profiles set schedules_deliveries = true where id = (select id from auth.users where email = 'julia@example.com')");
+  const julia = { id: (await admin.query("select id from auth.users where email = 'julia@example.com'")).rows[0].id, email: "julia@example.com" };
 
   // ---- Luke ----
   let s = await session(browser, users.luke), p = s.p;

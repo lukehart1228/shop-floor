@@ -35,10 +35,10 @@ const tomorrow = () => { const d = new Date(Date.now() + 86400000); return d.toI
 (async () => {
   const hasTT = (await q1("select to_regclass('public.delivery_tasks') is not null as h")).h;
   // Julia: schedules deliveries, not a manager
-  await admin.query("insert into auth.users (id, email) select gen_random_uuid(), 'julia@pdindy.com' where not exists (select 1 from auth.users where email = 'julia@pdindy.com')");
-  await admin.query("select set_person('julia@pdindy.com', 'Julia R', 'supervisor', '{finishing}')");
-  await admin.query("update profiles set schedules_deliveries = true where id = (select id from auth.users where email = 'julia@pdindy.com')");
-  const julia = { id: (await q1("select id from auth.users where email = 'julia@pdindy.com'")).id, email: "julia@pdindy.com" };
+  await admin.query("insert into auth.users (id, email) select gen_random_uuid(), 'julia@example.com' where not exists (select 1 from auth.users where email = 'julia@example.com')");
+  await admin.query("select set_person('julia@example.com', 'Julia R', 'supervisor', '{finishing}')");
+  await admin.query("update profiles set schedules_deliveries = true where id = (select id from auth.users where email = 'julia@example.com')");
+  const julia = { id: (await q1("select id from auth.users where email = 'julia@example.com'")).id, email: "julia@example.com" };
 
   let t = boot("delivery.html", julia), w = t.w;
   await until(() => $$(w, "[data-kind]").length, 8000); await wait(300);

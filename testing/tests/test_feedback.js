@@ -7,6 +7,7 @@ const { JSDOM } = require("jsdom");
 const { makeClient, users, admin, setOffline } = require("./pgsupa");
 const OUT = process.env.OUT || "/home/claude/sf/out";
 const OFFICE_V = (require("fs").readFileSync(`${process.env.OUT || "/home/claude/sf/out"}/office.html`, "utf8").match(/const OFFICE_VERSION = "([^"]+)"/) || [])[1];   // 6 Oct: read from the page, not written in here
+const TABLET_V = (require("fs").readFileSync(`${process.env.OUT || "/home/claude/sf/out"}/index.html`, "utf8").match(/const PAGE_VERSION = "([^"]+)"/) || [])[1];   // the same for the tablet page
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 let pass = 0, fail = 0;
 const ok = (n, c, x = "") => { c ? pass++ : fail++; console.log(`${c ? "PASS" : "FAIL"}  ${n}${x ? "  — " + x : ""}`); };
@@ -96,7 +97,7 @@ async function sendShared(w, note) {
   let f = (await rows()).pop();
   ok("Saved with Mike's login and name, the tablet page, the screen and its version",
      f && f.user_id === users.mike.id && f.person_name === "Mike B" && f.page === "index" && /Sanding › Work orders › PROJ-00418 › sheet/.test(f.screen)
-     && f.page_version === "2026-10-05.2" && f.body === "The + button is hard to hit with gloves on." && !f.is_test, f && JSON.stringify({ n: f.person_name, s: f.screen, v: f.page_version, b: f.body }));
+     && f.page_version === TABLET_V && f.body === "The + button is hard to hit with gloves on." && !f.is_test, f && JSON.stringify({ n: f.person_name, s: f.screen, v: f.page_version, b: f.body }));
   ok("The box closes and the tablet says thanks", !$(w, ".mdl") && /Thanks — sent to the office/.test(w.document.body.textContent));
   ok("The screen underneath is where Mike left it", /PROJ-00418/.test(txt(w)) && (!sheetNo || new RegExp("Sheet " + sheetNo).test(txt(w))));
   w.close();
@@ -151,7 +152,7 @@ async function sendShared(w, note) {
   const shown = lines.map(l => l.textContent.replace(/\s+/g, " "));
   ok("The Feedback list shows every note, newest first", lines.length === 4 && /Could Needs you/.test(shown[0]) && /hard to hit with gloves/.test(shown[3]), shown.map(s => s.slice(0, 40)).join(" | "));
   ok("Each note shows who, when, the note, the page, the screen and the version",
-     /Mike B · .*The \+ button is hard to hit with gloves on\. Tablets & phone · Sanding › Work orders › PROJ-00418 › sheet \d+ · version 2026-10-05\.2/.test(shown[3]), shown[3]);
+     /Mike B · .*The \+ button is hard to hit with gloves on\. Tablets & phone · Sanding › Work orders › PROJ-00418 › sheet \d+ · version /.test(shown[3]) && shown[3].includes("version " + TABLET_V), shown[3]);
   ok("A test note is labelled TEST", shown.some(s => /TEST\s*Test Supervisor|TEST .*Practice note/.test(s)));
   await click(w, '[data-fbkpage="office"]', 200);
   ok("Filtering by page shows just that page's notes", $$(w, "main .panel .line").length === 1 && /Could Needs you/.test(txt(w, "main .panel")));

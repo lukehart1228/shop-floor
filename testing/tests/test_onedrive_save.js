@@ -187,7 +187,7 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
   ok("The hard drive copy is written first, then OneDrive", firstBk && firstOd && firstBk[0] < firstOd[0]);
   ok("The panel lists the skipped jobs and why, with both paths for the duplicate",
      /PROJ-00502: two folders \(500s › PROJ-00502 Office and PROJ-00502 Office \(old\)\)\. Move or rename one\./.test(txt(t.w)) && /PROJ-00325: no OneDrive folder yet/.test(txt(t.w)), txt(t.w).match(/skipped[^]*?again next time:[^]{0,300}/) || "");
-  ok("The save is logged: both places reached, 2 skipped, by Luke's login", r && r.onedrive_ok && r.backup_ok && r.skipped.length === 2 && r.how === "button" && r.page_version === "2026-10-06.1",
+  ok("The save is logged: both places reached, 2 skipped, by Luke's login", r && r.onedrive_ok && r.backup_ok && r.skipped.length === 2 && r.how === "button" && r.page_version === (require("fs").readFileSync(`${process.env.OUT || "/home/claude/sf/out"}/office.html`, "utf8").match(/const OFFICE_VERSION = "([^"]+)"/) || [])[1],
      r && JSON.stringify({ od: r.onedrive_ok, bk: r.backup_ok, sk: r.skipped, files: r.files_written }));
   ok("No test job is ever saved", !bk.find("TEST-00418") && !bk.files().some(f => /TEST-/.test(f)));
   await click(t.w, '[data-tab="tasks"]', 1200);
