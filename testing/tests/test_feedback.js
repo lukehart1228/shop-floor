@@ -6,6 +6,7 @@ const fs = require("fs");
 const { JSDOM } = require("jsdom");
 const { makeClient, users, admin, setOffline } = require("./pgsupa");
 const OUT = process.env.OUT || "/home/claude/sf/out";
+const OFFICE_V = (require("fs").readFileSync(`${process.env.OUT || "/home/claude/sf/out"}/office.html`, "utf8").match(/const OFFICE_VERSION = "([^"]+)"/) || [])[1];   // 6 Oct: read from the page, not written in here
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 let pass = 0, fail = 0;
 const ok = (n, c, x = "") => { c ? pass++ : fail++; console.log(`${c ? "PASS" : "FAIL"}  ${n}${x ? "  — " + x : ""}`); };
@@ -139,7 +140,7 @@ async function sendShared(w, note) {
   let r = await sendShared(w, "Could Needs you show the oldest first?");
   ok("Office: the box names the tab, Send lights up only with words, and it says thanks", r.where === "Operations" && r.wasOff && r.nowOn && /Thanks — sent to the office/.test(r.said), JSON.stringify(r));
   f = (await rows()).pop();
-  ok("Saved as Luke, from the office, with the office's version", f.person_name === "Luke H" && f.page === "office" && f.screen === "Operations" && f.page_version === "2026-10-05.1", JSON.stringify({ n: f.person_name, p: f.page, s: f.screen, v: f.page_version }));
+  ok("Saved as Luke, from the office, with the office's version", f.person_name === "Luke H" && f.page === "office" && f.screen === "Operations" && f.page_version === OFFICE_V, JSON.stringify({ n: f.person_name, p: f.page, s: f.screen, v: f.page_version }));
   await wait(2700);
   ok("The thanks closes itself", !$(w, "#sf-fb"));
   $(w, "[data-menu]").click(); await wait(100);
