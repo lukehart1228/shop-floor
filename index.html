@@ -62,6 +62,11 @@
   main{max-width:1100px; margin:0 auto; padding:12px 14px 80px}
   .banner{border-radius:10px; padding:12px 16px; margin-bottom:14px; font-weight:600}
   .banner.warn{background:var(--warn-bg); color:var(--warn); border-left:5px solid var(--bright)}
+  .banner.failbar{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap}
+  .failitem{display:flex; gap:12px; align-items:flex-start; border-top:1px solid var(--line); padding:12px 0}
+  .failitem img{width:64px; height:64px; object-fit:cover; border-radius:6px; flex:none}
+  .failtext{flex:1; min-width:0; overflow-wrap:anywhere} .failtext small{color:var(--ink2)}
+  .failbtns{display:flex; flex-direction:column; gap:6px; align-items:flex-end; flex:none}
   .banner.info{background:#fff; color:var(--ink2); border:1px solid var(--line)}
   .banner.ok{background:var(--teal-bg); color:var(--teal-ink); border-left:5px solid var(--teal)}
   h1{font-size:26px; margin:2px 2px 4px}
@@ -445,7 +450,7 @@ const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 // This page's version. Change it with every edit (date, then .1, .2 … for more than one that day).
 // Each device reports it when it opens; see  select * from devices();  in the SQL Editor.
-const PAGE_VERSION = "2026-10-05.2";
+const PAGE_VERSION = "2026-10-06.1";
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -719,9 +724,9 @@ function agoText(ts, today = new Date()) {
   return n <= 0 ? "today" : n === 1 ? "yesterday" : `${n} days ago`;
 }
 
-/** Record a count to send. Only the latest count per sheet matters. */
-function setPending(outbox, progressId, qty) {
-  return { ...outbox, [progressId]: { qty, at: new Date().toISOString() } };
+/** Record a count to send. Only the latest count per sheet matters. `label` says what it was, in words. */
+function setPending(outbox, progressId, qty, label) {
+  return { ...outbox, [progressId]: { qty, at: new Date().toISOString(), ...(label ? { label } : {}) } };
 }
 
 function isNetworkError(err) {
@@ -730,22 +735,55 @@ function isNetworkError(err) {
 }
 
 /**
- * Send every waiting count. Returns { saved, refused, offline }.
+ * What to do with a count, entry or photo the database didn't take (review finding R-1, 6 Oct).
+ *   "network"  no connection: keep it, try again later.
+ *   "missing"  the function isn't in the database yet (a newer page before its SQL file): keep it, carry on with the rest.
+ *   "hold"     the database couldn't take it just now: reloading after a SQL file ran, an expired sign-in,
+ *              a request that went without a login, a server error. Keep it; stop this round; try again later.
+ *   "refuse"   a definite no from a rule in the database. It goes on the "Couldn't send" list, with what it
+ *              was, until a person tries it again or dismisses it. Nothing is ever just thrown away.
+ */
+function sendOutcome(err, status) {
+  if (isNetworkError(err)) return "network";
+  const code = String((err && err.code) || "");
+  const st = Number(status || (err && (err.status || err.statusCode)) || 0);
+  const m = String((err && (err.message || err.error_description || err.error || err.details)) || err || "");
+  if (code === "PGRST202" || code === "42883" || /could not find the function|function [^ ]+ does not exist/i.test(m)) return "missing";
+  if (/^PGRST/i.test(code)) return "hold";                                   // PostgREST itself: schema reloading (PGRST002), sign-in problems
+  if (code === "28000" || /^(08|53|57|58|XX)/.test(code)) return "hold";      // no login; connection, resources, shutdown, internal
+  if (st === 401 || st === 408 || st === 429 || st >= 500) return "hold";
+  if (/jwt|token|not signed in|not authenticated|invalid claim|schema cache|permission denied for (function|table|relation|schema|sequence|view)|too many requests|service unavailable|bad gateway|gateway timeout|internal server error/i.test(m)) return "hold";
+  return "refuse";
+}
+/** Held this long without getting through, a thing goes on the "Couldn't send" list instead of waiting for ever. */
+const HOLD_LIMIT_MS = 24 * 3600 * 1000;
+function heldTooLong(since, now = Date.now()) { return !!since && now - new Date(since).getTime() > HOLD_LIMIT_MS; }
+
+/**
+ * Send every waiting count. Returns { saved, refused, offline, held }.
  *
  * A count is sent as the number itself ("4 done"), so sending one twice
  * can never double it. `box` is { get(), set(next) } and is re-read after
  * every send, so a tap made while a count is still sending is never lost.
+ * It goes through set_count() (counts_safety.sql), which puts it on the job's
+ * current work order if a change order came in meanwhile. On a database
+ * without set_count() it writes the count directly, as pages before 6 Oct did.
+ * A refused count comes back in `refused` with everything needed to keep it.
  */
 async function flushOutbox(box, db) {
   const saved = [], refused = [];
-  let offline = false;
+  let offline = false, held = null;
   for (const id of Object.keys(box.get())) {
     const pending = box.get()[id];
     if (!pending) continue;
-    let res;
+    let res, row = null;
     try {
-      res = await db.from("sheet_progress").update({ qty_done: pending.qty }).eq("id", id).select("id, qty_done, state");
+      res = await db.rpc("set_count", { p_progress: id, p_qty: pending.qty });
+      if (res.error && sendOutcome(res.error, res.status) === "missing")
+        res = await db.from("sheet_progress").update({ qty_done: pending.qty }).eq("id", id).select("id, qty_done, state");
+      else if (!res.error) row = res.data;
     } catch (e) { res = { error: e }; }
+    if (!res.error && !row) row = res.data && res.data[0];
 
     const forget = (always) => {
       const cur = { ...box.get() };
@@ -753,18 +791,25 @@ async function flushOutbox(box, db) {
       if (cur[id] && (always || cur[id].qty === pending.qty)) { delete cur[id]; box.set(cur); }
     };
     if (res.error) {
-      if (isNetworkError(res.error)) { offline = true; break; }
-      refused.push({ id, reason: res.error.message || String(res.error) });
-      forget(true);
-    } else if (!res.data || res.data.length === 0) {
-      refused.push({ id, reason: "This login isn't allowed to change that department's counts." });
-      forget(true);
+      const how = sendOutcome(res.error, res.status);
+      if (how === "network") { offline = true; break; }
+      if (how !== "refuse" && !heldTooLong(pending.heldSince)) {
+        held = friendlyError(res.error);
+        if (!pending.heldSince) { const cur = { ...box.get() }; if (cur[id]) { cur[id] = { ...cur[id], heldSince: new Date().toISOString() }; box.set(cur); } }
+        if (how === "missing") continue; else break;
+      }
+      refused.push({ id, kind: "count", label: pending.label || "A count", reason: how === "refuse" ? friendlyError(res.error)
+                     : "It still hadn't sent after a day. The database said: " + friendlyError(res.error), payload: { id, qty: pending.qty } });
+      forget(false);
+    } else if (!row) {
+      refused.push({ id, kind: "count", label: pending.label || "A count", reason: "This login isn't allowed to change that department's counts.", payload: { id, qty: pending.qty } });
+      forget(false);
     } else {
-      saved.push(res.data[0]);
+      saved.push({ ...row, from: id, moved: !!row.moved || (row.id && row.id !== id), label: pending.label });
       forget(false);
     }
   }
-  return { saved, refused, offline };
+  return { saved, refused, offline, held };
 }
 
 function newId() {
@@ -786,7 +831,7 @@ function queueEntry(box, fn, args, label) {
 
 async function flushLogbox(box, db) {
   const sent = [], refused = [];
-  let offline = false;
+  let offline = false, held = null;
   const ids = Object.keys(box.get()).sort((a, b) => String(box.get()[a].at).localeCompare(String(box.get()[b].at)));
   for (const id of ids) {
     const e = box.get()[id];
@@ -794,14 +839,21 @@ async function flushLogbox(box, db) {
     let res;
     try { res = await db.rpc(e.fn, e.args); } catch (err) { res = { error: err }; }
     if (res && res.error) {
-      if (isNetworkError(res.error)) { offline = true; break; }
-      refused.push({ id, label: e.label, reason: friendlyError(res.error) });
+      const how = sendOutcome(res.error, res.status);
+      if (how === "network") { offline = true; break; }
+      if (how !== "refuse" && !heldTooLong(e.heldSince)) {
+        held = friendlyError(res.error);
+        if (!e.heldSince) { const cur = { ...box.get() }; cur[id] = { ...e, heldSince: new Date().toISOString() }; box.set(cur); }
+        if (how === "missing") continue; else break;
+      }
+      refused.push({ id, kind: "entry", label: e.label, reason: how === "refuse" ? friendlyError(res.error)
+                     : "It still hadn't sent after a day. The database said: " + friendlyError(res.error), payload: e });
     } else {
       sent.push({ id, label: e.label, fn: e.fn, data: res ? res.data : null });
     }
     const cur = { ...box.get() }; delete cur[id]; box.set(cur);
   }
-  return { sent, refused, offline };
+  return { sent, refused, offline, held };
 }
 
 /** Routine tasks pinned to the top of a person's tablet: theirs, or nobody's in their departments, due now. */
@@ -1017,13 +1069,24 @@ function photoError(err) {
  * against its defect, problem or load-out. A photo carries its own id, and the file's
  * name is made from it, so a resend can never add it twice. If the entry it belongs to
  * hasn't reached the database yet, it waits and tries again; if that entry was never
- * going to arrive, it's dropped after three tries, with a plain message.
+ * going to arrive, after three tries it goes on the "Couldn't send" list (kept, with the photo).
  * `store` is { list(), put(rec), remove(id) }; isPending(id) says whether that entry is still waiting to send.
  */
 async function flushPhotobox(store, db, isPending = () => false) {
   const sent = [], refused = [], waiting = [];
   let offline = false;
-  const list = (await store.list()).sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  let held = null;
+  const list = (await store.list()).filter(r => !r.failed).sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  // refused: kept on the device, marked, with the reason, for the "Couldn't send" list (never removed here)
+  const keep = async (rec, reason) => { refused.push({ id: rec.id, kind: "photo", label: rec.label, reason }); await store.put({ ...rec, failed: { reason, at: new Date().toISOString() } }); };
+  // the database couldn't take it just now: keep it as it is, and say whether to stop this round
+  const hold = async (rec, err, status) => {
+    const how = sendOutcome(err, status);
+    if (how === "refuse" || heldTooLong(rec.heldSince)) return false;
+    held = friendlyError(err);
+    if (!rec.heldSince) await store.put({ ...rec, heldSince: new Date().toISOString() });
+    return how === "missing" ? "next" : "stop";
+  };
   for (const rec of list) {
     const done = rec.kind === "delivery_done" || rec.kind === "pickup_done";   // a delivery or pickup marked done: the signature (if signed), then the record
     let up = null;
@@ -1034,7 +1097,11 @@ async function flushPhotobox(store, db, isPending = () => false) {
     if (up && up.error) {
       if (isNetworkError(up.error)) { offline = true; break; }
       const already = /already exists|duplicate|409/i.test(String(up.error.message) + " " + String(up.error.statusCode || "") + " " + String(up.error.error || ""));
-      if (!already) { refused.push({ id: rec.id, label: rec.label, reason: photoError(up.error) }); await store.remove(rec.id); continue; }
+      if (!already) {
+        const h = await hold(rec, up.error);
+        if (h === "stop") break; if (h === "next") continue;
+        await keep(rec, sendOutcome(up.error) === "refuse" ? photoError(up.error) : "It still hadn't sent after a day. The database said: " + photoError(up.error)); continue;
+      }
     }
     let res;
     try {
@@ -1064,20 +1131,21 @@ async function flushPhotobox(store, db, isPending = () => false) {
     } catch (e) { res = { error: e }; }
     if (res.error) {
       if (isNetworkError(res.error)) { offline = true; break; }
-      refused.push({ id: rec.id, label: rec.label, reason: photoError(res.error) }); await store.remove(rec.id); continue;
+      const h = await hold(rec, res.error, res.status);
+      if (h === "stop") break; if (h === "next") continue;
+      await keep(rec, sendOutcome(res.error, res.status) === "refuse" ? photoError(res.error) : "It still hadn't sent after a day. The database said: " + photoError(res.error)); continue;
     }
     if (res.data && res.data.waiting) {
       const tries = (rec.tries || 0) + 1;
       if (!isPending(rec.parent) && tries >= 3) {
-        refused.push({ id: rec.id, label: rec.label, reason: "The entry this photo belonged to wasn't saved, so the photo couldn't be kept." });
-        await store.remove(rec.id);
+        await keep(rec, "The entry this photo belongs to wasn't saved, so the photo has nothing to go with. Try again once that entry has sent, or dismiss it.");
       } else { await store.put({ ...rec, tries }); waiting.push(rec.id); }
       continue;
     }
     sent.push({ id: rec.id, label: rec.label, kind: rec.kind, parent: rec.parent, data: res.data });
     await store.remove(rec.id);
   }
-  return { sent, refused, waiting, offline };
+  return { sent, refused, waiting, offline, held };
 }
 
 /** A load-out's sheets: photographed on this truck (or waiting on the tablet), on an earlier truck, or not yet. */
@@ -1242,6 +1310,8 @@ if (typeof document !== "undefined") (function () {
     rows: [], rowsAt: null, fromCache: false,
     past: [], pastAt: null, pastLoaded: false,      // the Past tab (past_work.sql)
     outbox: store.get("outbox", {}), logbox: store.get("logbox", {}),
+    failed: store.get("failed", []) || [],          // counts and entries the database refused, kept until someone deals with them (R-1)
+    held: null,                                     // why things are waiting though there's a connection, in words
     view: { screen: "queue", jobId: null, progressId: null },
     online: navigator.onLine, notice: null, loading: false,
     // the log side
@@ -1253,6 +1323,7 @@ if (typeof document !== "undefined") (function () {
     // photos and load-outs
     photos: [],                 // photos on what's on screen (the piece, the problems list), from the database
     pending: [],                // photos still on this tablet, waiting to send (no image bytes kept here)
+    failedPh: [],               // photos (and signed deliveries) the database refused, kept for the Couldn't send list
     loadouts: [], localLoadouts: store.get("loadouts_local", []), loView: null,
     loForm: { jobId: null, filter: "", kind: "delivery" }, loItem: "", loPhotos: [], viewer: null, dtasks: store.get("dtasks", []) || [], taskView: null, taskNote: store.get("task_notes", {}) || {},
     loSheets: {}, loWo: null, loDoc: null, loPallets: store.get("lo_pallets", {}), loPages: {}, loDet: {},
@@ -1300,7 +1371,9 @@ if (typeof document !== "undefined") (function () {
   async function refreshPending() {
     const list = await photoStore.list();
     for (const r of list) if (!pendingUrls.has(r.id) && r.blob) pendingUrls.set(r.id, URL.createObjectURL(r.blob));
-    S.pending = list.map(({ blob, bytes, ...m }) => ({ ...m, url: pendingUrls.get(m.id) }));
+    const all = list.map(({ blob, bytes, ...m }) => ({ ...m, url: pendingUrls.get(m.id) }));
+    S.pending = all.filter(p => !p.failed);          // still trying: drawn on screens as "Waiting to send"
+    S.failedPh = all.filter(p => p.failed);          // refused: only on the Couldn't send list, so the slot asks for the photo again
   }
 
   /** Shrink a camera photo to about 300–500 KB: 1600 pixels on the long side, JPEG. Turned the right way up. */
@@ -1705,18 +1778,64 @@ if (typeof document !== "undefined") (function () {
     await loadTab();
   }
 
+  /* ---- "Couldn't send": what the database refused, kept on the tablet with what it was (R-1, 6 Oct) ---- */
+  function keepFailed(list) {
+    const add = list.filter(x => x.kind !== "photo").map(x => ({ id: x.id, kind: x.kind, label: x.label || "", reason: x.reason, at: new Date().toISOString(), payload: x.payload }));
+    if (add.length) { S.failed = S.failed.filter(f => !add.some(a => a.id === f.id)).concat(add); store.set("failed", S.failed); }
+  }
+  const failedPhotos = () => S.failedPh;
+  const failedCount = () => S.failed.length + failedPhotos().length;
+  /** Every refusal is counted; the first is spelled out. All of them are on the "Couldn't send" list. */
+  function noticeRefusals(list) {
+    if (!list.length) return;
+    const first = list[0];
+    S.notice = (first.label ? `${first.label}: ` : "") + first.reason
+      + (list.length > 1 ? ` (and ${list.length - 1} more — see Couldn't send at the top)` : "");
+  }
+  async function retryFailed(id) {
+    const f = S.failed.find(x => x.id === id);
+    if (f) {
+      S.failed = S.failed.filter(x => x.id !== id); store.set("failed", S.failed);
+      if (f.kind === "count" && !S.outbox[f.payload.id]) { S.outbox = setPending(S.outbox, f.payload.id, f.payload.qty, f.label); store.set("outbox", S.outbox); }
+      if (f.kind === "entry") {
+        const { heldSince, ...e } = f.payload; S.logbox = { ...S.logbox, [f.id]: e }; store.set("logbox", S.logbox);
+        const parent = e.args && e.args.p_client_id;      // its photos, if they gave up waiting for it, try again with it
+        if (parent) for (const rec of (await photoStore.list()).filter(x => x.failed && x.parent === parent)) { const { failed, heldSince: h, ...rest } = rec; await photoStore.put({ ...rest, tries: 0 }); }
+        await refreshPending();
+      }
+    } else {
+      const rec = (await photoStore.list()).find(x => x.id === id);
+      if (rec) { const { failed, heldSince, ...rest } = rec; await photoStore.put({ ...rest, tries: 0 }); await refreshPending(); }
+    }
+    if (!failedCount()) S.modal = null;
+    S.notice = null; render();
+    await flush(); await flushLog();
+  }
+  async function dismissFailed(id) {
+    if (S.failed.some(x => x.id === id)) { S.failed = S.failed.filter(x => x.id !== id); store.set("failed", S.failed); }
+    else { const u = pendingUrls.get(id); if (u) { URL.revokeObjectURL(u); pendingUrls.delete(id); } await photoStore.remove(id); await refreshPending(); }
+    S.modal = failedCount() ? { kind: "failed" } : null;
+    render();
+  }
+
   let flushing = false;
   async function flush() {
     if (flushing || !Object.keys(S.outbox).length) return;
     flushing = true;
     const r = await flushOutbox({ get: () => S.outbox, set: (b) => { S.outbox = b; store.set("outbox", b); } }, db);
-    S.online = !r.offline;
+    S.online = !r.offline; S.held = r.held;
     for (const row of r.saved) {
-      const i = S.rows.findIndex(x => x.progress_id === row.id);
-      if (i >= 0) S.rows[i] = { ...S.rows[i], qty_done: row.qty_done, state: row.state };
+      // the row it was sent for (or, moved to a new work order, the one it landed on): show the saved number either way
+      for (let i = 0; i < S.rows.length; i++) if (S.rows[i].progress_id === row.id || S.rows[i].progress_id === row.from) S.rows[i] = { ...S.rows[i], qty_done: row.qty_done, state: row.state };
     }
     store.set("rows_" + S.dept, { rows: S.rows, at: S.rowsAt });
-    if (r.refused.length) S.notice = r.refused[0].reason;
+    keepFailed(r.refused); noticeRefusals(r.refused);
+    // a change order came in since this tablet loaded the job: the count went to the new work order (or was refused) — show the job as it is now
+    const moved = r.saved.filter(x => x.moved);
+    if (moved.length) showToast(`${moved[0].label || "Your count"}: saved on the job's new work order.`);
+    if (moved.length || r.refused.length) await loadRows();
+    // stay on the same sheet, now the new version (only once the new rows are here; a tap before then goes to the old row, which set_count moves too)
+    for (const x of moved) if (S.view.progressId === x.from && S.rows.some(y => y.progress_id === x.id)) S.view = { ...S.view, progressId: x.id };
     flushing = false;
     render();
     if (!r.offline && Object.keys(S.outbox).length) flush();   // taps made while that was sending
@@ -1730,7 +1849,8 @@ if (typeof document !== "undefined") (function () {
     const r = await flushLogbox({ get: () => S.logbox, set: (b) => { S.logbox = b; store.set("logbox", b); } }, db);
     logFlushing = false;
     if (r.offline) S.online = false;
-    if (r.refused.length) S.notice = `${r.refused[0].label}: ${r.refused[0].reason}`;
+    S.held = r.held || S.held;
+    keepFailed(r.refused); noticeRefusals(r.refused);
     if (r.sent.length) {
       const last = r.sent[r.sent.length - 1];
       const said = typeof last.data === "string" ? last.data : last.data && last.data.summary;
@@ -1755,9 +1875,10 @@ if (typeof document !== "undefined") (function () {
     try { r = await flushPhotobox(photoStore, db, (id) => pendingIds.has(id)); }
     finally { photoFlushing = false; }
     if (r.offline) S.online = false;
-    for (const x of r.sent.concat(r.refused)) { const u = pendingUrls.get(x.id); if (u) { URL.revokeObjectURL(u); pendingUrls.delete(x.id); } }
+    for (const x of r.sent) { const u = pendingUrls.get(x.id); if (u) { URL.revokeObjectURL(u); pendingUrls.delete(x.id); } }
     await refreshPending();
-    if (r.refused.length) S.notice = `${r.refused[0].label}: ${r.refused[0].reason}`;
+    S.held = r.held || S.held;
+    noticeRefusals(r.refused);
     if (r.sent.length) {
       showToast(r.sent.length === 1 ? (r.sent[0].data && r.sent[0].data.summary) || "Photo saved." : `${r.sent.length} photos saved.`);
       if (S.tab === "loadout") await loadLoadouts();
@@ -1832,8 +1953,8 @@ if (typeof document !== "undefined") (function () {
   }
 
   function syncBadge() {
-    const n = Object.keys(S.outbox).length, m = Object.keys(S.logbox).length;
-    const dd = S.pending.filter(p => p.kind === "delivery_done").length, pd = S.pending.filter(p => p.kind === "pickup_done").length, k = S.pending.length - dd - pd;
+    const n = Object.keys(S.outbox).length, m = Object.keys(S.logbox).length, live = S.pending;
+    const dd = live.filter(p => p.kind === "delivery_done").length, pd = live.filter(p => p.kind === "pickup_done").length, k = live.length - dd - pd;
     if (n || m || k || dd || pd) {
       const parts = [];
       if (n) parts.push(`${n} count${n === 1 ? "" : "s"}`);
@@ -1841,7 +1962,7 @@ if (typeof document !== "undefined") (function () {
       if (k) parts.push(`${k} photo${k === 1 ? "" : "s"}`);
       if (dd) parts.push(`${dd} deliver${dd === 1 ? "y" : "ies"}`);
       if (pd) parts.push(`${pd} pickup${pd === 1 ? "" : "s"}`);
-      return `<span class="sync waiting">${parts.join(" and ")} waiting to send</span>`;
+      return `<span class="sync waiting"${S.held && S.online ? ` title="${esc(S.held)}"` : ""}>${parts.join(" and ")} waiting to send</span>`;
     }
     if (!S.online || S.fromCache) return `<span class="sync offline">Offline</span>`;
     return `<span class="sync">All saved</span>`;
@@ -1905,6 +2026,8 @@ if (typeof document !== "undefined") (function () {
     let out = "";
     if (S.me && S.me.is_test) out += `<div class="banner info"><b>Test login.</b> You're seeing test jobs only. Nothing done here touches real work.</div>`;
     if (S.notice) out += `<div class="banner warn">${esc(S.notice)}</div>`;
+    const nf = failedCount();
+    if (nf) out += `<div class="banner warn failbar"><span><b>${nf} thing${nf === 1 ? "" : "s"} couldn't be sent.</b> ${nf === 1 ? "It's" : "They're"} kept on this ${S.dept === "delivery" ? "phone" : "tablet"} until you try again or dismiss ${nf === 1 ? "it" : "them"}.</span><button class="btn" data-failed="1">See ${nf === 1 ? "it" : "them"}</button></div>`;
     if (S.fromCache && S.rowsAt) {
       const t = new Date(S.rowsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
       out += `<div class="banner info">No connection — showing the list from ${esc(t)}. Counts you enter are kept and will send when the connection is back.</div>`;
@@ -3041,6 +3164,14 @@ if (typeof document !== "undefined") (function () {
       return `<div class="ovl" data-close="1"><div class="viewer" role="dialog" aria-modal="true" aria-label="${esc(m.title)}">
         <img alt="${esc(m.title)}" src="${esc(m.url)}"><div class="vcap"><b>${esc(m.title)}</b></div>
         <div class="mdl-btns"><button data-close="1">Close</button></div></div></div>`;
+    } else if (m.kind === "failed") {             // Couldn't send: each thing, why, and what to do (R-1)
+      const items = S.failed.map(f => ({ id: f.id, label: f.label, reason: f.reason, at: f.at, img: null }))
+        .concat(failedPhotos().map(p => ({ id: p.id, label: p.label || "Photo", reason: p.failed.reason, at: p.failed.at, img: p.url })))
+        .sort((a, b) => String(a.at).localeCompare(String(b.at)));
+      inner = `<h3>Couldn't send</h3><div class="sub">The database said no to these, so they're kept here instead of being thrown away. Try again once the problem is sorted (or ask the office), or dismiss what isn't needed.</div>
+        ${items.map(x => `<div class="failitem">${x.img ? `<img alt="" src="${esc(x.img)}">` : ""}<div class="failtext"><b>${esc(x.label || "Something")}</b><div>${esc(x.reason || "")}</div>
+          <small>${esc(fmtWhen(x.at))}</small></div><div class="failbtns"><button class="btn" data-failretry="${esc(x.id)}">Try again</button><button class="link" data-faildismiss="${esc(x.id)}">Dismiss</button></div></div>`).join("") || `<div class="sub">Nothing left.</div>`}
+        <div class="mdl-btns"><button class="btn" data-close="1">Close</button></div>`;
     } else if (m.kind === "confirm") {
       inner = `<h3>${esc(m.title)}</h3><div class="sub">${esc(m.text)}</div>
         <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button><button class="go" data-confirm="1">${esc(m.yes)}</button></div>`;
@@ -3186,7 +3317,7 @@ if (typeof document !== "undefined") (function () {
 
   function setCount(r, qty) {
     qty = Math.max(0, Math.min(r.qty_required, qty));
-    S.outbox = setPending(S.outbox, r.progress_id, qty);
+    S.outbox = setPending(S.outbox, r.progress_id, qty, `${r.project_id} sheet ${r.sheet_number} · ${DEPT_NAME[r.department] || DEPT_NAME[S.dept] || ""}: ${qty} of ${r.qty_required} done`);
     store.set("outbox", S.outbox);
     S.notice = null;
     render();
@@ -3365,13 +3496,20 @@ if (typeof document !== "undefined") (function () {
       if (error) { S.notice = friendlyError(error); render(); return; }
       window.open(data.signedUrl, "_blank");
     });
+    on("[data-failed]", () => { S.modal = { kind: "failed" }; render(); });
+    on("[data-failretry]", (b) => retryFailed(b.dataset.failretry));
+    on("[data-faildismiss]", (b) => {
+      S.modal = { kind: "confirm", title: "Dismiss this?", text: "It's taken off this device and won't be sent. If it still matters, enter it again or tell the office.", yes: "Dismiss it",
+                  run: () => dismissFailed(b.dataset.faildismiss) };
+      render();
+    });
     on("[data-signout]", async () => {
-      const waiting = Object.keys(S.outbox).length + Object.keys(S.logbox).length + S.pending.length;
-      if (waiting && !confirm("Some counts, entries or photos haven't sent yet. Signing out will throw them away. Sign out anyway?")) return;
+      const waiting = Object.keys(S.outbox).length + Object.keys(S.logbox).length + S.pending.length + S.failed.length + S.failedPh.length;
+      if (waiting && !confirm("Some counts, entries or photos haven't sent yet (or couldn't be sent). Signing out will throw them away. Sign out anyway?")) return;
       await db.auth.signOut();
-      S.me = null; S.outbox = {}; S.logbox = {}; store.set("outbox", {}); store.set("logbox", {}); store.set("me", null);
+      S.me = null; S.outbox = {}; S.logbox = {}; S.failed = []; store.set("outbox", {}); store.set("logbox", {}); store.set("failed", []); store.set("me", null);
       for (const x of await photoStore.list()) await photoStore.remove(x.id);
-      S.pending = []; S.localLoadouts = []; store.set("loadouts_local", []);
+      S.pending = []; S.failedPh = []; S.localLoadouts = []; store.set("loadouts_local", []);
       signIn();
     });
 
@@ -3906,7 +4044,7 @@ if (typeof document !== "undefined") (function () {
 if (typeof module !== "undefined") module.exports = { PAGE_VERSION, arrowWaiting, arrowWaitFor, arrowOut, waitingText, withSends, routeWords, toSend, ROUTES, SEND_DEPTS, DEPT_NAME, buildPast, pastLine, PAST_DEPTS, withFinishBy, finishWords, dateLine, keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
   daysLeft, daysText, fmtDate, localISO, daysSince, agoText, setPending, flushOutbox, newId, queueEntry, flushLogbox, dueForMe, taskWhen,
   problemState, splitProblems, defectState, splitIssues, withReady, readyOf, readyKnown, waitingText, HAS_UPSTREAM, defectCounts, supplyLine, filterJobs, sheetsText, isNetworkError, friendlyError, DEPTS,
-  fitSize, photoPath, photoError, flushPhotobox, loadoutSheets, sizeLabel, loadoutPieces, missingText,
+  fitSize, photoPath, photoError, flushPhotobox, sendOutcome, heldTooLong, loadoutSheets, sizeLabel, loadoutPieces, missingText,
   supplyItemsFor, supplyMissing, supplyText, deliveryPlan, isFreshShot, fmtWhen, deliveryLine, TRIP_KINDS, tripName, pickupPlan, pickupLine,
   CHAIN, canAdvance, advJobs, advSheets, advShown, advBefore, advHere, advTidy, advChanges, withAdvPending, invListFor, tabsWithInventory, invPayload, invFeet };
 </script>

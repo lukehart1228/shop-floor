@@ -573,7 +573,13 @@ function makeZip(files) {
   return out;
 }
 
-function csvCell(v) { const t = v === null || v === undefined ? "" : String(v); return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; }
+/** One spreadsheet cell. Text that starts with = + - @ (or a tab or return) gets a leading ' so Excel shows it as
+ *  typed instead of running it as a formula ("-2 legs short" stays text). Numbers are left alone. (Review finding R-12, 6 Oct.) */
+function csvCell(v) {
+  let t = v === null || v === undefined ? "" : String(v);
+  if (typeof v !== "number" && /^[=+\-@\t\r]/.test(t)) t = "'" + t;
+  return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+}
 /** The spreadsheet inside the zip: every photo, so the archive can be searched without the app. */
 function photoCsv(list, batch) {
   const head = ["File", "Project", "Job", "Sheet", "Department", "Kind", "What", "Note", "Taken by", "Taken at", "Entered by mistake", "Test job", "Batch"];
@@ -826,7 +832,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-10-06.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-10-06.2";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
