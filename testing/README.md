@@ -1,6 +1,6 @@
 # Testing kit — Shop Floor Production System
 
-*For build chats. Luke doesn't need to read this.* This one file replaces the sixteen `testing-kit*.md` parts (they're kept in `history/` for their feature test scripts). Updated 2 Oct 2026.
+*For build chats. Luke doesn't need to read this.* This one file replaces the sixteen `testing-kit*.md` parts (they're kept in `history/` for their feature test scripts). Updated 5 Oct 2026 (with trip_types.sql).
 
 Every change is tested in Claude's sandbox against stand-ins for Supabase, Monday and the browser before Luke gets it. **Re-run the relevant tests before handing Luke any changed file,** and say plainly what the stand-ins can't cover: the real SQL Editor, GitHub Pages, the real Monday API, a real tablet's camera, signature and zoom, and jsDelivr in a real browser.
 
@@ -26,6 +26,15 @@ This installs Postgres 16 with `pg_cron` and the `http` extension, downloads the
 - Browser tests: `cd /home/claude/sf/t && TZ=America/Indiana/Indianapolis node test_x.js`. **Always use shop time**: after 8 pm Eastern the sandbox (UTC) is on tomorrow.
 - `test_same.js`: every supervisor's screens (Mike, Donnie, Willie, KP, Jim, Eric, Shawn) on the new `index.html` (`/home/claude/sf/out/index.html`) compared with the live one, ids blanked. **Run it on every tablet-page change.** It also checks the version report. For a build that adds a tab, `NAV=ignore` sets the tab strip aside and `SKIP_TABS=past` skips a named tab; then read every remaining difference.
 - `test_handoff_recent.js` (2 Oct): started jobs stay on Ready, the handoff hold, and Recently completed. Seed, load `scenario_handoff_recent.sql`, then run with `MODE=new` (with `handoff_recent.sql`) or `MODE=old` (without). On the live page it fails, which proves it tests something.
+- `test_pdf_ticket.js` (5 Oct): a trip's PDF ticket and PDF site files open on their own screen inside the app, never in a new tab; pictures still open in the photo viewer; the no-viewer, no-signal and broken-file messages. Seed, then run. It makes its own sample PDFs (`/tmp/sf_pdf_fixtures/`). On the live page of 2 Oct (`PAGE=…`) it fails, which proves it tests something.
+- `test_pdf_chromium.js` (5 Oct): the real pdf.js 3.11.174 drawing the ticket in Chromium at phone size, a tampered viewer file refused, and the ticket still drawing offline after the app is reopened. Seed first; it schedules its own trip. Run with `PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS=1 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers` (the first routes the service worker's requests through the stand-ins). Playwright is at `/home/claude/.npm-global/lib/node_modules/playwright`.
+- `test_feedback.js` (5 Oct): the Feedback button on every signed-in page (tablet, phone, office, deliveries, inventory, pace, upload), what each note records, the tablet's offline queue, the office's Feedback list (filter, copy as text). Load `feedback.sql` (and `install_log.sql`), seed, run. `OLDDB=1` on a database without `feedback.sql` tests the "not set up yet" messages; `OUT=/home/claude/sf/repo` runs it on the live pages, where it fails.
+- `test_trip_types.js` (5 Oct): dock to dock deliveries and Delivery's tasks — Julia's kinds, scheduling both, changing a task (adding a PROJ later), cancelling and putting back; Shawn's dock-to-dock screen and a task's Done (online and with no signal); the photo sender's task-photo and drop-photo paths; the TV's going-out list. Load `feedback.sql`, `trip_types.sql` and `install_log.sql`, seed, run. `OLDDB=1` on a database without `trip_types.sql`. Makes a Julia (schedules deliveries, a supervisor with a department).
+- `test_guards.sh` (updated 5 Oct): runs `feedback.sql` and `trip_types.sql` too; `delivery_types.sql` and `tv_pace.sql` now refuse, as `trip_types.sql` replaced pieces of both.
+- `test_same.js`: `SHOWDIFF=1` prints where a screen differs from the live page.
+- `test_office_sections.js` (5 Oct): the office app in Chromium — Deliveries, Upload, Inventory and Pace inside the office (frames, title rows hidden, state kept when switching), Julia's Deliveries-only office, a supervisor turned away, Feedback from inside a section, every page reporting its version, each section still working on its own. Load `feedback.sql` and `install_log.sql`, seed, run with `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`. In Playwright the last route added wins: add the catch-all block before the supabase-js stand-in.
+- **Pages that load `sf-common-….js`** (office, delivery, inventory, pace, upload): a jsdom harness must run that file and the page's own script as ONE eval (`pageScript()` in `test_feedback.js`), because jsdom keeps each eval's top-level `const`s separate, unlike a browser.
+- `test_same_office.js` (5 Oct): the office-side pages drawn live vs new, the same apart from the Feedback button. `test_same.js` covers the tablet: compare against a copy of the new `index.html` with the `data-feedback` button line taken out (`NEWPAGE=…`).
 - `test_guards.sh` and `test_devices.sh` cover the install log, the guards, `check_everything()` and device versions (`install_log.sql`).
 - Older feature tests (Advance, deliveries, pickups, pace, inventory, routes…) are in `history/`. Pull one out with `python3 base/kx.py history/testing-kit-deliveries.md "test_deliveries.js" t/test_deliveries.js`. They were written against the helpers of their day, so they may need the paths above, and a few are stale (see §6).
 
@@ -67,7 +76,7 @@ Supabase's API connects as `authenticator`, then switches role and sets the JWT 
 ## 5. Rules every page change follows
 
 1. **Bump `PAGE_VERSION`** in `index.html` (`2026-09-30.3` → `2026-10-02.1`; keep the number after the dot to one digit per day). Update `OFFICE_VERSION` in `office.html` when it changes.
-2. **Check library hashes.** Pages load supabase-js and pdf-lib with `integrity`. A library change means a new hash: `npm pack @supabase/supabase-js@2.45.4`, then `openssl dgst -sha384 -binary dist/umd/supabase.js | openssl base64 -A`. `supabase.min.js` isn't in the package; never hash it.
+2. **Check library hashes.** Pages load supabase-js and pdf-lib with `integrity`; `index.html` also loads pdf.js 3.11.174 (`legacy/build/pdf.worker.min.js`, then `pdf.min.js`, both checked) when a trip has a PDF. A library change means a new hash: `npm pack @supabase/supabase-js@2.45.4`, then `openssl dgst -sha384 -binary dist/umd/supabase.js | openssl base64 -A`. `supabase.min.js` isn't in the package; never hash it.
 3. **Make sure the new page works on the old database and the old page on the new one.** Test both, because tablets and the database never update at the same moment.
 
 ## 6. Gotchas that cost time
@@ -96,6 +105,7 @@ Supabase's API connects as `authenticator`, then switches role and sets the JWT 
 - **Read `#app`, never `document.body`**: the body holds the page's script text.
 - `textContent` runs adjacent elements together.
 - **Close a window only after its render settles** (`await wait(500)`).
+- **`pgsupa.js` keeps uploaded files in memory,** so a test that downloads a file must upload it in the same process.
 - `pgsupa.js` sends `jsonb` arguments as JSON (as Supabase does) and returns downloads with their uploaded type. Work-order pages download as a tiny PNG.
 - jsdom has no Cache API, `print`, `open` or `createObjectURL`; stub them. pdf-lib and the page live in different realms, so wrap bytes with `new Uint8Array(fs.readFileSync(…))`.
 - The office asks for a PIN on a new computer: click `[data-k]` 1-2-3-4 twice.
