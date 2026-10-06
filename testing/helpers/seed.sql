@@ -23,5 +23,5 @@ begin
   end loop;
 end $$;
 select make_test_job('PROJ-00418');
-select set_person('test@pdindy.com','Test Supervisor','supervisor','{milling,cnc,sanding,finishing,full_custom,metal,assembly_qc,delivery}',true);
+select set_person('test@example.com','Test Supervisor','supervisor','{milling,cnc,sanding,finishing,full_custom,metal,assembly_qc,delivery}',true);
 insert into profiles (id, full_name, role, departments) values ('77777777-7777-7777-7777-777777777777','Shawn K','supervisor','{delivery}') on conflict do nothing;

@@ -191,13 +191,13 @@ function makeClient(startUser = null) {
 }
 
 module.exports = { makeClient, admin, pool, files, setOffline: (v) => { offline = v; },
-  users: { mike: { id: "11111111-1111-1111-1111-111111111111", email: "sanding@pdindy.com" },
-           luke: { id: "22222222-2222-2222-2222-222222222222", email: "lukehart@pdindy.com" },
-           test: { id: "33333333-3333-3333-3333-333333333333", email: "test@pdindy.com" },
-           donnie: { id: "44444444-4444-4444-4444-444444444444", email: "donnie@pdindy.com" },
-           willie: { id: "55555555-5555-5555-5555-555555555555", email: "willie@pdindy.com" },
-           kp: { id: "66666666-6666-6666-6666-666666666666", email: "kp@pdindy.com" },
-           shawn: { id: "77777777-7777-7777-7777-777777777777", email: "shawn@pdindy.com" },
-           david: { id: "88888888-8888-8888-8888-888888888888", email: "ddart@pdindy.com" },
-           jim: { id: "99999999-9999-9999-9999-999999999990", email: "finish@pdindy.com" },
-           eric: { id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", email: "fullcustom@pdindy.com" } } };
+  users: { mike: { id: "11111111-1111-1111-1111-111111111111", email: "mike@example.com" },
+           luke: { id: "22222222-2222-2222-2222-222222222222", email: "luke@example.com" },
+           test: { id: "33333333-3333-3333-3333-333333333333", email: "test@example.com" },
+           donnie: { id: "44444444-4444-4444-4444-444444444444", email: "donnie@example.com" },
+           willie: { id: "55555555-5555-5555-5555-555555555555", email: "willie@example.com" },
+           kp: { id: "66666666-6666-6666-6666-666666666666", email: "kp@example.com" },
+           shawn: { id: "77777777-7777-7777-7777-777777777777", email: "shawn@example.com" },
+           david: { id: "88888888-8888-8888-8888-888888888888", email: "david@example.com" },
+           jim: { id: "99999999-9999-9999-9999-999999999990", email: "jimw@example.com" },
+           eric: { id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", email: "ericb@example.com" } } };
