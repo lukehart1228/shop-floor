@@ -52,7 +52,7 @@ async function isSetReturning(fn) {
 }
 
 function builder(client, table) {
-  const st = { table, kind: "select", cols: "*", where: [], params: [], order: [], limit: null, single: null, values: null, returning: null };
+  const st = { table, kind: "select", cols: "*", where: [], params: [], order: [], limit: null, offset: null, single: null, values: null, returning: null };
   const p = (v) => { st.params.push(v); return "$" + st.params.length; };
   const b = {
     select(cols = "*") { if (st.kind === "update") st.returning = cols; else st.cols = cols; return b; },
@@ -67,6 +67,7 @@ function builder(client, table) {
     is(c, v) { st.where.push(`${q(c)} is ${v === null ? "null" : v ? "true" : "false"}`); return b; },
     order(c, o = {}) { st.order.push(`${q(c)} ${o.ascending === false ? "desc" : "asc"}${o.nullsFirst ? " nulls first" : ""}`); return b; },
     limit(n) { st.limit = n; return b; },
+    range(from, to) { st.offset = from; st.limit = to - from + 1; return b; },      // 6 Oct: paging, as Supabase does it
     maybeSingle() { st.single = "maybe"; return b; },
     single() { st.single = "one"; return b; },
     then(res, rej) { return exec().then(res, rej); },
@@ -80,7 +81,9 @@ function builder(client, table) {
       const sets = Object.entries(st.values).map(([k, v]) => `${q(k)} = ${p(v)}`).join(", ");
       sql = `update ${q(st.table)} set ${sets}${w}${st.returning ? " returning " + cols(st.returning) : ""}`;
     } else {
-      sql = `select ${cols(st.cols)} from ${q(st.table)}${w}${st.order.length ? " order by " + st.order.join(", ") : ""}${st.limit ? " limit " + st.limit : ""}`;
+      // SF_MAX_ROWS=1000 caps every select the way Supabase's API does (it returns at most 1,000 rows a request)
+      const cap = Number(process.env.SF_MAX_ROWS || 0), lim = cap ? Math.min(st.limit || cap, cap) : st.limit;
+      sql = `select ${cols(st.cols)} from ${q(st.table)}${w}${st.order.length ? " order by " + st.order.join(", ") : ""}${lim ? " limit " + lim : ""}${st.offset ? " offset " + st.offset : ""}`;
     }
     client.log.push({ table: st.table, kind: st.kind });
     const r = await runAs(client.user, sql, st.params);
