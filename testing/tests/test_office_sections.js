@@ -7,6 +7,7 @@ const fs = require("fs"), http = require("http"), path = require("path");
 const { chromium } = require("/home/claude/.npm-global/lib/node_modules/playwright");
 const { makeClient, users, admin } = require("./pgsupa");
 const OUT = process.env.OUT || "/home/claude/sf/out", REPO = "/home/claude/sf/repo";
+const OFFICE_V = (require("fs").readFileSync(`${process.env.OUT || "/home/claude/sf/out"}/office.html`, "utf8").match(/const OFFICE_VERSION = "([^"]+)"/) || [])[1];   // 6 Oct: read from the page, not written in here
 let pass = 0, fail = 0;
 const ok = (n, c, x = "") => { c ? pass++ : fail++; console.log(`${c ? "PASS" : "FAIL"}  ${n}${x ? "  — " + x : ""}`); };
 
@@ -106,7 +107,7 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   await p.waitForTimeout(1500);
   const dev = await p.evaluate(() => JSON.parse(localStorage.getItem("sf_device")));
   const rep = (await admin.query("select page, version from device_versions where device_id = $1 order by page", [dev])).rows.map(r => r.page + " " + r.version);
-  ok("Every page reports its version, as one device", ["delivery 2026-10-05.2", "inventory 2026-10-05.1", "office 2026-10-05.1", "pace 2026-10-05.1"].every(x => rep.includes(x)), rep.join(", "));
+  ok("Every page reports its version, as one device", ["delivery 2026-10-05.2", "inventory 2026-10-05.1", `office ${OFFICE_V}`, "pace 2026-10-05.1"].every(x => rep.includes(x)), rep.join(", "));
   await menu(p); await p.click('.menu [data-section="upload"]');
   await p.waitForFunction(() => [...document.querySelectorAll("#secs iframe")].some(f => !f.hidden && /upload/.test(f.src) && f.contentDocument && f.contentDocument.body && f.contentDocument.body.innerText.length > 20), null, { timeout: 15000 });
   fr = frameOf(p, "upload.html");
