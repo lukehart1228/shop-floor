@@ -48,6 +48,7 @@ async function screens(html, user) {
     const only = (o) => o.filter(([n]) => !(process.env.SKIP_TABS || "").split(",").includes(n.replace(/^tab /, "")));
     const ao = only(a.out), bo = only(b.out);
     const diffs = ao.filter(([n, h], i) => !bo[i] || bo[i][0] !== n || norm(h) !== norm(bo[i][1])).map(([n]) => n);
+    if (process.env.SHOWDIFF) for (const n of diffs) { const i = ao.findIndex(x => x[0] === n); const x = norm(ao[i][1]), y = norm((bo[i] || [,''])[1]); let k = 0; while (x[k] === y[k]) k++; console.log(`  DIFF ${who} ${n}\n   live: ${x.slice(k - 120, k + 160)}\n   new:  ${y.slice(k - 120, k + 160)}`); }
     ok(`${who}: ${ao.length} screens identical to the live page`, diffs.length === 0 && ao.length === bo.length && ao.length > 0, diffs.join(", "));
     ok(`${who}: the new page reports once`, b.reports.length === 1 && b.reports[0][1].p_page === "index" && /^\d{4}-\d\d-\d\d\.\d+$/.test(b.reports[0][1].p_version) && b.dev && b.reports[0][1].p_device === b.dev,
        JSON.stringify(b.reports.map(r => r[1].p_version)));
