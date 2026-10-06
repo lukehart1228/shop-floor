@@ -5,7 +5,7 @@ L=${LIVE:-/home/claude/sf/repo/sql}
 FP="select md5(string_agg(x, '|' order by x)) from (select pg_get_functiondef(p.oid) x from pg_proc p where pronamespace='public'::regnamespace and prokind='f' union all select c.relname||pg_get_viewdef(c.oid) from pg_class c where relnamespace='public'::regnamespace and relkind='v') q"
 before=$($P -c "$FP"); runs0=$($P -c "select count(*) from sql_file_runs")
 refused=(); ran=()
-for f in schema verify_setup upload_function monday_sync tablet office test_lane catch_up problems flags routine_tasks supplies arrow_qc tv check_floor photos check_photos advance supply_lists loadouts_v2 deliveries deliveries_v2 ready_issues finish_by inventory pace send_routes arrow_pickup delivery_types install_log tv_pace handoff_recent feedback trip_types; do
+for f in schema verify_setup upload_function monday_sync tablet office test_lane catch_up problems flags routine_tasks supplies arrow_qc tv check_floor photos check_photos advance supply_lists loadouts_v2 deliveries deliveries_v2 ready_issues finish_by inventory pace send_routes arrow_pickup delivery_types install_log tv_pace handoff_recent feedback trip_types onedrive_save; do
   if out=$($P -1 -f $L/$f.sql 2>&1 >/dev/null); then ran+=($f); else
     if echo "$out" | grep -q "Stop — nothing was changed"; then refused+=($f); else echo "UNEXPECTED ERROR $f: $out"; fi; fi
 done
@@ -14,8 +14,8 @@ echo "RAN: ${#ran[@]} files"
 exp="schema monday_sync tablet problems arrow_qc tv photos loadouts_v2 deliveries deliveries_v2 ready_issues send_routes delivery_types tv_pace"   # trip_types.sql (5 Oct) replaced pieces of the last two
 [ "${refused[*]}" == "$exp" ] && echo "PASS refusals are exactly the replaced files" || echo "FAIL refusals, expected: $exp"
 after=$($P -c "$FP")
-[ "$before" == "$after" ] && echo "PASS every function and view unchanged after all 34 runs" || echo "FAIL definitions changed"
-echo "runs logged: $runs0 -> $($P -c "select count(*) from sql_file_runs") (expect +20, refusals leave no line)"
+[ "$before" == "$after" ] && echo "PASS every function and view unchanged after all 35 runs" || echo "FAIL definitions changed"
+echo "runs logged: $runs0 -> $($P -c "select count(*) from sql_file_runs") (expect +21, refusals leave no line)"
 $P -c "select count(*) from sql_file_runs where how='ran' and ran_at > now() - interval '5 min'" | xargs echo "  ran lines just now:"
 bash /home/claude/sf/base/checks.sh | grep -v -E ' ([0-9]+)/\1$' | sed 's/^/  NOT ALL PASS: /'
 echo "--- the message Luke sees:"; $P -1 -f $L/ready_issues.sql 2>&1 | grep -o 'Stop.*' | head -1
