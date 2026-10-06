@@ -595,6 +595,108 @@ function filingItem(f) {
            loadout_id: f.loadout_id, at: f.at, mistake: f.mistake, test: f.is_test, archive_batch: f.archive_batch,
            gps: f.lat !== null && f.lat !== undefined ? `${Number(f.lat).toFixed(6)}, ${Number(f.lng).toFixed(6)}` : "" };
 }
+/* ---- saving to OneDrive and the hard drive (onedrive_save.sql, 6 Oct): the parts that don't touch folders ---- */
+const SAVE_DIR = "shop-floor data";
+const PROJ_RE = /^proj[\s_-]*0*(\d+)(?!\d)/i;
+/** "Proj-00418 Smith Table" → 418; "PROJ-00418" → 418; anything else → null */
+function projNumber(name) { const m = String(name || "").match(PROJ_RE); return m ? Number(m[1]) : null; }
+/** One folder or file name that Windows and OneDrive accept */
+function safeSeg(s) {
+  let t = String(s ?? "").replace(/[\u0000-\u001f\\/:*?"<>|]+/g, "-").trim().replace(/[. ]+$/, "");
+  if (!t || /^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i.test(t)) t = "_" + t;
+  return t.slice(0, 120);
+}
+/** "PROJ-00418/TB-03/TB-03-2 Delivery Picture.jpg" → ["TB-03", "TB-03-2 Delivery Picture.jpg"], the path inside shop-floor data */
+function saveRelPath(filingName) { return String(filingName).split("/").slice(1).filter(Boolean).map(safeSeg); }
+/** a time in shop time, "2026-10-14 09:05" */
+function stampShop(ts) {
+  if (!ts) return "";
+  const d = new Date(ts); if (isNaN(d)) return String(ts);
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/Indiana/Indianapolis", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d).map(x => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
+}
+function csvText(head, rows) { return "\ufeff" + [head, ...rows].map(r => r.map(csvCell).join(",")).join("\r\n") + "\r\n"; }
+const byText = (f) => (a, b) => String(f(a)).localeCompare(String(f(b)));
+function productionCsv(rows) {
+  return csvText(["Sheet", "Item", "Department", "Pieces done", "Of", "State", "Started", "Finished", "How it was finished", "Finished by", "Work order version"],
+    (rows || []).map(r => [r.sheet, r.item || "", r.department, r.done, r.of, r.state, r.started || "", r.finished || "", r.how || "", r.by || "", r.version ?? ""]));
+}
+/** Defects and issues, each followed by its replies */
+function issuesCsv(defects, problems) {
+  const items = [
+    ...(defects || []).map(d => ({ at: d.logged_at, row: ["Defect", d.sheet_number ?? "", d.department_name || d.department, d.defect_type || "", d.note || "", d.logged_by_name || "",
+      stampShop(d.logged_at), d.ask_office ? (d.office_status || "Asked the office") : "Logged", d.answered_by_name || "", stampShop(d.answered_at),
+      d.voided ? `yes${d.void_reason ? ": " + d.void_reason : ""}` : ""], thread: d.thread })),
+    ...(problems || []).map(p => ({ at: p.raised_at, row: ["Issue", p.sheet_number ?? "", p.department_name || p.department, p.work_stopped ? "Work stopped" : "", p.body || "",
+      p.raised_by_name || "", stampShop(p.raised_at), p.status || "", p.answered_by_name || "", stampShop(p.answered_at), ""], thread: p.thread }))]
+    .sort((a, b) => String(a.at).localeCompare(String(b.at)) || String(a.row).localeCompare(String(b.row)));
+  const rows = [];
+  for (const it of items) {
+    rows.push(it.row);
+    for (const m of (it.thread || []).slice().sort(byText(m => m.at)))
+      rows.push(["", "", "", m.kind === "answer" ? "Answer" : "Reply", m.body || "", m.by || "", stampShop(m.at), "", "", "", ""]);
+  }
+  return csvText(["Kind", "Sheet", "Department", "What", "Note or message", "By", "When", "Status", "Answered by", "Answered", "Entered by mistake"], rows);
+}
+function flagsCsv(flags) {
+  return csvText(["Department", "Level", "Note", "Set by", "Set", "Open now", "Cleared or replaced", "Cleared by", "Clearing note"],
+    (flags || []).slice().sort(byText(f => f.set_at)).map(f => [f.department_name || (f.department ? f.department : "Whole job"), f.level, f.note || "", f.set_by_name || "",
+      stampShop(f.set_at), f.is_open ? "yes" : "", stampShop(f.cleared_at), f.cleared_by_name || "", f.clear_note || ""]));
+}
+function arrowCsv(items) {
+  return csvText(["Sheets", "Description", "Service", "Vendor", "Department", "Waiting to go since", "Queued by", "Gone to Arrow", "Taken by", "Sent", "Sent by", "Returned",
+                  "Returned by", "Entered by mistake"],
+    (items || []).slice().sort(byText(a => a.queued_on || a.sent_on)).map(a => [(a.sheet_numbers || []).join(" "), a.description || "", a.service === "paint" ? "Paint" : a.service ? "Powdercoat" : "",
+      a.vendor || "", a.department_name || "", a.queued_on || "", a.queued_by_name || "", stampShop(a.gone_at), a.gone_by_name || "", a.sent_on || "", a.sent_by_name || "",
+      a.returned_on || "", a.returned_by_name || "", a.voided ? `yes${a.void_reason ? ": " + a.void_reason : ""}` : ""]));
+}
+/** Every record for one job, by file name. A record with nothing in it isn't written. */
+function jobRecords(d) {
+  const out = {};
+  if ((d.production || []).length) out["Production record.csv"] = productionCsv(d.production);
+  if ((d.defects || []).length || (d.problems || []).length) out["Issues and defects.csv"] = issuesCsv(d.defects, d.problems);
+  if ((d.flags || []).length) out["Flags.csv"] = flagsCsv(d.flags);
+  if ((d.arrow || []).length) out["Arrow.csv"] = arrowCsv(d.arrow);
+  if ((d.files || []).length) out["Photos and files.csv"] = fileCsv(d.files, "");
+  return out;
+}
+/** The job folders in the OneDrive projects folder: the folder itself and one level down (the hundreds folders).
+ *  A folder whose name starts PROJ-##### is a job, unless it holds folders for other PROJ numbers (then it's a
+ *  hundreds folder). Returns Map(number → [{ dir, path }]); two entries for a number means two folders. */
+async function indexProjectFolders(root) {
+  const found = new Map();
+  const add = (num, dir, path) => { if (!found.has(num)) found.set(num, []); found.get(num).push({ dir, path }); };
+  for await (const [name, h] of root.entries()) {
+    if (h.kind !== "directory" || name === SAVE_DIR) continue;
+    const num = projNumber(name);
+    const kids = [];
+    for await (const [n, k] of h.entries()) if (k.kind === "directory" && projNumber(n) !== null) kids.push([n, k]);
+    const group = kids.some(([n]) => projNumber(n) !== num);
+    if (num !== null && !group) add(num, h, name);
+    else if (group) for (const [n, k] of kids) add(projNumber(n), k, `${name} › ${n}`);
+  }
+  return found;
+}
+async function fsDir(base, segs, create) { let d = base; for (const x of segs) d = await d.getDirectoryHandle(x, { create }); return d; }
+const fsMissing = (e) => e && (e.name === "NotFoundError" || e.name === "TypeMismatchError");
+async function fsSize(dir, name) { try { return (await (await dir.getFileHandle(name)).getFile()).size; } catch (e) { if (fsMissing(e)) return -1; throw e; } }
+/** Is the file already exactly this text? Compared byte for byte: reading a file back as text drops the marker that starts a spreadsheet file */
+async function fsSame(dir, name, text) {
+  let have; try { have = new Uint8Array(await (await (await dir.getFileHandle(name)).getFile()).arrayBuffer()); } catch (e) { if (fsMissing(e)) return false; throw e; }
+  const want = new TextEncoder().encode(text);
+  if (have.byteLength !== want.byteLength) return false;
+  for (let i = 0; i < want.byteLength; i++) if (have[i] !== want[i]) return false;
+  return true;
+}
+/** Write a whole file, then read its size back: a file that didn't land in full is an error, not a save */
+async function fsWrite(dir, name, data) {
+  const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+  const fh = await dir.getFileHandle(name, { create: true });
+  const w = await fh.createWritable(); await w.write(bytes); await w.close();
+  if ((await fh.getFile()).size !== bytes.byteLength) throw new Error(`${name} didn't save in full`);
+  return bytes.byteLength;
+}
 /** "2026-10-14 09:05" or an ISO timestamp → a Date for the zip */
 function atDate(at) {
   const s = String(at || "");
@@ -724,7 +826,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-10-05.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-10-06.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -905,7 +1007,7 @@ if (typeof document !== "undefined") (function () {
     if (arr) S.arrow = arr.concat((S.arrow || []).filter(a => !a.at_vendor));
     if (set) { const a = set.find(s => s.key === "arrow_alert_days"); if (a) S.arrowDays = Number(a.value);
                const t = set.find(s => s.key === "tv_link_made"); S.tvMade = t ? t : null; }
-    await Promise.all([loadPhotoStatus(), loadSync()]);
+    await Promise.all([loadPhotoStatus(), loadSync(), loadSaveStatus()]);
   }
   async function loadSync() {
     const [last, good] = await Promise.all([
@@ -1456,6 +1558,13 @@ if (typeof document !== "undefined") (function () {
         : `${ps.eligible} photo${ps.eligible === 1 ? " is" : "s are"} ready to archive${ps.last_batch ? ` — the last archive was ${ps.days_since_last} days ago` : ""}.`}</p>
         <button class="go" data-tab="photos">Open Photos</button></div>`));
 
+    const sv = S.save && S.save.status;
+    if (sv && sv.due && !S.save.missing) parts.push(sec("saving", "Saving to OneDrive", 0, `<div class="panel"><p class="sub" style="margin:0 0 10px">${!sv.ever
+        ? "Saving the shop floor's files to OneDrive and the hard drive hasn't been set up yet. Choose the two folders on the Photos tab, on the computer that stays open in the office."
+        : !sv.good_at ? "No save has reached both OneDrive and the backup folder yet. The Photos tab says what's in the way."
+        : `The last save that reached both OneDrive and the backup folder was ${sv.days_since_good} days ago${sv.good_by ? `, on ${esc(sv.good_by)}'s computer` : ""}. Open the office page there, or check the Photos tab for what's in the way.`}</p>
+        <button class="go" data-tab="photos">Open Photos</button></div>`));
+
     if ((S.inv || []).length) parts.push(sec("inventory", "Inventory", S.inv.length, `<div class="panel">${S.inv.map(n => `
         <div class="task"><div class="what">${esc(n.text)}</div><div class="detail"><a href="inventory.html">Open the Inventory page</a></div></div>`).join("")}</div>`));
 
@@ -1763,6 +1872,7 @@ if (typeof document !== "undefined") (function () {
     return `<h1>Photos</h1>
       <p class="sub">Photos taken on the floor: on defects and issues, and Delivery's load-outs. Look a job up to see everything photographed on it, and what left the building when.</p>
       ${msgBanner()}
+      ${savePanel()}
       <section class="panel"><h2>Look up a job</h2>
         <div class="btns" style="margin-top:4px"><input class="in" id="phJob" style="flex:1 1 220px; max-width:320px" value="${esc(S.phText)}" placeholder="PROJ number, e.g. 418">
           <button class="go" data-phfind="1">Show</button></div>
@@ -1894,6 +2004,258 @@ if (typeof document !== "undefined") (function () {
     return said.concat(await removeDeliveryDocs());       // delivery files leave with their batch (deliveries.sql)
   }
 
+  // ---------- saving to OneDrive and the hard drive (onedrive_save.sql, 6 Oct) ----------
+  // While this page is open on the computer where the two folders were chosen, it saves on opening and every 30
+  // minutes: each real job's photos, files, signed tickets and records go into "shop-floor data" inside its own
+  // OneDrive folder, and to the backup folder (hard drive) first. Files are written once and never overwritten;
+  // records are rewritten only when they've changed. Nothing is deleted, here or in Supabase.
+  const SAVE_EVERY_MS = 30 * 60 * 1000, SAVE_FIRST_MS = 20 * 1000, SAVE_OVERLAP_MS = 2 * 86400 * 1000, SAVE_BATCH = 20;
+  S.save = { supported: typeof window.showDirectoryPicker === "function", od: null, bk: null, perm: { od: null, bk: null },
+             running: false, progress: "", result: null, status: null, missing: false, started: false };
+  // where the two folders are remembered: this browser's own storage (a folder can't be written down any other way)
+  const saveKv = {
+    mem: new Map(),
+    open() {
+      if (!window.indexedDB) return Promise.resolve(null);
+      return this.p || (this.p = new Promise((res) => { const r = indexedDB.open("sf-save", 1);
+        r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => res(r.result); r.onerror = () => res(null); }));
+    },
+    async get(k) { const d = await this.open(); if (!d) return this.mem.get(k);
+      return new Promise((res) => { const t = d.transaction("kv").objectStore("kv").get(k); t.onsuccess = () => res(t.result); t.onerror = () => res(undefined); }); },
+    async set(k, v) { const d = await this.open(); if (!d) { this.mem.set(k, v); return; }
+      return new Promise((res, rej) => { const tx = d.transaction("kv", "readwrite"); tx.objectStore("kv").put(v, k); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); },
+  };
+  async function saveState() { const v = await saveKv.get("state"); return v && v.since ? v : { since: { od: null, bk: null }, retry: [] }; }
+  async function loadSaveStatus() {
+    let r; try { r = await db.rpc("save_status"); } catch (e) { r = { error: e }; }
+    if (r.error) { S.save.missing = /does not exist|schema cache|could not find/i.test(String(r.error.message)); return; }
+    S.save.missing = false; S.save.status = r.data;
+  }
+  async function saveLoadHandles() {
+    S.save.od = (await saveKv.get("onedrive")) || null; S.save.bk = (await saveKv.get("backup")) || null;
+    for (const k of ["od", "bk"]) {
+      const h = S.save[k];
+      S.save.perm[k] = h ? await h.queryPermission({ mode: "readwrite" }).catch(() => "prompt") : null;
+    }
+  }
+  function saveShow(text) { S.save.progress = text; const el = document.getElementById("saveProgress"); if (el) el.textContent = text; }
+  async function saveStart() {
+    if (S.save.started || !isManager(S.me) || !S.save.supported) return;
+    S.save.started = true;
+    await saveLoadHandles();
+    render();                                   // show the remembered folders (and Resume saving, if the browser wants permission)
+    saveSoon(SAVE_FIRST_MS);
+    setInterval(() => saveRun("auto"), SAVE_EVERY_MS);
+  }
+  function saveSoon(ms) { clearTimeout(S.save.soon); S.save.soon = setTimeout(() => saveRun("auto"), ms); }
+  async function savePick(which) {
+    let h;
+    try { h = await window.showDirectoryPicker({ id: which === "od" ? "sf-onedrive" : "sf-backup", mode: "readwrite" }); }
+    catch (e) { if (e && e.name === "AbortError") return; S.msg = { ok: false, text: friendlyError(e) }; return render(); }
+    const other = S.save[which === "od" ? "bk" : "od"];
+    if (other) {
+      const same = await h.isSameEntry(other).catch(() => false);
+      const inside = (await other.resolve(h).catch(() => null)) || (await h.resolve(other).catch(() => null));
+      if (same || inside) {
+        S.msg = { ok: false, text: "The backup folder has to be separate from the OneDrive projects folder: not the same folder, and not one inside the other. Nothing was changed; pick another folder." };
+        return render();
+      }
+    }
+    await saveKv.set(which === "od" ? "onedrive" : "backup", h);
+    const st = await saveState(); st.since[which] = null; if (which === "od") st.retry = []; await saveKv.set("state", st);
+    S.save[which] = h; S.save.perm[which] = "granted";
+    S.msg = { ok: true, text: which === "od"
+      ? `OneDrive projects folder chosen: ${h.name}. Saves look for each job's folder in it and in the folders one level inside.`
+      : `Backup folder chosen: ${h.name}. The next save copies everything it's missing there.` };
+    render(); saveSoon(3000);
+  }
+  async function saveResume() {
+    for (const k of ["od", "bk"]) {
+      const h = S.save[k]; if (!h) continue;
+      try { S.save.perm[k] = await h.requestPermission({ mode: "readwrite" }); } catch (e) { S.save.perm[k] = "prompt"; }
+    }
+    render(); if (S.save.perm.od === "granted") saveSoon(1000);
+  }
+  /** All rows of a request, 500 at a time (Supabase returns at most 1,000 a request; the tests make pages tiny) */
+  async function allRows(make) {
+    const size = window.SF_SAVE_PAGE || 500, out = [];
+    for (let from = 0; ; from += size) {
+      const rows = await q(make().range(from, from + size - 1));
+      out.push(...rows); if (rows.length < size) return out;
+    }
+  }
+  /** Everything a batch of jobs needs, in six requests (plus paging) */
+  async function saveBatchData(jobs) {
+    const ids = jobs.map(j => j.job_id), projects = jobs.map(j => j.project_id);
+    const [files, prod, defs, probs, flags, arrow] = await Promise.all([
+      allRows(() => db.from("v_filing").select("*").in("project_id", projects).eq("is_test", false).order("source").order("id")),
+      db.rpc("save_production_record", { p_job_ids: ids }).then(r => { if (r.error) throw r.error; return r.data || []; }),
+      allRows(() => db.from("v_defects").select("*").in("job_id", ids).order("id")),
+      allRows(() => db.from("v_problems").select("*").in("job_id", ids).order("id")),
+      allRows(() => db.from("v_flags").select("*").in("job_id", ids).order("id")),
+      allRows(() => db.from("v_outside_jobs").select("*").in("job_id", ids).order("id"))]);
+    const by = new Map(jobs.map(j => [j.job_id, { files: [], production: [], defects: [], problems: [], flags: [], arrow: [] }]));
+    const jobOf = new Map(jobs.map(j => [j.project_id, j.job_id]));
+    for (const f of files) { const id = jobOf.get(f.project_id); if (id) by.get(id).files.push(filingItem(f)); }
+    for (const [list, key] of [[prod, "production"], [defs, "defects"], [probs, "problems"], [flags, "flags"], [arrow, "arrow"]])
+      for (const r of list) if (by.has(r.job_id)) by.get(r.job_id)[key].push(r);
+    for (const d of by.values()) d.files.sort((a, b) => a.name.localeCompare(b.name));
+    return by;
+  }
+  /** One job into each target folder, the backup first. Returns how many files it wrote. */
+  async function saveOneJob(job, d, targets, res) {
+    const have = new Map();                         // a file downloaded for the first target is reused for the second
+    let deliveries = null;
+    const bytesOf = async (x) => {
+      if (have.has(x.name)) return have.get(x.name);
+      let data;
+      if (x.source === "signed") {
+        if (!deliveries) deliveries = await quiet(db.from("v_deliveries").select("*").in("id", d.files.filter(f => f.source === "signed").map(f => f.loadout_id || f.id))) || [];
+        const row = deliveries.find(r => r.id === (x.loadout_id || x.id));
+        if (!row) throw new Error("its trip couldn't be read");
+        data = await signedTicketFor(row);
+      } else data = await fileBytes(x.bucket, x.path);
+      have.set(x.name, data); return data;
+    };
+    const records = jobRecords(d);
+    let wrote = 0;
+    for (const [key, label, open] of targets) {
+      try {
+        const dir = await open();
+        const dirs = new Map([["", dir]]);
+        const sub = async (segs) => { const k = segs.join("/"); if (!dirs.has(k)) dirs.set(k, await fsDir(dir, segs, true)); return dirs.get(k); };
+        for (const x of d.files) {
+          const segs = saveRelPath(x.name); if (!segs.length) continue;
+          const folder = await sub(segs.slice(0, -1)), name = segs[segs.length - 1];
+          if (await fsSize(folder, name) > 0) continue;              // already saved: never touched again
+          if (x.in_cloud === false) continue;                         // archived before saving existed; it's in the archive zip
+          let data;
+          try { data = await bytesOf(x); }
+          catch (e) {                                                // not complete: tried again next save, and not counted as a good save
+            res[key] = false; res.retry.set(job.job_id, { job_id: job.job_id, project_id: job.project_id, name: job.name });
+            if (res.problems.length < 50) res.problems.push(`${job.project_id}: ${segs.join("/")} couldn't be downloaded (${e && e.message ? e.message : e}), so it wasn't saved to ${label}. It's tried again next time.`);
+            continue;
+          }
+          res.bytes += await fsWrite(folder, name, data); res.files++; wrote++;
+        }
+        for (const [name, text] of Object.entries(records)) {
+          if (await fsSame(dir, name, text)) continue;               // unchanged
+          res.bytes += await fsWrite(dir, name, text); res.files++; wrote++;
+        }
+      } catch (e) {
+        res[key] = false;
+        if (res.problems.length < 50) res.problems.push(`${job.project_id}: couldn't save to ${label} (${e && e.message ? e.message : e}).`);
+        if (key === "od") res.retry.set(job.job_id, { job_id: job.job_id, project_id: job.project_id, name: job.name });
+      }
+    }
+    return wrote;
+  }
+  async function saveRun(how) {
+    if (S.save.running || !S.save.supported || !S.me || !isManager(S.me) || S.save.missing || !S.save.od) return;
+    const go = async () => {
+      S.save.running = true; S.save.result = null;
+      if (how === "button") render(); else saveShow("Saving…");
+      const started = new Date().toISOString();
+      const res = { od: true, bk: true, checked: 0, saved: 0, files: 0, bytes: 0, skipped: [], problems: [], retry: new Map() };
+      let stopped = null;
+      try {
+        if (await S.save.od.queryPermission({ mode: "readwrite" }) !== "granted") { S.save.perm.od = "prompt"; throw { stop: "permission" }; }
+        let bk = S.save.bk;
+        if (!bk) { res.bk = false; res.problems.push("No backup folder has been chosen yet."); }
+        else if (await bk.queryPermission({ mode: "readwrite" }) !== "granted") {
+          S.save.perm.bk = "prompt"; res.bk = false; bk = null; res.problems.push("The backup folder needs permission again: tap Resume saving."); }
+        else { try { for await (const _ of bk.keys()) break; } catch (e) { res.bk = false; bk = null; res.problems.push("Backup drive not connected."); } }
+        saveShow("Looking in the OneDrive projects folder…");
+        let index;
+        try { index = await indexProjectFolders(S.save.od); }
+        catch (e) { throw { stop: "The OneDrive projects folder couldn't be opened. Check OneDrive is running and the folder is still there, then press Save now." }; }
+        const st = await saveState();
+        const sinces = [st.since.od].concat(bk ? [st.since.bk] : []);
+        const since = sinces.some(x => !x) ? null : new Date(Math.min(...sinces.map(x => Date.parse(x))) - SAVE_OVERLAP_MS).toISOString();
+        const { data: list, error } = await db.rpc("save_jobs", { p_since: since });
+        if (error) throw error;
+        const jobs = new Map((list.jobs || []).map(j => [j.job_id, j]));
+        for (const r of st.retry || []) if (!jobs.has(r.job_id)) jobs.set(r.job_id, r);
+        const all = [...jobs.values()];
+        for (let i = 0; i < all.length; i += SAVE_BATCH) {
+          const batch = all.slice(i, i + SAVE_BATCH);
+          saveShow(`Reading jobs ${i + 1}–${i + batch.length} of ${all.length}…`);
+          const data = await saveBatchData(batch);
+          for (const j of batch) {
+            res.checked++;
+            saveShow(`Saving ${j.project_id} (${res.checked} of ${all.length})…`);
+            const num = projNumber(j.project_id);
+            const matches = num === null ? [] : (index.get(num) || []);
+            const targets = [];
+            if (bk) targets.push(["bk", "the backup folder", () => fsDir(bk, [safeSeg(j.project_id), SAVE_DIR], true)]);
+            if (matches.length === 1) targets.push(["od", "OneDrive", () => fsDir(matches[0].dir, [SAVE_DIR], true)]);
+            else {
+              res.skipped.push({ project_id: j.project_id, why: matches.length ? "Two folders" : "No folder yet", paths: matches.map(m => m.path) });
+              res.retry.set(j.job_id, { job_id: j.job_id, project_id: j.project_id, name: j.name });
+            }
+            if (targets.length && await saveOneJob(j, data.get(j.job_id), targets, res)) res.saved++;
+          }
+        }
+        // remember where this save got to: OneDrive always moves on (skipped and failed jobs are retried by name);
+        // the backup moves on only when every job reached it
+        const st2 = await saveState();
+        st2.since.od = list.as_of;
+        if (bk && res.bk) st2.since.bk = list.as_of;
+        st2.retry = [...res.retry.values()];
+        await saveKv.set("state", st2);
+      } catch (e) {
+        stopped = e && e.stop ? e.stop : friendlyError(e);
+      }
+      if (stopped !== "permission") {
+        if (stopped) { res.od = false; res.problems.unshift(stopped); }
+        const r = await db.rpc("record_save_run", { p: { client_id: newId(), how, started_at: started, onedrive_ok: res.od, backup_ok: res.bk,
+          jobs_checked: res.checked, jobs_saved: res.saved, files_written: res.files, bytes: res.bytes,
+          skipped: res.skipped.map(x => ({ project_id: x.project_id, why: x.why })), problems: res.problems.slice(0, 50), page_version: OFFICE_VERSION } }).catch(e => ({ error: e }));
+        if (r.error && res.problems.length < 50) res.problems.push(`This save couldn't be logged: ${friendlyError(r.error)}`);
+      }
+      S.save.result = { ...res, stopped, at: new Date().toISOString() };
+      S.save.running = false; S.save.progress = "";
+      await loadSaveStatus();
+      render();
+    };
+    if (navigator.locks && navigator.locks.request) await navigator.locks.request("sf-save", { ifAvailable: true }, async (lock) => { if (lock) await go(); });
+    else await go();
+  }
+  function saveAgo(ts) { return !ts ? "" : `${fmtWhen(ts)} (${Date.now() - new Date(ts) < 60000 ? "just now" : agoWords(ts) + " ago"})`; }
+  /** The panel on the Photos tab */
+  function savePanel() {
+    const sv = S.save, st = sv.status, r = sv.result;
+    if (sv.missing) return `<section class="panel"><h2>Saving to OneDrive and the hard drive</h2>
+        <div class="banner warn">This part isn't set up in the database yet. Run onedrive_save.sql (Walkthrough 24), then reload this page.</div></section>`;
+    const last = st && st.ever ? `<p class="sub" style="margin:0 0 10px">Last save that reached both places: <b>${st.good_at ? esc(saveAgo(st.good_at)) : "none yet"}</b>${st.good_by ? ` · ${esc(st.good_by)}'s computer` : ""}.
+        ${st.last_at && st.last_at !== st.good_at ? ` Latest try: ${esc(saveAgo(st.last_at))}${st.last_backup_ok ? "" : " — it didn't reach the backup folder"}${st.last_onedrive_ok ? "" : " — it didn't finish in OneDrive"}.` : ""}</p>`
+      : `<p class="sub" style="margin:0 0 10px">Nothing has been saved yet.</p>`;
+    if (!sv.supported) return `<section class="panel"><h2>Saving to OneDrive and the hard drive</h2>${last}
+        <p class="sub">This browser can't save into folders. Saving runs in Chrome or Edge on a Windows computer with OneDrive.</p></section>`;
+    const folder = (k, what, none) => `<div class="task"><div class="what">${what}: ${sv[k] ? `<b>${esc(sv[k].name)}</b>` : `<span class="meta2">${none}</span>`}</div>
+        <div class="detail"><button class="plain" data-savepick="${k}" ${sv.running ? "disabled" : ""}>${sv[k] ? "Change" : "Choose"}</button></div></div>`;
+    const needPerm = (sv.od && sv.perm.od && sv.perm.od !== "granted") || (sv.bk && sv.perm.bk && sv.perm.bk !== "granted");
+    const skipped = r ? r.skipped : (st && st.last_skipped) || [];
+    const problems = r ? r.problems : (st && st.last_problems) || [];
+    return `<section class="panel"><h2>Saving to OneDrive and the hard drive</h2>
+      ${last}
+      ${folder("od", "OneDrive projects folder", "not chosen on this computer")}
+      ${folder("bk", "Backup folder (hard drive)", "not chosen on this computer")}
+      ${needPerm ? `<div class="banner warn">The browser wants permission again before it can save into the folders.
+          <div class="btns"><button class="go" data-saveresume="1">Resume saving</button></div></div>` : ""}
+      ${sv.od ? `<div class="btns" style="margin-top:12px"><button class="go" data-savenow="1" ${sv.running || needPerm ? "disabled" : ""}>Save now</button>
+          <span class="meta2" id="saveProgress">${esc(sv.running ? sv.progress || "Saving…" : "Saves by itself every 30 minutes while this page is open on this computer.")}</span></div>`
+        : `<p class="sub" style="margin-top:12px">Choose the OneDrive projects folder (the one holding every PROJ folder) and a backup folder outside OneDrive. After that, this page saves by itself while it's open.</p>`}
+      ${r && !r.stopped ? `<div class="banner ok">Saved ${esc(fmtWhen(r.at))}: ${r.checked} job${r.checked === 1 ? "" : "s"} checked, ${r.saved} with something new, ${r.files} file${r.files === 1 ? "" : "s"} written (${esc(fmtBytes(r.bytes))}).</div>` : ""}
+      ${skipped.length ? `<div class="banner warn">${skipped.length} job${skipped.length === 1 ? " was" : "s were"} skipped in OneDrive and will be tried again next time:
+          <ul style="margin:6px 0 0 18px; padding:0">${skipped.slice(0, 30).map(x => `<li><b>${esc(x.project_id)}</b>: ${x.why === "Two folders"
+            ? `two folders${x.paths && x.paths.length ? ` (${x.paths.map(esc).join(" and ")})` : ""}. Move or rename one.` : "no OneDrive folder yet. Make it and the next save fills it."}</li>`).join("")}</ul>
+          ${skipped.length > 30 ? `<p class="meta2">…and ${skipped.length - 30} more.</p>` : ""}</div>` : ""}
+      ${problems.length ? `<div class="banner warn"><ul style="margin:0 0 0 18px; padding:0">${problems.slice(0, 20).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
+      <p class="meta2" style="margin-top:10px">Each job's photos, files, signed tickets and records go into a folder called “${SAVE_DIR}” inside its own OneDrive folder, and a copy into the backup folder first. Files are never overwritten or deleted.</p>
+    </section>`;
+  }
+
   function render() {
     if (!S.me) return;
     showSections();
@@ -2008,6 +2370,9 @@ if (typeof document !== "undefined") (function () {
 
     // ---- the floor log ----
     const on = (sel, fn) => app.querySelectorAll(sel).forEach(el => el.onclick = () => fn(el));
+    on("[data-savepick]", (b) => savePick(b.dataset.savepick));
+    on("[data-saveresume]", () => saveResume());
+    on("[data-savenow]", () => saveRun("button"));
     const act = async (fn, args, after, from = null) => {      // one database call, its plain answer shown at the top
       S.busy = true; S.msg = null; S.msgFrom = from; render();
       const { data, error } = await db.rpc(fn, args);
@@ -2265,6 +2630,7 @@ if (typeof document !== "undefined") (function () {
     await loadTab();
     if (S.tab !== "tasks") { try { S.tasks = await q(db.from("v_handoff_tasks").select("*")); } catch (e) {} await loadCounts(); if (S.tab !== "setup") await loadRoutine(); }
     render();
+    saveStart();                                // saving to OneDrive: only does anything where the folders were chosen
   }
 
   document.addEventListener("visibilitychange", () => { if (!document.hidden && S.me && !S.locked && isManager(S.me) && !S.section && S.tab === "tasks") loadTab().then(render); });
@@ -2279,7 +2645,8 @@ if (typeof module !== "undefined") module.exports = { finishByLabel, isManager, 
   crc32, makeZip, photoCsv, csvCell, fmtBytes, normProject, BATCH_STATE,
   fileCsv, filingItem, atDate, buildSignedTicket, pdfText, wrapText, signedFileName, fmtWhen, shopDate,
   parseOptions, choicesFromForm, choiceSummary, supplyListFor,
-  OFFICE_VERSION, SYNC_ALERT_MINUTES, syncHealth, agoWords, jobMatches, jobGrid };
+  OFFICE_VERSION, SYNC_ALERT_MINUTES, syncHealth, agoWords, jobMatches, jobGrid,
+  SAVE_DIR, projNumber, safeSeg, saveRelPath, stampShop, productionCsv, issuesCsv, flagsCsv, arrowCsv, jobRecords, indexProjectFolders, fsWrite };
 </script>
 </body>
 </html>
