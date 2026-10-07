@@ -52,5 +52,6 @@ On the live database these have all run. The order matters only when building a 
 | 34 | `trip_types.sql` | Dock to dock deliveries and Delivery's tasks. Replaces pieces of `deliveries.sql`, `deliveries_v2.sql`, `delivery_types.sql` and `tv_pace.sql`, so those now stop. Run `install_log.sql` again after it |
 | 35 | `onedrive_save.sql` | Saving each job's photos, files, signed tickets and records into its OneDrive folder and a backup folder: the save log, the jobs that changed, the production record, the 7-day reminder. Run `install_log.sql` again after it |
 | 36 | `counts_safety.sql` | Counts sent after a change order land on the current work order (or are refused in plain words if that sheet's drawing changed); the tablet's `set_count()`; nobody without the secret key can empty a table. Run `install_log.sql` again after it |
+| 37 | `connector_safety.sql` | Only the database owner can reach the internet (the `http` extension), and only the floor TV's and the security rules' functions run without a login. Needed before any Claude connector to Supabase is turned on. Run `install_log.sql` again after it |
 
 Not here on purpose: **`set_up_logins.sql`**, which has everyone's login addresses. Keep it on your own computer, not on GitHub.
