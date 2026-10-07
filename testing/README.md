@@ -1,6 +1,6 @@
 # Testing kit — Shop Floor Production System
 
-*For build chats. Luke doesn't need to read this.* This one file replaces the sixteen `testing-kit*.md` parts (they're kept in `history/` for their feature test scripts). Updated 6 Oct 2026 (with counts_safety.sql and the review fixes R-1, R-2, R-5, R-9, R-10, R-12).
+*For build chats. Luke doesn't need to read this.* This one file replaces the sixteen `testing-kit*.md` parts (they're kept in `history/` for their feature test scripts). Updated 7 Oct 2026 (with connector_safety.sql, review findings R-14 and R-17).
 
 Every change is tested in Claude's sandbox against stand-ins for Supabase, Monday and the browser before Luke gets it. **Re-run the relevant tests before handing Luke any changed file,** and say plainly what the stand-ins can't cover: the real SQL Editor, GitHub Pages, the real Monday API, a real tablet's camera, signature and zoom, and jsDelivr in a real browser.
 
@@ -45,6 +45,7 @@ This installs Postgres 16 with `pg_cron` and the `http` extension, downloads the
 - **The pgsupa stand-in reports a missing function as Postgres does** (`42883 … does not exist`); real Supabase says `PGRST202`. The tablet treats both as "not there yet".
 - Since 6 Oct `test_feedback.js` and `test_onedrive_save.js` read the tablet's and the office's version from the pages, and `test_same_office.js` takes `OUT=` (a folder with every page).
 - **Login addresses in the kit are made up** (`@example.com`, R-9). Never put a real one in a test: the repo is public.
+- `test_connector_safety.sh` (7 Oct, R-14 and R-17): needs `sync_base_old` and `sync_base_new`. Runs the real `run_monday_sync()` on both against `helpers/monday_standin.py` (a local Monday on port 8765), makes a role shaped like Supabase's `supabase_read_only_user` (bypassrls, `pg_read_all_data`, read-only by default) and shows it reaching the internet on a database without the file and refused with it, runs the file twice on the old database, breaks each step of `check_connector_safety()` on purpose, and models the http functions belonging to someone else (the file finishes; step 1 names the owner). `F=` tests a changed copy.
 - `test_guards.sh` and `test_devices.sh` cover the install log, the guards, `check_everything()` and device versions (`install_log.sql`).
 - Older feature tests (Advance, deliveries, pickups, pace, inventory, routes…) are in `history/`. Pull one out with `python3 base/kx.py history/testing-kit-deliveries.md "test_deliveries.js" t/test_deliveries.js`. They were written against the helpers of their day, so they may need the paths above, and a few are stale (see §6).
 
@@ -83,6 +84,7 @@ Supabase's API connects as `authenticator`, then switches role and sets the JWT 
 4. **End with its own check**, so the editor's single visible result is the PASS/FAIL table. A `do` block at the end would hide it.
 5. **After building, run `test_guards.sh`** with the file loaded. The expected refusals change when a new file replaces something, so update the `exp=` line.
 6. **A new table revokes insert, update, delete and truncate from anon and authenticated** (`counts_safety.sql` also stops later tables getting TRUNCATE by default, and `check_counts_safety()` fails if any table has it).
+7. **Every function gets `revoke all on function … from public, anon;` before its grants**, SECURITY DEFINER or not (R-17). The only functions that may run with no login are `my_role()` and `owns_dept()` (the security rules use them) and the TV's `tv_snapshot()` and `tv_photo()`; a new one means adding its name to the `allowed` list in `check_connector_safety()`. **No function of an extension that reaches the internet** (`http`, `pg_net`) is executable by anyone but postgres (R-14). `check_connector_safety()`, and so `check_everything()`, fails if either is missed. Supabase is reached through a connector read-only only; SQL files are run by Luke or Claude in Chrome in the SQL Editor.
 
 ## 5. Rules every page change follows
 
@@ -106,7 +108,8 @@ Supabase's API connects as `authenticator`, then switches role and sets the JWT 
 
 - **pg_cron keeps a connection to `sync`**; `load.sh` terminates it before snapshotting. It also unschedules the sync so nothing calls the real Monday.
 - **Never put JSON inline in `psql -c`**: shell quoting strips it. Write a file and use `-f`.
-- `pgrep -f` matches itself; use `"[s]erver.py"`.
+- `pgrep -f` matches itself; use `"[s]erver.py"`. **`pkill -f` can kill the shell running it** if that command line names the process: the whole turn hangs. Check a stand-in server by its port (`curl -s -m 2 http://127.0.0.1:8765/`) instead, and start it with `setsid … &`.
+- **After editing a SQL file, rebuild the template before testing on it** (`LIVE=… bash base/load.sh`, then `create database sync_base_new template sync_base`). A copy made earlier still has the old functions, and a break test then passes or fails for the wrong reason.
 - Two things in one transaction share `now()`. Undo in send routes uses `events_mark`, and `check_loadouts` backdates one load-out.
 - **`check_ready_issues()` exists in two files.** `send_routes.sql` carries the current one.
 - **`v_ready_to_work` belongs to `handoff_recent.sql`** since 2 Oct, with an extra last column (`held_for_handoff`). An older file can't put the old view back without `drop view v_ready_to_work cascade` first (Postgres won't drop a column with `create or replace`), so a rollback of `ready_issues.sql` or `send_routes.sql` is a chat job. `test_guards.sh` now demonstrates the rollback path on `tablet.sql`.
