@@ -42,19 +42,34 @@
   .main{flex:1 1 auto; min-height:0; display:flex}
   .panel{background:#222941; border-radius:1.6rem}
 
-  /* the floor donut */
-  .floor{flex:0 0 50rem; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2.4rem}
-  .floor h2{margin:0 0 1.6rem; font-size:3.4rem; font-weight:600; color:#C2BAA0}
-  .donut{position:relative; width:36rem; height:36rem}
+  /* the left column: the floor donut, and under it the picture of finished work (tv_photos.sql) */
+  .leftcol{flex:0 0 56rem; display:flex; flex-direction:column; min-height:0}
+  .floor{flex:0 0 auto; padding:1.6rem 2.4rem 1.8rem}
+  .floor h2{margin:0 0 1rem; font-size:3.4rem; font-weight:600; color:#C2BAA0}
+  .floorrow{display:flex; align-items:center}
+  .donut{position:relative; width:22rem; height:22rem; flex:0 0 auto}
   .donut svg{width:100%; height:100%; display:block}
   .dc{position:absolute; top:0; left:0; right:0; bottom:0; display:flex; flex-direction:column; align-items:center; justify-content:center}
-  .dn{font-size:11rem; font-weight:700; line-height:1}
+  .dn{font-size:7rem; font-weight:700; line-height:1}
   .dn small{font-size:.45em}
   .dl{font-size:3rem; color:#A3A9BC}
-  .legend{margin-top:2.2rem; font-size:3.1rem; color:#FFF4D5; width:36rem}
-  .legend div{display:flex; align-items:center; padding:.4rem 0}
+  .legend{margin-left:2.4rem; font-size:2.7rem; color:#FFF4D5; flex:1 1 auto; min-width:0; white-space:nowrap}
+  .legend div{display:flex; align-items:center; padding:.5rem 0}
   .legend i{display:inline-block; width:2.4rem; height:2.4rem; border-radius:.5rem; margin-right:1.2rem; flex:0 0 auto}
   .legend span{margin-left:auto; font-weight:600}
+
+  /* in its new home: one site photo from a finished white glove delivery, 20 seconds each */
+  .home{flex:1 1 auto; min-height:0; margin-top:1.8rem; position:relative; overflow:hidden; display:flex; flex-direction:column}
+  .home .pic{flex:1 1 auto; min-height:0; position:relative; background:#2C3348}
+  .home .pic .img{position:absolute; top:0; left:0; width:100%; height:100%; background-position:center; background-size:cover; background-repeat:no-repeat}   /* background-size, not object-fit: older TV browsers */
+  .home .pic .waiting{position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:0 3rem; color:#A3A9BC; font-size:3rem; line-height:1.25}
+  .home .tag{position:absolute; top:1.2rem; left:1.6rem; background:rgba(24,29,46,.78); color:#FFF4D5; font-size:2.8rem; font-weight:600; padding:.4rem 1.2rem; border-radius:.6rem}
+  .home .cap{flex:0 0 auto; padding:1rem 1.8rem 1.2rem; background:#222941; line-height:1.2}
+  .home .cap .l1{display:flex; align-items:baseline; white-space:nowrap; overflow:hidden}
+  .home .cap .p{font-size:4.2rem; font-weight:700; margin-right:1.6rem}
+  .home .cap .w{font-size:3rem; color:#FFF4D5}
+  .home .cap .l2{display:flex; font-size:2.7rem; color:#A3A9BC; white-space:nowrap}
+  .home .cap .n{margin-left:auto}
 
   /* one row per department */
   .depts{flex:1 1 auto; margin-left:2rem; padding:1.6rem 2.8rem 1.2rem; display:flex; flex-direction:column; min-width:0}
@@ -94,10 +109,10 @@
 
   /* when bands are up they win the space: smaller donut; with two, one line each and Going out steps aside */
   .row{min-height:8rem}
-  .b1 .donut, .b2 .donut{width:27rem; height:27rem}
-  .b1 .dn, .b2 .dn{font-size:8.5rem}
-  .b1 .floor h2, .b2 .floor h2{margin-bottom:1rem}
-  .b1 .legend, .b2 .legend{margin-top:1.4rem; font-size:2.8rem; width:32rem}
+  .b1 .donut, .b2 .donut{width:19rem; height:19rem}
+  .b1 .dn, .b2 .dn{font-size:6rem}
+  .b2 .home .cap{padding:.8rem 1.8rem 1rem}
+  .b2 .home .cap .l2{display:none}
   .b1 .band, .b2 .band{font-size:3.8rem; padding:1.1rem 2.4rem}
   .b2 .band span{-webkit-line-clamp:1; display:block; white-space:nowrap; text-overflow:ellipsis}
   .b2 .out{display:none}
@@ -124,9 +139,11 @@
 var SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 var SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 
-var TV_VERSION = "2026-10-01.2";
+var TV_VERSION = "2026-10-07.1";
 var REFRESH_SECONDS = 30;     // how often the numbers are fetched
 var HIDE_AFTER_SECONDS = 90;  // with no connection this long, the numbers are hidden rather than shown stale
+var PICTURE_SECONDS = 20;     // in its new home: how long each picture stays
+var PICTURE_FETCHES_PER_HOUR = 30;   // each picture is fetched once and kept; this is the ceiling however the list changes (R-21)
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -210,6 +227,50 @@ function tripText(t, todayIso) {
   return { t: whenWords(t.date, todayIso) + (t.time ? " " + t.time : "") };
 }
 
+var DAYNAME = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+/** "Delivered today", "Delivered yesterday", "Delivered Tuesday" (inside a week), then "Delivered Oct 2". */
+function deliveredWords(iso, todayIso) {
+  if (!iso) return "Delivered";
+  var n = Math.round(dayNumber(todayIso) - dayNumber(iso));
+  var p = String(iso).slice(0, 10).split("-");
+  if (n <= 0) return "Delivered today";
+  if (n === 1) return "Delivered yesterday";
+  if (n < 7) return "Delivered " + DAYNAME[new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).getUTCDay()];
+  return "Delivered " + MON[+p[1] - 1] + " " + (+p[2]);
+}
+
+/** In its new home: which picture the panel shows now. list = the snapshot's home list (round order),
+    pics = the pictures this screen already holds, by id. Every PICTURE_SECONDS the turn moves on; a picture
+    not fetched yet is skipped for the next one that is, so the panel never sits blank while one loads. */
+function homePick(list, pics, now, seconds) {
+  if (!list || !list.length) return null;
+  var turn = Math.floor(now / ((seconds || 20) * 1000));
+  for (var k = 0; k < list.length; k++) {
+    var it = list[(turn + k) % list.length];
+    if (pics[it.id]) return { item: it, index: (turn + k) % list.length, loaded: true };
+  }
+  return { item: list[turn % list.length], index: turn % list.length, loaded: false };
+}
+/** The next picture to fetch: the one showing first, then the rest in order; only ids not held yet. */
+function homeNextFetch(list, pics, now, seconds) {
+  if (!list || !list.length) return null;
+  var turn = Math.floor(now / ((seconds || 20) * 1000));
+  for (var k = 0; k < list.length; k++) { var it = list[(turn + k) % list.length]; if (pics[it.id] === undefined) return it.id; }
+  return null;      // a picture that was refused (held as null) isn't asked for again until the next snapshot
+}
+/** Pictures that left the list are dropped, so memory holds only what can show. */
+function homePrune(list, pics) {
+  var keep = {}; (list || []).forEach(function (it) { keep[it.id] = true; });
+  for (var id in pics) if (!keep[id]) delete pics[id];
+  return pics;
+}
+/** The fetch budget: at most n fetches in any hour, counted from a log of fetch times. */
+function fetchBudgetOk(log, now, perHour) {
+  var hourAgo = now - 3600000, n = 0;
+  for (var i = 0; i < log.length; i++) if (log[i] > hourAgo) n++;
+  return n < (perHour || 30);
+}
+
 /** What the screen shows, worked out from the database's snapshot. Works with the older snapshot too (no pace, trips or stopped). */
 function tvModel(s) {
   var today = s.today || new Date().toISOString().slice(0, 10);
@@ -248,6 +309,7 @@ function tvModel(s) {
     }),
     hasTrips: !!s.trips,
     trips: (s.trips || []).map(function (t) { var x = tripText(t, today); x.p = short(t.project_id); x.name = t.job_name; return x; }),
+    home: s.home || [],      // the older database sends none: the panel shows its empty words
   };
 }
 
@@ -280,6 +342,38 @@ if (typeof document !== "undefined") (function () {
   if (location.hash && window.history && history.replaceState) history.replaceState(null, "", location.pathname);   // keep the secret out of sight on screen
 
   var snap = null, lastOkAt = null, failing = false, busy = false;
+  var pics = {}, picBusy = false, picLog = [];     // in its new home: pictures held by id, one fetch at a time, the hour's fetch times
+
+  // one small picture, the same request supabase-js makes for db.rpc("tv_photo", { p_key, p_photo })
+  function fetchPicture(id, done) {
+    var x = new XMLHttpRequest();
+    x.open("POST", SUPABASE_URL + "/rest/v1/rpc/tv_photo", true);
+    x.setRequestHeader("Content-Type", "application/json");
+    x.setRequestHeader("apikey", SUPABASE_KEY);
+    x.setRequestHeader("Authorization", "Bearer " + SUPABASE_KEY);
+    x.timeout = 20000;
+    x.onload = function () {
+      var data = null;
+      try { data = JSON.parse(x.responseText); } catch (e) {}
+      if (x.status >= 200 && x.status < 300 && data && data.ok && data.jpeg) done(null, data.jpeg); else done(new Error("HTTP " + x.status));
+    };
+    x.onerror = x.ontimeout = function () { done(new Error("no connection")); };
+    x.send(JSON.stringify({ p_key: key, p_photo: id }));
+  }
+  /** Fetch the pictures the panel is missing, one at a time, inside the hour's budget. Each is fetched once and kept. */
+  function fetchPictures() {
+    if (picBusy || !snap) return;
+    var list = snap.home || [], now = Date.now();
+    homePrune(list, pics);
+    var id = homeNextFetch(list, pics, now, PICTURE_SECONDS);
+    if (!id || !fetchBudgetOk(picLog, now, PICTURE_FETCHES_PER_HOUR)) return;
+    picBusy = true; picLog.push(now);
+    fetchPicture(id, function (err, jpeg) {
+      picBusy = false;
+      if (!err) { pics[id] = jpeg; draw(); fetchPictures(); }
+      else pics[id] = pics[id] || null;          // a refusal (the picture left the list, or the key is wrong): try no more until the next snapshot
+    });
+  }
 
   // the one request: the same one supabase-js makes for db.rpc("tv_snapshot", { p_key })
   function fetchSnapshot(done) {
@@ -325,13 +419,15 @@ if (typeof document !== "undefined") (function () {
         '<span class="clock cond">' + esc(c.t) + '</span><span class="date">' + esc(c.d) + '</span></div>' +
       bands.map(function (b) { return '<div class="band ' + b.cls + '"><b>' + esc(b.label) + '</b><span>' + esc(b.text) + '</span></div>'; }).join("") +
       '<div class="main">' +
-        '<div class="panel floor"><h2>All work on the floor</h2>' +
+        '<div class="leftcol"><div class="panel floor"><h2>All work on the floor</h2><div class="floorrow">' +
           '<div class="donut"><svg viewBox="0 0 220 220" role="img" aria-label="' + d.pct + ' percent finished"><circle cx="110" cy="110" r="86" fill="none" stroke="#39415C" stroke-width="30"/>' +
             seg(d.ready, d.finished / tot * C, "#ED5E0F") + seg(d.finished, 0, "#00B4B2") + '</svg>' +
             '<div class="dc"><div class="dn cond">' + d.pct + '<small>%</small></div><div class="dl">finished</div></div></div>' +
           '<div class="legend"><div><i style="background:#00B4B2"></i>Finished<span class="cond">' + fmt(d.finished) + '</span></div>' +
             '<div><i style="background:#ED5E0F"></i>Ready to work on<span class="cond">' + fmt(d.ready) + '</span></div>' +
             '<div><i style="background:#39415C"></i>Not ready yet<span class="cond">' + fmt(d.waiting) + '</span></div></div>' +
+        '</div></div>' +
+        homeHtml(m) +
         '</div>' +
         '<div class="panel depts">' +
           (m.rows.length ?
@@ -357,6 +453,25 @@ if (typeof document !== "undefined") (function () {
           || '<span class="trip"><span class="p">Nothing scheduled in the next 7 days</span></span>') +
         '</div><span class="more" id="more"></span></div>' : "");
     fit();
+  }
+
+  /** In its new home: the picture showing now, or why there isn't one. */
+  function homeHtml(m) {
+    var h = homePick(m.home, pics, Date.now(), PICTURE_SECONDS);
+    var body, cap;
+    if (!h) {
+      body = '<div class="waiting">Pictures of finished work appear here after the first white glove delivery</div>';
+      cap = '<div class="l1"><span class="w">White glove deliveries, last 14 days</span></div>';
+    } else if (!h.loaded) {
+      body = '<div class="waiting">Loading a picture…</div>';
+      cap = '<div class="l1"><span class="p cond">' + esc(short(h.item.project_id)) + '</span><span class="w">' + esc(deliveredWords(h.item.delivered_on, m.today)) + '</span></div>';
+    } else {
+      body = '<div class="img" role="img" aria-label="A table delivered on ' + esc(h.item.project_id) + '" style="background-image:url(data:image/jpeg;base64,' + pics[h.item.id] + ')"></div>';
+      cap = '<div class="l1"><span class="p cond">' + esc(short(h.item.project_id)) + '</span><span class="w">' + esc(deliveredWords(h.item.delivered_on, m.today)) + '</span></div>' +
+            '<div class="l2"><span>' + (h.item.tables ? h.item.tables + (h.item.tables === 1 ? ' table delivered' : ' tables delivered') : '') + '</span>' +
+            '<span class="n">' + (h.index + 1) + ' of ' + m.home.length + '</span></div>';
+    }
+    return '<div class="panel home"><div class="pic">' + body + '</div><div class="tag">In its new home</div><div class="cap">' + cap + '</div></div>';
   }
 
   // department names and big numbers shrink to fit; trips that don't fit whole become "and n more"
@@ -391,7 +506,9 @@ if (typeof document !== "undefined") (function () {
       if (err || !data) { failing = true; return draw(); }
       if (data.ok === false) { store.set("key", null); return msg("This TV link doesn't work any more", data.reason); }
       snap = data; lastOkAt = Date.now(); failing = false;
+      for (var id in pics) if (pics[id] === null) delete pics[id];     // a refused picture gets one more try per snapshot, inside the hour's budget
       draw();
+      fetchPictures();
     });
   }
 
@@ -414,7 +531,8 @@ if (typeof document !== "undefined") (function () {
 
 /* lets the core be tested outside a browser */
 if (typeof module !== "undefined") module.exports = { keyProblem: keyProblem, tvKey: tvKey, tvModel: tvModel, freshness: freshness,
-  whenWords: whenWords, weekCaption: weekCaption, barWidth: barWidth, tripText: tripText, TV_VERSION: TV_VERSION };
+  whenWords: whenWords, weekCaption: weekCaption, barWidth: barWidth, tripText: tripText, TV_VERSION: TV_VERSION,
+  deliveredWords: deliveredWords, homePick: homePick, homeNextFetch: homeNextFetch, homePrune: homePrune, fetchBudgetOk: fetchBudgetOk };
 </script>
 </body>
 </html>

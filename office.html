@@ -832,7 +832,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-10-06.2";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-10-07.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -1202,9 +1202,11 @@ if (typeof document !== "undefined") (function () {
       quiet(db.from("v_loadouts").select("*").eq("job_id", id)),
       quiet(db.from("v_photos").select("id").eq("job_id", id).eq("voided", false))]);
     const finishBy = await quiet(db.from("v_finish_by").select("*").eq("job_id", id));   // finish_by.sql; the grid goes without if it isn't there
+    const tv = await quiet(db.rpc("tv_job_pictures", { p_job: id }));                     // tv_photos.sql; nothing shows if it isn't there
     if (S.jobView !== id) return;                     // they moved on while it loaded
     S.job = { id, job, wo: cur, sheets, progress: progress || [], flags: flags || [], problems: problems || [], arrow: arrow || [],
-              defects: defects || [], loadouts: loadouts || [], photoCount: photos ? photos.length : null, finishBy: finishBy || [] };
+              defects: defects || [], loadouts: loadouts || [], photoCount: photos ? photos.length : null, finishBy: finishBy || [], tv: tv || null };
+    rememberTvPics(tv);
   }
   async function openJob(id) {
     S.jobBack = S.jobView ? S.jobBack : S.tab;
@@ -1263,6 +1265,7 @@ if (typeof document !== "undefined") (function () {
           || `<p class="sub" style="margin:0">None logged.</p>`}</section>
       <section class="panel"><h2>Photos ${J.photoCount ? `<span class="cnt num" style="color:var(--ink2)">${J.photoCount}</span>` : ""}</h2>
         ${J.photoCount ? `<button class="plain" data-jobphotos="${esc(j.project_id)}">See them on Photos</button>` : `<p class="sub" style="margin:0">None yet.</p>`}</section>
+      ${tvJobHtml(J)}
       <section class="panel"><h2>Load-outs and deliveries</h2>
         ${J.loadouts.slice().sort((a, b) => String(b.scheduled_for || b.started_at).localeCompare(String(a.scheduled_for || a.started_at))).map(l => `<div class="row">
             <b>${esc(tripWord(l))}</b> · ${l.completed_at ? `${l.kind === "delivery" ? "delivered" : "picked up"} ${esc(fmtWhen(l.completed_at))}${l.signed_name ? ` · signed by ${esc(l.signed_name)}` : ""}`
@@ -1780,6 +1783,21 @@ if (typeof document !== "undefined") (function () {
   const tripWord = (l) => l.kind === "shipping" ? (l.pickup_steps ? "BOL pickup" : "Shipment") : l.kind === "customer_pickup" ? "Customer pickup" : "Delivery";
   const photoWhat = (p) => p.kind === "loadout" ? (p.truck ? `Truck ${p.truck}, loaded` : p.stage === "bol" ? (p.note || "BOL") : p.pallet ? `Pallet ${p.pallet}, wrapped` : p.sheet_number !== null ? `Sheet ${p.sheet_number}${p.piece ? ` · table ${p.piece}` : ""}${p.stage === "site" ? " · at the site" : ""}` : p.note || "")
                                                 : `${p.department_name}${p.sheet_number !== null ? " · sheet " + p.sheet_number : ""}`;
+  /** The floor TV's view of a job's white glove site photos (tv_photos.sql), by photo id, for the viewer's hide switch. */
+  function rememberTvPics(rows) { S.tvPics = S.tvPics || {}; (rows || []).forEach(r => { S.tvPics[r.photo_id] = r; }); }
+  /** The job page's Floor TV line: what shows, what's hidden, and the switch. */
+  function tvJobHtml(J) {
+    const tv = J.tv; if (!tv || !tv.length) return "";
+    const showing = tv.filter(t => t.showing).length, withCopy = tv.filter(t => t.has_copy).length, jobHidden = tv[0].job_hidden;
+    const words = jobHidden ? `This job's pictures are hidden from the floor TV.`
+      : showing ? `${showing} picture${showing === 1 ? "" : "s"} of this job ${showing === 1 ? "shows" : "show"} on the floor TV (one per kind of table, for 14 days after delivery).`
+      : withCopy ? `None of this job's pictures show on the floor TV right now (delivered more than 14 days ago, or the delivery isn't finished).`
+      : `This job's site photos have no TV copy (taken before the TV showed pictures), so none show on the floor TV.`;
+    return `<section class="panel"><h2>Floor TV</h2><p class="sub" style="margin:0 0 8px">${esc(words)}</p>
+      ${jobHidden ? `<button class="plain" data-tvjob="${esc(J.id)}" data-hide="0">Let this job's pictures show again</button>`
+                  : withCopy ? `<button class="plain" data-tvjob="${esc(J.id)}" data-hide="1">Hide this job's pictures from the TV</button>` : ""}
+      <p class="meta2" style="margin:8px 0 0">To hide one picture, open it on Photos and use the button under it.</p></section>`;
+  }
   /** Thumbnails; an archived photo says which batch holds it. */
   function photoStrip(list, caption = false) {
     const shown = (list || []).filter(p => !p.voided);
@@ -1796,15 +1814,23 @@ if (typeof document !== "undefined") (function () {
       <div class="vcap"><b>${p.is_test ? "TEST " : ""}${esc(p.project_id)}${p.sheet_number !== null ? ` · sheet ${p.sheet_number}` : ""}</b> · ${esc(p.department_name)}
         <div>${esc(what)}</div>${p.note && p.kind !== "loadout" ? `<div>${esc(p.note)}</div>` : ""}
         <small>Taken by ${esc(p.taken_by_name)}, ${esc(fmtDay(p.taken_at))} ${esc(new Date(p.taken_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}</small></div>
-      <div class="btns"><button data-voidphoto="${esc(p.id)}">Entered by mistake</button><button data-closeviewer="1">Close</button></div></div></div>`;
+      <div class="btns">${tvPicButton(p)}<button data-voidphoto="${esc(p.id)}">Entered by mistake</button><button data-closeviewer="1">Close</button></div></div></div>`;
   }
 
+  /** Hide from the floor TV / show again, for a white glove site photo the TV knows about. */
+  function tvPicButton(p) {
+    const t = S.tvPics && S.tvPics[p.id]; if (!t || !t.has_copy) return "";
+    return t.hidden ? `<button data-tvpic="${esc(p.id)}" data-hide="0">Show on the floor TV again</button>`
+                    : `<button data-tvpic="${esc(p.id)}" data-hide="1">Hide from the floor TV</button>`;
+  }
   async function findJobPhotos(project) {
     const [ph, lo, dl] = await Promise.all([soft(db.from("v_photos").select("*").eq("project_id", project)),
                                             soft(db.from("v_loadouts").select("*").eq("project_id", project)),
                                             quiet(db.from("v_deliveries").select("*").eq("project_id", project))]);
     S.phJob = { project, photos: ph || [], loadouts: (lo || []).sort((a, b) => String(b.started_at).localeCompare(String(a.started_at))),
                 deliveries: dl, filing: dl !== null };
+    const jobId = (ph && ph[0] && ph[0].job_id) || (lo && lo[0] && lo[0].job_id);
+    rememberTvPics(jobId ? await quiet(db.rpc("tv_job_pictures", { p_job: jobId })) : null);
     S.jobZip = null;
     const byId = new Map(S.photos.map(p => [p.id, p])); for (const x of S.phJob.photos) byId.set(x.id, x); S.photos = [...byId.values()];
   }
@@ -2472,6 +2498,9 @@ if (typeof document !== "undefined") (function () {
     // ---- photos ----
     on("[data-viewphoto]", (b) => { S.viewer = S.photos.find(x => x.id === b.dataset.viewphoto) || null; render(); });
     app.querySelectorAll("[data-closeviewer]").forEach(el => el.onclick = (e) => { if (e.target !== el) return; S.viewer = null; render(); });
+    on("[data-tvjob]", (b) => act("hide_from_tv", { p_photo: null, p_job: b.dataset.tvjob, p_hide: b.dataset.hide === "1" }, async () => { if (S.jobView) await loadJob(S.jobView); }));
+    on("[data-tvpic]", (b) => { S.viewer = null;
+      act("hide_from_tv", { p_photo: b.dataset.tvpic, p_job: null, p_hide: b.dataset.hide === "1" }, () => { const t = S.tvPics && S.tvPics[b.dataset.tvpic]; if (t) { t.hidden = b.dataset.hide === "1"; t.showing = false; } }); });
     on("[data-voidphoto]", (b) => {
       if (!confirm("Mark this photo entered by mistake? It's hidden everywhere, and kept in history.")) return;
       S.viewer = null;

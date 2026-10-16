@@ -450,7 +450,7 @@ const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 // This page's version. Change it with every edit (date, then .1, .2 … for more than one that day).
 // Each device reports it when it opens; see  select * from devices();  in the SQL Editor.
-const PAGE_VERSION = "2026-10-06.1";
+const PAGE_VERSION = "2026-10-07.2";
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -1051,6 +1051,13 @@ function fitSize(w, h, max = 1600) {
   const s = Math.min(1, max / Math.max(w, h));
   return { w: Math.max(1, Math.round(w * s)), h: Math.max(1, Math.round(h * s)) };
 }
+/** A blob as base64 text, the way the database takes the floor TV's copy (tv_photos.sql). */
+async function blobBase64(blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  return btoa(bin);
+}
 /** Where a photo's file lives: the job's folder, the tablet's own id. The database insists on exactly this. */
 function photoPath(projectId, clientId) { return `${projectId}/${clientId}.jpg`; }
 
@@ -1120,9 +1127,7 @@ async function flushPhotobox(store, db, isPending = () => false) {
         ? await db.rpc("add_task_photo", { p_client_id: rec.id, p_task: rec.parent, p_shot_at: rec.shotAt || null,
                                            p_lat: rec.lat ?? null, p_lng: rec.lng ?? null, p_accuracy: rec.accuracy ?? null })
         : rec.stage                                                  // a delivery's truck (dock) or a table in its final spot (site)
-        ? await db.rpc("add_delivery_photo", { p_client_id: rec.id, p_loadout: rec.parent, p_stage: rec.stage, p_sheet: rec.sheet ?? null,
-                                               p_piece: rec.piece || null, p_truck: rec.truck || null, p_lat: rec.lat ?? null, p_lng: rec.lng ?? null,
-                                               p_accuracy: rec.accuracy ?? null, p_shot_at: rec.shotAt || null, p_width: rec.width || null, p_height: rec.height || null })
+        ? await sendDeliveryPhoto(db, rec)
         : rec.kind === "loadout" && (rec.piece || rec.pallet)      // a load-out photo of one table, or a pallet
         ? await db.rpc("add_loadout_photo", { p_client_id: rec.id, p_loadout: rec.parent, p_sheet: rec.sheet ?? null, p_piece: rec.piece || null,
                                               p_pallet: rec.pallet || null, p_note: rec.note || null, p_width: rec.width || null, p_height: rec.height || null })
@@ -1146,6 +1151,20 @@ async function flushPhotobox(store, db, isPending = () => false) {
     await store.remove(rec.id);
   }
   return { sent, refused, waiting, offline, held };
+}
+
+/** A delivery photo, with the floor TV's small copy when there is one (tv_photos.sql). On a database that doesn't take
+    the copy yet (PGRST202: no function with that argument), the photo is sent again without it, so nothing waits. */
+async function sendDeliveryPhoto(db, rec) {
+  const args = { p_client_id: rec.id, p_loadout: rec.parent, p_stage: rec.stage, p_sheet: rec.sheet ?? null,
+                 p_piece: rec.piece || null, p_truck: rec.truck || null, p_lat: rec.lat ?? null, p_lng: rec.lng ?? null,
+                 p_accuracy: rec.accuracy ?? null, p_shot_at: rec.shotAt || null, p_width: rec.width || null, p_height: rec.height || null };
+  if (!rec.tv) return db.rpc("add_delivery_photo", args);
+  let tv = null;
+  try { tv = await blobBase64(rec.tv); } catch (e) { tv = null; }
+  const res = await db.rpc("add_delivery_photo", { ...args, p_tv: tv });
+  if (res.error && /PGRST202|does not exist|p_tv/i.test(String(res.error.code || "") + " " + String(res.error.message || ""))) return db.rpc("add_delivery_photo", args);
+  return res;
 }
 
 /** A load-out's sheets: photographed on this truck (or waiting on the tablet), on an earlier truck, or not yet. */
@@ -1376,8 +1395,9 @@ if (typeof document !== "undefined") (function () {
     S.failedPh = all.filter(p => p.failed);          // refused: only on the Couldn't send list, so the slot asks for the photo again
   }
 
-  /** Shrink a camera photo to about 300–500 KB: 1600 pixels on the long side, JPEG. Turned the right way up. */
-  async function shrinkPhoto(file) {
+  /** Shrink a camera photo to about 300–500 KB: 1600 pixels on the long side, JPEG. Turned the right way up.
+      With opts.tv, also a small copy for the floor TV (tv_photos.sql): 800 pixels on the long side, under 200 KB. */
+  async function shrinkPhoto(file, opts = {}) {
     let src, w, h;
     if (window.createImageBitmap) {
       try { src = await createImageBitmap(file, { imageOrientation: "from-image" }); } catch (e) { src = await createImageBitmap(file); }
@@ -1396,6 +1416,12 @@ if (typeof document !== "undefined") (function () {
     if (out.blob && out.blob.size > 560000) out = await encode(1600, 0.6);
     if (out.blob && out.blob.size > 560000) out = await encode(1280, 0.6);
     if (!out.blob) throw new Error("That photo couldn't be read. Take it again.");
+    if (opts.tv) {
+      let tv = await encode(800, 0.7);
+      if (tv.blob && tv.blob.size > 190000) tv = await encode(800, 0.55);
+      if (tv.blob && tv.blob.size > 190000) tv = await encode(640, 0.55);
+      out.tv = tv.blob && tv.blob.size <= 190000 ? tv.blob : null;      // no copy rather than one the database would drop
+    }
     return out;
   }
 
@@ -1410,7 +1436,7 @@ if (typeof document !== "undefined") (function () {
         S.notice = "That photo wasn't just taken, so it wasn't used. Tap the spot again and take the photo with the camera.";
         return render();
       }
-      try { done({ ...(await (window.sfShrinkPhoto || shrinkPhoto)(file)), shotAt: new Date(Number(file.lastModified) || Date.now()).toISOString() }); }      // sfShrinkPhoto: lets the tests stand in for a camera
+      try { done({ ...(await (window.sfShrinkPhoto || shrinkPhoto)(file, { tv: !!opts.tv })), shotAt: new Date(Number(file.lastModified) || Date.now()).toISOString() }); }      // sfShrinkPhoto: lets the tests stand in for a camera
       catch (e) { S.notice = e.message || "That photo couldn't be read. Take it again."; render(); }
     };
     cam.click();
@@ -1420,7 +1446,7 @@ if (typeof document !== "undefined") (function () {
   async function queuePhotos(shots, meta) {
     for (const p of shots) {
       const id = p.id || newId();
-      await photoStore.put({ id, blob: p.blob, width: p.width, height: p.height, at: new Date().toISOString(), tries: 0,
+      await photoStore.put({ id, blob: p.blob, width: p.width, height: p.height, tv: p.tv || null, at: new Date().toISOString(), tries: 0,
                              label: p.label || meta.label || "Photo", ...meta, sheet: "sheet" in p ? p.sheet : meta.sheet, note: p.note ?? meta.note ?? null });
     }
     await refreshPending();
@@ -3742,12 +3768,13 @@ if (typeof document !== "undefined") (function () {
     const shootDl = (meta) => {
       if (!lo) return;
       const where = whereAmI();                       // asked for as the camera opens; GPS works with no signal
+      const tv = meta.stage === "site" && meta.sheet !== null && lo.kind === "delivery";   // a table in place on a white glove delivery: a small copy for the floor TV
       takePhoto(async (shot) => {
         const pos = await where;
         await queuePhotos([shot], { kind: "loadout", parent: lo.client_id, projectId: lo.project_id, note: null, ...meta,
                                     shotAt: shot.shotAt, lat: pos ? pos.lat : null, lng: pos ? pos.lng : null, accuracy: pos ? pos.accuracy : null });
         render(); flushPhotos();
-      }, { fresh: true });
+      }, { fresh: true, tv });
     };
     on("[data-dltruck]", (b) => shootDl({ stage: "dock", truck: Number(b.dataset.dltruck), sheet: null, label: `Truck ${b.dataset.dltruck}` }));
     on("[data-dldrop]", () => shootDl({ stage: "site", sheet: null, piece: null, label: "At their dock" }));     // dock to dock: the drop
