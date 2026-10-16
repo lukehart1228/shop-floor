@@ -259,6 +259,12 @@
   .lopage img{display:block; width:100%; height:auto}
   .lopage .missing{padding:24px; color:var(--ink2)}
   .lopage .pdfgap{height:10px; background:var(--line)}
+  /* the whole work order beside the ticket (14 Oct) */
+  .wopick{display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 2px}
+  .wopick button{min-width:48px; min-height:48px; border-radius:9px; border:1.5px solid var(--gray); background:#fff; font-weight:700; font-size:18px; color:var(--midnight)}
+  .wopick button[aria-pressed="true"]{background:var(--midnight); border-color:var(--midnight); color:#fff}
+  .wonav{display:flex; justify-content:space-between; gap:10px; margin-top:12px}
+  .wonav .lowo{margin-top:0}
   /* deliveries: the ticket and site files, the customer's signature */
   .dlinfo{background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:14px}
   .dlinfo .loslots button{margin-top:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
@@ -450,7 +456,7 @@ const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 // This page's version. Change it with every edit (date, then .1, .2 … for more than one that day).
 // Each device reports it when it opens; see  select * from devices();  in the SQL Editor.
-const PAGE_VERSION = "2026-10-07.2";
+const PAGE_VERSION = "2026-10-16.1";
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -1345,7 +1351,7 @@ if (typeof document !== "undefined") (function () {
     failedPh: [],               // photos (and signed deliveries) the database refused, kept for the Couldn't send list
     loadouts: [], localLoadouts: store.get("loadouts_local", []), loView: null,
     loForm: { jobId: null, filter: "", kind: "delivery" }, loItem: "", loPhotos: [], viewer: null, dtasks: store.get("dtasks", []) || [], taskView: null, taskNote: store.get("task_notes", {}) || {},
-    loSheets: {}, loWo: null, loDoc: null, loPallets: store.get("lo_pallets", {}), loPages: {}, loDet: {},
+    loSheets: {}, loWo: null, loWoAll: false, loDoc: null, loPallets: store.get("lo_pallets", {}), loPages: {}, loDet: {},
     // deliveries: scheduled trips (tickets, site files), trucks planned, the customer step per delivery
     deliveries: store.get("deliveries", []), dlReady: !!store.get("deliveries", null), dlTrucks: store.get("dl_trucks", {}), dlSig: {}, dlFiles: {},
     pkReady: store.get("pk_ready", false), pkBolMore: {},
@@ -2742,7 +2748,7 @@ if (typeof document !== "undefined") (function () {
   function deliveryDetail(lo) {
     const d = dlOf(lo), plan = dlPlan(lo), p = plan.site, sheets = S.loSheets[lo.job_id], left = !!lo.finished_at;
     const pend = dlPend(lo).filter(x => x.kind !== "delivery_done"), photos = S.loPhotos.filter(x => x.loadout_id === lo.id);
-    const pg = S.loPages[lo.job_id], fs = S.dlFiles[lo.client_id];
+    const pg = S.loPages[lo.job_id], fs = S.dlFiles[lo.client_id], wob = woButton(lo);
     const nFiles = d ? (d.files || []).filter(x => x.in_cloud !== false).length : 0;
     const what = [pg && pg.total ? `${pg.total} work order page${pg.total === 1 ? "" : "s"}` : null, d && d.ticket ? "the ticket" : null,
                   nFiles ? `${nFiles} site file${nFiles === 1 ? "" : "s"}` : null].filter(Boolean);
@@ -2784,9 +2790,10 @@ if (typeof document !== "undefined") (function () {
       ${lo.scheduled_for ? `<div class="dlwhen">${dock ? "Dock to dock" : "Delivery"} ${esc(fmtWhen(lo.scheduled_for))}</div>` : ""}
       ${left || lo.scheduled_for || plan.delivered ? "" : kindButtons(lo.kind, "lokind")}
       ${ready}
-      ${d ? `<div class="dlinfo">${d.schedule_note ? `<div style="margin-bottom:8px"><b>Note${d.scheduled_by_name ? ` from ${esc(d.scheduled_by_name)}` : ""}:</b> ${esc(d.schedule_note)}</div>` : ""}
-          <div class="loslots">${d.ticket ? `<button class="lowo" data-dlopen="${esc(d.ticket.path)}" data-mime="${esc(d.ticket.mime)}" data-name="Delivery ticket">Delivery ticket</button>` : `<span class="meta2">No delivery ticket attached.</span>`}
-            ${(d.files || []).filter(x => x.in_cloud !== false).map(x => `<button class="lowo" data-dlopen="${esc(x.path)}" data-mime="${esc(x.mime)}" data-name="${esc(x.name)}">${esc(x.name)}</button>`).join("")}</div></div>` : ""}
+      ${d || wob ? `<div class="dlinfo">${d && d.schedule_note ? `<div style="margin-bottom:8px"><b>Note${d.scheduled_by_name ? ` from ${esc(d.scheduled_by_name)}` : ""}:</b> ${esc(d.schedule_note)}</div>` : ""}
+          <div class="loslots">${!d ? "" : d.ticket ? `<button class="lowo" data-dlopen="${esc(d.ticket.path)}" data-mime="${esc(d.ticket.mime)}" data-name="Delivery ticket">Delivery ticket</button>` : `<span class="meta2">No delivery ticket attached.</span>`}
+            ${wob}
+            ${d ? (d.files || []).filter(x => x.in_cloud !== false).map(x => `<button class="lowo" data-dlopen="${esc(x.path)}" data-mime="${esc(x.mime)}" data-name="${esc(x.name)}">${esc(x.name)}</button>`).join("") : ""}</div></div>` : ""}
       ${dock ? `<div class="lostep">1 · At our dock — each table before it leaves <span>— ${plan.dock.done} of ${plan.dock.total}</span></div>
         ${sheets === undefined ? `<div class="meta2">Loading the sheets…</div>` : ""}
         ${plan.dock.list.length ? plan.dock.list.map(s => `<div class="locard${s.complete ? " done" : ""}">
@@ -2828,7 +2835,7 @@ if (typeof document !== "undefined") (function () {
   function pickupDetail(lo) {
     const d = dlOf(lo), plan = pkPlan(lo), p = plan.tables, sheets = S.loSheets[lo.job_id], bol = plan.bol;
     const pend = dlPend(lo).filter(x => x.kind !== "pickup_done"), photos = S.loPhotos.filter(x => x.loadout_id === lo.id);
-    const pg = S.loPages[lo.job_id];
+    const pg = S.loPages[lo.job_id], wob = woButton(lo);
     const cap = (x) => x.stage === "bol" ? (x.note || "BOL") : x.pallet ? `Pallet ${x.pallet}`
                      : (x.sheet ?? x.sheet_number) != null ? `Sheet ${x.sheet ?? x.sheet_number}${x.piece ? ` · table ${x.piece}` : ""}` : x.note;
     const g = S.dlSig[lo.client_id] || (S.dlSig[lo.client_id] = { name: "", note: "", noSign: false, reason: null, reasonNote: "", strokes: [], aspect: 2 });
@@ -2893,9 +2900,10 @@ if (typeof document !== "undefined") (function () {
                     : done ? "" : kindButtons(lo.kind, "lokind")}
       ${pg && pg.total ? `<div class="lopages${pg.saved === pg.total ? " ready" : ""}">${pg.saved === pg.total ? `✓ Ready for no signal · ${pg.total} work order page${pg.total === 1 ? "" : "s"} saved on this device`
           : pg.busy ? `Saving the work order pages for no signal… ${pg.saved} of ${pg.total}` : `${pg.saved} of ${pg.total} work order pages saved on this device.`}</div>` : ""}
-      ${d && (d.schedule_note || d.ticket || (d.files || []).length) ? `<div class="dlinfo">${d.schedule_note ? `<div style="margin-bottom:8px"><b>Note${d.scheduled_by_name ? ` from ${esc(d.scheduled_by_name)}` : ""}:</b> ${esc(d.schedule_note)}</div>` : ""}
-          <div class="loslots">${d.ticket ? `<button class="lowo" data-dlopen="${esc(d.ticket.path)}" data-mime="${esc(d.ticket.mime)}" data-name="Ticket">Ticket</button>` : `<span class="meta2">No ticket attached.</span>`}
-            ${(d.files || []).filter(x => x.in_cloud !== false).map(x => `<button class="lowo" data-dlopen="${esc(x.path)}" data-mime="${esc(x.mime)}" data-name="${esc(x.name)}">${esc(x.name)}</button>`).join("")}</div></div>` : ""}
+      ${(d && (d.schedule_note || d.ticket || (d.files || []).length)) || wob ? `<div class="dlinfo">${d && d.schedule_note ? `<div style="margin-bottom:8px"><b>Note${d.scheduled_by_name ? ` from ${esc(d.scheduled_by_name)}` : ""}:</b> ${esc(d.schedule_note)}</div>` : ""}
+          <div class="loslots">${!d ? "" : d.ticket ? `<button class="lowo" data-dlopen="${esc(d.ticket.path)}" data-mime="${esc(d.ticket.mime)}" data-name="Ticket">Ticket</button>` : `<span class="meta2">No ticket attached.</span>`}
+            ${wob}
+            ${d ? (d.files || []).filter(x => x.in_cloud !== false).map(x => `<button class="lowo" data-dlopen="${esc(x.path)}" data-mime="${esc(x.mime)}" data-name="${esc(x.name)}">${esc(x.name)}</button>`).join("") : ""}</div></div>` : ""}
       ${tablesStep}
       ${palletStep}
       ${bolStep}
@@ -2948,10 +2956,53 @@ if (typeof document !== "undefined") (function () {
     return await new Promise(res => c.toBlob(res, "image/png"));
   }
 
+  // the trip's whole work order, beside the ticket (14 Oct): one button for every sheet with a page
+  const woSheets = (lo) => (S.loSheets[lo.job_id] || []).filter(x => x.png_path && x.pages_ready);
+  function woButton(lo) {
+    const all = S.loSheets[lo.job_id];
+    if (all === undefined) return "";                                       // still loading the sheets
+    const n = woSheets(lo).length;
+    if (!n) return `<span class="meta2">${all.length ? "The work order pages aren't uploaded yet." : "No work order uploaded."}</span>`;
+    return `<button class="lowo" data-lowoall="1">Work order · ${n} sheet${n === 1 ? "" : "s"}</button>`;
+  }
+  // every sheet in one read-only viewer: no photo buttons, so nothing is photographed by accident while reading
+  function loadoutWoAll(lo) {
+    const list = woSheets(lo), i = list.findIndex(x => x.sheet_number === S.loWo), s = list[i];
+    const m = list.length, plain = list.every((x, k) => x.sheet_number === k + 1);
+    const where = plain ? `Sheet ${s.sheet_number} of ${m}` : `Sheet ${s.sheet_number} · ${i + 1} of ${m}`;
+    const prev = list[i - 1], next = list[i + 1];
+    return `<button class="back" data-lowoback="1">← ${isDl(lo) ? "Delivery" : isPk(lo) ? esc(tripName(lo.kind)) : "Load-out"}</button>
+      <h1>Work order</h1>
+      <p class="sub">${esc(lo.project_id)} · ${where}${sizeLabel(s) || s.item_code ? ` · ${esc(sizeLabel(s) || s.item_code)}` : ""} · ${s.qty} table${s.qty === 1 ? "" : "s"}</p>
+      ${m > 1 ? `<div class="wopick">${list.map(x => `<button data-lowogo="${x.sheet_number}" aria-pressed="${x.sheet_number === s.sheet_number}" aria-label="Sheet ${x.sheet_number}">${x.sheet_number}</button>`).join("")}</div>` : ""}
+      <div class="lopage" id="lopage"><div class="missing">Loading the page…</div></div>
+      ${m > 1 ? `<div class="wonav"><button class="lowo" data-lowogo="${prev ? prev.sheet_number : ""}" ${prev ? "" : `style="visibility:hidden" tabindex="-1"`}>‹ Sheet ${prev ? prev.sheet_number : ""}</button>
+        <button class="lowo" data-lowogo="${next ? next.sheet_number : ""}" ${next ? "" : `style="visibility:hidden" tabindex="-1"`}>Sheet ${next ? next.sheet_number : ""} ›</button></div>` : ""}
+      <p class="meta2" style="text-align:center">Pinch to zoom.${m > 1 ? " Swipe left or right for the next sheet." : ""}</p>`;
+  }
+  // swipe between sheets, one finger, only when the page isn't zoomed in (pinch zoom stays as it is)
+  function initWoSwipe() {
+    const el = document.getElementById("lopage");
+    if (!el || !S.loWoAll || el.dataset.swipe) return;
+    el.dataset.swipe = "1";
+    let st = null;
+    el.addEventListener("touchstart", (e) => { st = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null; }, { passive: true });
+    el.addEventListener("touchmove", (e) => { if (e.touches.length > 1) st = null; }, { passive: true });
+    el.addEventListener("touchend", (e) => {
+      if (!st || e.changedTouches.length !== 1) { st = null; return; }
+      const dx = e.changedTouches[0].clientX - st.x, dy = e.changedTouches[0].clientY - st.y; st = null;
+      if (window.visualViewport && window.visualViewport.scale > 1.05) return;
+      if (Math.abs(dx) < 60 || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
+      const lo = currentLoadout(); if (!lo) return;
+      const list = woSheets(lo), i = list.findIndex(x => x.sheet_number === S.loWo), to = list[i + (dx < 0 ? 1 : -1)];
+      if (to) { S.loWo = to.sheet_number; render(); }
+    }, { passive: true });
+  }
   // one sheet's work order page, from the load-out (saved on the device, so it shows with no signal)
   function loadoutWo(lo) {
     const s = (S.loSheets[lo.job_id] || []).find(x => x.sheet_number === S.loWo);
-    if (!s) { S.loWo = null; return isPk(lo) ? pickupDetail(lo) : isDl(lo) ? deliveryDetail(lo) : loadoutDetail2(lo); }
+    if (!s) { S.loWo = null; S.loWoAll = false; return isPk(lo) ? pickupDetail(lo) : isDl(lo) ? deliveryDetail(lo) : loadoutDetail2(lo); }
+    if (S.loWoAll && s.png_path && s.pages_ready) return loadoutWoAll(lo);
     const dl = isDl(lo), pk = isPk(lo);
     const row = dl ? deliveryPlan([s], lo, dlPend(lo)).site.list[0] : loadoutPieces([s], lo, loPend(lo), 1).list[0];
     return `<button class="back" data-lowoback="1">← ${dl ? "Delivery" : pk ? tripName(lo.kind) : "Load-out"}</button>
@@ -3320,7 +3371,7 @@ if (typeof document !== "undefined") (function () {
     fillPhotos();
     if (S.adv) { if (S.advJob && S.advSheet) advShowPage(); }
     else if ((onCountTab() || S.tab === "past") && S.view.screen === "sheet") showPage();
-    if (S.tab === "loadout" && S.loWo && !S.adv) showLoPage();
+    if (S.tab === "loadout" && S.loWo && !S.adv) { showLoPage(); initWoSwipe(); }
     if (S.tab === "loadout" && S.loDoc && !S.adv) showLoDoc();
     if (S.tab === "loadout" && !S.loWo && !S.loDoc && !S.adv && S.loView) initSigPad();
   }
@@ -3693,8 +3744,11 @@ if (typeof document !== "undefined") (function () {
       lo.kind = b.dataset.lokind; store.set("loadouts_local", S.localLoadouts); render();
       send("set_loadout_details", { p_loadout: lo.client_id, p_kind: lo.kind, p_carrier: null, p_tracking: null }, "Load-out");
     });
-    on("[data-lowo]", (b) => { S.loWo = Number(b.dataset.lowo); render(); scrollTo(0, 0); });
-    on("[data-lowoback]", () => { S.loWo = null; S.loDoc = null; render(); });
+    on("[data-lowo]", (b) => { S.loWo = Number(b.dataset.lowo); S.loWoAll = false; render(); scrollTo(0, 0); });
+    on("[data-lowoall]", () => { const lo = currentLoadout(), first = lo && woSheets(lo)[0]; if (!first) return;
+                                 S.loWo = first.sheet_number; S.loWoAll = true; render(); scrollTo(0, 0); });
+    on("[data-lowogo]", (b) => { if (!b.dataset.lowogo) return; S.loWo = Number(b.dataset.lowogo); render(); });
+    on("[data-lowoback]", () => { S.loWo = null; S.loWoAll = false; S.loDoc = null; render(); });
     on("[data-loaddpallet]", () => { if (!lo) return; S.loPallets[lo.client_id] = loadoutPieces([], lo, loPend(lo), loPlanned(lo)).pallets + 1; store.set("lo_pallets", S.loPallets); render(); });
     on("[data-lopallet]", (b) => { const n = Number(b.dataset.lopallet); shootFor(null, null, `Pallet ${n}`, { pallet: n }, isPk(lo)); });
     app.querySelectorAll("[data-lodet]").forEach(el => el.oninput = () => {
