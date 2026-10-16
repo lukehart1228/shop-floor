@@ -265,6 +265,11 @@
   .wopick button[aria-pressed="true"]{background:var(--midnight); border-color:var(--midnight); color:#fff}
   .wonav{display:flex; justify-content:space-between; gap:10px; margin-top:12px}
   .wonav .lowo{margin-top:0}
+  /* extras to load (16 Oct, delivery_extras.sql) */
+  .xctl{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:10px}
+  .xstep{min-width:56px; min-height:56px; border-radius:10px; border:1.5px solid var(--gray); background:#fff; font-size:26px; font-weight:700; color:var(--midnight); line-height:1}
+  .xctl .lowo{margin-top:0}
+  .xnote{color:var(--ink2); font-size:14px; margin-top:6px}
   /* deliveries: the ticket and site files, the customer's signature */
   .dlinfo{background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:14px}
   .dlinfo .loslots button{margin-top:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
@@ -456,7 +461,7 @@ const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 // This page's version. Change it with every edit (date, then .1, .2 … for more than one that day).
 // Each device reports it when it opens; see  select * from devices();  in the SQL Editor.
-const PAGE_VERSION = "2026-10-16.1";
+const PAGE_VERSION = "2026-10-16.3";
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -1351,7 +1356,7 @@ if (typeof document !== "undefined") (function () {
     failedPh: [],               // photos (and signed deliveries) the database refused, kept for the Couldn't send list
     loadouts: [], localLoadouts: store.get("loadouts_local", []), loView: null,
     loForm: { jobId: null, filter: "", kind: "delivery" }, loItem: "", loPhotos: [], viewer: null, dtasks: store.get("dtasks", []) || [], taskView: null, taskNote: store.get("task_notes", {}) || {},
-    loSheets: {}, loWo: null, loWoAll: false, loDoc: null, loPallets: store.get("lo_pallets", {}), loPages: {}, loDet: {},
+    loSheets: {}, xtra: {}, loWo: null, loWoAll: false, loDoc: null, loPallets: store.get("lo_pallets", {}), loPages: {}, loDet: {},
     // deliveries: scheduled trips (tickets, site files), trucks planned, the customer step per delivery
     deliveries: store.get("deliveries", []), dlReady: !!store.get("deliveries", null), dlTrucks: store.get("dl_trucks", {}), dlSig: {}, dlFiles: {},
     pkReady: store.get("pk_ready", false), pkBolMore: {},
@@ -1620,6 +1625,16 @@ if (typeof document !== "undefined") (function () {
     if (d) S.loSheets[jobId] = d.slice().sort((a, b) => a.sheet_number - b.sheet_number);
   }
   const lo2 = () => !S.missing.losheets;              // version 2 is set up in the database
+  // a job's extras (delivery_extras.sql): what to load, whether the work order listed them, and what each trip loaded
+  async function loadExtras(jobId) {
+    const [x, l, t] = await Promise.all([
+      read("xextras", db.from("v_sheet_extras").select("*").eq("job_id", jobId), "xextras_" + jobId),
+      read("xlisted", db.from("v_extras_listed").select("*").eq("job_id", jobId), "xlisted_" + jobId),
+      read("xloaded", db.from("v_loadout_extras").select("*").eq("job_id", jobId), "xloaded_" + jobId)]);
+    if (S.missing.xextras) { S.xtra[jobId] = null; return; }               // an older database: no extras yet
+    if (x) S.xtra[jobId] = { rows: x.slice().sort((a, b) => a.sheet_number - b.sheet_number || a.position - b.position),
+                             listed: !!(l && l.length), loaded: t || [] };
+  }
   // every work order page of the load-out's job, kept on this phone for the road
   async function saveLoPages(jobId) {
     const list = (S.loSheets[jobId] || []).filter(x => x.png_path && x.pages_ready);
@@ -1651,7 +1666,7 @@ if (typeof document !== "undefined") (function () {
     const lo = currentLoadout();
     if (lo) {
       const jobs = [loadPickSheets(lo.job_id), loadLoSheets(lo.job_id).then(() => { if (!S.loPages[lo.job_id] || (!S.loPages[lo.job_id].busy && S.loPages[lo.job_id].saved < S.loPages[lo.job_id].total)) saveLoPages(lo.job_id); })];
-      if (isDl(lo) || isPk(lo)) saveDlFiles(lo);
+      if (isDl(lo) || isPk(lo)) { saveDlFiles(lo); jobs.push(loadExtras(lo.job_id)); }
       if (lo.id) jobs.push(read("photos", db.from("v_photos").select("*").eq("loadout_id", lo.id), null).then(p => { if (p) S.loPhotos = p.filter(x => !x.voided); }));
       await Promise.all(jobs);
     }
@@ -2805,6 +2820,7 @@ if (typeof document !== "undefined") (function () {
       ${Array.from({ length: plan.trucks }, (_, i) => i + 1).map(n => { const has = plan.trucksHere.includes(n), waiting = has && !(lo.trucks_here || []).includes(n);
           return `<div class="locard${has ? " done" : ""}"><div class="lotop"><span class="no num">T${n}</span><span class="size">Truck ${n}</span><span class="cnt">${has ? "Photographed" : "Not yet"}</span></div>
             ${plan.delivered ? "" : `<div class="loslots"><button class="loslot${has ? " here" : ""}" data-dltruck="${n}">${has ? "Loaded ✓" : "Photograph it loaded"}<small>${waiting ? "Waiting to send" : has ? "Tap for another photo" : "Once it's loaded"}</small></button></div>`}</div>`; }).join("")}
+      ${extrasBlock(lo, left || plan.delivered)}
       ${left || plan.delivered ? `<div class="meta2" style="margin:6px 2px 0">${left ? `The truck left ${esc(fmtWhen(lo.finished_at))}${lo.finished_by_name ? ` · ${esc(lo.finished_by_name)}` : ""}` : ""}</div>`
         : `<button class="btn" data-dladdtruck="1">Add another truck</button>
            <button class="go wide" style="margin-top:12px" data-lofinish="1">The truck is leaving</button>`}
@@ -2906,6 +2922,7 @@ if (typeof document !== "undefined") (function () {
             ${d ? (d.files || []).filter(x => x.in_cloud !== false).map(x => `<button class="lowo" data-dlopen="${esc(x.path)}" data-mime="${esc(x.mime)}" data-name="${esc(x.name)}">${esc(x.name)}</button>`).join("") : ""}</div></div>` : ""}
       ${tablesStep}
       ${palletStep}
+      ${extrasBlock(lo, done)}
       ${bolStep}
       ${finish}
       ${done ? "" : `<div class="card"><label class="f" style="margin-top:0" for="loItem">Something with no sheet</label>
@@ -2956,6 +2973,57 @@ if (typeof document !== "undefined") (function () {
     return await new Promise(res => c.toBlob(res, "image/png"));
   }
 
+  // ---------- extras to load (16 Oct): the work order's small loose items, ticked off at the dock ----------
+  const xKey = (sheet, name) => sheet + "|" + String(name).toLowerCase();
+  const xMine = (lo, r) => (lo.id && r.loadout_id === lo.id) || r.client_id === lo.client_id;
+  function extrasPlan(lo) {
+    const x = S.xtra[lo.job_id];
+    if (!x) return null;                                                     // not loaded, or an older database
+    const sheets = S.loSheets[lo.job_id] || [];
+    if (!x.rows.length) return { list: [], listed: x.listed, hasSheets: sheets.length > 0, done: 0, total: 0, short: [] };
+    const list = x.rows.map(r => {
+      const k = xKey(r.sheet_number, r.name);
+      const mine = x.loaded.find(t => xMine(lo, t) && xKey(t.sheet_number, t.name) === k);
+      const earlier = x.loaded.filter(t => !xMine(lo, t) && xKey(t.sheet_number, t.name) === k && (t.finished_at || t.completed_at))
+                              .reduce((a, t) => a + t.loaded, 0);
+      const room = Math.max(r.qty - earlier, 0), here = Math.min(mine ? mine.loaded : 0, r.qty);
+      const sh = sheets.find(s => s.sheet_number === r.sheet_number);
+      return { sheet: r.sheet_number, name: r.name, qty: r.qty, here, earlier: Math.min(earlier, r.qty), room,
+               complete: here + earlier >= r.qty, pages: !!(sh && sh.png_path && sh.pages_ready) };
+    });
+    const short = list.filter(e => !e.complete).map(e => ({ ...e, missing: e.qty - e.here - e.earlier }));
+    return { list, listed: x.listed, hasSheets: sheets.length > 0, done: list.filter(e => e.complete).length, total: list.length, short };
+  }
+  const extrasShortText = (lo) => { const xp = extrasPlan(lo);
+    return xp && xp.short.length ? `Not loaded: ${xp.short.map(e => `${e.name} × ${e.missing} (sheet ${e.sheet})`).join(", ")}.` : ""; };
+  function extrasBlock(lo, readOnly) {
+    const xp = extrasPlan(lo);
+    if (!xp) return "";
+    if (!xp.total) return "";            // no extras, or a work order uploaded before extras existed: nothing shown (Luke, 16 Oct)
+    return `<div class="lostep">Don't forget — extras <span>— ${xp.done} of ${xp.total} loaded</span></div>
+      ${xp.list.map(e => `<div class="locard${e.complete ? " done" : ""}">
+        <div class="lotop"><span class="no num">${e.sheet}</span><span class="size">${esc(e.name)}</span><span class="cnt">${e.here + e.earlier} of ${e.qty}</span></div>
+        ${e.earlier ? `<div class="xnote">${e.earlier} went on an earlier trip</div>` : ""}
+        ${readOnly ? (e.pages ? `<div class="xctl"><button class="lowo" data-xsheet="${e.sheet}">Sheet ${e.sheet}</button></div>` : "")
+          : `<div class="xctl"><button class="xstep" data-xset="${e.here - 1}" data-xs="${e.sheet}" data-xn="${esc(e.name)}" aria-label="One fewer ${esc(e.name)}" ${e.here > 0 ? "" : "disabled"}>−</button>
+             <button class="xstep" data-xset="${e.here + 1}" data-xs="${e.sheet}" data-xn="${esc(e.name)}" aria-label="One more ${esc(e.name)}" ${e.here < e.room ? "" : "disabled"}>+</button>
+             ${e.complete ? "" : `<button class="lowo" data-xset="${e.room}" data-xs="${e.sheet}" data-xn="${esc(e.name)}">All ${e.room} loaded</button>`}
+             ${e.pages ? `<button class="lowo" data-xsheet="${e.sheet}">Sheet ${e.sheet}</button>` : ""}</div>`}</div>`).join("")}`;
+  }
+  function setExtra(lo, sheet, name, loaded) {
+    const x = S.xtra[lo.job_id]; if (!x) return;
+    const k = xKey(sheet, name);
+    // one waiting entry per extra: a newer number replaces an older one still on the phone (they're absolute)
+    const box = { ...S.logbox };
+    for (const id of Object.keys(box)) { const e = box[id];
+      if (e.fn === "set_extra_loaded" && e.args.p_loadout === lo.client_id && xKey(e.args.p_sheet, e.args.p_name) === k) delete box[id]; }
+    S.logbox = box; store.set("logbox", S.logbox);
+    const mine = x.loaded.find(t => xMine(lo, t) && xKey(t.sheet_number, t.name) === k);
+    if (mine) mine.loaded = loaded;
+    else x.loaded.push({ loadout_id: lo.id || null, client_id: lo.client_id, job_id: lo.job_id, sheet_number: sheet, name, loaded, finished_at: null, completed_at: null });
+    store.set("xloaded_" + lo.job_id, x.loaded);
+    send("set_extra_loaded", { p_loadout: lo.client_id, p_sheet: sheet, p_name: name, p_loaded: loaded, p_client_id: null }, `Extras: ${name}`);
+  }
   // the trip's whole work order, beside the ticket (14 Oct): one button for every sheet with a page
   const woSheets = (lo) => (S.loSheets[lo.job_id] || []).filter(x => x.png_path && x.pages_ready);
   function woButton(lo) {
@@ -3745,6 +3813,10 @@ if (typeof document !== "undefined") (function () {
       send("set_loadout_details", { p_loadout: lo.client_id, p_kind: lo.kind, p_carrier: null, p_tracking: null }, "Load-out");
     });
     on("[data-lowo]", (b) => { S.loWo = Number(b.dataset.lowo); S.loWoAll = false; render(); scrollTo(0, 0); });
+    on("[data-xset]", (b) => { if (!lo) return; const n = Number(b.dataset.xset), sh = Number(b.dataset.xs);
+                               const xp = extrasPlan(lo), e = xp && xp.list.find(x => x.sheet === sh && x.name === b.dataset.xn);
+                               if (!e || !(n >= 0) || n > e.room) return; setExtra(lo, sh, e.name, n); });
+    on("[data-xsheet]", (b) => { S.loWo = Number(b.dataset.xsheet); S.loWoAll = true; render(); scrollTo(0, 0); });
     on("[data-lowoall]", () => { const lo = currentLoadout(), first = lo && woSheets(lo)[0]; if (!first) return;
                                  S.loWo = first.sheet_number; S.loWoAll = true; render(); scrollTo(0, 0); });
     on("[data-lowogo]", (b) => { if (!b.dataset.lowogo) return; S.loWo = Number(b.dataset.lowogo); render(); });
@@ -3783,8 +3855,9 @@ if (typeof document !== "undefined") (function () {
       if (!lo) return;
       if (isDl(lo)) {                     // a delivery: the truck leaves; the site and the customer come next
         const plan = dlPlan(lo);
+        const xs = extrasShortText(lo);
         S.modal = { kind: "confirm", title: "The truck is leaving?",
-          text: `${lo.kind === "dock" && plan.dock.total && plan.dock.done < plan.dock.total ? `Only ${plan.dock.done} of ${plan.dock.total} tables photographed. ` : ""}${plan.trucksMissing.length ? `No photo of truck${plan.trucksMissing.length === 1 ? "" : "s"} ${plan.trucksMissing.join(", ")} yet. ` : ""}This records that the truck left now. ${lo.kind === "dock" ? "At their dock: a few photos of the drop, then the receiver's signature." : "At the site: a photo of each table where it ended up, then the customer's signature."}`,
+          text: `${xs ? xs + " Leave anyway? That's fine if they're going later. " : ""}${lo.kind === "dock" && plan.dock.total && plan.dock.done < plan.dock.total ? `Only ${plan.dock.done} of ${plan.dock.total} tables photographed. ` : ""}${plan.trucksMissing.length ? `No photo of truck${plan.trucksMissing.length === 1 ? "" : "s"} ${plan.trucksMissing.join(", ")} yet. ` : ""}This records that the truck left now. ${lo.kind === "dock" ? "At their dock: a few photos of the drop, then the receiver's signature." : "At the site: a photo of each table where it ended up, then the customer's signature."}`,
           yes: "The truck is leaving",
           run: () => send("finish_loadout", { p_loadout: lo.client_id, p_note: null }, "Load-out") };
         return render();
@@ -3907,7 +3980,8 @@ if (typeof document !== "undefined") (function () {
     const pickupDone = (g) => {
       const plan = pkPlan(lo), bol = plan.bol;
       const gaps = [plan.tables.missing.length ? `Not photographed — ${missingText(plan.tables.missing)}.` : "",
-                    bol && plan.palletsMissing.length ? `No wrapped photo of pallet${plan.palletsMissing.length === 1 ? "" : "s"} ${plan.palletsMissing.join(", ")}.` : ""].filter(Boolean).join(" ");
+                    bol && plan.palletsMissing.length ? `No wrapped photo of pallet${plan.palletsMissing.length === 1 ? "" : "s"} ${plan.palletsMissing.join(", ")}.` : "",
+                    extrasShortText(lo)].filter(Boolean).join(" ");
       S.modal = { kind: "confirm",
         title: bol ? `${lo.project_id} picked up?` : g.noSign ? "Picked up, not signed?" : `Picked up, signed by ${g.name.trim()}?`,
         text: `${gaps ? gaps + " " : ""}This marks ${lo.project_id} picked up now.${gaps ? " Finish anyway? That's fine if something is going later." : ""} It can't be changed afterwards.`,
