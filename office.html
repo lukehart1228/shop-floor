@@ -832,7 +832,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-10-18.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-10-20.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -1060,9 +1060,12 @@ if (typeof document !== "undefined") (function () {
         await loadPhotosWhere("defect_id", (S.defects || []).filter(d => d.office_status).map(d => d.id));
         return;
       }
-      if (S.tab === "feedback") {        // feedback.sql
-        const r = await db.from("feedback").select("*").order("created_at", { ascending: false }).limit(1000);
-        S.fbkMissing = !!(r.error && /does not exist|schema cache|could not find|42P01|PGRST205/i.test(String(r.error.message) + " " + String(r.error.code)));
+      if (S.tab === "feedback") {        // feedback.sql; feedback_close.sql (20 Oct) adds v_feedback: each note open, solved or not relevant
+        const missing = (e) => !!(e && /does not exist|schema cache|could not find|42P01|PGRST205/i.test(String(e.message) + " " + String(e.code)));
+        let r = await db.from("v_feedback").select("*").order("created_at", { ascending: false }).limit(1000);
+        S.fbkCanClose = !r.error;
+        if (missing(r.error)) r = await db.from("feedback").select("*").order("created_at", { ascending: false }).limit(1000);   // before feedback_close.sql: every note, as before
+        S.fbkMissing = missing(r.error);
         if (r.error && !S.fbkMissing) S.notice = friendlyError(r.error); else S.feedback = r.data || [];
         return;
       }
@@ -1424,21 +1427,41 @@ if (typeof document !== "undefined") (function () {
   const FB_PAGES = [["", "All pages"], ["index", "Tablets & phone"], ["office", "Office"], ["delivery", "Deliveries"], ["inventory", "Inventory"], ["pace", "Pace"], ["upload", "Upload"]];
   const fbPageName = (k) => (FB_PAGES.find(p => p[0] === k) || [k, k])[1];
   const fbWhen = (t) => new Date(t).toLocaleString("en-US", { timeZone: "America/Indiana/Indianapolis", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-  const feedbackShown = () => (S.feedback || []).filter(f => !S.fbkPage || f.page === S.fbkPage);
-  function feedbackScreen() {
-    const head = `<h1>Feedback</h1>
-      <p class="sub">What people sent with the Feedback button on any page, newest first, with the screen they were on. It's a record for planning changes: nobody gets a reply.</p>`;
-    if (S.fbkMissing) return head + `<div class="banner warn">The Feedback list isn't in the database yet. Run feedback.sql, then install_log.sql, then reload this page.</div>`;
-    if (!S.feedback) return head + `<p class="sub">Loading…</p>`;
-    const list = feedbackShown();
-    return head + msgBanner() + `<div class="row" style="margin:0 0 16px; justify-content:space-between">
-        <div class="seg">${FB_PAGES.map(([k, l]) => `<button data-fbkpage="${k}" aria-pressed="${(S.fbkPage || "") === k}">${l}</button>`).join("")}</div>
-        ${list.length ? `<button class="plain" data-fbkcopy="1">Copy ${list.length === 1 ? "it" : "these " + list.length} as text</button>` : ""}</div>
-      ${list.length ? `<section class="panel">${list.map(f => `<div class="line"><span class="body">
+  // 20 Oct (feedback_close.sql): a note dealt with is closed as Solved or Not relevant. It moves to Closed, folded at the
+  // bottom, with who closed it and when, and Put it back undoes it. Nothing is deleted. Before the file runs, every note shows as open.
+  const fbIsOpen = (f) => !f.state || f.state === "open";
+  const fbOnPage = (f) => !S.fbkPage || f.page === S.fbkPage;
+  const feedbackShown = () => (S.feedback || []).filter(f => fbOnPage(f) && fbIsOpen(f));
+  const feedbackClosed = () => (S.feedback || []).filter(f => fbOnPage(f) && !fbIsOpen(f))
+    .sort((a, b) => String(b.closed_at || "").localeCompare(String(a.closed_at || "")));
+  const FB_STATE = { solved: "Solved", not_relevant: "Not relevant" };
+  function feedbackLine(f) {
+    const open = fbIsOpen(f), off = S.busy ? " disabled" : "";
+    return `<div class="line"><span class="body">
           <b>${testTag(f)}${esc(f.person_name)}</b> <span class="meta2">· ${esc(fbWhen(f.created_at))}</span>
           <div style="white-space:pre-wrap; margin:4px 0">${esc(f.body)}</div>
-          <div class="meta2">${esc(fbPageName(f.page))}${f.screen && f.screen !== fbPageName(f.page) ? ` · ${esc(f.screen)}` : ""}${f.page_version ? ` · ${/^page/.test(f.page_version) ? "" : "version "}${esc(f.page_version)}` : ""}</div></span></div>`).join("")}</section>`
-        : `<div class="empty"><b>No feedback yet${S.fbkPage ? " from this page" : ""}</b>When someone taps Feedback and sends a note, it shows here.</div>`}`;
+          <div class="meta2">${esc(fbPageName(f.page))}${f.screen && f.screen !== fbPageName(f.page) ? ` · ${esc(f.screen)}` : ""}${f.page_version ? ` · ${/^page/.test(f.page_version) ? "" : "version "}${esc(f.page_version)}` : ""}</div>
+          ${open ? "" : `<div class="meta2"><b>${esc(FB_STATE[f.state] || f.state)}</b>${f.closed_by_name ? ` · closed by ${esc(f.closed_by_name)}` : ""}${f.closed_at ? ` · ${esc(fbWhen(f.closed_at))}` : ""}</div>`}
+          ${!S.fbkCanClose ? "" : open
+            ? `<div class="btns" style="margin-top:8px"><button class="plain" data-fbk="${esc(f.id)}" data-fbkstate="solved"${off}>Solved</button><button class="plain" data-fbk="${esc(f.id)}" data-fbkstate="not_relevant"${off}>Not relevant</button></div>`
+            : `<div class="btns" style="margin-top:8px"><button class="plain" data-fbk="${esc(f.id)}" data-fbkstate="open"${off}>Put it back</button></div>`}</span></div>`;
+  }
+  function feedbackScreen() {
+    const head = `<h1>Feedback</h1>
+      <p class="sub">What people sent with the Feedback button on any page, newest first, with the screen they were on. It's a record for planning changes: nobody gets a reply.${S.fbkCanClose ? " When a note is dealt with, close it as Solved or Not relevant: it moves to Closed at the bottom, with who closed it, and Put it back undoes that. Nothing is deleted." : ""}</p>`;
+    if (S.fbkMissing) return head + `<div class="banner warn">The Feedback list isn't in the database yet. Run feedback.sql, then install_log.sql, then reload this page.</div>`;
+    if (!S.feedback) return head + `<p class="sub">Loading…</p>`;
+    const list = feedbackShown(), closed = feedbackClosed();
+    const none = !list.length && !closed.length;
+    return head + msgBanner() + (S.fbkCanClose ? "" : `<p class="sub">To close notes once they're dealt with, run feedback_close.sql, then install_log.sql, then reload this page.</p>`)
+      + `<div class="row" style="margin:0 0 16px; justify-content:space-between">
+        <div class="seg">${FB_PAGES.map(([k, l]) => `<button data-fbkpage="${k}" aria-pressed="${(S.fbkPage || "") === k}">${l}</button>`).join("")}</div>
+        ${list.length ? `<button class="plain" data-fbkcopy="1">Copy ${list.length === 1 ? "it" : "these " + list.length} as text</button>` : ""}</div>
+      ${list.length ? `<section class="panel">${list.map(feedbackLine).join("")}</section>`
+        : none ? `<div class="empty"><b>No feedback yet${S.fbkPage ? " from this page" : ""}</b>When someone taps Feedback and sends a note, it shows here.</div>`
+        : `<div class="empty"><b>Nothing open${S.fbkPage ? " from this page" : ""}</b>Every note here has been closed. They're under Closed, below.</div>`}
+      ${closed.length ? `<details class="more" data-keep="fbkclosed" ${S.openDetails.has("fbkclosed") ? "open" : ""}><summary>Closed (${closed.length})</summary>
+        <section class="panel">${closed.map(feedbackLine).join("")}</section></details>` : ""}`;
   }
   function feedbackText(list) {
     return list.map(f => `${fbWhen(f.created_at)} — ${f.person_name}${f.is_test ? " (TEST)" : ""} — ${fbPageName(f.page)}${f.screen ? ": " + f.screen : ""}\n${f.body}`).join("\n\n");
@@ -2440,6 +2463,8 @@ if (typeof document !== "undefined") (function () {
     on("[data-setflag]", () => { const f = S.flagForm;
       act("set_flag", { p_job: f.jobId, p_level: f.level, p_note: f.note.trim(), p_department: f.department || null },
           () => { S.flagForm = { jobId: "", department: "", level: "priority", note: "" }; S.flagFormOpen = false; }, "flags"); });
+    // Feedback (feedback_close.sql): Solved, Not relevant, Put it back. The list reloads after each.
+    on("[data-fbkstate]", (b) => act("set_feedback_state", { p_feedback_id: b.dataset.fbk, p_state: b.dataset.fbkstate }, null, "fbk"));
     on("[data-clearflag]", (b) => { if (confirm("Clear this flag? It stays in the history.")) act("clear_flag", { p_flag: b.dataset.clearflag, p_note: null }, null, "flags"); });
 
     app.querySelectorAll("[data-otick]").forEach(box => box.onchange = () => { box.checked ? S.oticked.add(box.dataset.otick) : S.oticked.delete(box.dataset.otick); render(); });

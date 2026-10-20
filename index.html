@@ -461,7 +461,7 @@ const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 // This page's version. Change it with every edit (date, then .1, .2 … for more than one that day).
 // Each device reports it when it opens; see  select * from devices();  in the SQL Editor.
-const PAGE_VERSION = "2026-10-20.2";
+const PAGE_VERSION = "2026-10-20.3";
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -560,9 +560,29 @@ function buildPast(rows) {
   return [...jobs.values()].sort((a, b) => String(b.done_at || "").localeCompare(String(a.done_at || ""))
                                         || String(a.project_id).localeCompare(String(b.project_id)));
 }
-/** "Done Sep 26 · 4 sheets · Monday: Delivery" */
+/** "Done Sep 26 · Delivery Oct 22 · 4 sheets · Monday: Delivery". The delivery date is Monday's, in words only (20 Oct, Eric). */
 function pastLine(j) {
-  return [j.done_at ? "Done " + fmtDate(localISO(j.done_at)) : "Done", `${j.sheets} sheet${j.sheets === 1 ? "" : "s"}`, j.phase ? "Monday: " + j.phase : null].filter(Boolean).join(" · ");
+  return [j.done_at ? "Done " + fmtDate(localISO(j.done_at)) : "Done", j.delivery_date ? "Delivery " + fmtDate(j.delivery_date) : "No delivery date",
+          `${j.sheets} sheet${j.sheets === 1 ? "" : "s"}`, j.phase ? "Monday: " + j.phase : null].filter(Boolean).join(" · ");
+}
+
+/* ---- New versions (20 Oct, Luke): the page checks GitHub for a newer copy of itself and reloads when nobody's using it ---- */
+const UPDATE_CHECK_MS = 15 * 60 * 1000;   // how often it asks (and whenever the app comes back to the front)
+const UPDATE_IDLE_MS = 2 * 60 * 1000;     // untouched this long before it reloads
+const UPDATE_RETRY_MS = 30 * 60 * 1000;   // the same version isn't tried again sooner (a reload that still came back old)
+const UPDATE_SAFE_TABS = ["work", "paint", "past", "loadout", "tasks", "issues"];
+/** The version written in a copy of this page ("2026-10-20.3"), or null. */
+function versionIn(html) { const m = String(html || "").match(/const PAGE_VERSION = "(\d{4}-\d{2}-\d{2}\.\d+)";/); return m ? m[1] : null; }
+/** Is version a newer than b? Never true for an older or unreadable one. */
+function isNewerVersion(a, b) {
+  const pa = /^(\d{4}-\d{2}-\d{2})\.(\d+)$/.exec(a || ""), pb = /^(\d{4}-\d{2}-\d{2})\.(\d+)$/.exec(b || "");
+  if (!pa || !pb) return false;
+  return pa[1] > pb[1] || (pa[1] === pb[1] && Number(pa[2]) > Number(pb[2]));
+}
+/** May the page reload now? Only signed in, on a list, with nothing open, half-typed or waiting to send, and untouched for a while. */
+function safeToReload(x, idleMs = UPDATE_IDLE_MS) {
+  return !!x.me && x.screen === "queue" && UPDATE_SAFE_TABS.includes(x.tab) && !x.modal && !x.viewer && !x.loView && !x.taskView && !x.openTask
+      && !x.adv && !x.waiting && !x.typed && x.idle >= idleMs;
 }
 
 /* ---- Inventory (inventory.sql): a department's month-end count ---- */
@@ -4208,6 +4228,34 @@ if (typeof document !== "undefined") (function () {
   // Advance: a job's counts stay current while it's open, unless there are changes not yet saved
   setInterval(() => { if (S.me && S.adv && S.advJob && !document.hidden && !S.modal && !Object.keys(S.advEdit).length) loadAdvRows(S.advJob).then(render); }, 60000);
 
+  // ---------- new versions: ask GitHub every 15 minutes; reload only when it's safe (see safeToReload) ----------
+  let lastTouch = Date.now(), lastCheck = 0, checking = false, updateTo = null;
+  for (const ev of ["pointerdown", "touchstart", "keydown", "input", "wheel"]) document.addEventListener(ev, () => { lastTouch = Date.now(); }, { capture: true, passive: true });
+  const typedSomething = () => [...document.querySelectorAll("#app input, #app textarea")]
+    .some(el => !["hidden", "checkbox", "radio", "button", "submit"].includes(el.type) && el.value !== el.defaultValue);
+  function maybeReload() {
+    if (!updateTo) return;
+    const tried = store.get("update_tried", null);
+    if (tried && tried.v === updateTo && Date.now() - tried.at < UPDATE_RETRY_MS) return;
+    const waiting = Object.keys(S.outbox).length + Object.keys(S.logbox).length + S.pending.length;
+    if (!safeToReload({ me: S.me, screen: S.view.screen, tab: S.tab, modal: S.modal, viewer: S.viewer, loView: S.loView, taskView: S.taskView,
+                        openTask: S.openTask, adv: S.adv, waiting, typed: typedSomething(), idle: Date.now() - lastTouch })) return;
+    store.set("update_tried", { v: updateTo, at: Date.now() });
+    location.reload();
+  }
+  async function checkForUpdate() {
+    if (checking || !navigator.onLine) return;
+    checking = true; lastCheck = Date.now();
+    try {   // the same address the app opened with; "no-cache" asks GitHub, which answers "unchanged" cheaply most of the time
+      const r = await fetch(location.href.split("#")[0], { cache: "no-cache" });
+      if (r.ok) { const v = versionIn(await r.text()); if (isNewerVersion(v, PAGE_VERSION)) updateTo = v; }
+    } catch (e) {}
+    checking = false;
+    maybeReload();
+  }
+  setInterval(() => { if (Date.now() - lastCheck >= UPDATE_CHECK_MS) checkForUpdate(); else maybeReload(); }, 60000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastCheck >= 60000) checkForUpdate(); });
+
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 
   db.auth.getSession().then(({ data }) => {
@@ -4219,7 +4267,7 @@ if (typeof document !== "undefined") (function () {
 })();
 
 /* lets the core be tested outside a browser */
-if (typeof module !== "undefined") module.exports = { PAGE_VERSION, arrowWaiting, arrowWaitFor, arrowOut, waitingText, withSends, routeWords, toSend, ROUTES, SEND_DEPTS, DEPT_NAME, buildPast, pastLine, PAST_DEPTS, withFinishBy, finishWords, dateLine, keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
+if (typeof module !== "undefined") module.exports = { PAGE_VERSION, versionIn, isNewerVersion, safeToReload, UPDATE_SAFE_TABS, arrowWaiting, arrowWaitFor, arrowOut, waitingText, withSends, routeWords, toSend, ROUTES, SEND_DEPTS, DEPT_NAME, buildPast, pastLine, PAST_DEPTS, withFinishBy, finishWords, dateLine, keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
   daysLeft, daysText, fmtDate, localISO, daysSince, agoText, setPending, flushOutbox, newId, queueEntry, flushLogbox, dueForMe, taskWhen,
   problemState, splitProblems, defectState, splitIssues, withReady, readyOf, readyKnown, waitingText, HAS_UPSTREAM, defectCounts, supplyLine, filterJobs, sheetsText, isNetworkError, friendlyError, DEPTS,
   fitSize, photoPath, photoError, flushPhotobox, sendOutcome, heldTooLong, loadoutSheets, sizeLabel, loadoutPieces, missingText,
