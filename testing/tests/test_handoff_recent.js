@@ -1,4 +1,5 @@
 // Run: bash base/fresh.sh /abs/handoff_recent.sql && psql -h /tmp/pg -p 5433 -U postgres -d sync -f testing/tests/scenario_handoff_recent.sql, then MODE=new node test_handoff_recent.js (MODE=old without the file)
+// 20 Oct: the queue is rows (button.qrow); button.job stays on Recently completed and the load-out cards.
 // 2 Oct: started jobs stay on Ready, jobs not handed off are hidden from Milling/Metal/Full Custom,
 // and Recently completed. MODE=new (new database) or MODE=old (live database, no handoff_recent.sql).
 const fs = require("fs");
@@ -30,7 +31,7 @@ async function open(user, dept) { const w = boot(user, dept); await until(() => 
   // 1. Mike, Sanding: PROJ-00099 is started (sheet 1 done) with nothing ready -> stays on Ready
   let w = await open(users.mike, "sanding");
   let t = txt(w);
-  const readyCards = [...app(w).querySelectorAll("button.job")].map(b => b.textContent.replace(/\s+/g, " "));
+  const readyCards = [...app(w).querySelectorAll("button.qrow, button.job")].map(b => b.textContent.replace(/\s+/g, " "));
   const c99 = readyCards.find(c => /PROJ-00099/.test(c)) || "";
   ok("Sanding: a started job with nothing ready stays on Ready", !!c99, readyCards.join(" | "));
   ok("…its card says what it's waiting on", /Started · waiting on CNC/.test(c99), c99);
@@ -42,7 +43,7 @@ async function open(user, dept) { const w = boot(user, dept); await until(() => 
   if (MODE === "new") {
     ok("Recently completed lists PROJ-00418, finished on the tablet today", /PROJ-00418/.test(t) && /Done /.test(t), t.slice(0, 400));
     ok("…and not PROJ-00099 (half done)", !/PROJ-00099/.test(t));
-    await click(w, "button.job"); t = txt(w);
+    await click(w, "button.qrow, button.job"); t = txt(w);
     ok("…opening it shows its sheets, read only", /← Recently completed/.test(t) && /9 \/ |1 \/ 1|3 \/ 3/.test(t), t.slice(0, 300));
   } else ok("Old database: Recently completed says its SQL file needs running", /isn't set up in the database yet/.test(t), t.slice(0, 300));
   w.close();

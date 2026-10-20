@@ -8,6 +8,9 @@ const fs = require("fs"), http = require("http"), path = require("path");
 const { chromium } = require("/home/claude/.npm-global/lib/node_modules/playwright");
 const { makeClient, users, admin } = require("./pgsupa");
 const PAGE = fs.readFileSync(process.env.PAGE || "/home/claude/sf/out/index.html", "utf8").replace(/(supabase\.js") integrity="[^"]+"/, "$1");
+// 20 Oct: "newer" is worked out from the page's own version (its day with .9, or the next day's .1 when it is already .9), so the test keeps working after every bump
+const NEWER = (() => { const v = (PAGE.match(/const PAGE_VERSION = "([^"]+)"/) || [])[1]; if (!v) return "2026-10-20.9";
+  const [d, n] = v.split("."); if (n !== "9") return d + ".9"; const t = new Date(d + "T12:00:00Z"); t.setUTCDate(t.getUTCDate() + 1); return t.toISOString().slice(0, 10) + ".1"; })();
 const OWN = (PAGE.match(/const PAGE_VERSION = "([^"]+)"/) || [])[1];
 const copy = (v) => PAGE.replace(/const PAGE_VERSION = "[^"]+";/, `const PAGE_VERSION = "${v}";`);
 let pass = 0, fail = 0;
@@ -84,9 +87,9 @@ async function minutes(p, n) { for (let i = 0; i < n; i++) { await p.clock.fastF
   ok("No new version: it asked GitHub and didn't reload", gh.checks >= 2 && await sameLoad(s.p), `checks ${gh.checks}`);
   ok("…it asks every 15 minutes, not every minute", gh.checks <= 3, `checks ${gh.checks} in 20 minutes`);
   // 2. A newer copy appears: it reloads into it once the tablet has been left alone
-  serve("2026-10-20.9"); const navs0 = gh.navs;
+  serve(NEWER); const navs0 = gh.navs;
   await minutes(s.p, 16); await loaded(s.p);
-  ok("A newer version on GitHub: the idle tablet reloads by itself into it", !(await sameLoad(s.p)) && await version(s.p) === "2026-10-20.9" && gh.navs === navs0 + 1,
+  ok("A newer version on GitHub: the idle tablet reloads by itself into it", !(await sameLoad(s.p)) && await version(s.p) === NEWER && gh.navs === navs0 + 1,
      `version ${await version(s.p)}, navigations ${gh.navs - navs0}`);
   const t1 = await s.p.evaluate(() => document.getElementById("app").innerText);
   ok("…and comes back on the same list, signed in", /jobs? (ready )?·|Nothing waiting/.test(t1), JSON.stringify(t1.slice(0, 200)));
@@ -106,7 +109,7 @@ async function minutes(p, n) { for (let i = 0; i < n; i++) { await p.clock.fastF
   // 4. Someone is using it: a sheet open, then touching the screen; it waits, then goes once left alone on the list
   serve(null);
   s = await session(browser, users.mike); await s.p.goto(base); await loaded(s.p);
-  serve("2026-10-20.9");
+  serve(NEWER);
   await s.p.click("[data-job]"); await wait(400); await s.p.click("[data-sheet]"); await wait(400); await mark(s.p);
   await minutes(s.p, 30);
   ok("A sheet left open for 30 minutes: no reload", await sameLoad(s.p) && await s.p.evaluate(() => !!document.querySelector("#page, .page")), `version ${await version(s.p)}`);
@@ -114,13 +117,13 @@ async function minutes(p, n) { for (let i = 0; i < n; i++) { await p.clock.fastF
   for (let i = 0; i < 4; i++) { await s.p.keyboard.press("Shift"); await minutes(s.p, 1); }
   ok("Back on the list but tapped every minute: no reload", await sameLoad(s.p));
   await minutes(s.p, 3); await loaded(s.p);
-  ok("Left alone for 2 minutes on the list: reloads into the new version", await version(s.p) === "2026-10-20.9", `version ${await version(s.p)}`);
+  ok("Left alone for 2 minutes on the list: reloads into the new version", await version(s.p) === NEWER, `version ${await version(s.p)}`);
   await s.ctx.close();
 
   // 5. A count waiting to send: it waits until the count has gone, and the count is kept
   serve(null);
   s = await session(browser, users.mike); await s.p.goto(base); await loaded(s.p);
-  serve("2026-10-20.9");
+  serve(NEWER);
   await s.p.click("[data-job]"); await wait(400);
   const nSheets = await s.p.evaluate(() => document.querySelectorAll("[data-sheet]").length);
   for (let i = 0; i < nSheets; i++) {          // a sheet with room for one more
@@ -136,19 +139,19 @@ async function minutes(p, n) { for (let i = 0; i < n; i++) { await p.clock.fastF
   ok("A count waiting to send (no signal to the database): no reload for 20 minutes", queued > 0 && await sameLoad(s.p), `queued ${queued}`);
   s.st.offline = false; await minutes(s.p, 5); await loaded(s.p);
   const left = await s.p.evaluate(() => Object.keys(JSON.parse(localStorage.getItem("sf_outbox") || "{}")).length);
-  ok("Signal back: the count sends, then it reloads into the new version", await version(s.p) === "2026-10-20.9" && left === 0, `version ${await version(s.p)}, still waiting ${left}`);
+  ok("Signal back: the count sends, then it reloads into the new version", await version(s.p) === NEWER && left === 0, `version ${await version(s.p)}, still waiting ${left}`);
   await s.ctx.close();
 
   // 6. GitHub's cache behind: the check sees the new copy but the reload gets the old one. It tries once per 30 minutes, no loop
   serve(null);
   s = await session(browser, users.mike); await s.p.goto(base); await loaded(s.p);
-  gh.check = copy("2026-10-20.9"); gh.nav = PAGE; const n0 = gh.navs;
+  gh.check = copy(NEWER); gh.nav = PAGE; const n0 = gh.navs;
   await minutes(s.p, 4); await loaded(s.p);
   ok("Reload came back old: one reload", gh.navs === n0 + 1, `navigations ${gh.navs - n0}`);
   await minutes(s.p, 20);
   ok("…then no second try for 30 minutes (no reload loop)", gh.navs === n0 + 1, `navigations ${gh.navs - n0}`);
-  gh.nav = copy("2026-10-20.9"); await minutes(s.p, 14); await loaded(s.p);
-  ok("…after that it tries again and gets the new version", await version(s.p) === "2026-10-20.9", `version ${await version(s.p)}, navigations ${gh.navs - n0}`);
+  gh.nav = copy(NEWER); await minutes(s.p, 14); await loaded(s.p);
+  ok("…after that it tries again and gets the new version", await version(s.p) === NEWER, `version ${await version(s.p)}, navigations ${gh.navs - n0}`);
   await s.ctx.close();
 
   // 7. Shawn's phone, with the service worker as on the real phone: a trip open waits; on the Load-out list it reloads
@@ -156,9 +159,9 @@ async function minutes(p, n) { for (let i = 0; i < n; i++) { await p.clock.fastF
   s = await session(browser, users.shawn, true); await s.p.goto(base); await wait(1500); await s.p.reload(); await wait(1500);
   const swOn = await s.p.evaluate(() => !!navigator.serviceWorker.controller);
   ok("Shawn's phone: the service worker is running, as on the real phone", swOn);
-  serve("2026-10-20.9"); await mark(s.p);
+  serve(NEWER); await mark(s.p);
   await minutes(s.p, 18); await wait(1500);
-  ok("Shawn on the Load-out list: reloads into the new version through the service worker", await version(s.p) === "2026-10-20.9", `version ${await version(s.p)}`);
+  ok("Shawn on the Load-out list: reloads into the new version through the service worker", await version(s.p) === NEWER, `version ${await version(s.p)}`);
   ok("No errors on the page", s.errs.length === 0, s.errs.join(" | "));
   await s.ctx.close();
 

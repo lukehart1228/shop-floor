@@ -29,7 +29,7 @@ async function screens(html, user) {
   const out = [];
   const snap = async (name) => { await wait(350); out.push([name, $(w, "#app").innerHTML]); };
   await snap("queue");
-  const job = $(w, "button.job"); if (job) { await click(w, job); await snap("job"); const sh = $(w, "button.sheet"); if (sh) { await click(w, sh); await snap("sheet"); } }
+  const job = $(w, "button.qrow, button.job");   // 20 Oct: the queue is rows (.qrow); .job stays on Recently completed if (job) { await click(w, job); await snap("job"); const sh = $(w, "button.sheet"); if (sh) { await click(w, sh); await snap("sheet"); } }
   const back = $(w, "[data-back]"); if (back) { await click(w, back); const b2 = $(w, "[data-back]"); if (b2) await click(w, b2); }
   for (const t of [...w.document.querySelectorAll("[data-tab]")].map(b => b.dataset.tab)) { await click(w, `[data-tab="${t}"]`); await snap("tab " + t); }
   await wait(500);

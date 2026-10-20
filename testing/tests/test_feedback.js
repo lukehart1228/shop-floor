@@ -1,4 +1,5 @@
 // 5 Oct: the Feedback button on every signed-in page, what each note records, the tablet's offline queue,
+// 20 Oct: the queue is rows (button.qrow); button.job stays on Recently completed and the load-out cards.
 // the office's Feedback list, and what a page says on a database without feedback.sql.
 //   bash /home/claude/sf/base/fresh.sh /home/claude/sf/out/sql/feedback.sql && TZ=America/Indiana/Indianapolis node test_feedback.js
 //   OLDDB=1 on a database WITHOUT feedback.sql: only the "not set up yet" messages are tested.
@@ -84,7 +85,7 @@ async function sendShared(w, note) {
   let t = boot("index.html", users.mike), w = t.w;
   await until(() => /PROJ-00418/.test(txt(w)), 8000); await wait(400);
   ok("The tablet header has a Feedback button", !!$(w, "header.top [data-feedback]") && /Feedback/.test($(w, "[data-feedback]").textContent));
-  const job = $$(w, "button.job").find(b => /PROJ-00418/.test(b.textContent)); await click(w, job);
+  const job = $$(w, "button.qrow, button.job").find(b => /PROJ-00418/.test(b.textContent)); await click(w, job);
   const sheet = $(w, "button.sheet"); const sheetNo = sheet ? (sheet.textContent.match(/\d+/) || [""])[0] : ""; if (sheet) await click(w, sheet);
   await click(w, "[data-feedback]");
   const where = txt(w, ".mdl .sub");

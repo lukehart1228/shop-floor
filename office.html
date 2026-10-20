@@ -9,12 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sf-style-2026-10-20.1.css">   <!-- the colours and the scale: one sheet for every page (20 Oct) -->
 <style>
-  :root{
-    --midnight:#181D2E; --orange:#ED5E0F; --bright:#F0A721; --teal:#00B4B2;
-    --teal-ink:#00807E; --teal-bg:#DDF2F1; --sawdust:#FFF4D5; --gray:#C2BAA0;
-    --paper:#EFEDE6; --line:#E4DFCF; --ink2:#6B7082; --warn:#8A4B00;
-  }
   *{box-sizing:border-box}
   html,body{margin:0; background:var(--paper); color:var(--midnight)}
   body{font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:17px; line-height:1.45}
@@ -32,29 +28,31 @@
   .who b{color:var(--sawdust)}
   .lockbtn{background:#2C3348; border:none; color:var(--sawdust); border-radius:8px; padding:6px 14px; font-weight:600; font-size:15px}
   .tabs{display:flex; gap:2px; overflow-x:auto; align-self:stretch; min-width:0; flex:0 1 auto; scrollbar-width:none}
-  .tab{background:none; border:none; color:#9AA0B4; padding:0 13px; font-weight:600; border-top:4px solid transparent; border-bottom:4px solid transparent; white-space:nowrap}
+  .tab{background:none; border:none; color:var(--dim); padding:0 13px; font-weight:600; border-top:4px solid transparent; border-bottom:4px solid transparent; white-space:nowrap}
   .tab[aria-current="true"]{color:var(--sawdust); border-bottom-color:var(--orange)}
   .tab .n{font-family:'Barlow Condensed',sans-serif; margin-left:6px; color:var(--bright)}
   @media (max-width: 900px){ .place{display:none} }
   @media (max-width: 520px){ .top{padding:0 12px} .tab{padding:0 10px} .brand{display:none} main{padding:18px 14px 60px} }
 
-  main{max-width:1040px; margin:0 auto; padding:20px 20px 80px}
+  main{max-width:1160px; margin:0 auto; padding:16px 24px 80px}
 
   /* Needs you */
   .need{margin-bottom:22px}
-  .need > h2{display:flex; align-items:baseline; gap:10px; margin:0 0 10px}
-  .need > h2 .cnt{font-size:20px; color:var(--ink2)}
+  .need > h2{display:flex; align-items:baseline; gap:8px; margin:0 0 6px; font-size:15px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--ink2)}
+  .need > h2 .cnt{font-family:'Barlow Condensed',sans-serif; font-size:17px; color:var(--midnight); letter-spacing:0}
+  .need > .sub{font-size:15px; margin-bottom:8px}
+  .need{scroll-margin-top:72px}
   .need .panel{padding:8px 22px}
   .later{margin-top:28px; border-top:1px solid var(--line); padding-top:8px}
   .later > details{border-bottom:1px solid var(--line); padding:4px 0}
   .later > details[open]{padding-bottom:12px}
-  h1{font-size:28px; margin:0 0 4px}
-  h2{font-size:21px; margin:0 0 4px}
+  h1{font-size:26px; margin:0 0 4px}
+  h2{font-size:20px; margin:0 0 4px}
   .sub{color:var(--ink2); margin:0 0 18px; max-width:70ch}
   .banner{border-radius:10px; padding:12px 16px; margin-bottom:16px; font-weight:600}
   .banner.warn{background:var(--sawdust); color:var(--warn); border-left:5px solid var(--bright)}
   .banner.ok{background:var(--teal-bg); color:var(--teal-ink)}
-  .panel{background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px 22px; margin-bottom:18px}
+  .panel{background:#fff; border:none; border-radius:10px; padding:16px 18px; margin-bottom:16px}
   .panel[id], .setgroup, .ops-flags{scroll-margin-top:84px}
   .jumps{display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 20px}
   .jumps button{min-height:44px}
@@ -94,7 +92,7 @@
   /* find a job, in the header */
   .find{position:relative; margin-left:auto; flex:0 1 250px; min-width:150px}
   .find input{width:100%; background:#2C3348; border:none; border-radius:8px; color:var(--sawdust); padding:8px 12px; font-size:15px}
-  .find input::placeholder{color:#9AA0B4}
+  .find input::placeholder{color:var(--dim)}
   .hits{position:absolute; right:0; top:calc(100% + 6px); width:min(420px, 92vw); background:#fff; color:var(--midnight); border:1px solid var(--gray); border-radius:12px; box-shadow:0 12px 32px rgba(24,29,46,.25); padding:6px; z-index:32}
   .hits button{display:flex; gap:10px; align-items:baseline; width:100%; text-align:left; background:none; border:none; border-radius:8px; padding:10px 12px}
   .hits button:hover,.hits button.first{background:var(--paper)}
@@ -112,14 +110,14 @@
   .syncalert .go{background:var(--midnight); white-space:nowrap}
 
   /* the job page */
-  .jobhead h1{font-size:32px}
+  .jobhead h1{font-size:26px; margin-bottom:8px}
   .jobhead .jn{font-size:20px; font-weight:600; margin-left:10px}
   .jobband{border-radius:10px; padding:10px 16px; font-weight:700; margin:0 0 16px}
   .jobband.priority{background:var(--bright); color:var(--midnight)}
   .jobband.critical{background:var(--orange); color:#fff}
   .jobband.watch{background:#fff; border:1.5px solid var(--midnight)}
   .jobband small{font-weight:400; margin-left:8px; font-size:15px}
-  .jobcols{display:grid; grid-template-columns:minmax(0,1fr) 330px; gap:20px; align-items:start}
+  .jobcols{display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:16px; align-items:start}
   @media (max-width: 1000px){ .jobcols{grid-template-columns:minmax(0,1fr)} }
   .grid{display:grid; gap:6px; font-size:15px; min-width:min-content}
   .grid .gh{font-weight:700; text-align:center; padding:4px 2px; line-height:1.15; align-self:end}
@@ -132,7 +130,7 @@
   .grid .gs{padding:6px 0; line-height:1.15; white-space:nowrap}
   .grid .gs small{display:block; color:var(--ink2); font-size:14px}
   .grid .c{font-family:'Barlow Condensed',sans-serif; font-variant-numeric:tabular-nums; text-align:center; border-radius:8px; padding:9px 4px; font-weight:700; font-size:18px}
-  .grid .c.done{background:var(--teal); color:#fff}
+  .grid .c.done{background:var(--teal); color:var(--midnight)}
   .grid .c.part{background:var(--sawdust); border:1px solid var(--gray)}
   .grid .c.zero{background:#fff; border:1px solid var(--gray); color:var(--ink2)}
   .grid .c.no{color:var(--gray); font-weight:600}
@@ -147,8 +145,8 @@
   main.wide{max-width:1300px}
   .brand{white-space:nowrap}
   @media (max-width: 1420px){ .place{display:none} }
-  .side .panel{padding:14px 16px; margin-bottom:14px}
-  .side h2{font-size:19px}
+  .side .panel{padding:12px 16px; margin-bottom:12px}
+  .side h2{font-size:15px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--ink2); margin:0 0 4px}
   .side .row{font-size:15px; padding:6px 0; border-top:1px solid var(--line)}
   .side .row:first-of-type{border-top:none}
 
@@ -209,7 +207,7 @@
   .tj .nm span{color:var(--ink2)}
 
   /* the floor log: problems, flags, ordering, Arrow, routine tasks */
-  .li{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:12px}
+  .li{background:#fff; border:none; border-radius:10px; padding:12px 16px; margin-bottom:8px}
   .li.open{border-left:6px solid var(--midnight)}
   .li.stop{border-left:6px solid var(--warn)}
   .li-top{display:flex; gap:10px; align-items:baseline; flex-wrap:wrap}
@@ -221,7 +219,7 @@
   .ktag.defect{border:1.5px solid var(--midnight); color:var(--midnight); padding:1px 6px}
   .st.ok{background:var(--teal-bg); color:var(--teal-ink); border-color:transparent}
   .stoptag{font-size:13px; font-weight:700; padding:2px 8px; border-radius:5px; background:var(--sawdust); color:var(--warn); border:1.5px solid var(--warn)}
-  .msg{background:var(--paper); border-radius:9px; padding:10px 12px; margin-top:8px}
+  .msg{background:var(--paper); border-radius:6px; padding:8px 12px; margin-top:6px}
   .msg.answer,.msg.office_note{background:#fff; border:1.5px solid var(--midnight)}
   .msg-meta{font-size:13px; color:var(--ink2); margin-top:3px; font-weight:600}
   textarea.in,input.in,select.in{width:100%; font:inherit; padding:11px 12px; border:1px solid var(--gray); border-radius:9px; background:#fff; color:var(--midnight); min-width:0}
@@ -832,7 +830,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-10-20.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-10-20.2";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -974,7 +972,7 @@ if (typeof document !== "undefined") (function () {
     uploaded: [], testMsg: null, busy: false,
     locked: false, pinEntry: "", pinBad: 0,
     // the floor log
-    problems: [], defects: [], metal: [], noteOpen: null, defFrom: "month", flags: [], activeJobs: [], supplies: [], oticked: new Set(), notOrdering: null,
+    problems: [], defects: [], metal: [], noteOpen: null, answering: new Set(), defFrom: "month", flags: [], activeJobs: [], supplies: [], oticked: new Set(), notOrdering: null,
     arrow: [], arrowDays: 14, tasks: [], people: [], types: [], tvMade: null, tvKey: null,
     drafts: {}, flagForm: { jobId: "", department: "", level: "priority", note: "" }, flagFormOpen: false, routine: [],
     taskForm: { name: "", department: "sanding", assigned_to: "", schedule_type: "weekly", week_interval: 1, monthly_occurrence: 1, weekday: 1, start_date: "", is_test: false },
@@ -1251,37 +1249,40 @@ if (typeof document !== "undefined") (function () {
            ${g.rows.map(r => `<div class="gs"><b>Sheet ${r.n}</b><small>${esc(r.code)}</small></div>${r.cells.map(c => `<div class="c ${c.kind}">${esc(c.text)}</div>`).join("")}`).join("")}
          </div></div>`;
 
+    // 20 Oct: one Status card, a line per fact, instead of six panels
+    const first = openP[0] || askedD[0];
+    const issuesV = !first ? `None open${answeredP.length ? ` · ${answeredP.length} answered` : ""}`
+      : `${first.sheet_number !== null ? `Sheet ${first.sheet_number}` : "Whole job"} · ${esc(first.department_name)}${first.work_stopped ? ` <span class="stoptag">Work stopped</span>` : ""}: ${esc(first.body || first.defect_type || "")}${first.note ? ` — ${esc(first.note)}` : ""}
+         <span class="m">${esc(first.raised_by_name || first.logged_by_name || "")}, ${esc(ago(first.raised_at || first.logged_at))}${openP.length + askedD.length > 1 ? ` · ${openP.length + askedD.length - 1} more` : ""}${answeredP.length ? ` · ${answeredP.length} answered` : ""}</span>`;
+    const arrowV = toGo.concat(atArrow).map(a => `<div>${esc(what(a))}<span class="m">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · ${a.waiting ? `<b>waiting to go</b> · sent on ${esc(fmtDate(a.queued_on || a.sent_on))} by ${esc(a.queued_by_name || a.sent_by_name)}` : `sent ${esc(fmtDate(a.sent_on))} by ${esc(a.sent_by_name)} · <b>${a.days_out} day${a.days_out === 1 ? "" : "s"} out</b>`}</span></div>`).join("")
+      || `Nothing at Arrow${back2.length ? `<span class="m">${back2.length} returned</span>` : ""}`;
+    const defectsV = Object.entries(defectGroups).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${esc(t)} ×${n}`).join(", ") || "None logged";
+    const tv = J.tv || [], showing = tv.filter(t => t.showing).length, withCopy = tv.filter(t => t.has_copy).length, jobHidden = tv.length && tv[0].job_hidden;
+    const tvV = !tv.length ? "" : jobHidden ? "Hidden from the floor TV" : showing ? `${showing} picture${showing === 1 ? "" : "s"} on the floor TV` : withCopy ? "Not on the floor TV right now" : "No TV copy of its site photos";
+    const tvA = !tv.length ? "" : jobHidden ? `<button class="a" data-tvjob="${esc(J.id)}" data-hide="0">Show again</button>` : withCopy ? `<button class="a" data-tvjob="${esc(J.id)}" data-hide="1">Hide from the TV</button>` : "";
+    const loV = J.loadouts.slice().sort((a, b) => String(b.scheduled_for || b.started_at).localeCompare(String(a.scheduled_for || a.started_at))).map(l => `<div><b>${esc(tripWord(l))}</b> · ${l.completed_at ? `${l.kind === "delivery" ? "delivered" : "picked up"} ${esc(fmtWhen(l.completed_at))}${l.signed_name ? ` · signed by ${esc(l.signed_name)}` : ""}`
+              : l.scheduled_for ? `scheduled ${esc(fmtWhen(l.scheduled_for))}` : l.ready_at ? `ready for pickup since ${esc(fmtWhen(l.ready_at))}` : l.is_open ? `started ${esc(fmtWhen(l.started_at))}` : `finished ${esc(fmtWhen(l.finished_at))}`}
+            ${l.pieces_total ? `<span class="m">${l.pieces_here || 0} of ${l.pieces_total} pieces${l.scheduled_by_name ? ` · scheduled by ${esc(l.scheduled_by_name)}` : ""}</span>` : ""}</div>`).join("") || "None yet";
     const side = `
-      <section class="panel"><h2>Issues ${openP.length + askedD.length ? `<span class="cnt num" style="color:var(--ink2)">${openP.length + askedD.length} open</span>` : ""}</h2>
-        ${openP.map(p => `<div class="row"><b>${p.sheet_number !== null ? `Sheet ${p.sheet_number}` : "Whole job"} · ${esc(p.department_name)}</b>
-            ${p.work_stopped ? ` <span class="stoptag">Work stopped</span>` : ""}<div>${esc(p.body)}</div><div class="meta2">${esc(p.raised_by_name)}, ${esc(ago(p.raised_at))}</div></div>`).join("")}
-        ${askedD.map(d => `<div class="row"><b>${d.sheet_number !== null ? `Sheet ${d.sheet_number}` : "Whole job"} · ${esc(d.department_name)}</b> <span class="meta2">defect</span>
-            <div>${esc(d.defect_type)}${d.note ? ` — ${esc(d.note)}` : ""}</div><div class="meta2">${esc(d.logged_by_name)}, ${esc(ago(d.logged_at))}</div></div>`).join("")}
-        ${openP.length + askedD.length ? "" : `<p class="sub" style="margin:0">None open.</p>`}
-        ${answeredP.length ? `<p class="meta2" style="margin:8px 0 0">${answeredP.length} answered</p>` : ""}
-        ${openP.length + askedD.length ? `<button class="link" data-tab="tasks" style="padding-left:0">Answer on Needs you</button>` : ""}</section>
-      <section class="panel"><h2>Arrow</h2>
-        ${toGo.map(a => `<div class="row"><b>${esc(what(a))}</b><div class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · <b>waiting to go</b> · sent on ${esc(fmtDate(a.queued_on || a.sent_on))} by ${esc(a.queued_by_name || a.sent_by_name)}</div></div>`).join("")}
-        ${atArrow.map(a => `<div class="row"><b>${esc(what(a))}</b><div class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent ${esc(fmtDate(a.sent_on))} by ${esc(a.sent_by_name)} · <b>${a.days_out} day${a.days_out === 1 ? "" : "s"} out</b></div></div>`).join("")
-          || (toGo.length ? "" : `<p class="sub" style="margin:0">Nothing at Arrow.</p>`)}
-        ${back2.length ? `<p class="meta2" style="margin:8px 0 0">${back2.length} returned</p>` : ""}</section>
-      <section class="panel"><h2>Defects ${J.defects.length ? `<span class="cnt num" style="color:var(--ink2)">${J.defects.length}</span>` : ""}</h2>
-        ${Object.entries(defectGroups).sort((a, b) => b[1] - a[1]).map(([t, n]) => `<div class="row">${esc(t)} <span class="num" style="float:right">${n}</span></div>`).join("")
-          || `<p class="sub" style="margin:0">None logged.</p>`}</section>
-      <section class="panel"><h2>Photos ${J.photoCount ? `<span class="cnt num" style="color:var(--ink2)">${J.photoCount}</span>` : ""}</h2>
-        ${J.photoCount ? `<button class="plain" data-jobphotos="${esc(j.project_id)}">See them on Photos</button>` : `<p class="sub" style="margin:0">None yet.</p>`}</section>
-      ${tvJobHtml(J)}
-      <section class="panel"><h2>Load-outs and deliveries</h2>
-        ${J.loadouts.slice().sort((a, b) => String(b.scheduled_for || b.started_at).localeCompare(String(a.scheduled_for || a.started_at))).map(l => `<div class="row">
-            <b>${esc(tripWord(l))}</b> · ${l.completed_at ? `${l.kind === "delivery" ? "delivered" : "picked up"} ${esc(fmtWhen(l.completed_at))}${l.signed_name ? ` · signed by ${esc(l.signed_name)}` : ""}`
-              : l.scheduled_for ? `scheduled ${esc(fmtWhen(l.scheduled_for))}` : l.ready_at ? `ready for pickup since ${esc(fmtWhen(l.ready_at))}` : l.is_open ? `started ${esc(fmtWhen(l.started_at))}` : `finished ${esc(fmtWhen(l.finished_at || l.started_at))}`}
-            ${l.pieces_total ? `<div class="meta2">${l.pieces_here || 0} of ${l.pieces_total} pieces${l.scheduled_by_name ? ` · scheduled by ${esc(l.scheduled_by_name)}` : ""}</div>` : ""}</div>`).join("")
-          || `<p class="sub" style="margin:0">None yet.</p>`}</section>`;
+      <section class="panel"><h2>Status</h2>
+        <div class="srow"><span class="k">Issues${openP.length + askedD.length ? `<span class="n">${openP.length + askedD.length} open</span>` : ""}</span><span class="v">${issuesV}</span>${openP.length + askedD.length ? `<button class="a" data-tab="tasks">Answer</button>` : "<span></span>"}</div>
+        <div class="srow"><span class="k">Arrow${toGo.length + atArrow.length ? `<span class="n">${toGo.length + atArrow.length}</span>` : ""}</span><span class="v">${arrowV}</span><button class="a" data-tab="arrow">Arrow tab</button></div>
+        <div class="srow"><span class="k">Defects${J.defects.length ? `<span class="n">${J.defects.length}</span>` : ""}</span><span class="v">${defectsV}</span><span></span></div>
+        <div class="srow"><span class="k">Photos${J.photoCount ? `<span class="n">${J.photoCount}</span>` : ""}</span><span class="v">${J.photoCount ? `${J.photoCount} photo${J.photoCount === 1 ? "" : "s"}` : "None yet"}</span>${J.photoCount ? `<button class="a" data-jobphotos="${esc(j.project_id)}">See them</button>` : "<span></span>"}</div>
+        ${tv.length ? `<div class="srow"><span class="k">Floor TV</span><span class="v">${tvV}<span class="m">To hide one picture, open it on Photos and use the button under it.</span></span>${tvA || "<span></span>"}</div>` : ""}
+        <div class="srow"><span class="k">Load-outs</span><span class="v">${loV}</span><span></span></div>
+      </section>`;
 
+    const done = J.sheets.length ? g.totals.reduce((a, t) => a + t.done, 0) : 0;
     return `${back}
-      <div class="jobhead"><h1>${testTag(j)}${esc(j.project_id || "(no PROJ number)")}<span class="jn">${esc(j.name)}</span></h1>
-        <p class="sub">${esc(facts.join(" · "))}</p></div>
-      ${flag ? `<div class="jobband ${flag.level}">${esc(LEVEL_NAME[flag.level])}: ${esc(flag.note)}<small>Set by ${esc(flag.set_by_name)}, ${esc(ago(flag.set_at))}${flag.department_name ? ` · ${esc(flag.department_name)} only` : ""}</small></div>` : ""}
+      <div class="jobhead"><h1>${testTag(j)}${esc(j.project_id || "(no PROJ number)")}<span class="jn">${esc(j.name)}</span></h1></div>
+      <div class="facts">
+        <div class="fact"><small>Phase</small><b>${esc(facts[0])}</b></div>
+        <div class="fact"><small>Delivery</small><b>${esc(j.delivery_date ? fmtDate(j.delivery_date) : "no date")}${j.delivery_date && daysLeft(j.delivery_date) !== null ? ` · ${esc(daysText(daysLeft(j.delivery_date)))}` : ""}</b></div>
+        <div class="fact"><small>Work order</small><b>${J.wo ? `v${J.wo.version} · ${J.sheets.length} sheet${J.sheets.length === 1 ? "" : "s"} · ${pieces} pieces` : "none uploaded"}</b></div>
+        ${J.wo ? `<div class="fact"><small>Steps done</small><b>${done} of ${g.totals.reduce((a, t) => a + t.req, 0)}</b></div>` : ""}
+        ${flag ? `<div class="fact flag ${flag.level}"><small>${esc(LEVEL_NAME[flag.level])} · set by ${esc(flag.set_by_name)}, ${esc(ago(flag.set_at))}${flag.department_name ? ` · ${esc(flag.department_name)} only` : ""}</small><b>${esc(flag.note)}</b></div>` : ""}
+      </div>
       <div class="jobcols"><section class="panel"><h2 style="margin-bottom:10px">Progress by sheet</h2>${grid}</section><div class="side">${side}</div></div>`;
   }
 
@@ -1319,9 +1320,11 @@ if (typeof document !== "undefined") (function () {
       <div class="msg"><div>${esc(p.body)}</div><div class="msg-meta">${esc(p.raised_by_name)} · ${esc(fmtDay(p.raised_at))} (${esc(ago(p.raised_at))})</div></div>
       ${(p.thread || []).map(m => `<div class="msg ${esc(m.kind)}"><div>${esc(m.body)}</div><div class="msg-meta">${esc(m.by)} · ${esc(fmtDay(m.at))}${m.kind === "answer" ? " · answered" : ""}</div></div>`).join("")}
       ${photoStrip(S.photos.filter(x => x.problem_id === p.id))}
-      ${p.status === "open" ? `<textarea class="in" style="margin-top:10px" data-draft="${esc(p.id)}" placeholder="Your answer — what did you decide, or what should they do?">${esc(d)}</textarea>
+      ${p.status !== "open" ? "" : !(S.answering.has(p.id) || d.trim()) ? `<div class="btns"><button class="go" data-openanswer="${esc(p.id)}">Answer…</button></div>`
+        : `<textarea class="in" style="margin-top:10px" data-draft="${esc(p.id)}" placeholder="Your answer — what did you decide, or what should they do?">${esc(d)}</textarea>
         <div class="btns"><button class="go" data-answer="${esc(p.id)}" data-close="1" ${d.trim() ? "" : "disabled"}>Answer and close</button>
-          <button class="plain" data-answer="${esc(p.id)}" data-close="0" ${d.trim() ? "" : "disabled"}>Reply, keep it open</button></div>` : ""}
+          <button class="plain" data-answer="${esc(p.id)}" data-close="0" ${d.trim() ? "" : "disabled"}>Reply, keep it open</button>
+          <button class="link" data-closeanswer="${esc(p.id)}">Not now</button></div>`}
     </div>`;
   }
   /** A defect on Needs you: the ones the floor asked about wait for an answer; any other can take a note. */
@@ -1334,9 +1337,11 @@ if (typeof document !== "undefined") (function () {
       <div class="msg"><div><b>${esc(d.defect_type)}</b>${d.note ? ` — ${esc(d.note)}` : ""}</div><div class="msg-meta">${esc(d.logged_by_name)} · ${esc(fmtDay(d.logged_at))} (${esc(ago(d.logged_at))})</div></div>
       ${(d.thread || []).map(m => `<div class="msg ${esc(m.kind)}"><div>${esc(m.body)}</div><div class="msg-meta">${esc(m.by)} · ${esc(fmtDay(m.at))}${m.kind === "answer" ? " · answered" : ""}</div></div>`).join("")}
       ${photoStrip(S.photos.filter(x => x.defect_id === d.id))}
-      ${waiting ? `<textarea class="in" style="margin-top:10px" data-draft="${esc(d.id)}" placeholder="Your answer — what did you decide, or what should they do?">${esc(dr)}</textarea>
+      ${waiting && !(S.answering.has(d.id) || dr.trim()) ? `<div class="btns"><button class="go" data-openanswer="${esc(d.id)}">Answer…</button></div>`
+      : waiting ? `<textarea class="in" style="margin-top:10px" data-draft="${esc(d.id)}" placeholder="Your answer — what did you decide, or what should they do?">${esc(dr)}</textarea>
         <div class="btns"><button class="go" data-danswer="${esc(d.id)}" data-close="1" ${dr.trim() ? "" : "disabled"}>Answer and close</button>
-          <button class="plain" data-danswer="${esc(d.id)}" data-close="0" ${dr.trim() ? "" : "disabled"}>Reply, keep it open</button></div>`
+          <button class="plain" data-danswer="${esc(d.id)}" data-close="0" ${dr.trim() ? "" : "disabled"}>Reply, keep it open</button>
+          <button class="link" data-closeanswer="${esc(d.id)}">Not now</button></div>`
       : !d.office_status && S.noteOpen === d.id ? `<textarea class="in" style="margin-top:10px" data-draft="${esc(d.id)}" placeholder="A note to ${esc(d.logged_by_name)}. It shows on their tablet; the defect still won't wait on you.">${esc(dr)}</textarea>
         <div class="btns"><button class="go" data-danswer="${esc(d.id)}" data-close="0" ${dr.trim() ? "" : "disabled"}>Send the note</button><button class="link" data-dnote="">Cancel</button></div>`
       : !d.office_status ? `<div class="btns"><button class="link" data-dnote="${esc(d.id)}" style="padding-left:0">Send a note</button></div>` : ""}
@@ -1553,7 +1558,8 @@ if (typeof document !== "undefined") (function () {
     const who = (r) => `${esc(r.requested_by_name)} · ${esc(fmtDay(r.requested_at))}`;
     const scope = (x) => x.department_name ? `${x.department_name} only` : "whole job";
     const what = (a) => [a.sheet_numbers && a.sheet_numbers.length ? `sheet${a.sheet_numbers.length === 1 ? "" : "s"} ${a.sheet_numbers.join(", ")}` : "", a.description].filter(Boolean).join(" — ");
-    const sec = (key, title, n, body) => `<section class="need" data-need="${key}"><h2>${title}${n ? ` <span class="cnt num">${n}</span>` : ""}</h2>${body}</section>`;
+    const strip = [];   // 20 Oct: one tile per section that has something, up top
+    const sec = (key, title, n, body) => { strip.push({ key, title, n }); return `<section class="need" id="need-${key}" data-need="${key}"><h2>${title}${n ? ` <span class="cnt num">${n}</span>` : ""}</h2>${body}</section>`; };
     const keep = (k) => S.openDetails.has(k) ? "open" : "";
     const parts = [];
 
@@ -1621,8 +1627,13 @@ if (typeof document !== "undefined") (function () {
           <div class="detail">${esc(t.job_name)} · ${esc(t.phase)} · due ${esc(fmtDate(t.delivery_date))}${t.handed_off_text ? ` · Monday says “${esc(t.handed_off_text)}”` : ""}</div>
         </div>`).join("")}</div>`));
 
+    const openFl = openFlags(S.flags), stopped = open.filter(x => x.work_stopped).length;
+    const tiles = strip.map(t => `<button class="st${(t.key === "problems" && stopped) || !t.n ? " hot" : ""}" data-jump="need-${t.key}"><span class="n num">${t.n || "!"}</span><span class="l">${esc(t.title)}${t.key === "problems" && stopped ? `<small>${stopped} work stopped</small>` : ""}</span></button>`)
+      .concat([`<button class="st${openFl.length ? "" : " zero"}" data-jump="opsflags"><span class="n num">${openFl.length}</span><span class="l">Flags open${stale.length ? `<small>${stale.length} older than two weeks</small>` : ""}</span></button>`,
+               `<button class="st" data-findfocus="1"><span class="n num">${(S.activeJobs || []).length}</span><span class="l">Jobs in production<small>find one by PROJ or name</small></span></button>`]);
     return `<h1>Operations</h1>
       <p class="sub">What's waiting on the office, most urgent first, then the flags in front of the floor.</p>
+      <div class="status">${tiles.join("")}</div>
       ${missingNote()}${S.msgFrom === "flags" ? "" : msgBanner()}${syncAlertHtml()}
       <h2 class="opshead">Needs you</h2>
       ${parts.length ? parts.join("") : syncProblem() ? "" : `<div class="empty"><b>Nothing needs you</b>No issues waiting, nothing to order, nothing overdue, no handoffs.</div>`}
@@ -2443,6 +2454,9 @@ if (typeof document !== "undefined") (function () {
       S.drafts[t.dataset.draft] = t.value;
       app.querySelectorAll(`[data-answer="${t.dataset.draft}"], [data-danswer="${t.dataset.draft}"]`).forEach(b => b.disabled = !t.value.trim());
     });
+    on("[data-findfocus]", () => { const f = document.querySelector("[data-jobfind]"); if (f) { f.focus(); f.select(); } });
+    on("[data-openanswer]", (b) => { S.answering.add(b.dataset.openanswer); render(); const t = app.querySelector(`[data-draft="${b.dataset.openanswer}"]`); if (t) t.focus(); });
+    on("[data-closeanswer]", (b) => { S.answering.delete(b.dataset.closeanswer); delete S.drafts[b.dataset.closeanswer]; render(); });
     on("[data-answer]", (b) => act("answer_problem", { p_problem: b.dataset.answer, p_body: (S.drafts[b.dataset.answer] || "").trim(), p_close: b.dataset.close === "1" },
                                    () => { delete S.drafts[b.dataset.answer]; }));
     on("[data-danswer]", (b) => act("answer_defect", { p_defect: b.dataset.danswer, p_body: (S.drafts[b.dataset.danswer] || "").trim(), p_close: b.dataset.close === "1" },

@@ -1,4 +1,5 @@
 // 20 Oct (look_only.sql, index.html 2026-10-20.2): a supervisor looks at another department without changing it.
+// 20 Oct: the queue is rows (button.qrow); button.job stays on Recently completed and the load-out cards.
 // Sam (CNC only; made here) is given Milling to look at. His tablet gets a Milling tab next to CNC: Milling's Work orders
 // and Recently completed exactly as Donnie sees them, but no − / +, Mark all done, send or Report, and nothing is sent.
 // His CNC tab is unchanged; the database refuses a Milling count from him; the old page and the old database are unaffected.
@@ -68,7 +69,7 @@ const actions = "[data-step], [data-all], [data-send], [data-sendall], [data-uns
   // before: Sam with no look list, on the new page and on the live page
   const plain = boot(NEW, SAM); await settled(plain.w);
   const cncBefore = body(plain.w);
-  ok("Sam with nothing to look at: no department tabs", !$(plain.w, "nav.tabs") && !!$(plain.w, "button.job, .empty"));
+  ok("Sam with nothing to look at: no department tabs", !$(plain.w, "nav.tabs") && !!$(plain.w, "button.qrow, button.job, .empty"));
   plain.w.close();
 
   const r = await admin.query("select set_look_only('sam@example.com', '{milling}') m");
@@ -90,9 +91,9 @@ const actions = "[data-step], [data-all], [data-send], [data-sendall], [data-uns
   ok("On Milling: Work orders and Recently completed only", JSON.stringify(subt) === '["work","past"]', JSON.stringify(subt));
 
   const d = boot(NEW, users.donnie, "milling"); await settled(d.w);
-  ok("Milling's Work orders list is exactly Donnie's", body(s.w) === body(d.w) && $$(s.w, "button.job").length > 0, `${$$(s.w, "button.job").length} jobs`);
+  ok("Milling's Work orders list is exactly Donnie's", body(s.w) === body(d.w) && $$(s.w, "button.qrow").length > 0, `${$$(s.w, "button.qrow").length} jobs`);
   // the same job, then the same sheet
-  await click(s.w, "button.job"); await click(d.w, "button.job"); await wait(300);
+  await click(s.w, "button.qrow"); await click(d.w, "button.qrow"); await wait(300);
   ok("A Milling job page is exactly Donnie's", body(s.w) === body(d.w));
   await click(s.w, "button.sheet"); await click(d.w, "button.sheet"); await wait(400);
   ok("A Milling sheet: the count as a number, and nothing to press", !$(s.w, actions) && /of \d+ done/.test($(s.w, ".counter").textContent) && !!$(s.w, "[data-print]") && !!$(s.w, "#page"),
