@@ -153,7 +153,8 @@ function storageFor(client, bucket) {
     },
     async remove(paths) {
       if (offline) return netErr();
-      const r = await runAs(client.user, "delete from storage.objects where bucket_id = $1 and name = any($2) returning name", [bucket, paths]);
+      // 20 Oct: through "the Storage API": it sets storage.allow_delete_query, without which storage refuses any delete (as on Supabase)
+      const r = await runAs(client.user, "delete from storage.objects where (select set_config('storage.allow_delete_query', 'true', true)) = 'true' and bucket_id = $1 and name = any($2) returning name", [bucket, paths]);
       if (r.error) return { data: null, error: { message: r.error.message } };
       for (const x of r.data) files.delete(key(x.name));
       return { data: r.data.map(x => ({ name: x.name })), error: null };   // like Storage: silently skips what you may not delete
