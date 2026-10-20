@@ -55,8 +55,9 @@ function builder(client, table) {
   const st = { table, kind: "select", cols: "*", where: [], params: [], order: [], limit: null, offset: null, single: null, values: null, returning: null };
   const p = (v) => { st.params.push(v); return "$" + st.params.length; };
   const b = {
-    select(cols = "*") { if (st.kind === "update") st.returning = cols; else st.cols = cols; return b; },
+    select(cols = "*", o = {}) { if (st.kind === "update" || st.kind === "insert") st.returning = cols; else { st.cols = cols; st.count = o.count || null; st.head = !!o.head; } return b; },
     update(values) { st.kind = "update"; st.values = values; return b; },
+    insert(values) { st.kind = "insert"; st.values = Array.isArray(values) ? values : [values]; return b; },   // 18 Oct: the lab inserts rows directly
     eq(c, v) { st.where.push(`${q(c)} = ${p(v)}`); return b; },
     neq(c, v) { st.where.push(`${q(c)} <> ${p(v)}`); return b; },
     gt(c, v) { st.where.push(`${q(c)} > ${p(v)}`); return b; },
@@ -77,7 +78,13 @@ function builder(client, table) {
     if (offline) return netErr();
     let sql;
     const w = st.where.length ? " where " + st.where.join(" and ") : "";
-    if (st.kind === "update") {
+    if (st.kind === "insert") {
+      // jsonb arrays and objects go as JSON, as Supabase sends them (node-pg would make a Postgres array of a JS array)
+      const val = (v) => (v !== null && typeof v === "object" && !(v instanceof Date)) ? JSON.stringify(v) : v;
+      const keys = [...new Set(st.values.flatMap(r => Object.keys(r)))];
+      const rows = st.values.map(r => "(" + keys.map(k => k in r ? p(val(r[k])) : "default").join(", ") + ")").join(", ");
+      sql = `insert into ${q(st.table)} (${keys.map(q).join(", ")}) values ${rows}${st.returning ? " returning " + cols(st.returning) : ""}`;
+    } else if (st.kind === "update") {
       const sets = Object.entries(st.values).map(([k, v]) => `${q(k)} = ${p(v)}`).join(", ");
       sql = `update ${q(st.table)} set ${sets}${w}${st.returning ? " returning " + cols(st.returning) : ""}`;
     } else {
@@ -89,7 +96,8 @@ function builder(client, table) {
     const r = await runAs(client.user, sql, st.params);
     if (r.error) return r;
     let data = r.data.map(norm);
-    if (st.kind === "update" && !st.returning) data = null;
+    if ((st.kind === "update" || st.kind === "insert") && !st.returning) data = null;
+    if (st.count) { const n = data.length; return { data: st.head ? null : data, count: n, error: null }; }
     if (st.single === "maybe") return { data: data[0] || null, error: null };
     if (st.single === "one") return data.length === 1 ? { data: data[0], error: null } : { data: null, error: { message: "JSON object requested, multiple (or no) rows returned" } };
     return { data, error: null };

@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#181D2E">
+<title>Prototype lab · Shop Floor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --midnight:#181D2E; --orange:#ED5E0F; --bright:#F0A721; --teal:#00B4B2;
+    --teal-ink:#00807E; --teal-bg:#DDF2F1; --sawdust:#FFF4D5; --gray:#C2BAA0;
+    --paper:#EFEDE6; --line:#E4DFCF; --ink2:#6B7082; --warn:#7A4400;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--paper); color:var(--midnight); font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:17px; line-height:1.45}
+  header{background:var(--midnight); color:var(--sawdust); padding:16px 20px; display:flex; align-items:baseline; gap:14px; flex-wrap:wrap}
+  .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.16em; color:var(--orange)}
+  .brand span{color:var(--sawdust)}
+  header h1{margin:0; font-size:20px; font-weight:600}
+  header .toofc{margin-left:auto; color:var(--sawdust); font-weight:600; text-decoration:none; border-bottom:1.5px solid var(--orange)}
+  main{max-width:900px; margin:0 auto; padding:22px 16px 70px}
+  .card{background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin-bottom:16px}
+  h2{margin:0 0 4px; font-size:22px} h3{margin:0 0 8px; font-size:18px}
+  .sub{color:var(--ink2); margin:0 0 12px}
+  label.f{display:block; font-weight:600; margin:12px 0 4px}
+  input[type=email],input[type=password],input[type=text],select{font:inherit; padding:9px 11px; border:1px solid var(--gray); border-radius:9px; background:#fff; color:var(--midnight)}
+  input[type=email],input[type=password]{width:100%}
+  button{font:inherit; font-weight:600; border-radius:9px; padding:10px 16px; cursor:pointer; border:1px solid var(--gray); background:#fff; color:var(--midnight)}
+  button.go{background:var(--orange); color:#fff; border-color:transparent}
+  button.wide{width:100%; margin-top:16px; padding:13px 18px}
+  button:disabled{opacity:.45; cursor:default}
+  button.link{background:none; border:none; padding:4px; color:var(--ink2); text-decoration:underline; font-weight:500}
+  button:focus-visible,.drop:focus-within,select:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--bright); outline-offset:2px}
+  .who{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; color:var(--ink2); margin-bottom:14px}
+  .who b{color:var(--midnight)}
+  .drop{position:relative; display:block; border:2px dashed var(--gray); border-radius:12px; background:#fff; padding:30px 20px; text-align:center; cursor:pointer; margin-bottom:16px}
+  .drop.over{border-color:var(--orange); background:var(--sawdust)}
+  .drop b{display:block; font-size:19px; margin-bottom:4px} .drop span{color:var(--ink2)}
+  .drop input{position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer}
+  .bad{background:var(--sawdust); color:var(--warn); border-left:5px solid var(--bright); border-radius:10px; padding:14px 16px}
+  .bad p{margin:0 0 6px} .bad p:last-child{margin:0}
+  .alarm{background:var(--midnight); color:var(--sawdust); border-radius:12px; padding:20px}
+  .alarm h2{color:var(--bright)}
+  .tally{display:flex; gap:10px; flex-wrap:wrap; margin:12px 0 0}
+  .t{border-radius:9px; padding:8px 12px; min-width:120px}
+  .t b{display:block; font-family:'Barlow Condensed',sans-serif; font-size:30px; line-height:1}
+  .t span{font-size:14px}
+  .st-made{background:var(--teal-bg); color:var(--teal-ink)}
+  .st-flag{background:var(--sawdust); color:var(--warn); box-shadow:inset 4px 0 0 var(--bright)}
+  .st-stuck{background:transparent; color:#4A5063; border:1.5px dashed var(--gray)}
+  .need{border-left:5px solid var(--orange)}
+  .need ul{margin:6px 0 0; padding-left:20px} .need li{margin:10px 0}
+  .ctl{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:6px}
+  .small{font-size:15px; color:var(--ink2)}
+  ul.checks{list-style:none; padding:0; margin:0}
+  ul.checks li{display:flex; gap:10px; align-items:baseline; padding:7px 0; border-bottom:1px solid var(--line)}
+  ul.checks li:last-child{border-bottom:none}
+  .badge{font-size:13px; font-weight:700; border-radius:6px; padding:2px 8px; white-space:nowrap; flex-shrink:0}
+  details.sheet{border-top:1px solid var(--line)} details.sheet:first-of-type{border-top:none}
+  details.sheet>summary{list-style:none; cursor:pointer; padding:12px 0; display:flex; gap:12px; align-items:center; flex-wrap:wrap}
+  details.sheet>summary::-webkit-details-marker{display:none}
+  .sn{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:20px; min-width:30px; color:var(--ink2)}
+  .sid{font-weight:700} .sdim{color:var(--ink2)}
+  .chips{margin-left:auto; display:flex; gap:6px; flex-wrap:wrap}
+  .chip{font-size:14px; font-weight:600; border-radius:7px; padding:3px 9px}
+  .out{margin:0 0 14px 42px}
+  .out h4{margin:10px 0 4px; font-size:16px; display:flex; gap:8px; align-items:center}
+  .out p{margin:4px 0}
+  .scroll{overflow-x:auto}
+  table.math{border-collapse:collapse; font-size:15px; margin:6px 0}
+  table.math th,table.math td{padding:4px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap}
+  table.math th:first-child,table.math td:first-child{text-align:left}
+  table.math tr.win td{font-weight:700; color:var(--teal-ink)}
+  table.math tr.no td{color:var(--ink2)}
+  .flagline{color:var(--warn)}
+  ul.taught{list-style:none; padding:0; margin:8px 0 0}
+  ul.taught li{display:flex; gap:10px; align-items:baseline; padding:8px 0; border-bottom:1px solid var(--line); flex-wrap:wrap}
+  ul.taught li:last-child{border-bottom:none}
+  ul.taught .what{flex:1; min-width:220px}
+  .saved{font-size:14px; color:var(--ink2); margin:-8px 0 14px}
+  .fform{display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:4px 14px; align-items:end}
+  .fform label{display:block; font-weight:600; font-size:15px; margin:8px 0 4px}
+  .fform input[type=text],.fform select{width:100%}
+  .tag{font-size:13px; font-weight:700; border-radius:6px; padding:2px 8px; white-space:nowrap}
+  [hidden]{display:none!important}
+  @media (max-width:600px){ .out{margin-left:0} .chips{margin-left:0} }
+  @media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">PURPOSEFUL <span>DESIGN</span></div>
+  <h1>Prototype lab</h1>
+  <a class="toofc" href="office.html#lab">← Office</a>
+</header>
+
+<main>
+  <section id="configProblem" class="alarm" hidden><h2 id="configTitle">This page isn’t set up yet</h2><p id="configBody"></p></section>
+
+  <section id="signIn" class="card" hidden>
+    <h2>Sign in</h2>
+    <p class="sub">The lab is only for the logins let into it.</p>
+    <form id="signInForm">
+      <label class="f" for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" required>
+      <label class="f" for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button class="go wide" type="submit" id="signInBtn">Sign in</button>
+    </form>
+    <div id="signInError" class="bad" style="margin-top:14px" hidden></div>
+  </section>
+
+  <section id="notAllowed" class="card" hidden>
+    <h2>Not let into the lab</h2>
+    <p id="notAllowedBody"></p>
+    <button class="link" id="signOutBtn2">Sign out</button>
+  </section>
+
+  <section id="labArea" hidden>
+    <div class="who"><span>Signed in as <b id="whoName"></b></span><button class="link" id="signOutBtn">Sign out</button></div>
+    <label class="drop" id="drop"><input type="file" id="pick"><b>Choose a work order PDF</b><span>Tap here to pick one, or drop it here. It’s read on this computer; the lab keeps what it worked out, not the PDF.</span></label>
+    <div id="out"></div>
+    <section class="card" id="files"></section>
+    <section class="card" id="learned"></section>
+    <p class="small" id="foot"></p>
+  </section>
+</main>
+
+<!-- the Supabase library, checked: the browser refuses it if even one byte differs from the published file -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+<script src="sf-common-2026-10-05.1.js"></script>
+<!-- pdf.js 3.11.174 (the version the tablets use), checked the same way -->
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js" integrity="sha384-sS8B4COeBqzQV9DaPpp5cbpF+xz2jPcFbN3L8FL3/dx0RMC6WLUwTUOFm0iFb1lw" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js" integrity="sha384-OemFRmhjDZwhIKuUld0HJozkF2YErsgDaCL41trxGQZt4/WgnopJQqQl2DvDZ07Z" crossorigin="anonymous"></script>
+<script>
+var PAGE_VERSION = "2026-10-20.1";          // this page's version: bump it with every change (it shows in select * from devices();)
+
+/* Prototype lab engine — reads a Purposeful Design work order PDF (its text layer, via pdf.js)
+   and runs generators by fixed rules. Every output says Made, Flag or Stuck, and what it's missing.
+   Plain script: works in the browser (window.LabEngine) and in node (module.exports). No build step. */
+(function (root) {
+  "use strict";
+
+  // ---------- the rules (data; the lab will keep these in the database) ----------
+  const DEFAULT_RULES = {
+    version: "wood-tops-2 (18 Oct 2026: the generator’s instructions, CNC template reference, wo_upload.py and the PROJ-00418 decisions)",
+    split_length_over: 144,          // L > 144 -> halve, qty x2
+    split_width_at: 52,              // W >= 52 -> halve, qty x2, repeat
+    start_length_add: 2,
+    width_factor: 1.12,
+    stock: [{ name: "8'", usable: 92 }, { name: "10'", usable: 116 }, { name: "12'", usable: 140 }, { name: "14'", usable: 164 }],
+    // top shape (lower case) -> floor note. A shape missing here is a missing rule.
+    notes_by_shape: {
+      "rectangle": "", "square": "",
+      "round": "NO BISCUITS!", "racetrack": "NO BISCUITS!", "pill": "NO BISCUITS!",
+      "round with radius corners": "NO BISCUITS!", "ellipse": "NO BISCUITS!",
+      "boat": "NO BISCUITS Outside Boards",
+      "oval": "NO BISCUITS!", "organic": "NO BISCUITS!"      // curved edges: the reference run's rule for shapes the table omits
+    },
+    curved_extensions: ["oval", "organic"],
+    shape_names: { "circle": "round" },
+    slab_leg_words: ["slab leg", "waterfall"],
+    // top shape -> CNC: a template the lab can fill, a shop template whose inputs it doesn't know yet, or a custom program
+    cnc_by_shape: {
+      "rectangle": "rectangle", "square": "rectangle", "round": "round", "round with radius corners": "round",
+      "oval": "template-inputs-unknown", "racetrack": "template-inputs-unknown", "ellipse": "template-inputs-unknown",
+      "boat": "custom", "pill": "custom", "organic": "custom"
+    },
+    departments: {                   // wo_upload.py departments_for()
+      always: ["milling", "cnc", "sanding", "finishing"], last: ["assembly_qc"],
+      metal_words: ["steel", "metal", "powdercoat", "powder coat", "paint", "aluminum"], not_metal_words: ["no metal"]
+    },
+    defaults: {},                    // standing answers Luke taught: power_model_when_unnamed, wood_base_full_custom
+    cnc_templates: {},               // shop templates taught as data: { name: { shapes: [...], inputs: [{ name, from | value }] } }
+    extras: [                        // work order field -> extra name on Delivery's checklist
+      { field: "power_units", name: "Power unit" }, { field: "data_ports", name: "Data port" },
+      { field: "grommets", name: "Grommet" }, { field: "magnets", name: "Magnet" }
+    ]
+  };
+
+  // ---------- reading the PDF ----------
+  const LABELS = {                    // normalised label start -> field key
+    "project id": "project_id", "project name": "project_name", "item id": "item_id",
+    "item description": "description", "product type": "product_type", "quantity": "qty",
+    "total height": "total_height", "width": "width", "length": "length", "top shape": "top_shape",
+    "species": "species", "thickness": "thickness", "top style": "top_style",
+    "edge profile-top edge": "edge_top", "edge profile-bottom edge": "edge_bottom", "branding": "branding",
+    "stain color": "stain_color", "finish sheen": "finish_sheen",
+    "# of power units": "power_units", "style (in-surface": "power_style", "configuration (# of ports": "power_config",
+    "cord length": "cord_length", "do power cords need to be": "cords_connected", "cord / wire management": "cord_management",
+    "where will unit(s) plug in": "plug_in", "grommets": "grommets", "magnets": "magnets", "data ports": "data_ports",
+    "# of bases per table": "bases_per_table", "base material": "base_material", "base style": "base_style",
+    "levelers/casters/other": "levelers", "base placement": "base_placement",
+    "# of under-table support bars": "support_bars", "finish type (stain/paint/powdercoat)": "base_finish_type",
+    "what is the item": "what_is_it", "model": "power_model", "dimensions": "dimensions", "paint color": "paint_color",
+    "color": "@color", "other": "@other"   // two of each on the table form: told apart by column
+  };
+  const norm = (s) => String(s || "").replace(/\s+/g, " ").trim();
+  const labelKey = (s) => {
+    const t = norm(s).toLowerCase().replace(/\s*:\s*$/, "").replace(/\s*\(in\.\)\s*/g, " ").trim();
+    for (const k of Object.keys(LABELS).sort((a, b) => b.length - a.length)) {
+      if (t === k || (k.length > 8 && t.startsWith(k))) return LABELS[k];
+    }
+    return null;
+  };
+
+  async function pageItems(page) {
+    const tc = await page.getTextContent();
+    return tc.items.filter(it => norm(it.str)).map(it => ({
+      s: norm(it.str), x: it.transform[4], y: it.transform[5], w: it.width || 0
+    }));
+  }
+
+  function readFields(items) {
+    const f = {};
+    const labels = items.filter(it => labelKey(it.s.split(":")[0] + ":") || labelKey(it.s));
+    const tall = items.find(it => labelKey(it.s) === "total_height");
+    const leftValueX = tall ? (items.filter(v => Math.abs(v.y - tall.y) < 3 && v.x > tall.x).sort((a, b) => a.x - b.x)[0] || {}).x : null;
+    for (const lab of labels) {
+      let key = labelKey(lab.s), inline = null;
+      if (!key && lab.s.includes(":")) {          // "Style (…edgemount):none" arrives as one piece
+        key = labelKey(lab.s.split(":")[0] + ":"); inline = norm(lab.s.split(":").slice(1).join(":"));
+      }
+      if (!key) continue;
+      if (key.startsWith("@")) key = (leftValueX && lab.x > leftValueX ? "base_" : "power_") + key.slice(1);
+      if (key === "power_color" || key === "power_other") key = key === "power_color" ? "power_color" : "power_other";
+      let val = inline;
+      if (val === null || val === "") {
+        const right = items.filter(v => Math.abs(v.y - lab.y) < 3 && v.x > lab.x + 1 && v !== lab && !labelKey(v.s))
+          .sort((a, b) => a.x - b.x)[0];
+        val = right ? right.s : "";
+        if (right) {                              // a value can wrap onto the lines below it, in the same cell
+          let prevY = right.y;
+          for (;;) {
+            const looksLabel = (t) => !!labelKey(t.s) || /:\s*$/.test(t.s);
+            const next = items.find(c => Math.abs(c.x - right.x) < 4 && c.y < prevY - 5 && c.y > prevY - 15 && !looksLabel(c));
+            if (!next) break;
+            const labelled = items.some(L => L !== next && Math.abs(L.y - next.y) < 3 && L.x < right.x && L.x > right.x - 200 && looksLabel(L));
+            if (labelled) break;
+            val += " " + next.s; prevY = next.y;
+          }
+        }
+      }
+      if (!(key in f)) f[key] = val;
+    }
+    if (f.project_id && /PROJ/i.test(f.project_id) === false) delete f.project_id;
+    return f;
+  }
+
+  function readCover(items) {
+    const out = { rows: [], total: null, paying_customer: null, project_id: null };
+    for (const it of items) {
+      let m;
+      if ((m = it.s.match(/^Project ID:\s*(PROJ-\s*\d+)/i))) out.project_id = m[1].replace(/\s+/g, "");
+      if ((m = it.s.match(/^Paying Customer:\s*(.*)$/i))) out.paying_customer = norm(m[1]);
+    }
+    const head = (t) => items.find(it => it.s === t);
+    const cols = [["row", head("Number")], ["item_id", head("Item ID")], ["description", head("Item Description")],
+      ["qty", head("Quantity")], ["product_type", head("Product Type")]];
+    if (cols.some(c => !c[1])) return out;
+    const headY = cols[1][1].y;
+    const colOf = (it) => cols.slice().sort((a, b) => Math.abs((a[1].x + 20) - (it.x + 10)) - Math.abs((b[1].x + 20) - (it.x + 10)))[0][0];
+    const below = items.filter(it => it.y < headY - 2);
+    const totalItem = below.find(it => it.s === "Total");
+    const floorY = totalItem ? totalItem.y + 2 : -1;    // the Total line and below are not rows
+    const rowMarks = below.filter(it => colOf(it) === "row" && /^\d+$/.test(it.s) && it.y > floorY).sort((a, b) => b.y - a.y);
+    const used = new Set();
+    const rows = rowMarks.map(m => {
+      const row = { row: +m.s, y: m.y };
+      for (const c of ["item_id", "description", "qty", "product_type"]) {
+        const best = below.filter(it => colOf(it) === c && Math.abs(it.y - m.y) < 2).sort((a, b) => Math.abs(a.y - m.y) - Math.abs(b.y - m.y))[0];
+        if (best) { row[c] = best.s; used.add(best); }
+      }
+      used.add(m); return row;
+    });
+    for (const it of below) {                    // leftover wrapped text belongs to the row above it
+      if (used.has(it) || it.y <= floorY) continue;
+      const c = colOf(it); if (c === "row") continue;
+      const owner = rows.filter(r => r.y > it.y).sort((a, b) => a.y - b.y)[0];
+      if (owner) owner[c] = owner[c] ? owner[c] + " " + it.s : it.s;
+    }
+    out.rows = rows.map(r => ({ row: r.row, item_id: r.item_id || "", description: r.description || "", qty: +r.qty, product_type: r.product_type || "" }));
+    if (totalItem) { const q = below.find(it => colOf(it) === "qty" && Math.abs(it.y - totalItem.y) < 2); if (q) out.total = +q.s; }
+    return out;
+  }
+
+  async function readWorkOrder(pdf, fileName) {
+    const job = { file: fileName || "", pages: pdf.numPages, cover: null, items: [] };
+    for (let n = 1; n <= pdf.numPages; n++) {
+      const items = await pageItems(await pdf.getPage(n));
+      if (items.some(it => it.s === "Order Summary")) { job.cover = readCover(items); job.cover.page = n; continue; }
+      const formItem = items.find(it => /^DESIGN ELEMENTS\s*-\s*/i.test(it.s));
+      if (!formItem) { job.items.push({ page: n, form: null, fields: {}, blank: items.length < 5 }); continue; }
+      job.items.push({ page: n, form: formItem.s.replace(/^DESIGN ELEMENTS\s*-\s*/i, "").trim().toUpperCase(), fields: readFields(items) });
+    }
+    job.project_id = (job.cover && job.cover.project_id) || (job.items.find(i => i.fields.project_id) || { fields: {} }).fields.project_id || null;
+    return job;
+  }
+
+  // ---------- numbers ----------
+  function inches(v) {
+    const t = norm(v).replace(/["”″]+/g, "").replace(/in\.?$/i, "").trim();
+    let m;
+    if ((m = t.match(/^(\d+)\s+(\d+)\/(\d+)$/))) return +m[1] + m[2] / m[3];
+    if ((m = t.match(/^(\d+)\/(\d+)$/))) return m[1] / m[2];
+    if (/^\d+(\.\d+)?$/.test(t)) return +t;
+    return null;
+  }
+  const isNone = (v) => !norm(v) || /^(none|n\/a|no|0|-)(\b|$)/i.test(norm(v));
+  const count = (v) => { if (isNone(v)) return 0; const m = norm(v).match(/^(\d+)/); return m ? +m[1] : null; };
+  const fmt = (n) => (Math.round(n * 1000) / 1000).toString();
+  const idKey = (s) => norm(s).toLowerCase().replace(/[\s"]+/g, "").replace(/-+$/, "");
+
+  // ---------- the wood-top generator ----------
+  function stockPick(startLen, rules) {
+    const rows = rules.stock.map(s => {
+      const pieces = Math.floor(s.usable / startLen);
+      return pieces === 0 ? { stock: s.name, usable: s.usable, pieces, viable: false }
+        : { stock: s.name, usable: s.usable, pieces, viable: true, scrap: (s.usable - pieces * startLen) / pieces };
+    });
+    const ranked = rows.filter(r => r.viable).sort((a, b) => a.scrap - b.scrap || a.usable - b.usable);
+    const pick = ranked.length === 0 ? null : ranked.length === 1 ? `1st. ${ranked[0].stock}` : `1st. ${ranked[0].stock}  2nd. ${ranked[1].stock}`;
+    return { rows, pick };
+  }
+
+  function cutPiece(label, W, L, qty, rules) {
+    const steps = []; let w = W, l = L, q = qty, lengthSplit = false;
+    if (l > rules.split_length_over) { l = l / 2; q *= 2; lengthSplit = true; steps.push(`Length ${fmt(L)}" is over ${rules.split_length_over}": halved to ${fmt(l)}", quantity doubled.`); }
+    while (w >= rules.split_width_at) { const was = w; w = w / 2; q *= 2; steps.push(`Width ${fmt(was)}" is ${rules.split_width_at}" or more: halved to ${fmt(w)}", quantity doubled.`); }
+    if (!steps.length) steps.push(`No splits: length ${fmt(L)}" is ${rules.split_length_over}" or less and width ${fmt(W)}" is under ${rules.split_width_at}".`);
+    const start = l + rules.start_length_add;
+    const raw = w * rules.width_factor, lo = Math.floor(raw + 1e-9), hi = Math.ceil(raw - 1e-9);
+    const stock = stockPick(start, rules);
+    return { piece: label, width: w, length: l, qty: q, start_length: start, width_raw: raw, length_split: lengthSplit, width_split: w !== W,
+      starting_width: `${lo}" - ${hi}"`, width_whole: lo === hi, stock: stock.rows, optimal_stock: stock.pick, steps };
+  }
+
+  // The shape as the rules know it: other names, and "with N" radius" corners.
+  function shapeOf(raw, rules) {
+    const t = norm(raw).toLowerCase();
+    const m = t.match(/^(rectangle|square)\b.*?(\d+(?:\.\d+)?)\s*"?\s*radius/);
+    if (m) return { key: m[1], radius: +m[2], named: t };
+    if (rules.shape_names[t]) return { key: rules.shape_names[t], named: t, renamed: true };
+    return { key: t, named: t };
+  }
+
+  // The CNC block, by the CNC template reference (merged with the round rework).
+  function cncBlock(f, sh, top, rules, ctx) {
+    const kind = rules.cnc_by_shape[sh.key];
+    const flags = [], notes = [];
+    const taught = Object.entries(rules.cnc_templates || {}).find(([, t]) => (t.shapes || []).map(x => String(x).toLowerCase()).includes(sh.key));
+    if (taught && kind !== "rectangle" && kind !== "round") {
+      const [name, t] = taught;
+      if ((count(f.power_units) || 0) + (count(f.data_ports) || 0) + (count(f.grommets) || 0) > 0)
+        return { state: "stuck", kind: "rule", missing: `${name} was taught without port or grommet inputs, and this top has one. Teach those inputs, or a person sets them.` };
+      const T0 = inches(f.thickness);
+      const src = { length: top.length, width: top.width, thickness: T0, half_length: top.length / 2, half_width: top.width / 2 };
+      const inputs = [];
+      for (const i of t.inputs || []) {
+        const v = "value" in i ? i.value : src[i.from];
+        if (v === null || v === undefined || (typeof v === "number" && isNaN(v))) return { state: "stuck", kind: "value", missing: `${name} needs ${i.name} (${i.from || "a value"}), and this sheet doesn’t have it.` };
+        inputs.push([i.name, typeof v === "number" ? fmt(v) : String(v)]);
+      }
+      return { state: "flag", template: name, inputs, notes: [], flags: [`From a template you taught the lab (${name}). Check the first few against the machine.`] };
+    }
+    if (kind === "custom") return { state: "flag", template: "Needs custom program written", inputs: [], notes: [], flags: [`Top shape “${f.top_shape}” has no template, so a program has to be written.`] };
+    if (kind === "template-inputs-unknown") return { state: "stuck", kind: "rule", missing: `The shop has ${/^[aeiou]/.test(sh.key) ? "an" : "a"} ${sh.key} template, but the lab doesn’t know its inputs yet (the CNC template reference still says ${sh.key} tops need a custom program).` };
+    if (kind !== "rectangle" && kind !== "round") return { state: "stuck", kind: "rule", missing: `Top shape “${f.top_shape}” isn’t in the CNC rule: which template, or a custom program?` };
+    const T = inches(f.thickness);
+    if (T === null) return { state: "stuck", kind: "value", missing: `Thickness reads “${f.thickness || ""}”: the CNC block needs it.` };
+    const words = (k) => norm([f.description, f.top_style, f.edge_top, f.edge_bottom, f[k] || ""].join(" ")).toLowerCase();
+    const edges = norm([f.edge_top, f.edge_bottom, f.description].join(" ")).toLowerCase();
+    const BEV = ctx.slab || /bevel|chamfer|45\s*°|45 deg/.test(edges) ? 1 : 0;
+    if (ctx.slab) flags.push("BEV 1: slab leg or waterfall joints are 45° mitres. The legs piece takes BEV 1 too; how its CNC appears on the sheet is still an open question in the reference run.");
+    else if (BEV) flags.push("BEV 1: the edge profile or description says bevel, chamfer or 45°.");
+    const BA = /batten|cleat/.test(words("base_other")) ? 1 : 0;
+    if (BA) flags.push("BA 1: the work order mentions battens or cleats.");
+    // ports and grommets
+    const units = count(f.power_units) || 0, dports = count(f.data_ports) || 0, grom = count(f.grommets) || 0;
+    let SDP = 0, CDP = 0, SG = 0, CDPL = null, CDPW = null;
+    if (units > 0 || dports > 0) {
+      let model = norm(f.power_model);
+      if ((!model || isNone(model)) && rules.defaults.power_model_when_unnamed) {
+        model = rules.defaults.power_model_when_unnamed;
+        flags.push(`No model named, so your rule was used: an unnamed power unit is a ${model}.`);
+      }
+      const cut = norm(f.port_cutout).match(/(\d+(?:\.\d+)?)\s*"?\s*[x×]\s*(\d+(?:\.\d+)?)/i);
+      if (cut) { CDP = 1; CDPL = +cut[1]; CDPW = +cut[2]; if (/\bdean\b/i.test(model)) SDP = 1; }
+      else if (/\bdean\b/i.test(model)) SDP = 1;
+      else {
+        return { state: "stuck", kind: "value", ask: "power_unit", missing: model && !isNone(model)
+          ? `The power unit is a “${model}”, not a Dean, so it’s a custom port, and the order gives no cutout size.`
+          : `There’s a power unit (${norm(f.power_config) || "no configuration given"}), but no model is named. A Dean is the standard port; anything else needs its cutout size.` };
+      }
+    }
+    if (grom > 0) {
+      const back = /\bback\b/i.test(norm(f.grommets) + " " + norm(f.description));
+      if (kind === "round" && back) return { state: "stuck", kind: "value", missing: "A grommet at the back of a round: the round template can only centre it. Ask before translating it." };
+      SG = kind === "rectangle" && back ? 2 : 1;
+    }
+    if (SDP && CDP) { SDP = 0; flags.push("Both a standard and a custom port were called for; kept the custom port (the template handles one kind at a time)."); }
+    if (kind === "rectangle") {
+      if (CDP && top.length_split) { CDP = 3; flags.push("CDP 3: this top is half of a length split, so the ports are spaced across the pair."); }
+      const live = /live edge/.test(words("base_other"));
+      const RC = sh.radius != null ? sh.radius : 0.04;
+      if (sh.radius != null) flags.push(`RC ${fmt(sh.radius)}: the top shape names a ${fmt(sh.radius)}" radius.`);
+      if (live) { notes.push("Live edge: CS 0 so the perimeter cut doesn’t remove it. Confirm on the drawing."); flags.push("CS 0 for a live edge."); }
+      const inputs = [["L", top.length], ["W", top.width], ["T", T], ["RC", RC], ["CS", live ? 0 : 1], ["BEV", BEV], ["JFE", 0], ["BA", BA], ["SDP", SDP], ["SG", SG], ["CDP", CDP]];
+      if (CDP) { inputs.push(["CDPL", CDPL], ["CDPW", CDPW]); if (CDP === 1) { inputs.push(["CDPDL", top.length / 2]); flags.push("CDPDL: the order doesn’t say where along the length, so the port is centred."); }
+        inputs.push(["CDPDW", top.width / 2]); flags.push("CDPDW: centred across the width (W ÷ 2), as the reference says when it isn’t stated."); }
+      return { state: flags.length ? "flag" : "made", template: "Rectangle_Template", inputs: inputs.map(([k, v]) => [k, fmt(v)]), notes, flags };
+    }
+    // round
+    if (top.width_split) return { state: "stuck", kind: "value", missing: "A round split in half across its width: the reference says Round_Template, but not which diameter to give it." };
+    const KN = /knife/.test(edges) ? 1 : 0;
+    const D = top.width;
+    const inputs = [["D", D], ["T", T], ["BEV", BEV], ["KN", KN], ["BA", BA], ["SDP", SDP], ["CDP", CDP]];
+    if (CDP) inputs.push(["CDPL", CDPL], ["CDPW", CDPW]);
+    inputs.push(["SG", SG]);
+    if (D <= 25.99 && (SDP || CDP || SG)) notes.push("Check pod clearance by hand before running: a cutout on a round this small leaves too few pods to switch one off.");
+    if (sh.renamed) flags.push(`“${f.top_shape}” read as ${sh.key}.`);
+    return { state: flags.length ? "flag" : "made", template: "Round_Template", inputs: inputs.map(([k, v]) => [k, fmt(v)]), notes, flags };
+  }
+
+  // Departments, by the generator's own rule (wo_upload.py departments_for()).
+  const TOP_KEYS = ["width", "length", "thickness", "top_shape", "species", "top_style", "edge_top", "edge_bottom", "branding", "total_height"];
+  const NOT_SPEC = ["project_id", "project_name", "item_id", "description", "product_type", "qty", "port_cutout"];
+  function departments(f, rules, ctx) {
+    const d = rules.departments;
+    const text = Object.entries(f).filter(([k]) => !TOP_KEYS.includes(k) && !NOT_SPEC.includes(k)).map(([, v]) => norm(v).toLowerCase()).join(" ");
+    const metal = !d.not_metal_words.some(w => text.includes(w)) && d.metal_words.some(w => text.includes(w));
+    const list = d.always.concat(metal ? ["metal"] : [], d.last);
+    const flags = []; let how = metal ? "Metal added: the base or finish mentions steel, metal, powder coat, paint or aluminum." : "No Metal: nothing in the base or finish mentions it.";
+    let ask = null;
+    if (/^wood/i.test(norm(f.base_material)) && !ctx.slab) {
+      const said = norm(f.full_custom).toLowerCase();
+      const rule = rules.defaults.wood_base_full_custom;
+      const yes = said ? said === "yes" : (rule === true ? true : rule === false ? false : null);
+      if (yes === null) { ask = "full_custom"; flags.push(`Wood base (“${f.base_style}”): the default rule doesn’t send it to Full Custom. The generator sets departments by hand for full custom work. Does this base go to Full Custom?`); }
+      else {
+        if (yes) list.splice(list.length - 1, 0, "full_custom");
+        how += said ? (yes ? " Full Custom added: you said so for this job." : " No Full Custom: you said so for this job.")
+                    : (yes ? " Full Custom added by your rule for wood bases." : " No Full Custom, by your rule for wood bases.");
+      }
+    }
+    return { state: flags.length ? "flag" : "made", departments: list, flags, how, ask };
+  }
+
+  function woodTops(job, rules, answers) {
+    const sheets = [];
+    let n = 0;
+    for (const item of job.items) {
+      if (!item.form) continue;
+      n++;
+      const given = (answers && answers[item.fields.item_id]) || {};
+      const f = Object.assign({}, item.fields, given);
+      const out = { sheet: n, page: item.page, item_id: f.item_id || "?", description: f.description || "", form: item.form, qty: count(f.qty) || null, results: {}, answers: given };
+      const R = out.results;
+      const hasTop = ["width", "length", "top_shape", "thickness"].every(k => k in f);
+      if (!hasTop) { out.no_generator = item.form; sheets.push(out); continue; }
+      const W = inches(f.width), L = inches(f.length), T = inches(f.thickness), H = inches(f.total_height);
+      const sh = shapeOf(f.top_shape, rules);
+      out.fields = { width: f.width, length: f.length, thickness: f.thickness, top_shape: f.top_shape, species: f.species, total_height: f.total_height, base_material: f.base_material, base_style: f.base_style };
+      const flags = [];
+      const slab = rules.slab_leg_words.some(wd => norm(f.base_style).toLowerCase().includes(wd));
+      let top = null;
+
+      // the cut: glue-up rows, starting width, stock, floor note
+      const bad = [];
+      if (W === null) bad.push(`Width reads “${f.width || ""}”`);
+      if (L === null) bad.push(`Length reads “${f.length || ""}”`);
+      if (!out.qty) bad.push(`Quantity reads “${f.qty || ""}”`);
+      if (bad.length) R.cut = { state: "stuck", kind: "value", missing: bad.join("; ") + ". Give the number for this job." };
+      else {
+        top = cutPiece("Top", W, L, out.qty, rules);
+        const pieces = [top];
+        if (slab) {
+          if (H === null) flags.push(`Slab leg base but Total Height reads “${f.total_height}”: no legs row.`);
+          else pieces.unshift(cutPiece("Legs", W, Math.ceil(H), out.qty * 2, rules));
+        }
+        const cut = { state: "made", pieces, flags: [] };
+        let note = sh.radius != null ? "NO BISCUITS!" : rules.notes_by_shape[sh.key];
+        if (note === undefined) { cut.state = "stuck"; cut.kind = "rule"; cut.missing = `Top shape “${f.top_shape}” isn’t in the notes rule. Say what the floor note is for it (or that it’s another name for a shape that is).`; }
+        else cut.notes = note;
+        if (sh.radius != null) cut.flags.push(`NO BISCUITS!: radius corners are a curved edge (an extension of the shape table).`);
+        else if (rules.curved_extensions.includes(sh.key)) cut.flags.push(`NO BISCUITS!: “${f.top_shape}” isn’t in the shape table, but it has a curved edge (the reference run’s rule for shapes the table omits).`);
+        if (sh.renamed) cut.flags.push(`“${f.top_shape}” read as ${sh.key}.`);
+        if (T === null) cut.flags.push(`Thickness reads “${f.thickness || ""}”.`);
+        for (const p of pieces) {
+          if (!p.optimal_stock) { cut.state = "stuck"; cut.kind = "rule"; cut.missing = `${p.piece}: start length ${fmt(p.start_length)}" doesn’t fit any stock length.`; }
+          if (p.width_whole) cut.flags.push(`${p.piece}: ${fmt(p.width)}" × ${rules.width_factor} is exactly ${fmt(p.width_raw)}", so the width range is one number. The rule doesn’t say what to print.`);
+        }
+        if (slab && pieces.length > 1) cut.flags.push(`Slab leg base: a legs row was added (width ${fmt(W)}", length = total height ${fmt(Math.ceil(H))}", quantity ${out.qty * 2}).`);
+        if (cut.flags.length && cut.state === "made") cut.state = "flag";
+        R.cut = cut;
+      }
+
+      R.cnc = top ? cncBlock(f, sh, top, rules, { slab }) : { state: "stuck", kind: "value", missing: "Needs the top’s width and length first." };
+      R.departments = departments(f, rules, { slab });
+
+      // extras
+      const ex = [], exFlags = [];
+      for (const e of rules.extras) {
+        if (!(e.field in f)) continue;
+        const per = count(f[e.field]);
+        if (per === null) { exFlags.push(`${e.name}: “${f[e.field]}” isn’t a number; left out.`); continue; }
+        if (per > 0) ex.push({ name: e.name, qty: per * out.qty, how: `${per} per table × ${out.qty}` });
+      }
+      R.extras = { state: exFlags.length ? "flag" : "made", extras: ex, flags: exFlags };
+
+      // things worth a look
+      const tail = ["base_style", "base_material"].filter(k => /\b(and|with|or|,)$/i.test(norm(f[k])));
+      for (const k of tail) flags.push(`${k === "base_style" ? "Base Style" : "Base Material"} reads “${f[k]}”: it looks cut off in the work order.`);
+      const dims = (out.description.match(/(\d+(?:\.\d+)?)\s*"+/g) || []).map(inches).filter(x => x);
+      if (dims.length && W !== null && L !== null) {
+        const want = dims.length === 1 ? [dims[0]] : dims.slice(0, 2);
+        if (want.some(d => ![W, L].some(h => Math.abs(h - d) < 0.01))) flags.push(`Description “${out.description}” doesn’t match the fields (${fmt(W)}" × ${fmt(L)}"). The fields were used.`);
+      }
+      out.flags = flags;
+      out.upload = uploadSheet(out, f);
+      sheets.push(out);
+    }
+    return sheets;
+  }
+
+  // The sheet as the upload page expects it (wo_upload.py build_payload()), page images aside.
+  function uploadSheet(s, f) {
+    const R = s.results;
+    if (["cut", "cnc", "departments"].some(k => !R[k] || R[k].state === "stuck")) return null;
+    const inch = (v) => { const n = inches(v); return n === null ? norm(v) : fmt(n) + '"'; };
+    const glue = R.cut.pieces.map(p => `${fmt(p.start_length)}" start · ${p.starting_width} width · ${p.optimal_stock}`).join(" · ");
+    const notes = R.cut.notes ? [R.cut.notes] : [];
+    notes.push(...(R.cnc.notes || []));
+    if (R.cnc.template === "Needs custom program written") notes.push("CNC program does not exist yet — needs writing");
+    return { sheet_number: s.sheet, item_code: s.item_id, qty: s.qty, species: f.species, shape: f.top_shape,
+      width: inch(f.width), length: inch(f.length), thickness: inch(f.thickness), total_height: inch(f.total_height),
+      cnc_program: R.cnc.template, glue_up_notes: glue, floor_notes: notes.join(" · ") || null,
+      departments: R.departments.departments, extras: R.extras.extras.map(e => ({ name: e.name, qty: e.qty })) };
+  }
+
+  // ---------- whole-job checks ----------
+  function jobChecks(job) {
+    const c = [];
+    if (!job.cover) { c.push({ state: "stuck", text: "No Order Summary page found." }); return c; }
+    const rows = job.cover.rows, sum = rows.reduce((a, r) => a + (r.qty || 0), 0);
+    c.push(job.cover.total === sum ? { state: "made", text: `Order Summary: ${rows.length} lines, ${sum} items, matching its total.` }
+      : { state: "flag", text: `Order Summary lines add up to ${sum}, but its total says ${job.cover.total}.` });
+    const pages = job.items.filter(i => i.form);
+    const NO_SHEET = /^(delivery|pallet|packaging|shipping)$/i;
+    for (const r of rows.filter(r => NO_SHEET.test(r.product_type))) c.push({ state: "made", text: `${r.item_id} is a ${r.product_type.toLowerCase()} line: no sheet.` });
+    const prodRows = rows.filter(r => !NO_SHEET.test(r.product_type));
+    if (pages.length !== prodRows.length) c.push({ state: "flag", text: `${prodRows.length} Order Summary lines to make but ${pages.length} item pages.` });
+    for (const r of prodRows) {
+      const p = pages.find(i => idKey(i.fields.item_id) === idKey(r.item_id));
+      if (!p) { c.push({ state: "flag", text: `Summary line ${r.row} (${r.item_id}) has no page with that Item ID.` }); continue; }
+      if (count(p.fields.qty) !== r.qty) c.push({ state: "flag", text: `${r.item_id}: summary says ${r.qty}, page ${p.page} says ${p.fields.qty}.` });
+      if (!norm(r.product_type)) c.push({ state: "flag", text: `${r.item_id}: no product type on the summary; page ${p.page} says “${p.fields.product_type}”.` });
+      else if (norm(p.fields.product_type).toLowerCase() !== norm(r.product_type).toLowerCase()) c.push({ state: "flag", text: `${r.item_id}: product type “${r.product_type}” on the summary, “${p.fields.product_type}” on page ${p.page}.` });
+      if (/power/i.test(r.description) && !/power/i.test(p.fields.description || "") && count(p.fields.power_units) === 0)
+        c.push({ state: "flag", text: `${r.item_id}: the summary calls it “${r.description}”, but page ${p.page} has no power units.` });
+    }
+    for (const p of pages) if (!rows.some(r => idKey(r.item_id) === idKey(p.fields.item_id))) c.push({ state: "flag", text: `Page ${p.page} (${p.fields.item_id}) isn’t on the Order Summary.` });
+    if (job.cover.paying_customer && /^KI\b|krueger/i.test(job.cover.paying_customer)) c.push({ state: "stuck", text: "Paying Customer is KI: KI jobs aren't in the lab yet." });
+    return c;
+  }
+
+  async function run(pdf, fileName, rules, answers) {
+    rules = Object.assign({}, DEFAULT_RULES, rules || {});
+    const job = await readWorkOrder(pdf, fileName);
+    const sheets = woodTops(job, rules, answers && answers[job.project_id]);
+    return { project_id: job.project_id, file: job.file, pages: job.pages, cover: job.cover,
+      checks: jobChecks(job), sheets, rules_version: rules.version, items: job.items,
+      upload_payload: { project_id: job.project_id, project_name: (job.items.find(i => i.fields.project_name) || { fields: {} }).fields.project_name || null,
+        total_items: job.cover ? job.cover.total : null, sheets: sheets.map(s => s.upload) } };
+  }
+
+  // The rules: the code's defaults, then what Luke taught (the newest row of each, from v_lab_rules_now).
+  const OBJECT_SETS = ["notes_by_shape", "shape_names", "cnc_by_shape", "cnc_templates", "defaults"];
+  const SETTINGS = ["split_length_over", "split_width_at", "start_length_add", "width_factor", "stock", "slab_leg_words", "departments", "extras", "curved_extensions"];
+  function rulesWith(rows) {
+    const r = JSON.parse(JSON.stringify(DEFAULT_RULES));
+    let n = 0;
+    for (const row of rows || []) {
+      if (OBJECT_SETS.includes(row.rule_set)) {
+        if (row.value === null || row.value === undefined) delete r[row.rule_set][row.rule_key]; else r[row.rule_set][row.rule_key] = row.value;
+        n++;
+      } else if (row.rule_set === "settings" && SETTINGS.includes(row.rule_key)) {
+        r[row.rule_key] = row.value === null || row.value === undefined ? JSON.parse(JSON.stringify(DEFAULT_RULES[row.rule_key])) : row.value;
+        n++;
+      }
+    }
+    if (n) r.version = DEFAULT_RULES.version + ` + ${n} rule${n === 1 ? "" : "s"} taught in the lab`;
+    return r;
+  }
+  // A rule file (kind "lab-rules") turned into rows to save. Data only: unknown settings refuse the whole file.
+  function ruleFileRows(j) {
+    if (!j || j.kind !== "lab-rules" || typeof j.rules !== "object" || Array.isArray(j.rules)) throw new Error("It isn’t a lab rule file (it needs \"kind\": \"lab-rules\" and a \"rules\" section).");
+    const rows = [], bad = [];
+    for (const [k, v] of Object.entries(j.rules)) {
+      if (OBJECT_SETS.includes(k)) {
+        if (!v || typeof v !== "object" || Array.isArray(v)) { bad.push(k); continue; }
+        for (const [kk, vv] of Object.entries(v)) rows.push({ rule_set: k, rule_key: (k === "cnc_templates" || k === "defaults" ? String(kk) : String(kk).toLowerCase()).slice(0, 80), value: vv });   // shapes are lower case; template names keep theirs
+      } else if (SETTINGS.includes(k)) rows.push({ rule_set: "settings", rule_key: k, value: v });
+      else bad.push(k);
+    }
+    for (const r of rows.filter(r => r.rule_set === "cnc_templates")) {
+      const t = r.value;
+      const okT = t && Array.isArray(t.shapes) && Array.isArray(t.inputs) && t.inputs.every(i => i && typeof i.name === "string" && /^[A-Z][A-Z0-9]{0,9}$/.test(i.name) && (("value" in i && ["number", "string"].includes(typeof i.value)) || ["length", "width", "thickness", "half_length", "half_width"].includes(i.from)));
+      if (!okT) bad.push("cnc_templates." + r.rule_key);
+    }
+    if (bad.length) throw new Error("It has settings the lab doesn’t know or can’t read: " + bad.join(", ") + ".");
+    if (!rows.length) throw new Error("It has no rules in it.");
+    return rows;
+  }
+
+  const api = { DEFAULT_RULES, rulesWith, ruleFileRows, readWorkOrder, run, inches, cutPiece, stockPick, woodTops };
+  if (typeof module !== "undefined" && module.exports) module.exports = api; else root.LabEngine = api;
+})(typeof window !== "undefined" ? window : globalThis);
+
+/* ---------- the screen ---------- */
+if (typeof document !== "undefined") (function () {
+  "use strict";
+  const E = window.LabEngine;
+  const $ = (id) => document.getElementById(id);
+  const show = (id, on = true) => { $(id).hidden = !on; };
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = (n) => (Math.round(n * 1000) / 1000).toString();
+  const STATE = { made: ["Made", "st-made"], flag: ["Look", "st-flag"], stuck: ["Stuck", "st-stuck"] };
+  const OUT = [["cut", "Cut"], ["cnc", "CNC"], ["departments", "Departments"], ["extras", "Extras"]];
+  const DEPT = { milling: "Milling", cnc: "CNC", sanding: "Sanding", finishing: "Finishing", full_custom: "Full Custom", metal: "Metal", assembly_qc: "Assembly / QC" };
+  const SET_WORDS = { notes_by_shape: "Floor note for a shape", shape_names: "Another name for a shape", cnc_by_shape: "CNC for a shape",
+    cnc_templates: "A shop template", defaults: "A standing answer", settings: "A setting" };
+
+  const problem = keyProblem(SUPABASE_URL, SUPABASE_KEY);
+  if (problem) {
+    $("configTitle").textContent = problem.secret ? "Stop — wrong key in this file" : "This page isn’t set up yet";
+    $("configBody").textContent = problem.text; show("configProblem"); return;
+  }
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  sfEmbed("header");
+  sfReportDevice(db, "lab", PAGE_VERSION);
+
+  let ruleRows = [], answerRows = [], runCount = 0, rules = E.DEFAULT_RULES;
+  let lastPdf = null, lastName = "", lastReport = null, savedNote = "";
+
+  const notSetUp = (e) => /lab_allowed|v_lab_|lab_rules|lab_runs|schema cache|does not exist|PGRST202|PGRST205|42883|42P01/i.test(String((e && (e.message || e.code)) || "") + " " + String((e && e.code) || ""));
+  function friendly(e) {
+    const m = String((e && (e.message || e.error_description)) || e || "");
+    if (isNetworkError(e)) return "Couldn’t reach the database. Check the internet connection and try again.";
+    if (/invalid login credentials/i.test(m)) return "That email and password didn’t match. Check them and try again.";
+    if (/jwt expired|refresh token/i.test(m)) return "Your sign-in has expired. Sign out, sign back in, and try again.";
+    if (/row-level security|permission denied/i.test(m)) return "The database refused it: this login isn’t let into the lab.";
+    if (notSetUp(e)) return "The lab isn’t set up in the database yet: lab.sql hasn’t run.";
+    return m || "Something went wrong, with no further detail.";
+  }
+
+  // ---------- signing in ----------
+  async function enter(user) {
+    show("signIn", false);
+    let ok = null, err = null;
+    try { const r = await db.rpc("lab_allowed", {}); err = r.error; ok = r.data === true; } catch (e) { err = e; }
+    if (err || !ok) {
+      $("notAllowedBody").textContent = err && notSetUp(err)
+        ? "The lab isn’t set up in the database yet. Run lab.sql in the Supabase SQL Editor (walkthrough 32), then reload this page."
+        : err ? friendly(err)
+        : `${user.email} isn’t let into the lab. Being a manager isn’t enough: in the Supabase SQL Editor, run  select lab_allow('${user.email}');  and reload.`;
+      show("notAllowed"); show("labArea", false); return;
+    }
+    const { data: me } = await db.from("profiles").select("full_name, role").eq("id", user.id).maybeSingle();
+    $("whoName").textContent = me ? me.full_name : user.email;
+    show("notAllowed", false); show("labArea");
+    await loadLearned();
+    await loadFiles();
+  }
+  function leave() { show("labArea", false); show("notAllowed", false); show("signIn"); $("out").innerHTML = ""; lastPdf = null; lastReport = null; }
+  db.auth.getSession().then(({ data }) => data.session ? enter(data.session.user) : leave());
+  $("signInForm").addEventListener("submit", async (e) => {
+    e.preventDefault(); show("signInError", false); $("signInBtn").disabled = true;
+    const { data, error } = await db.auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value });
+    $("signInBtn").disabled = false;
+    if (error) { $("signInError").textContent = friendly(error); show("signInError"); return; }
+    $("password").value = ""; enter(data.user);
+  });
+  for (const b of ["signOutBtn", "signOutBtn2"]) $(b).addEventListener("click", async () => { await db.auth.signOut(); leave(); });
+
+  // ---------- what it has learned ----------
+  async function loadLearned() {
+    const [r, a, n] = await Promise.all([
+      db.from("v_lab_rules_now").select("*"), db.from("v_lab_answers_now").select("*"),
+      db.from("lab_runs").select("id", { count: "exact", head: true })]);
+    if (r.error || a.error) { $("learned").innerHTML = `<div class="bad"><p>${esc(friendly(r.error || a.error))}</p></div>`; return; }
+    ruleRows = r.data || []; answerRows = a.data || []; runCount = n.count || 0;
+    rules = E.rulesWith(ruleRows);
+    renderLearned();
+  }
+  function answersMap() {
+    const m = {};
+    for (const a of answerRows) if (a.value !== null) ((m[a.project_id] = m[a.project_id] || {})[a.item_id] = m[a.project_id][a.item_id] || {})[a.field] = a.value;
+    return m;
+  }
+  function ruleWords(row) {
+    const v = row.value;
+    if (row.rule_set === "shape_names") return `“${row.rule_key}” is the same as ${v}`;
+    if (row.rule_set === "notes_by_shape") return `Floor note for “${row.rule_key}”: ${v ? "“" + v + "”" : "blank"}`;
+    if (row.rule_set === "cnc_by_shape") return `“${row.rule_key}” tops: ${v === "custom" ? "custom program" : v}`;
+    if (row.rule_set === "cnc_templates") return `${row.rule_key}, for ${(v.shapes || []).join(", ")} tops: ${(v.inputs || []).map(i => i.name).join(" ")}`;
+    if (row.rule_set === "defaults" && row.rule_key === "power_model_when_unnamed") return `An unnamed power unit is a ${v}`;
+    if (row.rule_set === "defaults" && row.rule_key === "wood_base_full_custom") return v ? "A wood base that isn’t a slab leg goes to Full Custom" : "A wood base that isn’t a slab leg doesn’t go to Full Custom";
+    return `${row.rule_key}: ${JSON.stringify(v)}`;
+  }
+  function renderLearned() {
+    const live = ruleRows.filter(r => r.value !== null).sort((a, b) => String(b.made_at).localeCompare(String(a.made_at)));
+    $("learned").innerHTML = `<h3>What it has learned</h3>
+      <p class="sub">${live.length} rule${live.length === 1 ? "" : "s"} taught, ${answerRows.filter(a => a.value !== null).length} answers for single jobs, ${runCount} run${runCount === 1 ? "" : "s"} saved.
+        The file below lists all of it, with why, for the next build chat.</p>
+      <div class="ctl"><button class="go" id="dlLearned">Download what I’ve learned</button><button id="cpLearned">Copy it</button>
+        <label class="small">Teach from a rule file (.json) <input type="file" id="rulefile" accept="application/json,.json"></label></div>
+      ${live.length ? `<ul class="taught">${live.map(r => `<li><span class="what"><b>${esc(ruleWords(r))}</b><br><span class="small">${esc(SET_WORDS[r.rule_set] || r.rule_set)}${r.job ? " · from " + esc(r.job) : ""} · ${esc(new Date(r.made_at).toLocaleDateString())}${r.note ? " · " + esc(r.note) : ""}</span></span>
+        <button class="link" data-stop="${esc(r.rule_set)}|${esc(r.rule_key)}">Stop using</button></li>`).join("")}</ul>` : `<p class="small">Nothing taught yet. When a sheet gets stuck on a rule, answer it above and it lands here.</p>`}
+      <div id="learnedMsg" class="small"></div>`;
+    $("dlLearned").onclick = async () => { const t = await learnedText(); if (!t) return; const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([t], { type: "text/markdown" })); a.download = `lab_learned_${new Date().toISOString().slice(0, 10)}.md`; document.body.appendChild(a); a.click(); a.remove(); };
+    $("cpLearned").onclick = async () => { const t = await learnedText(); if (!t) return; try { await navigator.clipboard.writeText(t); $("learnedMsg").textContent = "Copied. Paste it into a chat with Claude."; } catch (e) { $("learnedMsg").textContent = "This browser wouldn’t copy it. Use Download instead."; } };
+    document.querySelectorAll("[data-stop]").forEach(b => b.onclick = async () => {
+      const [set, key] = b.dataset.stop.split("|");
+      if (!confirm("Stop using this rule? It stays in the history, and you can teach it again.")) return;
+      await teach([{ rule_set: set, rule_key: key, value: null }], "Stopped using it", null);
+    });
+    $("rulefile").onchange = async () => {
+      const f = $("rulefile").files[0]; $("rulefile").value = ""; if (!f) return;
+      try {
+        const j = JSON.parse(await f.text());
+        const rows = E.ruleFileRows(j);
+        await teach(rows, j.note || `From the rule file ${f.name}`, j.job || null);
+      } catch (e) { alert("That rule file wasn’t used. " + (e.message || e)); }
+    };
+  }
+
+  // ---------- teaching and answering: always a new row, never a change ----------
+  async function teach(rows, note, job) {
+    const { error } = await db.from("lab_rules").insert(rows.map(r => ({ rule_set: r.rule_set, rule_key: r.rule_key, value: r.value === undefined ? null : r.value,
+      note: note ? String(note).slice(0, 2000) : null, job: job ? String(job).slice(0, 80) : null })));
+    if (error) { alert("It wasn’t saved. " + friendly(error)); return; }
+    await loadLearned(); if (lastPdf) await runAgain();
+  }
+  async function answer(pid, item, field, value, note) {
+    const { error } = await db.from("lab_answers").insert({ project_id: pid, item_id: item, field, value, note });
+    if (error) { alert("It wasn’t saved. " + friendly(error)); return; }
+    await loadLearned(); if (lastPdf) await runAgain();
+  }
+
+  // ---------- running a work order ----------
+  const drop = $("drop"), pick = $("pick");
+  ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) load(f); });
+  pick.addEventListener("change", () => { if (pick.files[0]) load(pick.files[0]); pick.value = ""; });
+
+  async function load(file) {
+    if (!window.pdfjsLib) { $("out").innerHTML = `<div class="bad"><p>The PDF reader didn’t load. Check the internet connection and reload the page.</p></div>`; return; }
+    $("out").innerHTML = `<div class="card"><p>Reading ${esc(file.name)}…</p></div>`;
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (String.fromCharCode.apply(null, bytes.slice(0, 5)) !== "%PDF-") { $("out").innerHTML = `<div class="bad"><p>“${esc(file.name || "That file")}” isn’t a PDF. Choose the work order PDF.</p></div>`; return; }
+      lastPdf = await pdfjsLib.getDocument({ data: bytes, isEvalSupported: false }).promise; lastName = file.name;
+      await runAgain();
+    } catch (e) { $("out").innerHTML = `<div class="bad"><p>That PDF couldn’t be read (${esc(e.message || e)}). Is it the original work order?</p></div>`; }
+  }
+
+  async function runAgain() {
+    lastReport = await E.run(lastPdf, lastName, rules, answersMap());
+    savedNote = "Saving this run…"; render(lastReport);
+    savedNote = await saveRun(lastReport); const el = $("savedNote"); if (el) el.textContent = savedNote;
+  }
+
+  function reasonsOf(r) {
+    const out = [];
+    for (const s of r.sheets) {
+      if (s.no_generator) { out.push({ kind: "generator", text: `No generator for the “${s.no_generator.toLowerCase()}” form`, item: s.item_id }); continue; }
+      for (const [k, v] of Object.entries(s.results)) if (v.state === "stuck") out.push({ kind: v.kind || "value", output: k, text: v.missing, item: s.item_id });
+    }
+    return out;
+  }
+  async function saveRun(r) {
+    const all = r.sheets.flatMap(s => Object.values(s.results));
+    const n = (st) => all.filter(x => x.state === st).length;
+    const slim = { checks: r.checks, sheets: r.sheets.map(s => ({ sheet: s.sheet, page: s.page, item_id: s.item_id, qty: s.qty, form: s.form, no_generator: s.no_generator || null,
+      fields: s.fields || null, results: s.results, flags: s.flags || [], upload: s.upload || null })) };
+    const { error } = await db.from("lab_runs").insert({ project_id: r.project_id, file_name: (r.file || "").slice(0, 200), rules_version: (r.rules_version || "").slice(0, 300),
+      made: n("made"), looks: n("flag"), stuck: n("stuck"), no_generator: r.sheets.filter(s => s.no_generator).length,
+      stuck_reasons: reasonsOf(r), report: slim, page_version: PAGE_VERSION });
+    if (error) return "This run wasn’t saved (" + friendly(error) + "). The results above are still right.";
+    runCount++; const c = document.querySelector("#learned .sub"); if (c) renderLearned();
+    return "Saved to the lab’s history.";
+  }
+
+  function render(r) {
+    const all = r.sheets.flatMap(s => Object.values(s.results));
+    const n = (st) => all.filter(x => x.state === st).length;
+    const noGen = r.sheets.filter(s => s.no_generator).length;
+    let h = `<div class="card"><h2>${esc(r.project_id || "No project number found")}</h2>
+      <p class="sub">${esc(r.cover && r.cover.paying_customer || "")} · ${r.sheets.length} sheets from ${r.pages} pages · ${r.upload_payload.sheets.filter(Boolean).length} ready for the upload file (page images aside)</p>
+      <div class="tally"><div class="t st-made"><b>${n("made")}</b><span>outputs made</span></div>
+      <div class="t st-flag"><b>${n("flag")}</b><span>made, worth a look</span></div>
+      <div class="t st-stuck"><b>${n("stuck")}</b><span>stuck: missing something</span></div>
+      ${noGen ? `<div class="t st-stuck"><b>${noGen}</b><span>sheets with no generator yet</span></div>` : ""}</div></div>
+      <p class="saved" id="savedNote">${esc(savedNote)}</p>`;
+    h += needsCard(r);
+    h += `<div class="card"><h3>The whole job</h3><ul class="checks">${r.checks.map(c => `<li><span class="badge ${STATE[c.state][1]}">${STATE[c.state][0]}</span><span>${esc(c.text)}</span></li>`).join("")}</ul></div>`;
+    h += `<div class="card"><h3>Sheet by sheet</h3><p class="small">Tap a sheet for the math, including the stock lengths that lost.</p>${r.sheets.map(sheetBlock).join("")}</div>`;
+    $("out").innerHTML = h;
+    $("foot").textContent = `Rules: ${r.rules_version}. Lab page ${PAGE_VERSION}.`;
+    renderFiles();
+    wireNeeds(r);
+  }
+
+  function needsCard(r) {
+    const shapes = new Map(), tmpl = new Set(), gens = new Map(), asks = [], customs = [], values = [];
+    for (const s of r.sheets) {
+      if (s.no_generator) { (gens.get(s.no_generator) || gens.set(s.no_generator, []).get(s.no_generator)).push(s.item_id); continue; }
+      for (const [k, v] of Object.entries(s.results)) {
+        if (k === "departments" && v.ask === "full_custom") customs.push(s);
+        if (v.state !== "stuck") continue;
+        const shape = s.fields && s.fields.top_shape;
+        if (k === "cut" && v.kind === "rule" && /notes rule/.test(v.missing)) shapes.set(String(shape).toLowerCase(), shape);
+        else if (k === "cnc" && /isn’t in the CNC rule/.test(v.missing)) shapes.set(String(shape).toLowerCase(), shape);
+        else if (k === "cnc" && v.kind === "rule") { const m = v.missing.match(/has an? (\w+) template/); tmpl.add(m ? m[1] : v.missing); }
+        else if (v.ask === "power_unit") asks.push(s);
+        else values.push([s, v.missing]);
+      }
+    }
+    if (!shapes.size && !tmpl.size && !gens.size && !asks.length && !customs.length && !values.length)
+      return `<div class="card st-made"><h3>Nothing missing</h3><p>Every output the lab knows how to make was made.</p></div>`;
+    const known = Object.keys(rules.notes_by_shape);
+    let h = `<div class="card need"><h3>What it needs from you</h3><p class="small">A rule you teach is kept and used on every job after this. An answer for one sheet stays with this job.</p><ul>`;
+    for (const [key, shape] of shapes) h += `<li><b>Top shape “${esc(shape)}”</b> isn’t in the rules.<div class="ctl" data-shape="${esc(key)}">
+        <label>It’s the same as <select class="same"><option value="">a new shape…</option>${known.map(k => `<option>${esc(k)}</option>`).join("")}</select></label>
+        <span class="newbits"><label>Floor note <input type="text" class="note" placeholder="blank, or NO BISCUITS!"></label>
+        <label>CNC <select class="cnc"><option value="custom">custom program</option><option value="template-inputs-unknown">a shop template</option></select></label></span>
+        <button class="go use">Teach this</button></div></li>`;
+    for (const t of tmpl) h += `<li><b>The inputs for the shop’s ${esc(t)} template.</b> Teach it with a rule file (Teach from a rule file, below): the template’s name, the shapes it’s for, and each input with where its value comes from. Claude can write the file from the template’s input list.</li>`;
+    for (const s of asks) h += `<li><b>${esc(s.item_id)}</b> (sheet ${s.sheet}): ${esc(s.results.cnc.missing)}<div class="ctl" data-power="${esc(s.item_id)}">
+        <button class="go dean">It’s a Dean</button><label class="small"><input type="checkbox" class="always"> Always: an unnamed power unit is a Dean</label></div>
+        <div class="ctl" data-cut="${esc(s.item_id)}"><span class="small">Or another unit, with a cutout of</span>
+        <input type="text" class="cutL" inputmode="decimal" size="4" aria-label="Cutout length in inches"> × <input type="text" class="cutW" inputmode="decimal" size="4" aria-label="Cutout width in inches"> inches
+        <button class="cut">Use this cutout</button></div></li>`;
+    for (const s of customs) h += `<li><b>${esc(s.item_id)}</b> (sheet ${s.sheet}): a wood base (“${esc(s.fields.base_style)}”) that isn’t a slab leg. Does it go to Full Custom?
+        <div class="ctl" data-fc="${esc(s.item_id)}"><button class="go yes">Yes, Full Custom</button><button class="no">No</button>
+        <label class="small"><input type="checkbox" class="always"> Always, for wood bases that aren’t slab legs</label></div></li>`;
+    for (const [s, why] of values) h += `<li><b>${esc(s.item_id)}</b> (sheet ${s.sheet}): ${esc(why)}</li>`;
+    for (const [form, ids] of gens) h += `<li><b>A generator for the “${esc(form.toLowerCase())}” form</b>, for ${ids.map(esc).join(", ")}. Until there is one, a person makes ${ids.length === 1 ? "this sheet" : "these sheets"}. <span class="small">A generator is code, so it comes from a build chat; it’s listed in the learned file so it isn’t forgotten.</span></li>`;
+    return h + `</ul></div>`;
+  }
+
+  function wireNeeds(r) {
+    const pid = r.project_id;
+    document.querySelectorAll(".ctl[data-shape]").forEach(box => {
+      const same = box.querySelector(".same"), bits = box.querySelector(".newbits");
+      same.onchange = () => { bits.hidden = !!same.value; };
+      box.querySelector(".use").onclick = async () => {
+        const shape = box.dataset.shape;
+        if (same.value) await teach([{ rule_set: "shape_names", rule_key: shape, value: same.value }], `Taught on ${pid}`, pid);
+        else await teach([{ rule_set: "notes_by_shape", rule_key: shape, value: box.querySelector(".note").value.trim() },
+                          { rule_set: "cnc_by_shape", rule_key: shape, value: box.querySelector(".cnc").value }], `Taught on ${pid}`, pid);
+      };
+    });
+    document.querySelectorAll(".ctl[data-power]").forEach(box => {
+      const item = box.dataset.power;
+      box.querySelector(".dean").onclick = () => box.querySelector(".always").checked
+        ? teach([{ rule_set: "defaults", rule_key: "power_model_when_unnamed", value: "Dean" }], `Taught on ${pid} ${item}`, pid)
+        : answer(pid, item, "power_model", "Dean", "Said on the lab page");
+    });
+    document.querySelectorAll(".ctl[data-cut]").forEach(box => {
+      box.querySelector(".cut").onclick = () => {
+        const l = parseFloat(box.querySelector(".cutL").value), w = parseFloat(box.querySelector(".cutW").value);
+        if (!(l > 0 && w > 0)) { alert("Give the cutout’s length and width in inches, like 10 and 4."); return; }
+        answer(pid, box.dataset.cut, "port_cutout", `${l} x ${w}`, "Said on the lab page");
+      };
+    });
+    document.querySelectorAll(".ctl[data-fc]").forEach(box => {
+      const item = box.dataset.fc;
+      const say = (yes) => box.querySelector(".always").checked
+        ? teach([{ rule_set: "defaults", rule_key: "wood_base_full_custom", value: yes }], `Taught on ${pid} ${item}`, pid)
+        : answer(pid, item, "full_custom", yes ? "yes" : "no", "Said on the lab page");
+      box.querySelector(".yes").onclick = () => say(true);
+      box.querySelector(".no").onclick = () => say(false);
+    });
+  }
+
+  function chip(v) { const s = STATE[v.state]; return `<span class="chip ${s[1]}">${s[0]}</span>`; }
+  function sheetBlock(s) {
+    if (s.no_generator) return `<details class="sheet"><summary><span class="sn">${s.sheet}</span><span><span class="sid">${esc(s.item_id)}</span> <span class="sdim">${s.qty || "?"} · ${esc(s.no_generator.toLowerCase())} form · page ${s.page}</span></span>
+      <span class="chips"><span class="chip st-stuck">No generator yet</span></span></summary><div class="out"><p>The lab doesn’t make sheets from the “${esc(s.no_generator.toLowerCase())}” form yet, so a person makes this one for now.</p></div></details>`;
+    const d = `${s.qty || "?"} × ${esc(s.fields.width)} × ${esc(s.fields.length)} ${esc(s.fields.top_shape)}`;
+    let h = `<details class="sheet"><summary><span class="sn">${s.sheet}</span><span><span class="sid">${esc(s.item_id)}</span> <span class="sdim">${d} · page ${s.page}</span></span>
+      <span class="chips">${OUT.map(([k, t]) => s.results[k] ? `<span class="chip ${STATE[s.results[k].state][1]}">${t}</span>` : "").join("")}</span></summary><div class="out">`;
+    if (s.answers && Object.keys(s.answers).length) h += `<p class="small">Your answers for this sheet: ${Object.entries(s.answers).map(([k, v]) => `${esc(k.replace(/_/g, " "))} = ${esc(v)}`).join(", ")}</p>`;
+    for (const [k, t] of OUT) {
+      const v = s.results[k]; if (!v) continue;
+      h += `<h4>${t} ${chip(v)}</h4>`;
+      if (v.missing) h += `<p>${esc(v.missing)}</p>`;
+      if (k === "cut" && v.pieces) {
+        for (const p of v.pieces) {
+          const win = (r) => (p.optimal_stock || "").startsWith("1st. " + r.stock + " ") || p.optimal_stock === "1st. " + r.stock;
+          h += `<p><b>${esc(p.piece)}</b>: ${p.qty} at ${fmt(p.width)}" × ${fmt(p.length)}". Start length <b>${fmt(p.start_length)}"</b>, starting width <b>${esc(p.starting_width)}</b> (${fmt(p.width)}" × 1.12 = ${fmt(p.width_raw)}"), stock <b>${esc(p.optimal_stock || "none fits")}</b>.</p>
+            <p class="small">${p.steps.map(esc).join(" ")}</p>
+            <div class="scroll"><table class="math"><tr><th>Stock</th><th>Usable</th><th>Pieces per board</th><th>Scrap per piece</th></tr>
+            ${p.stock.map(r => `<tr class="${!r.viable ? "no" : win(r) ? "win" : ""}"><td>${esc(r.stock)}</td><td>${r.usable}"</td><td>${r.pieces}</td><td>${r.viable ? fmt(r.scrap) + '"' : "doesn’t fit"}</td></tr>`).join("")}</table></div>`;
+        }
+        if (v.notes !== undefined) h += `<p>Floor note: <b>${v.notes ? esc(v.notes) : "(blank)"}</b></p>`;
+      }
+      if (k === "cnc" && v.template) {
+        h += `<p><b>${esc(v.template)}</b></p>`;
+        if (v.inputs && v.inputs.length) h += `<div class="scroll"><table class="math cncin"><tr>${v.inputs.map(([nm]) => `<th>${esc(nm)}</th>`).join("")}</tr><tr>${v.inputs.map(([, x]) => `<td>${esc(x)}</td>`).join("")}</tr></table></div>`;
+        for (const nt of v.notes || []) h += `<p>Note on the sheet: <i>${esc(nt)}</i></p>`;
+      }
+      if (k === "departments" && v.departments) h += `<p><b>${v.departments.map(dd => esc(DEPT[dd] || dd)).join(" → ")}</b></p><p class="small">${esc(v.how)}</p>`;
+      if (k === "extras" && v.extras) h += v.extras.length ? `<p>${v.extras.map(e => `<b>${esc(e.name)} × ${e.qty}</b> (${esc(e.how)})`).join(", ")}</p>` : `<p>None on this sheet.</p>`;
+      for (const f of v.flags || []) h += `<p class="flagline">${esc(f)}</p>`;
+    }
+    for (const f of s.flags || []) h += `<p class="flagline"><b>Worth a look:</b> ${esc(f)}</p>`;
+    return h + `</div></details>`;
+  }
+
+  // ---------- machine files: STEP files and programs to the Homag router and the Bend-Tech (machine_files.sql) ----------
+  const MACH = { homag: "Homag router", bendtech: "Bend-Tech" };
+  const fday = (t) => new Date(t).toLocaleDateString([], { month: "short", day: "numeric" });
+  let fileRows = [], filesReady = false;
+  async function loadFiles() {
+    const r = await db.from("machine_files").select("*").order("uploaded_at", { ascending: false }).limit(100);
+    if (r.error) { filesReady = false; $("files").innerHTML = `<h3>Machine files</h3><p class="small">${esc(/machine_files|schema cache|does not exist|PGRST20|42P01/i.test(String(r.error.message) + String(r.error.code)) ? "Not set up in the database yet: machine_files.sql hasn’t run." : friendly(r.error))}</p>`; return; }
+    fileRows = r.data || []; filesReady = true; renderFiles();
+  }
+  function fileStatus(f) {
+    const byRev = (id) => (fileRows.find(x => x.id === id) || {}).rev;
+    if (f.replaced_by) return [`Replaced by r${byRev(f.replaced_by) || "?"}${f.picked_up_at ? ", after the machine got it" : ""}`, "st-flag"];
+    if (f.picked_up_at) return [`On the ${MACH[f.machine]} since ${fday(f.picked_up_at)}`, "st-made"];
+    if (f.stored_at) return [`Waiting for the ${MACH[f.machine]}`, "st-stuck"];
+    return ["Didn’t finish uploading: send it again", "st-flag"];
+  }
+  function renderFiles() {
+    if (!filesReady) return;
+    const items = lastReport ? lastReport.sheets.map(s => s.item_id) : [];
+    const keep = (id) => { const el = $(id); return el ? el.value : ""; };
+    const job = keep("fJob") || (lastReport && lastReport.project_id) || "", prevMachine = keep("fMachine");
+    const wasAssembly = !!($("fAssembly") && $("fAssembly").checked);
+    $("files").innerHTML = `<h3>Machine files</h3>
+      <p class="small">STEP files for the Bend-Tech and programs for the Homag router. On the Bend-Tech they’re filed by hundreds › job › item, with each item’s whole assembly beside its parts. Each machine gets them with its own login on its own computer (machine.html). Once a machine has a file, it’s cleared from the app’s storage; the record below stays. A new file for the same part is the next revision.</p>
+      <div class="fform">
+        <div><label for="fJob">Job</label><input type="text" id="fJob" placeholder="PROJ-00451" value="${esc(job)}"></div>
+        <div><label for="fItem">Item</label><input type="text" id="fItem" list="fItems" placeholder="TA-02" value="${esc(keep("fItem"))}"><datalist id="fItems">${[...new Set(items)].map(i => `<option value="${esc(i)}">`).join("")}</datalist></div>
+        <div><label for="fMachine">Machine</label><select id="fMachine"><option value="bendtech">Bend-Tech (STEP, DXF)</option><option value="homag">Homag router (.mprx)</option></select></div>
+        <div><label for="fPart">Part</label><input type="text" id="fPart" placeholder="Leg Long, or Program" value="${esc(keep("fPart"))}">
+          <label class="small" style="font-weight:500"><input type="checkbox" id="fAssembly"${wasAssembly ? " checked" : ""}> This is the whole assembly</label></div>
+        <div style="grid-column:1/-1"><label for="fNote">What it is, or what changed</label><input type="text" id="fNote" style="width:100%" placeholder="Cope to X per STEP file" value="${esc(keep("fNote"))}"></div>
+        <div style="grid-column:1/-1"><label for="fFiles">Files</label><input type="file" id="fFiles" multiple accept=".step,.stp,.dxf,.mprx,.mpr"> <span class="small">Several files at once: each file’s own name is its part.</span></div>
+      </div>
+      <div class="ctl" style="margin-top:12px"><button class="go" id="fSend">Send to the machine</button><span id="fMsg" class="small"></span></div>
+      ${fileRows.length ? `<ul class="taught">${fileRows.map(f => { const [t, c] = fileStatus(f); return `<li><span class="what"><b>${esc(f.file_name)}</b><br>
+        <span class="small">${esc(MACH[f.machine])} · revision ${f.rev} · sent ${esc(fday(f.uploaded_at))}${f.note ? " · " + esc(f.note) : ""}${f.picked_up_at && !f.cleared_at ? " · still in storage" : ""}</span></span>
+        <span class="tag ${c}">${esc(t)}</span>${f.picked_up_at && !f.cleared_at ? `<button class="link" data-clear="${esc(f.id)}">Clear it</button>` : ""}</li>`; }).join("")}</ul>` : `<p class="small">Nothing sent yet.</p>`}`;
+    if (prevMachine) $("fMachine").value = prevMachine;
+    const syncPart = () => { const a = $("fAssembly").checked; $("fPart").disabled = a; if (a) $("fPart").value = "Assembly"; };
+    $("fAssembly").onchange = syncPart; if (wasAssembly) syncPart();
+    $("fSend").onclick = sendFiles;
+    document.querySelectorAll("[data-clear]").forEach(b => b.onclick = async () => { const f = fileRows.find(x => x.id === b.dataset.clear); await clearPaths([f.path]); await loadFiles(); });
+  }
+  const hexOf = (buf) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+  async function clearPaths(paths) {
+    if (!paths.length) return;
+    await db.storage.from("machine-files").remove(paths);
+    const { data } = await db.from("machine_files").select("id, path").in("path", paths);
+    for (const r of data || []) await db.rpc("machine_file_cleared", { p_id: r.id });
+  }
+  async function sendFiles() {
+    const files = [...($("fFiles").files || [])], msg = $("fMsg");
+    const job = $("fJob").value.trim().toUpperCase(), item = $("fItem").value.trim(), machine = $("fMachine").value, note = $("fNote").value.trim();
+    const assembly = $("fAssembly").checked, partTyped = assembly ? "Assembly" : $("fPart").value.trim();
+    if (!/^(PROJ|TEST)-\d{5}$/.test(job)) { msg.textContent = "The job should look like PROJ-00451 (TEST-… on the test lane)."; return; }
+    if (!item) { msg.textContent = "Say which item it’s for (the Item ID on the work order)."; return; }
+    if (!files.length) { msg.textContent = "Choose the file or files first."; return; }
+    if (assembly && files.length > 1) { msg.textContent = "An item has one whole-assembly file: choose just that file with the box ticked, and send the parts without it."; return; }
+    $("fSend").disabled = true; const done = [], bad = [];
+    for (const file of files) {
+      const part = (files.length === 1 && partTyped) ? partTyped : file.name.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").trim().slice(0, 60);
+      msg.textContent = `Sending ${file.name}…`;
+      try {
+        const buf = await file.arrayBuffer();
+        const sha = hexOf(await crypto.subtle.digest("SHA-256", buf));
+        const n = await db.rpc("machine_file_new", { p_project: job, p_item: item, p_part: part, p_machine: machine, p_original_name: file.name, p_size: file.size, p_sha256: sha, p_note: note || null });
+        if (n.error) throw n.error;
+        const up = await db.storage.from("machine-files").upload(n.data.path, new Blob([buf], { type: "application/octet-stream" }), { contentType: "application/octet-stream" });
+        if (up.error) throw up.error;
+        const st = await db.rpc("machine_file_stored", { p_id: n.data.id });
+        if (st.error) throw st.error;
+        await clearPaths(st.data.clear || []);
+        done.push(`${n.data.file_name}`);
+      } catch (e) { bad.push(`${file.name}: ${friendly(e)}`); }
+    }
+    $("fSend").disabled = false;
+    await loadFiles();
+    $("fMsg").textContent = (done.length ? `Sent: ${done.join(", ")}.` : "") + (bad.length ? ` Not sent: ${bad.join("; ")}` : "");
+  }
+
+  // ---------- "what I've learned": one file for the next build chat ----------
+  async function learnedText() {
+    $("learnedMsg").textContent = "Gathering it…";
+    const [r, a, runs] = await Promise.all([
+      db.from("lab_rules").select("*").order("made_at", { ascending: true }),
+      db.from("lab_answers").select("*").order("made_at", { ascending: true }),
+      db.from("lab_runs").select("project_id, file_name, made_at, made, looks, stuck, no_generator, stuck_reasons, rules_version").order("made_at", { ascending: false }).limit(1000)]);
+    if (r.error || a.error || runs.error) { $("learnedMsg").textContent = friendly(r.error || a.error || runs.error); return null; }
+    $("learnedMsg").textContent = "";
+    const day = (t) => new Date(t).toISOString().slice(0, 10);
+    const L = [];
+    L.push(`# What the Prototype lab has learned`, ``, `Written ${new Date().toISOString().slice(0, 16).replace("T", " ")} from the lab page ${PAGE_VERSION}. The lab's built-in rules: ${E.DEFAULT_RULES.version}.`, ``,
+      `Give this file to Claude in a build chat. Everything below was decided on the lab page; the newest line for a rule is the one in use. Nothing here has been built into the app, the generator project or its instruction files yet.`, ``);
+    L.push(`## Rules taught (oldest first; the last line for each rule wins)`, ``);
+    if (!r.data.length) L.push(`None yet.`);
+    for (const x of r.data) L.push(`- ${day(x.made_at)} · **${x.value === null ? "Stopped using: " + x.rule_set + " / " + x.rule_key : ruleWords(x)}**  \n  \`${x.rule_set}\` / \`${x.rule_key}\` = \`${JSON.stringify(x.value)}\`${x.job ? " · from " + x.job : ""}${x.note ? " · " + x.note : ""}`);
+    L.push(``, `## Answers for single jobs`, ``);
+    if (!a.data.length) L.push(`None yet.`);
+    for (const x of a.data) L.push(`- ${day(x.made_at)} · ${x.project_id} · ${x.item_id}: ${x.field} = ${x.value === null ? "(taken back)" : x.value}${x.note ? " · " + x.note : ""}`);
+    // what it gets stuck on most: the newest run of each job
+    const newest = new Map(); for (const x of runs.data) if (x.project_id && !newest.has(x.project_id)) newest.set(x.project_id, x);
+    const tally = new Map();
+    for (const x of newest.values()) for (const s of x.stuck_reasons || []) {
+      const key = s.kind === "generator" ? s.text : String(s.text).replace(/“[^”]*”/g, "“…”").replace(/\d+(\.\d+)?"?/g, "#");
+      const t = tally.get(key) || { kind: s.kind, text: key, n: 0, jobs: new Set(), example: s.text }; t.n++; t.jobs.add(x.project_id); tally.set(key, t);
+    }
+    L.push(``, `## What it still gets stuck on (newest run of each of ${newest.size} job${newest.size === 1 ? "" : "s"})`, ``);
+    if (!tally.size) L.push(`Nothing.`);
+    for (const t of [...tally.values()].sort((p, q) => q.n - p.n)) L.push(`- ${t.n} × [${t.kind}] ${t.example}  (jobs: ${[...t.jobs].join(", ")})`);
+    L.push(``, `## Jobs run`, ``);
+    for (const x of newest.values()) L.push(`- ${x.project_id} (${x.file_name || "?"}), newest run ${day(x.made_at)}: ${x.made} made, ${x.looks} worth a look, ${x.stuck} stuck, ${x.no_generator} with no generator`);
+    const now = {}; for (const x of ruleRows.filter(z => z.value !== null)) { const k = x.rule_set === "settings" ? x.rule_key : x.rule_set;
+      if (x.rule_set === "settings") now[k] = x.value; else (now[k] = now[k] || {})[x.rule_key] = x.value; }
+    L.push(``, `## The rules in use now, as a lab rule file`, ``, "```json", JSON.stringify({ kind: "lab-rules", note: "Everything taught in the lab, as of " + day(new Date()), rules: now }, null, 2), "```", ``);
+    return L.join("\n");
+  }
+})();
+</script>
+</body>
+</html>

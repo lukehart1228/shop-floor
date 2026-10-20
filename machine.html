@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#181D2E">
+<title>Machine files · Shop Floor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --midnight:#181D2E; --orange:#ED5E0F; --bright:#F0A721; --teal:#00B4B2; --teal-ink:#00807E; --teal-bg:#DDF2F1;
+         --sawdust:#FFF4D5; --gray:#C2BAA0; --paper:#EFEDE6; --line:#E4DFCF; --ink2:#6B7082; --warn:#7A4400; }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--paper); color:var(--midnight); font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:18px; line-height:1.45}
+  header{background:var(--midnight); color:var(--sawdust); padding:16px 22px; display:flex; align-items:baseline; gap:16px; flex-wrap:wrap}
+  .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.16em; color:var(--orange)}
+  .brand span{color:var(--sawdust)}
+  header h1{margin:0; font-size:22px; font-weight:600}
+  header .mach{margin-left:auto; font-family:'Barlow Condensed',sans-serif; font-size:24px; font-weight:700; color:var(--bright)}
+  main{max-width:960px; margin:0 auto; padding:22px 18px 70px}
+  .card{background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px 22px; margin-bottom:16px}
+  h2{margin:0 0 6px; font-size:24px} h3{margin:0 0 8px; font-size:19px}
+  .sub{color:var(--ink2); margin:0 0 12px}
+  label.f{display:block; font-weight:600; margin:12px 0 4px}
+  input[type=email],input[type=password]{width:100%; font:inherit; padding:10px 12px; border:1px solid var(--gray); border-radius:9px}
+  button{font:inherit; font-weight:600; border-radius:10px; padding:11px 18px; cursor:pointer; border:1px solid var(--gray); background:#fff; color:var(--midnight)}
+  button.go{background:var(--orange); color:#fff; border-color:transparent}
+  button.big{font-size:22px; padding:16px 26px}
+  button:disabled{opacity:.45; cursor:default}
+  button.link{background:none; border:none; padding:4px; color:var(--ink2); text-decoration:underline; font-weight:500}
+  button:focus-visible,input:focus-visible{outline:3px solid var(--bright); outline-offset:2px}
+  .bad{background:var(--sawdust); color:var(--warn); border-left:5px solid var(--bright); border-radius:10px; padding:14px 16px; margin:10px 0}
+  .alarm{background:var(--midnight); color:var(--sawdust); border-radius:12px; padding:20px}
+  .folder{display:flex; gap:12px; align-items:center; flex-wrap:wrap}
+  .folder b{font-size:20px}
+  ul.files{list-style:none; padding:0; margin:0}
+  ul.files li{padding:12px 0; border-bottom:1px solid var(--line); display:flex; gap:12px; align-items:baseline; flex-wrap:wrap}
+  ul.files li:last-child{border-bottom:none}
+  .fname{font-weight:700; font-size:19px; word-break:break-all; flex:1; min-width:260px}
+  .meta{display:block; font-weight:400; font-size:15px; color:var(--ink2); word-break:normal; overflow-wrap:anywhere}
+  .tag{font-size:14px; font-weight:700; border-radius:7px; padding:3px 9px; white-space:nowrap}
+  .ok{background:var(--teal-bg); color:var(--teal-ink)}
+  .warn{background:var(--sawdust); color:var(--warn); box-shadow:inset 4px 0 0 var(--bright)}
+  .wait{border:1.5px dashed var(--gray); color:#4A5063}
+  .who{display:flex; justify-content:space-between; color:var(--ink2); margin-bottom:12px; flex-wrap:wrap; gap:8px}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">PURPOSEFUL <span>DESIGN</span></div>
+  <h1>Machine files</h1>
+  <div class="mach" id="machName"></div>
+</header>
+<main>
+  <section id="configProblem" class="alarm" hidden><h2 id="configTitle">This page isn’t set up yet</h2><p id="configBody"></p></section>
+
+  <section id="signIn" class="card" hidden>
+    <h2>Sign in</h2>
+    <p class="sub">Use this machine’s own login (the Homag router or the Bend-Tech), not a person’s.</p>
+    <form id="signInForm">
+      <label class="f" for="email">Email</label><input id="email" type="email" autocomplete="username" required>
+      <label class="f" for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+      <button class="go" style="margin-top:16px; width:100%" type="submit" id="signInBtn">Sign in</button>
+    </form>
+    <div id="signInError" class="bad" hidden></div>
+  </section>
+
+  <section id="notMachine" class="card" hidden>
+    <h2>Not a machine login</h2><p id="notMachineBody"></p><button class="link" id="signOutBtn2">Sign out</button>
+  </section>
+
+  <section id="area" hidden>
+    <div class="who"><span id="whoLine"></span><span><button class="link" id="refreshBtn">Check again</button> · <button class="link" id="signOutBtn">Sign out</button></span></div>
+    <section class="card" id="folderCard"></section>
+    <section class="card">
+      <h2 id="waitTitle">Waiting for this machine</h2>
+      <div id="waitList"></div>
+      <div id="getRow" style="margin-top:14px"></div>
+      <div id="results"></div>
+    </section>
+    <section class="card" id="replacedCard" hidden><h3>Replaced: don’t use these</h3><ul class="files" id="replacedList"></ul></section>
+    <section class="card"><h3>Got lately</h3><ul class="files" id="gotList"></ul></section>
+    <p class="sub" id="foot"></p>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+<script src="sf-common-2026-10-05.1.js"></script>
+<script>
+var PAGE_VERSION = "2026-10-20.1";          // this page's version: bump it with every change (it shows in select * from devices();)
+
+/* The Homag router's and the Bend-Tech's computers (Chrome). Files sent from the Prototype lab wait here; Get files saves
+   them into the folder chosen on this computer, checks each against its fingerprint, records the pickup, and clears the
+   file from the app's storage (its record stays). Nothing on this computer is ever deleted or changed by this page. */
+if (typeof document !== "undefined") (function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const show = (id, on = true) => { $(id).hidden = !on; };
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const NAMES = { homag: "Homag router", bendtech: "Bend-Tech (Dragon)" };
+  const day = (t) => new Date(t).toLocaleDateString([], { month: "short", day: "numeric" });
+  const when = (t) => `${day(t)} ${new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+  const size = (n) => n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+
+  const problem = keyProblem(SUPABASE_URL, SUPABASE_KEY);
+  if (problem) { $("configTitle").textContent = problem.secret ? "Stop — wrong key in this file" : "This page isn’t set up yet"; $("configBody").textContent = problem.text; show("configProblem"); return; }
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  sfReportDevice(db, "machine", PAGE_VERSION);
+
+  let machine = null, rows = [], busy = false, dir = null, perm = null;
+  const canFolder = typeof window.showDirectoryPicker === "function";
+
+  function friendly(e) {
+    const m = String((e && (e.message || e.error_description)) || e || "");
+    if (isNetworkError(e)) return "Couldn’t reach the app. Check the internet connection and try again.";
+    if (/invalid login credentials/i.test(m)) return "That email and password didn’t match.";
+    if (/my_machine|machine_files|schema cache|does not exist|PGRST20|42883|42P01/i.test(m + " " + String((e && e.code) || ""))) return "Machine files aren’t set up in the database yet (machine_files.sql hasn’t run).";
+    return m || "Something went wrong, with no further detail.";
+  }
+
+  // ---------- the folder on this computer, remembered between visits ----------
+  const idb = { p: null, open() { return this.p || (this.p = new Promise((res, rej) => { const r = indexedDB.open("sf-machine", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); })); },
+    async get(k) { const d = await this.open(); return new Promise((res) => { const r = d.transaction("kv").objectStore("kv").get(k); r.onsuccess = () => res(r.result || null); r.onerror = () => res(null); }); },
+    async set(k, v) { const d = await this.open(); return new Promise((res) => { const t = d.transaction("kv", "readwrite"); t.objectStore("kv").put(v, k); t.oncomplete = () => res(true); t.onerror = () => res(false); }); } };
+  async function loadFolder() {
+    if (!canFolder) { dir = null; perm = null; return; }
+    try { dir = await idb.get("folder-" + machine); perm = dir ? await dir.queryPermission({ mode: "readwrite" }) : null; } catch (e) { dir = null; perm = null; }
+  }
+  function renderFolder() {
+    let h;
+    if (!canFolder) h = `<h3>Where files go</h3><p>This browser can’t save into a chosen folder, so files go to <b>Downloads</b>. In Chrome, they can go straight into the machine’s folder.</p>`;
+    else if (!dir) h = `<h3>Where files go</h3><p>Choose the folder ${machine === "homag" ? "WoodWOP opens programs from" : "Bend-Tech imports parts from"}. You only do this once on this computer.</p><button class="go" id="pickBtn">Choose the folder</button>`;
+    else if (perm !== "granted") h = `<h3>Where files go</h3><div class="folder"><span>Folder: <b>${esc(dir.name)}</b></span><button class="go" id="allowBtn">Allow saving into ${esc(dir.name)}</button><button class="link" id="pickBtn">Choose another</button></div><p class="sub">Chrome asks again after it’s been closed. Press Allow, then Allow on Chrome’s question.</p>`;
+    else h = `<div class="folder"><span>Files go into <b>${esc(dir.name)}</b>${SORTED[machine] ? `, sorted into <b>hundreds › job › item</b> folders` : ""}</span><button class="link" id="pickBtn">Choose another folder</button></div>`;
+    $("folderCard").innerHTML = h;
+    const pb = $("pickBtn"); if (pb) pb.onclick = async () => {
+      try { const h2 = await window.showDirectoryPicker({ id: "sf-machine", mode: "readwrite" }); await idb.set("folder-" + machine, h2); dir = h2; perm = await dir.queryPermission({ mode: "readwrite" }); }
+      catch (e) { if (e && e.name !== "AbortError") alert("That folder couldn’t be used: " + (e.message || e)); }
+      renderFolder(); renderWaiting();
+    };
+    const ab = $("allowBtn"); if (ab) ab.onclick = async () => { try { perm = await dir.requestPermission({ mode: "readwrite" }); } catch (e) { perm = "prompt"; } renderFolder(); renderWaiting(); };
+  }
+
+  // ---------- signing in ----------
+  async function enter(user) {
+    show("signIn", false);
+    let m = null, err = null;
+    try { const r = await db.rpc("my_machine", {}); err = r.error; m = r.data; } catch (e) { err = e; }
+    if (err || !m) {
+      $("notMachineBody").textContent = err ? friendly(err) : `${user.email} isn’t a machine’s login. Each machine has its own login, set up in the Supabase SQL Editor with select machine_allow('email', 'homag'); (or 'bendtech').`;
+      show("notMachine"); show("area", false); return;
+    }
+    machine = m; $("machName").textContent = NAMES[m] || m; $("whoLine").textContent = `Signed in as ${user.email}`;
+    document.title = `${NAMES[m]} · Machine files`;
+    show("notMachine", false); show("area");
+    await loadFolder(); renderFolder(); await refresh();
+  }
+  function leave() { machine = null; show("area", false); show("notMachine", false); show("signIn"); $("machName").textContent = ""; }
+  db.auth.getSession().then(({ data }) => data.session ? enter(data.session.user) : leave());
+  $("signInForm").addEventListener("submit", async (e) => {
+    e.preventDefault(); show("signInError", false); $("signInBtn").disabled = true;
+    const { data, error } = await db.auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value });
+    $("signInBtn").disabled = false;
+    if (error) { $("signInError").textContent = friendly(error); show("signInError"); return; }
+    $("password").value = ""; enter(data.user);
+  });
+  for (const b of ["signOutBtn", "signOutBtn2"]) $(b).addEventListener("click", async () => { await db.auth.signOut(); leave(); });
+  $("refreshBtn").addEventListener("click", () => refresh());
+  setInterval(() => { if (machine && !busy && document.visibilityState === "visible") refresh(); }, 60000);
+
+  // ---------- the list ----------
+  async function refresh() {
+    const { data, error } = await db.from("machine_files").select("*").order("uploaded_at", { ascending: false }).limit(300);
+    if (error) { $("waitList").innerHTML = `<div class="bad">${esc(friendly(error))}</div>`; return; }
+    rows = data || [];
+    renderWaiting(); renderOthers();
+    $("foot").textContent = `Checked ${when(new Date())}. Machine files page ${PAGE_VERSION}.`;
+  }
+  const waiting = () => rows.filter(r => r.stored_at && !r.picked_up_at && !r.replaced_by && !r.cleared_at).sort((a, b) => String(a.uploaded_at).localeCompare(String(b.uploaded_at)));
+  function line(r, tag) {
+    return `<li><span class="fname">${esc(r.file_name)}<span class="meta">${esc(r.project_id)} · ${esc(r.item_id)} · ${esc(r.part)} · revision ${r.rev} · ${size(r.size_bytes)} · sent ${esc(when(r.uploaded_at))}${r.note ? " · " + esc(r.note) : ""}</span></span>${tag || ""}</li>`;
+  }
+  function renderWaiting() {
+    const w = waiting();
+    $("waitTitle").textContent = w.length ? `Waiting for this machine (${w.length})` : "Nothing waiting";
+    $("waitList").innerHTML = w.length ? `<ul class="files">${w.map(r => line(r, `<span class="tag wait">Waiting</span>`)).join("")}</ul>` : `<p class="sub">When a file is sent to the ${esc(NAMES[machine])}, it shows here.</p>`;
+    const blocked = canFolder && (!dir || perm !== "granted");
+    $("getRow").innerHTML = w.length ? `<button class="go big" id="getBtn" ${blocked || busy ? "disabled" : ""}>Get files (${w.length})</button>${blocked ? ` <span class="sub">Choose or allow the folder first.</span>` : ""}` : "";
+    const gb = $("getBtn"); if (gb) gb.onclick = getFiles;
+  }
+  function renderOthers() {
+    const newest = new Map();
+    for (const r of rows) { const k = [r.project_id, r.item_id, r.part].join("|"); if (r.stored_at && (!newest.has(k) || r.rev > newest.get(k).rev)) newest.set(k, r); }
+    const old = rows.filter(r => r.picked_up_at && r.replaced_by && Date.now() - new Date(r.picked_up_at) < 60 * 864e5);
+    $("replacedList").innerHTML = old.map(r => { const n = newest.get([r.project_id, r.item_id, r.part].join("|"));
+      return line(r, `<span class="tag warn">You got this ${esc(day(r.picked_up_at))}. Use revision ${n ? n.rev : "newer"}${n && n.picked_up_at ? " (got " + esc(day(n.picked_up_at)) + ")" : " when it arrives"}</span>`); }).join("");
+    show("replacedCard", old.length > 0);
+    const got = rows.filter(r => r.picked_up_at).sort((a, b) => String(b.picked_up_at).localeCompare(String(a.picked_up_at))).slice(0, 15);
+    $("gotList").innerHTML = got.length ? got.map(r => line(r, `<span class="tag ok">Got ${esc(when(r.picked_up_at))}</span>`)).join("") : `<li class="sub">Nothing yet.</li>`;
+  }
+
+  // ---------- where a file goes in the chosen folder ----------
+  // The Bend-Tech (Luke, 20 Oct): hundreds › job › item, e.g. 400s › PROJ-00451 › TA-02. The router: straight into the folder.
+  const SORTED = { bendtech: true, homag: false };
+  const safeName = (x) => String(x || "").replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").replace(/^[\s.]+|[\s.]+$/g, "").slice(0, 80) || "Item";
+  function hundreds(project) { const n = parseInt(String(project).replace(/\D/g, ""), 10) || 0; return `${String(Math.floor(n / 100) * 100).padStart(3, "0")}s`; }
+  async function projectFolder(parent, project) {
+    // a folder already starting with the job number (someone may have added the job's name) is used, not doubled
+    const want = String(project).toUpperCase(); const found = [];
+    for await (const [name, h] of parent.entries()) {
+      if (h.kind !== "directory") continue;
+      const up = name.toUpperCase();
+      if (up === want || (up.startsWith(want) && !/[0-9]/.test(up.charAt(want.length)))) found.push([name, h]);
+    }
+    found.sort((a, b) => (a[0].toUpperCase() === want ? -1 : 0) - (b[0].toUpperCase() === want ? -1 : 0) || a[0].localeCompare(b[0]));
+    if (found.length) return found[0];
+    return [project, await parent.getDirectoryHandle(project, { create: true })];
+  }
+  let savedWhere = "";
+  async function folderFor(r) {
+    if (!SORTED[machine]) { savedWhere = dir.name; return { folder: dir, where: dir.name }; }
+    const h = hundreds(r.project_id);
+    const hd = await dir.getDirectoryHandle(h, { create: true });
+    const [pname, pd] = await projectFolder(hd, r.project_id);
+    const iname = safeName(r.item_id);
+    const idir = await pd.getDirectoryHandle(iname, { create: true });
+    savedWhere = `${h} › ${pname} › ${iname}`;
+    return { folder: idir, where: savedWhere };
+  }
+
+  // ---------- Get files ----------
+  const hex = (buf) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+  async function getFiles() {
+    if (busy) return; busy = true; renderWaiting();
+    const out = [];
+    for (const r of waiting()) {
+      try {
+        const dl = await db.storage.from("machine-files").download(r.path);
+        if (dl.error || !dl.data) throw new Error("couldn’t download it (" + friendly(dl.error) + ")");
+        const buf = await dl.data.arrayBuffer();
+        const sha = hex(await crypto.subtle.digest("SHA-256", buf));
+        if (sha !== r.sha256) throw new Error("it arrived different from the file that was sent, so it wasn’t saved. Try again");
+        if (canFolder) {
+          if (await dir.queryPermission({ mode: "readwrite" }) !== "granted") { perm = "prompt"; renderFolder(); throw new Error("Chrome needs permission for the folder again: press Allow, then Get files"); }
+          const { folder, where } = await folderFor(r);
+          const fh = await folder.getFileHandle(r.file_name, { create: true });
+          const w = await fh.createWritable(); await w.write(buf); await w.close();
+          const back = await (await fh.getFile()).arrayBuffer();
+          if (hex(await crypto.subtle.digest("SHA-256", back)) !== r.sha256) throw new Error("the copy in the folder doesn’t match. Try again");
+        } else {
+          const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([buf])); a.download = r.file_name; document.body.appendChild(a); a.click(); a.remove();
+        }
+        const pk = await db.rpc("machine_file_picked_up", { p_id: r.id, p_sha256: sha });
+        if (pk.error) throw new Error("it’s saved, but the app couldn’t record that (" + friendly(pk.error) + "). It will show again; Get files once more");
+        const rm = await db.storage.from("machine-files").remove([r.path]);
+        if (!rm.error) await db.rpc("machine_file_cleared", { p_id: r.id });
+        out.push(`<li><span class="fname">${esc(r.file_name)}</span><span class="tag ok">${canFolder ? "Saved into " + esc(savedWhere) : "In Downloads"}</span></li>`);
+      } catch (e) {
+        out.push(`<li><span class="fname">${esc(r.file_name)}<span class="meta">Not got: ${esc(e.message || e)}.</span></span><span class="tag warn">Not got</span></li>`);
+        if (perm === "prompt") break;
+      }
+    }
+    $("results").innerHTML = out.length ? `<h3 style="margin-top:16px">Just now</h3><ul class="files">${out.join("")}</ul>` : "";
+    busy = false; await refresh();
+  }
+})();
+</script>
+</body>
+</html>

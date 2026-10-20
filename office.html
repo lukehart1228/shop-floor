@@ -832,7 +832,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-10-07.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-10-18.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -930,9 +930,11 @@ if (typeof document !== "undefined") (function () {
     { key: "upload", label: "Upload a work order", file: "upload.html", page: "upload", note: "The generator's upload file" },
     { key: "inventory", label: "Inventory", file: "inventory.html", page: "inventory", note: "Month-end counts, scrap rate" },
     { key: "pace", label: "Pace", file: "pace.html", page: "pace", note: "Square feet a week, time in stage" },
+    { key: "lab", label: "Prototype lab", file: "lab.html", page: "lab", note: "Trying new generators. Only you see this", lab: true },
   ];
   const sectionOf = (k) => SECTIONS.find(x => x.key === k) || null;
-  const mySections = () => SECTIONS.filter(x => isManager(S.me) || (S.me && S.me.scheduler && x.scheduler));
+  const mySections = () => SECTIONS.filter(x => x.lab ? !!(S.me && S.me.lab)       // the lab: only logins let in with lab_allow() (lab.sql)
+    : isManager(S.me) || (S.me && S.me.scheduler && x.scheduler));
   const secBox = document.createElement("div"); secBox.id = "secs"; secBox.hidden = true; document.body.appendChild(secBox);
   const frames = {};
   function frameVersion(k) { try { return frames[k].contentWindow.PAGE_VERSION || ""; } catch (e) { return ""; } }
@@ -2649,6 +2651,10 @@ if (typeof document !== "undefined") (function () {
       }
     }
     S.me = { id: user.id, name: data.full_name, role: data.role, scheduler };
+    if (isManager(S.me)) {                      // the Prototype lab (18 Oct): asked, never assumed; a database without lab.sql says no
+      let l = null; try { l = await db.rpc("lab_allowed", {}); } catch (e) { l = null; }
+      S.me.lab = !!(l && !l.error && l.data === true);
+    }
     // which section to open: Julia always Deliveries; a manager, the link's #section or where they were last
     const want = (location.hash || "").slice(1) || store.get("section", null);
     S.section = scheduler ? "deliveries" : (want && sectionOf(want) ? want : null);
