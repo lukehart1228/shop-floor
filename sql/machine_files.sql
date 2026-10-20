@@ -353,6 +353,7 @@ begin
 
     -- ---- 7: picking up: the fingerprint must match; then it may remove the file, and only then ----------
     n := 0; msg := null;
+    perform set_config('storage.allow_delete_query', 'true', true);   -- as the Storage API does: Supabase refuses any other delete from storage
     begin execute 'set local role authenticated';
       delete from storage.objects where bucket_id = 'machine-files' and name = p2; get diagnostics m = row_count; execute 'reset role';
       if m > 0 then msg := 'removed a file before picking it up'; else n := n + 1; end if;
