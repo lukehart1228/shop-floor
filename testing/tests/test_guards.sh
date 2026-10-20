@@ -13,7 +13,7 @@ for f in $ORDER; do
 done
 echo "REFUSED: ${refused[*]}"
 echo "RAN: ${#ran[@]} files"
-exp="schema upload_function monday_sync tablet problems arrow_qc tv photos loadouts_v2 deliveries deliveries_v2 ready_issues send_routes delivery_types tv_pace trip_types"   # trip_types.sql (5 Oct) replaced pieces of delivery_types and tv_pace; tv_photos.sql (7 Oct) replaced pieces of tv_pace and trip_types; delivery_extras.sql (16 Oct) replaced upload_work_order from upload_function
+exp="schema upload_function monday_sync tablet problems arrow_qc tv photos loadouts_v2 deliveries deliveries_v2 ready_issues send_routes delivery_types tv_pace trip_types tv_photos"   # trip_types.sql (5 Oct) replaced pieces of delivery_types and tv_pace; tv_photos.sql (7 Oct) replaced pieces of tv_pace and trip_types; delivery_extras.sql (16 Oct) replaced upload_work_order from upload_function; tv_coming.sql (20 Oct) replaced tv_snapshot from tv_photos
 [ "${refused[*]}" == "$exp" ] && echo "PASS refusals are exactly the replaced files" || echo "FAIL refusals, expected: $exp"
 after=$($P -c "$FP")
 [ "$before" == "$after" ] && echo "PASS every function and view unchanged after all $(echo $ORDER | wc -w) runs" || echo "FAIL definitions changed"

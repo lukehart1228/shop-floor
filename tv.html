@@ -42,33 +42,31 @@
   .main{flex:1 1 auto; min-height:0; display:flex}
   .panel{background:#222941; border-radius:1.6rem}
 
-  /* the left column: the floor donut, and under it the picture of finished work (tv_photos.sql) */
-  .leftcol{flex:0 0 56rem; display:flex; flex-direction:column; min-height:0}
-  .floor{flex:0 0 auto; padding:1.6rem 2.4rem 1.8rem}
-  .floor h2{margin:0 0 1rem; font-size:3.4rem; font-weight:600; color:#C2BAA0}
-  .floorrow{display:flex; align-items:center}
-  .donut{position:relative; width:22rem; height:22rem; flex:0 0 auto}
-  .donut svg{width:100%; height:100%; display:block}
-  .dc{position:absolute; top:0; left:0; right:0; bottom:0; display:flex; flex-direction:column; align-items:center; justify-content:center}
-  .dn{font-size:7rem; font-weight:700; line-height:1}
-  .dn small{font-size:.45em}
-  .dl{font-size:3rem; color:#A3A9BC}
-  .legend{margin-left:2.4rem; font-size:2.7rem; color:#FFF4D5; flex:1 1 auto; min-width:0; white-space:nowrap}
-  .legend div{display:flex; align-items:center; padding:.5rem 0}
-  .legend i{display:inline-block; width:2.4rem; height:2.4rem; border-radius:.5rem; margin-right:1.2rem; flex:0 0 auto}
-  .legend span{margin-left:auto; font-weight:600}
+  /* the left column (20 Oct): the picture of finished work on top, and under it all work on the floor as one bar */
+  .leftcol{flex:0 0 88rem; display:flex; flex-direction:column; min-height:0; min-width:0}
+  .floor{flex:0 0 auto; padding:1.5rem 2.6rem 1.7rem; margin-top:1.8rem}
+  .main.rows .leftcol{flex:0 0 56rem}
+  .floor .ft{display:flex; align-items:baseline; white-space:nowrap}
+  .floor h2{margin:0; font-size:3.2rem; font-weight:600; color:#C2BAA0}
+  .floor .pct{margin-left:auto; font-size:6rem; font-weight:700; line-height:1}
+  .floor .pct small{font-size:.5em; font-weight:600; margin-left:.6rem}
+  .floor .bar{position:relative; height:4.6rem; background:#39415C; border-radius:1rem; overflow:hidden; margin:1.3rem 0 1.1rem}
+  .floor .bar i{position:absolute; top:0; bottom:0}
+  .floor .fs{font-size:3rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .floor .fs span{color:#A3A9BC}
 
   /* in its new home: one site photo from a finished white glove delivery, 20 seconds each */
-  .home{flex:1 1 auto; min-height:0; margin-top:1.8rem; position:relative; overflow:hidden; display:flex; flex-direction:column}
+  .home{flex:1 1 auto; min-height:0; position:relative; overflow:hidden; display:flex; flex-direction:column}
   .home .pic{flex:1 1 auto; min-height:0; position:relative; background:#2C3348}
   .home .pic .img{position:absolute; top:0; left:0; width:100%; height:100%; background-position:center; background-size:cover; background-repeat:no-repeat}   /* background-size, not object-fit: older TV browsers */
+  .home .pic .img.tall{background-size:contain}   /* a photo taken upright is shown whole, with dark sides, never cropped */
   .home .pic .waiting{position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:0 3rem; color:#A3A9BC; font-size:3rem; line-height:1.25}
-  .home .tag{position:absolute; top:1.2rem; left:1.6rem; background:rgba(24,29,46,.78); color:#FFF4D5; font-size:2.8rem; font-weight:600; padding:.4rem 1.2rem; border-radius:.6rem}
+  .home .tag{position:absolute; top:1.2rem; left:1.6rem; background:rgba(24,29,46,.78); color:#FFF4D5; font-size:3rem; font-weight:600; padding:.4rem 1.2rem; border-radius:.6rem}
   .home .cap{flex:0 0 auto; padding:1rem 1.8rem 1.2rem; background:#222941; line-height:1.2}
   .home .cap .l1{display:flex; align-items:baseline; white-space:nowrap; overflow:hidden}
-  .home .cap .p{font-size:4.2rem; font-weight:700; margin-right:1.6rem}
-  .home .cap .w{font-size:3rem; color:#FFF4D5}
-  .home .cap .l2{display:flex; font-size:2.7rem; color:#A3A9BC; white-space:nowrap}
+  .home .cap .p{font-size:4.6rem; font-weight:700; margin-right:1.6rem}
+  .home .cap .w{font-size:3.4rem; color:#FFF4D5}
+  .home .cap .l2{display:flex; font-size:2.8rem; color:#A3A9BC; white-space:nowrap}
   .home .cap .n{margin-left:auto}
 
   /* one row per department */
@@ -93,6 +91,17 @@
   .usual{position:absolute; top:-1rem; bottom:-1rem; width:.6rem; margin-left:-.3rem; background:#C2BAA0; border-radius:.3rem}
   .keyline{display:inline-block; width:.6rem; height:3rem; background:#C2BAA0; border-radius:.3rem; vertical-align:-.6rem; margin:0 .8rem 0 1.6rem}
 
+  /* coming up (tv_coming.sql, 20 Oct): the next 10 jobs on the floor by Monday's delivery date. Words only, no colour. */
+  .coming{flex:1 1 auto; margin-left:2rem; padding:1.6rem 2.8rem 1.2rem; display:flex; flex-direction:column; min-width:0; min-height:0}
+  .coming .ch{display:flex; align-items:baseline; white-space:nowrap; padding-bottom:1rem; border-bottom:.2rem solid #39415C}
+  .coming .ch h2{margin:0; font-size:3.4rem; font-weight:600; color:#C2BAA0}
+  .coming .ch span{margin-left:auto; font-size:2.8rem; color:#A3A9BC}
+  .crow{flex:1 1 0; max-height:7.4rem; min-height:0; display:flex; align-items:center; white-space:nowrap; overflow:hidden; border-bottom:.2rem solid #2C3348; font-size:4.2rem; line-height:1.1}
+  .crow:last-child{border-bottom:0}
+  .crow .cw{flex:0 0 23rem; font-weight:700}
+  .crow .cp{flex:0 0 12rem; color:#A3A9BC}
+  .crow .cn{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis}
+
   /* going out */
   .out{display:flex; align-items:center; padding:1.3rem 2.4rem; flex:0 0 auto; white-space:nowrap}
   .out > b{font-size:3.4rem; color:#C2BAA0; margin-right:2.6rem}
@@ -107,12 +116,12 @@
   .msgscreen h1{font-size:7rem; color:#F0A721; margin:0 0 .5em}
   .msgscreen p{font-size:3.6rem; color:#C2BAA0}
 
-  /* when bands are up they win the space: smaller donut; with two, one line each and Going out steps aside */
+  /* when bands are up they win the space: a slimmer floor bar; with two, one line each and Going out steps aside */
   .row{min-height:8rem}
-  .b1 .donut, .b2 .donut{width:19rem; height:19rem}
-  .b1 .dn, .b2 .dn{font-size:6rem}
   .b2 .home .cap{padding:.8rem 1.8rem 1rem}
   .b2 .home .cap .l2{display:none}
+  .b1 .floor .pct, .b2 .floor .pct{font-size:5rem}
+  .b1 .floor .bar, .b2 .floor .bar{height:3.6rem; margin:1rem 0 .8rem}
   .b1 .band, .b2 .band{font-size:3.8rem; padding:1.1rem 2.4rem}
   .b2 .band span{-webkit-line-clamp:1; display:block; white-space:nowrap; text-overflow:ellipsis}
   .b2 .out{display:none}
@@ -139,7 +148,7 @@
 var SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 var SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 
-var TV_VERSION = "2026-10-07.1";
+var TV_VERSION = "2026-10-20.1";
 var REFRESH_SECONDS = 30;     // how often the numbers are fetched
 var HIDE_AFTER_SECONDS = 90;  // with no connection this long, the numbers are hidden rather than shown stale
 var PICTURE_SECONDS = 20;     // in its new home: how long each picture stays
@@ -271,6 +280,20 @@ function fetchBudgetOk(log, now, perHour) {
   return n < (perHour || 30);
 }
 
+/** Coming up: "Today", "Tomorrow", then "Thu Oct 22" — counted from the shop's date, not the TV's. Words only, never a colour. */
+function comingWords(iso, todayIso) {
+  if (!iso) return "";
+  var n = Math.round(dayNumber(iso) - dayNumber(todayIso));
+  var p = String(iso).slice(0, 10).split("-");
+  if (n === 0) return "Today";
+  if (n === 1) return "Tomorrow";
+  return DAY[new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).getUTCDay()] + " " + MON[+p[1] - 1] + " " + (+p[2]);
+}
+
+/** The picture as the database sends it: base64 broken into lines every 76 characters (Postgres's encode).
+    A line break inside url(…) makes the browser drop the whole picture, so every break and space comes out. */
+function cleanJpeg(b64) { return String(b64 == null ? "" : b64).replace(/[^A-Za-z0-9+\/=]/g, ""); }
+
 /** What the screen shows, worked out from the database's snapshot. Works with the older snapshot too (no pace, trips or stopped). */
 function tvModel(s) {
   var today = s.today || new Date().toISOString().slice(0, 10);
@@ -297,7 +320,7 @@ function tvModel(s) {
     today: today,
     bands: bands,
     donut: { finished: d.finished, ready: d.ready, waiting: Math.max(d.total - d.finished - d.ready, 0), total: d.total,
-             pct: d.total ? Math.round(d.finished / d.total * 100) : 0 },
+             pct: d.total ? Math.floor(d.finished / d.total * 100) : 0 },   // floor: 100% only when every piece is done
     hasPace: !!pace,
     caption: pace ? weekCaption(commonDays(pace), today) : "",
     rows: live.map(function (l) {
@@ -310,6 +333,9 @@ function tvModel(s) {
     hasTrips: !!s.trips,
     trips: (s.trips || []).map(function (t) { var x = tripText(t, today); x.p = short(t.project_id); x.name = t.job_name; return x; }),
     home: s.home || [],      // the older database sends none: the panel shows its empty words
+    // tv_coming.sql (20 Oct): the next 10 jobs by delivery date. The older database sends none: the department rows show as before.
+    hasComing: Object.prototype.toString.call(s.coming) === "[object Array]",
+    coming: (s.coming || []).map(function (c) { return { p: short(c.project_id), name: c.job_name, when: comingWords(c.delivery_date, today) }; }),
   };
 }
 
@@ -342,7 +368,7 @@ if (typeof document !== "undefined") (function () {
   if (location.hash && window.history && history.replaceState) history.replaceState(null, "", location.pathname);   // keep the secret out of sight on screen
 
   var snap = null, lastOkAt = null, failing = false, busy = false;
-  var pics = {}, picBusy = false, picLog = [];     // in its new home: pictures held by id, one fetch at a time, the hour's fetch times
+  var pics = {}, tall = {}, picBusy = false, picLog = [];     // in its new home: pictures held by id (and which were taken upright), one fetch at a time, the hour's fetch times
 
   // one small picture, the same request supabase-js makes for db.rpc("tv_photo", { p_key, p_photo })
   function fetchPicture(id, done) {
@@ -355,7 +381,7 @@ if (typeof document !== "undefined") (function () {
     x.onload = function () {
       var data = null;
       try { data = JSON.parse(x.responseText); } catch (e) {}
-      if (x.status >= 200 && x.status < 300 && data && data.ok && data.jpeg) done(null, data.jpeg); else done(new Error("HTTP " + x.status));
+      if (x.status >= 200 && x.status < 300 && data && data.ok && data.jpeg) done(null, cleanJpeg(data.jpeg)); else done(new Error("HTTP " + x.status));
     };
     x.onerror = x.ontimeout = function () { done(new Error("no connection")); };
     x.send(JSON.stringify({ p_key: key, p_photo: id }));
@@ -364,13 +390,18 @@ if (typeof document !== "undefined") (function () {
   function fetchPictures() {
     if (picBusy || !snap) return;
     var list = snap.home || [], now = Date.now();
-    homePrune(list, pics);
+    homePrune(list, pics); homePrune(list, tall);
     var id = homeNextFetch(list, pics, now, PICTURE_SECONDS);
     if (!id || !fetchBudgetOk(picLog, now, PICTURE_FETCHES_PER_HOUR)) return;
     picBusy = true; picLog.push(now);
     fetchPicture(id, function (err, jpeg) {
       picBusy = false;
-      if (!err) { pics[id] = jpeg; draw(); fetchPictures(); }
+      if (!err) {
+        pics[id] = jpeg; draw(); fetchPictures();
+        var im = new Image();      // an upright photo is shown whole (contain), a wide one fills the panel (cover)
+        im.onload = function () { if (im.naturalHeight > im.naturalWidth && pics[id]) { tall[id] = true; draw(); } };
+        im.src = "data:image/jpeg;base64," + jpeg;
+      }
       else pics[id] = pics[id] || null;          // a refusal (the picture left the list, or the key is wrong): try no more until the next snapshot
     });
   }
@@ -410,25 +441,17 @@ if (typeof document !== "undefined") (function () {
     if (bands.length > 2) { var turn = Math.floor(Date.now() / 10000); bands = [bands[(turn * 2) % bands.length], bands[(turn * 2 + 1) % bands.length]]; }
     app.className = bands.length ? "b" + Math.min(bands.length, 2) : "";
 
-    var d = m.donut, tot = Math.max(d.total, 1), C = 2 * Math.PI * 86;
-    function seg(v, off, col) { return '<circle cx="110" cy="110" r="86" fill="none" stroke="' + col + '" stroke-width="30" stroke-dasharray="' + (v / tot * C) + ' ' + C + '" stroke-dashoffset="' + (-off) + '" transform="rotate(-90 110 110)"/>'; }
+    var d = m.donut, tot = Math.max(d.total, 1);
 
     app.innerHTML =
       '<div class="head"><span class="brand">Purposeful Design</span><span class="title">Production Floor</span>' +
         (f === "reconnecting" ? '<span class="status" style="margin-left:2.4rem; font-size:2.8rem; color:#F0A721">Reconnecting…</span>' : "") +
         '<span class="clock cond">' + esc(c.t) + '</span><span class="date">' + esc(c.d) + '</span></div>' +
       bands.map(function (b) { return '<div class="band ' + b.cls + '"><b>' + esc(b.label) + '</b><span>' + esc(b.text) + '</span></div>'; }).join("") +
-      '<div class="main">' +
-        '<div class="leftcol"><div class="panel floor"><h2>All work on the floor</h2><div class="floorrow">' +
-          '<div class="donut"><svg viewBox="0 0 220 220" role="img" aria-label="' + d.pct + ' percent finished"><circle cx="110" cy="110" r="86" fill="none" stroke="#39415C" stroke-width="30"/>' +
-            seg(d.ready, d.finished / tot * C, "#ED5E0F") + seg(d.finished, 0, "#00B4B2") + '</svg>' +
-            '<div class="dc"><div class="dn cond">' + d.pct + '<small>%</small></div><div class="dl">finished</div></div></div>' +
-          '<div class="legend"><div><i style="background:#00B4B2"></i>Finished<span class="cond">' + fmt(d.finished) + '</span></div>' +
-            '<div><i style="background:#ED5E0F"></i>Ready to work on<span class="cond">' + fmt(d.ready) + '</span></div>' +
-            '<div><i style="background:#39415C"></i>Not ready yet<span class="cond">' + fmt(d.waiting) + '</span></div></div>' +
-        '</div></div>' +
-        homeHtml(m) +
+      '<div class="main' + (m.hasComing ? '' : ' rows') + '">' +      // an older database (no Coming up yet): the department rows, at their old width
+        '<div class="leftcol">' + homeHtml(m) + floorHtml(d, tot) +
         '</div>' +
+        (m.hasComing ? comingHtml(m) :
         '<div class="panel depts">' +
           (m.rows.length ?
             '<div class="dh"><span class="c-name"></span><span class="c-ready">Pieces ready</span>' +
@@ -445,7 +468,7 @@ if (typeof document !== "undefined") (function () {
               '</div>';
             }).join("")
             : '<p class="empty">No department is live yet. Switch one on in the office: Setup → Departments.</p>') +
-        '</div>' +
+        '</div>') +
       '</div>' +
       (m.hasTrips ? '<div class="panel out"><b>Going out</b><div class="trips" id="trips">' +
         (m.trips.map(function (t) {
@@ -453,6 +476,25 @@ if (typeof document !== "undefined") (function () {
           || '<span class="trip"><span class="p">Nothing scheduled in the next 7 days</span></span>') +
         '</div><span class="more" id="more"></span></div>' : "");
     fit();
+  }
+
+  /** All work on the floor as one bar (20 Oct, in place of the donut): how much is done, and what can be worked on now.
+      Turquoise = done, Purposeful Orange = ready to work on (the TV's one exception), the track = waiting on an earlier step. */
+  function floorHtml(d, tot) {
+    function pc(v) { return (Math.round(v / tot * 10000) / 100) + "%"; }
+    if (!d.total) return '<div class="panel floor"><div class="ft"><h2>All work on the floor</h2></div><div class="bar"></div><div class="fs"><span>Nothing on the floor right now</span></div></div>';
+    return '<div class="panel floor"><div class="ft"><h2>All work on the floor</h2><span class="pct cond">' + d.pct + '%<small>done</small></span></div>' +
+      '<div class="bar" role="img" aria-label="' + d.pct + ' percent done"><i class="done" style="left:0;width:' + pc(d.finished) + ';background:#00B4B2"></i>' +
+        '<i class="ready" style="left:' + pc(d.finished) + ';width:' + pc(d.ready) + ';background:#ED5E0F"></i></div>' +
+      '<div class="fs">' + fmt(d.ready) + (d.ready === 1 ? ' piece' : ' pieces') + ' ready to work on now <span>· ' + fmt(d.waiting) + ' waiting on an earlier step</span></div></div>';
+  }
+
+  /** Coming up: the next 10 jobs by Monday's delivery date, words only. */
+  function comingHtml(m) {
+    return '<div class="panel coming"><div class="ch"><h2>Coming up</h2><span>Next ' + (m.coming.length > 1 ? m.coming.length + ' jobs' : 'job') + ' by delivery date</span></div>' +
+      (m.coming.length ? m.coming.map(function (c) {
+        return '<div class="crow"><span class="cw">' + esc(c.when) + '</span><span class="cp cond">' + esc(c.p) + '</span><span class="cn">' + esc(c.name) + '</span></div>';
+      }).join("") : '<p class="empty">No job on the floor has a delivery date in Monday from today on.</p>') + '</div>';
   }
 
   /** In its new home: the picture showing now, or why there isn't one. */
@@ -466,7 +508,7 @@ if (typeof document !== "undefined") (function () {
       body = '<div class="waiting">Loading a picture…</div>';
       cap = '<div class="l1"><span class="p cond">' + esc(short(h.item.project_id)) + '</span><span class="w">' + esc(deliveredWords(h.item.delivered_on, m.today)) + '</span></div>';
     } else {
-      body = '<div class="img" role="img" aria-label="A table delivered on ' + esc(h.item.project_id) + '" style="background-image:url(data:image/jpeg;base64,' + pics[h.item.id] + ')"></div>';
+      body = '<div class="img' + (tall[h.item.id] ? ' tall' : '') + '" role="img" aria-label="A table delivered on ' + esc(h.item.project_id) + '" style="background-image:url(data:image/jpeg;base64,' + pics[h.item.id] + ')"></div>';
       cap = '<div class="l1"><span class="p cond">' + esc(short(h.item.project_id)) + '</span><span class="w">' + esc(deliveredWords(h.item.delivered_on, m.today)) + '</span></div>' +
             '<div class="l2"><span>' + (h.item.tables ? h.item.tables + (h.item.tables === 1 ? ' table delivered' : ' tables delivered') : '') + '</span>' +
             '<span class="n">' + (h.index + 1) + ' of ' + m.home.length + '</span></div>';
@@ -532,7 +574,8 @@ if (typeof document !== "undefined") (function () {
 /* lets the core be tested outside a browser */
 if (typeof module !== "undefined") module.exports = { keyProblem: keyProblem, tvKey: tvKey, tvModel: tvModel, freshness: freshness,
   whenWords: whenWords, weekCaption: weekCaption, barWidth: barWidth, tripText: tripText, TV_VERSION: TV_VERSION,
-  deliveredWords: deliveredWords, homePick: homePick, homeNextFetch: homeNextFetch, homePrune: homePrune, fetchBudgetOk: fetchBudgetOk };
+  deliveredWords: deliveredWords, homePick: homePick, homeNextFetch: homeNextFetch, homePrune: homePrune, fetchBudgetOk: fetchBudgetOk,
+  comingWords: comingWords, cleanJpeg: cleanJpeg };
 </script>
 </body>
 </html>
