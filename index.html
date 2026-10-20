@@ -461,7 +461,7 @@ const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 // This page's version. Change it with every edit (date, then .1, .2 … for more than one that day).
 // Each device reports it when it opens; see  select * from devices();  in the SQL Editor.
-const PAGE_VERSION = "2026-10-16.3";
+const PAGE_VERSION = "2026-10-20.2";
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -504,7 +504,8 @@ function keyProblem(url, key) {
 function departmentsFor(me) {
   if (!me) return [];
   if (me.role === "manager" || me.role === "admin") return DEPTS.map(d => d[0]);
-  return DEPTS.map(d => d[0]).filter(k => (me.departments || []).includes(k));
+  // 20 Oct (look_only.sql): plus departments this login can look at but not change
+  return DEPTS.map(d => d[0]).filter(k => (me.departments || []).includes(k) || (!LOG_ONLY.includes(k) && (me.look || []).includes(k)));
 }
 const isLogOnly = (dept) => LOG_ONLY.includes(dept);
 /** The areas a department's tablet has. */
@@ -983,6 +984,10 @@ const CHAIN = ["milling", "cnc", "sanding", "finishing", "assembly_qc"];
 const DEPT_ORDER = DEPTS.map(d => d[0]);
 
 /** Who gets the Advance tab: managers, and the Test Supervisor (test jobs only — the database enforces both). */
+/** Managers only (not the Test Supervisor): the way back to the office page (20 Oct). */
+function isManager(me) {
+  return !!me && (me.role === "manager" || me.role === "admin");
+}
 function canAdvance(me) {
   return !!me && (me.role === "manager" || me.role === "admin" || !!me.is_test);
 }
@@ -1502,21 +1507,28 @@ if (typeof document !== "undefined") (function () {
   /** The department being counted: Metal paint on Finishing's Metal to paint tab, otherwise the tablet's department. */
   function wd() { return S.tab === "paint" && S.dept === "finishing" ? "metal_paint" : S.dept; }
   const onCountTab = () => S.tab === "work" || S.tab === "paint";
-  function tabs() { return tabsWithInventory(S.dept, S.me && S.me.is_test ? [] : S.invLists); }
+  function tabs() {
+    if (lookOnly(S.dept)) return ["work", ...(PAST_DEPTS.includes(S.dept) ? ["past"] : [])];
+    return tabsWithInventory(S.dept, S.me && S.me.is_test ? [] : S.invLists);
+  }
   function myDepts() { return S.depts; }
   const owns = (d) => S.me && (S.me.role === "manager" || S.me.role === "admin" || (S.me.departments || []).includes(d));
+  /** 20 Oct: a department this login can look at but not change (look_only.sql): Work orders and Recently completed, no buttons. */
+  const lookOnly = (d) => !!S.me && !owns(d) && !LOG_ONLY.includes(d) && (S.me.look || []).includes(d);
+  const firstDept = () => S.depts.find(k => owns(k)) || S.depts[0] || null;
 
   // ---------- data ----------
   async function loadMe(user) {
     const { data, error } = await db.from("profiles").select("*").eq("id", user.id).maybeSingle();
     if (error && !isNetworkError(error)) throw error;
-    const me = data ? { id: user.id, email: user.email, name: data.full_name, role: data.role, departments: data.departments || [], is_test: !!data.is_test }
+    const me = data ? { id: user.id, email: user.email, name: data.full_name, role: data.role, departments: data.departments || [], is_test: !!data.is_test,
+                       look: Array.isArray(data.look_departments) ? data.look_departments : [] }
                     : store.get("me", null);
     if (!me) return null;
     store.set("me", me);
     S.me = me;
     S.depts = departmentsFor(me);
-    if (!S.depts.includes(S.dept)) S.dept = S.depts[0] || null;
+    if (!S.depts.includes(S.dept)) S.dept = firstDept();
     if (!tabs().includes(S.tab)) S.tab = tabs()[0];
     if (!canAdvance(me)) S.adv = false;
     return me;
@@ -2061,6 +2073,8 @@ if (typeof document !== "undefined") (function () {
         ${S.depts.map(k => `<button class="dmitem" data-dept="${k}" aria-current="${k === S.dept && !S.adv}">${esc(DEPT_NAME[k])}${isLogOnly(k) ? `<small>log only</small>` : ""}</button>`).join("")}
         <div class="dmline"></div>
         <button class="dmitem adv" data-adv="1" aria-current="${!!S.adv}">Advance<small>set counts by hand</small></button>
+        ${isManager(S.me) ? `<div class="dmline"></div>
+        <button class="dmitem" data-gooffice="1">Back to the office</button>` : ""}
       </nav>`;
   }
 
@@ -2208,7 +2222,7 @@ if (typeof document !== "undefined") (function () {
     const fb = dateLine(j, done >= total);
     const when = fb ? [fb.main + (fb.when ? " · " + fb.when : ""), `${done} of ${total} pieces done`, fb.delivery].filter(Boolean).join(" · ")
                     : `due ${fmtDate(j.delivery_date)} · ${done} of ${total} pieces done`;
-    const unsent = list.filter(toSend);
+    const unsent = lookOnly(S.dept) ? [] : list.filter(toSend);
     return `<div class="head"><button class="back" data-back="queue">← ${esc(DEPT_NAME[wd()])}</button>
       <h1>${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</h1>
       <span class="hsub${fb ? " wrap" : ""}">${esc(j.job_name)} · ${esc(when)}</span></div>
@@ -2252,23 +2266,25 @@ if (typeof document !== "undefined") (function () {
       ${r.not_needed ? `<div class="band watch">Not needed here — Full Custom sent this cabinet straight to Finishing.</div>` : ""}
       ${(() => { const rd = HAS_UPSTREAM.includes(wd()) && !full ? readyOf(r) : null;
                  return rd === null ? "" : `<div class="band watch">${rd > 0 ? `${rd} piece${rd === 1 ? "" : "s"} ready from the stage before` : esc(waitingText(r, S.arrow))}</div>`; })()}
-      <div class="counter">
+      ${lookOnly(S.dept) ? `<div class="counter"><div class="count-row">
+          <div class="readout"><div class="n num">${r.qty_done}</div><div class="l">of ${r.qty_required} done<small>${esc(DEPT_NAME[wd()])}</small></div></div>
+          ${full ? `<div class="complete">Sheet complete</div>` : ""}</div></div>` : `<div class="counter">
         <div class="count-row">
           <button class="step" data-step="-1" ${r.qty_done <= 0 ? "disabled" : ""} aria-label="One fewer">−</button>
           <div class="readout"><div class="n num">${r.qty_done}</div><div class="l">of ${r.qty_required} done<small>${esc(DEPT_NAME[wd()])}</small></div></div>
           <button class="step" data-step="1" ${full ? "disabled" : ""} aria-label="One more">+</button>
           ${full ? `<div class="complete">Sheet complete</div>` : `<button class="all" data-all="${r.qty_required}">Mark all ${r.qty_required} done</button>`}
         </div>
-      </div>
-      ${sendBlock(r)}
+      </div>`}
+      ${lookOnly(S.dept) ? "" : sendBlock(r)}
       <div class="page" id="page">${r.png_path && r.pages_ready ? `<div class="missing">Loading the page…</div>` : `<div class="missing">This sheet's page hasn't been uploaded yet.</div>`}</div>
       <div class="actions">
         <button data-print="1" ${r.png_path && r.pages_ready ? "" : "disabled"}>Print this sheet</button>
         <button data-pdf="1" ${r.pdf_path && r.pages_ready ? "" : "disabled"}>Open the PDF</button>
       </div>
-      <div class="actions">
+      ${lookOnly(S.dept) ? "" : `<div class="actions">
         <button data-report="here">Report a defect or issue</button>
-      </div>
+      </div>`}
       ${pager}
       ${pieceSection(r)}`;
   }
@@ -2333,13 +2349,13 @@ if (typeof document !== "undefined") (function () {
       ${pager}
       <div class="complete">Sheet complete · ${r.qty_done} of ${r.qty_required} · ${esc(DEPT_NAME[S.dept])}</div>
       <p class="sub" style="margin:8px 2px 12px">Finished work, to look back at. Counts can't be changed here.</p>
-      ${sendBlock(r)}
+      ${lookOnly(S.dept) ? "" : sendBlock(r)}
       <div class="page" id="page">${r.png_path && r.pages_ready ? `<div class="missing">Loading the page…</div>` : `<div class="missing">This sheet's page hasn't been uploaded yet.</div>`}</div>
       <div class="actions">
         <button data-print="1" ${r.png_path && r.pages_ready ? "" : "disabled"}>Print this sheet</button>
         <button data-pdf="1" ${r.pdf_path && r.pages_ready ? "" : "disabled"}>Open the PDF</button>
       </div>
-      <div class="actions"><button data-report="here">Report a defect or issue</button></div>
+      ${lookOnly(S.dept) ? "" : `<div class="actions"><button data-report="here">Report a defect or issue</button></div>`}
       ${pager}
       ${pieceSection(r)}`;
   }
@@ -3461,6 +3477,7 @@ if (typeof document !== "undefined") (function () {
   }
 
   function setCount(r, qty) {
+    if (lookOnly(r.department)) return;
     qty = Math.max(0, Math.min(r.qty_required, qty));
     S.outbox = setPending(S.outbox, r.progress_id, qty, `${r.project_id} sheet ${r.sheet_number} · ${DEPT_NAME[r.department] || DEPT_NAME[S.dept] || ""}: ${qty} of ${r.qty_required} done`);
     store.set("outbox", S.outbox);
@@ -3647,6 +3664,12 @@ if (typeof document !== "undefined") (function () {
       S.modal = { kind: "confirm", title: "Dismiss this?", text: "It's taken off this device and won't be sent. If it still matters, enter it again or tell the office.", yes: "Dismiss it",
                   run: () => dismissFailed(b.dataset.faildismiss) };
       render();
+    });
+    // 20 Oct: managers came here from the office's ☰ → Tablet app and had no way back. Anything waiting stays on this device.
+    on("[data-gooffice]", () => {
+      const waiting = Object.keys(S.outbox).length + Object.keys(S.logbox).length + S.pending.length;
+      if (waiting && !confirm("Some counts, entries or photos haven't sent yet. They stay on this device and send the next time the tablet app is opened here. Go to the office anyway?")) return;
+      location.href = "office.html";
     });
     on("[data-signout]", async () => {
       const waiting = Object.keys(S.outbox).length + Object.keys(S.logbox).length + S.pending.length + S.failed.length + S.failedPh.length;
@@ -4190,7 +4213,7 @@ if (typeof document !== "undefined") (function () {
   db.auth.getSession().then(({ data }) => {
     if (data.session) return start(data.session.user);
     const me = store.get("me", null);             // offline, but signed in before
-    if (me && !navigator.onLine) { S.me = me; S.depts = departmentsFor(me); if (!S.depts.includes(S.dept)) S.dept = S.depts[0]; start({ id: me.id, email: me.email }); return; }
+    if (me && !navigator.onLine) { S.me = me; S.depts = departmentsFor(me); if (!S.depts.includes(S.dept)) S.dept = firstDept(); start({ id: me.id, email: me.email }); return; }
     signIn();
   });
 })();
