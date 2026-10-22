@@ -1,5 +1,5 @@
 -- =====================================================================
--- direct_counts_off.sql — the old direct count route is closed (21 Oct 2026)
+-- direct_counts_off.sql — the old direct count route is closed (21 Oct 2026; 22 Oct: verify_setup picks a real supervisor)
 --
 -- Finishes review finding R-4. Since 6 Oct every tablet page sends counts
 -- through set_count(), which finds the current work order itself. The
@@ -12,7 +12,9 @@
 -- Four checks wrote or expected that direct route, so this file carries
 -- them whole, rewritten (it is their one current copy now; the files they
 -- came from stop if run again):
---   verify_setup()        (verify_setup.sql)  step 3 counts through set_count()
+--   verify_setup()        (verify_setup.sql)  step 3 counts through set_count(); picks a real
+--                         Sanding supervisor in a fixed order (22 Oct: on the live database the
+--                         arbitrary first row had become the Test Supervisor)
 --   check_test_lane()     (test_lane.sql)     steps 3 and 9 count through set_count()
 --   check_counts_safety() (counts_safety.sql) step 6 expects the direct route refused
 --   check_tv_photos()     (tv_photos.sql)     looks only at its own practice jobs; since
@@ -86,8 +88,8 @@ begin
 
   -- 1. people ---------------------------------------------------------
   select id into sup from profiles
-   where role = 'supervisor' and 'sanding' = any(departments) and active
-   limit 1;
+   where role = 'supervisor' and 'sanding' = any(departments) and active and not is_test   -- 22 Oct: a real login, in a fixed order; the Test Supervisor owns every department and counts only on test jobs
+   order by full_name limit 1;
   step := 1; check_name := 'A sanding supervisor account exists';
   if sup is null then
     result := 'FAIL';
@@ -97,7 +99,7 @@ begin
   end if;
   result := 'PASS'; if_it_failed := null; return next;
 
-  select id into mgr from profiles where role in ('manager','admin') and active limit 1;
+  select id into mgr from profiles where role in ('manager','admin') and active and not is_test order by full_name limit 1;
   step := 2; check_name := 'A manager account exists';
   result := case when mgr is null then 'FAIL' else 'PASS' end;
   if_it_failed := case when mgr is null then 'Add your own profile as manager (walkthrough step 8).' end;
