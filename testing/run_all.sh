@@ -104,6 +104,7 @@ run test_office_sections   seed  OUT=$P $PW -- node test_office_sections.js
 run test_office_link       seed  PAGE=$PAGE $PW -- node test_office_link.js
 run test_auto_update       seed  PAGE=$PAGE ROOT=$P $PW -- node test_auto_update.js
 run test_sw_assets         none  SW=$P/sw.js $PW -- node test_sw_assets.js
+run test_drawing_pictures  seed  PAGE=$PAGE $PW -- node test_drawing_pictures.js
 fi
 if in_group browser2; then
 run test_pdf_chromium      seed  $PW -- node test_pdf_chromium.js
