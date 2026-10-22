@@ -160,6 +160,20 @@
   .sheet .cnt{font-size:28px; font-weight:700; white-space:nowrap}
   .sheet.done{background:var(--teal-bg); border-color:transparent}
   .sheet.done .no,.sheet.done .cnt{color:var(--teal-ink)}
+  /* 22 Oct: each sheet's drawing, cut from its own work order page (the LINE DRAWING window), beside the count */
+  .snip{display:block; flex:0 0 auto; width:136px; aspect-ratio:268/195; background:#fff center/100% 100% no-repeat;
+        border:1px solid var(--line); border-radius:8px}
+  .snip.none{background:none; border-color:transparent}
+  @media (max-width:560px){ .sheet .snip{width:96px} }
+  .li-top .jn{color:var(--ink2)}
+  .arpics{display:flex; flex-wrap:wrap; gap:12px 28px; margin-top:12px}
+  .arpic{display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; background:none; border:none; padding:0; text-align:left; color:inherit; font:inherit}
+  .arpic .snip{width:min(236px, 50vw); border-color:var(--gray)}
+  .arlab{display:flex; flex-direction:column; gap:2px; font-size:15px; color:var(--ink2)}
+  .arlab b{color:var(--midnight); font-size:16px}
+  .arlab .n{font-size:40px; font-weight:700; line-height:1; color:var(--midnight); margin-top:6px}
+  .arlab .n small{font-family:'Barlow',sans-serif; font-size:15px; font-weight:600; color:var(--ink2); margin-left:2px}
+  .rowbtns .arwo{margin-left:auto}
 
   /* sheet */
   .pager{display:flex; gap:10px; margin:0 0 10px}
@@ -488,7 +502,7 @@ const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 // This page's version. Change it with every edit (date, then .1, .2 … for more than one that day).
 // Each device reports it when it opens; see  select * from devices();  in the SQL Editor.
-const PAGE_VERSION = "2026-10-20.4";
+const PAGE_VERSION = "2026-10-22.1";
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -1261,6 +1275,17 @@ function sizeLabel(s) {
   if (!size && !h) return null;
   return [size, h ? `${h} H` : null].filter(Boolean).join(" · ");
 }
+/* ---- Drawing pictures (22 Oct): each sheet's LINE DRAWING window, cut from its own work order page ----
+   The generator fits every drawing into the same place on the sheet: 268 × 195 pt at (483, 136) on the 792 × 612 pt
+   page (measured on PROJ-00099, all nine sheets). Kept as fractions, so any page size or resolution works. If the
+   generator's sheet ever moves the drawing box, these four numbers are the only thing to change. */
+const SNIP = { x: 483 / 792, y: 136 / 612, w: 268 / 792, h: 195 / 612 };
+const SNIP_PX = 480;                       // the cut-out's width in pixels: sharp at the Arrow tab's size, small to keep
+/** The window on a page of w × h pixels, in whole pixels, kept inside the page. */
+function snipRect(w, h) {
+  const x = Math.round(SNIP.x * w), y = Math.round(SNIP.y * h);
+  return { x, y, w: Math.max(1, Math.min(w - x, Math.round(SNIP.w * w))), h: Math.max(1, Math.min(h - y, Math.round(SNIP.h * h))) };
+}
 /** A load-out, table by table: every sheet's tables (photographed here, waiting to send, or gone on an earlier truck),
  *  the pallets photographed, and what's still missing. Tables are "sheet:table", e.g. "4:2". */
 function loadoutPieces(sheets, lo, pending = [], planned = 1) {
@@ -1399,7 +1424,7 @@ if (typeof document !== "undefined") (function () {
     // the log side
     flags: store.get("flags", []), tasks: store.get("tasks", []), types: store.get("types", []),
     problems: [], probScope: "mine", defects: [], supplies: [], arrow: [], pickJobs: store.get("pickjobs", []),
-    pickSheets: {}, piece: {}, qcJob: null, qcEntries: [], arrowForm: null, supplyForm: { item: "", qty: 1, note: "", pick: null, picked: {} }, supplyItems: [],
+    pickSheets: {}, piece: {}, qcJob: null, qcEntries: [], arrowForm: null, arWo: null, supplyForm: { item: "", qty: 1, note: "", pick: null, picked: {} }, supplyItems: [],
     openTask: null, modal: null, toast: null, missing: {},
     invLists: store.get("invlists", []), invItems: [], invDrafts: store.get("invdrafts", {}),
     // photos and load-outs
@@ -1813,6 +1838,12 @@ if (typeof document !== "undefined") (function () {
   async function loadArrow() {
     const d = await read("arrow", db.from("v_outside_jobs").select("*").eq("voided", false), "arrow");
     if (d) S.arrow = d;
+    if (S.tab === "arrow") await loadArrowSheets();
+  }
+  // 22 Oct: each job with something waiting for Arrow or at Arrow, its current sheets, for the pictures (kept for no signal)
+  async function loadArrowSheets() {
+    const jobs = [...new Set([...arrowWaiting(S.arrow), ...arrowOut(S.arrow)].filter(a => (a.sheet_numbers || []).length).map(a => a.job_id))];
+    await Promise.all(jobs.map(j => loadLoSheets(j)));
   }
   async function loadQc(jobId) {
     const d = await read("qc", db.from("v_qc_entries").select("*").eq("job_id", jobId), null);
@@ -2030,6 +2061,61 @@ if (typeof document !== "undefined") (function () {
     const url = URL.createObjectURL(blob);
     pageUrls.set(path, url);
     return url;
+  }
+
+  // ---------- drawing pictures (22 Oct): cut once from the page this device keeps, then kept beside it ----------
+  const snipUrls = new Map(), snipFailed = new Map();          // page path -> picture; page path -> when it last couldn't be made
+  let snipBusy = false;
+  async function snipImage(path) {
+    if (snipUrls.has(path)) return snipUrls.get(path);
+    const key = "caches" in window ? new Request(location.origin + "/__sheet-snips__/" + encodeURIComponent(path)) : null;
+    const cache = key ? await caches.open("sheet-pages-v1") : null;
+    const hit = cache ? await cache.match(key) : null;
+    let blob = hit ? await hit.blob() : null;
+    if (!blob) {
+      const img = new Image();
+      img.src = await pageImage(path);                         // the page itself: saved here already, or fetched once
+      await img.decode();
+      const r = snipRect(img.naturalWidth, img.naturalHeight);
+      const c = document.createElement("canvas");
+      c.width = SNIP_PX; c.height = Math.round(SNIP_PX * r.h / r.w);
+      const g = c.getContext("2d");
+      g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+      g.imageSmoothingQuality = "high";
+      g.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, c.width, c.height);
+      blob = await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error("The picture couldn't be made.")), "image/png"));
+      if (cache) await cache.put(key, new Response(blob, { headers: { "Content-Type": "image/png" } }));
+    }
+    const url = URL.createObjectURL(blob);
+    snipUrls.set(path, url);
+    return url;
+  }
+  /** A sheet's picture: ready, or an empty frame fillSnips() fills in. Nothing for a sheet whose page isn't uploaded. */
+  function snipHtml(path, ready) {
+    if (!path || !ready) return "";
+    const url = snipUrls.get(path), failed = Date.now() - (snipFailed.get(path) || 0) < 60000;
+    return `<span class="snip${!url && failed ? " none" : ""}" data-snip="${esc(path)}" aria-hidden="true"${url ? ` style="background-image:url('${url}')"` : ""}></span>`;
+  }
+  /** Fills the empty frames on screen, one page at a time. One that can't be made now (no signal and never saved here)
+   *  stays blank and is tried again a minute later; nothing else on the screen waits for it. */
+  async function fillSnips() {
+    if (snipBusy) return;
+    snipBusy = true;
+    try {
+      for (;;) {
+        const el = [...app.querySelectorAll("[data-snip]")].find(e => !e.style.backgroundImage && !e.classList.contains("none"));
+        if (!el) break;
+        const path = el.dataset.snip, all = () => [...app.querySelectorAll("[data-snip]")].filter(e => e.dataset.snip === path);
+        try {
+          const url = await snipImage(path);
+          snipFailed.delete(path);
+          all().forEach(e => { e.style.backgroundImage = `url('${url}')`; e.classList.remove("none"); });
+        } catch (e) {
+          snipFailed.set(path, Date.now());
+          all().forEach(e => e.classList.add("none"));
+        }
+      }
+    } finally { snipBusy = false; }
   }
 
   let prefetching = false;
@@ -2286,7 +2372,7 @@ if (typeof document !== "undefined") (function () {
         return `<button class="sheet${full ? " done" : ""}" data-sheet="${esc(r.progress_id)}">
           <span class="no num">${r.sheet_number}</span>
           <span class="meta"><span class="code">${esc(r.item_code || "Sheet " + r.sheet_number)}</span>
-            <span class="desc">${esc([r.species, r.shape, size].filter(Boolean).join(" · "))}</span>${status}</span>
+            <span class="desc">${esc([r.species, r.shape, size].filter(Boolean).join(" · "))}</span>${status}</span>${snipHtml(r.png_path, r.pages_ready)}
           <span class="cnt num">${r.qty_done} / ${r.qty_required}</span></button>`;
       }).join("")}`;
   }
@@ -2375,7 +2461,7 @@ if (typeof document !== "undefined") (function () {
         return `<button class="sheet done" data-sheet="${esc(r.progress_id)}">
           <span class="no num">${r.sheet_number}</span>
           <span class="meta"><span class="code">${esc(r.item_code || "Sheet " + r.sheet_number)}</span>
-            <span class="desc">${esc([r.species, r.shape, size].filter(Boolean).join(" · "))}</span>${r.send ? `<span class="why">Sent ${esc(routeWords(r.send.route))}</span>` : ""}</span>
+            <span class="desc">${esc([r.species, r.shape, size].filter(Boolean).join(" · "))}</span>${r.send ? `<span class="why">Sent ${esc(routeWords(r.send.route))}</span>` : ""}</span>${snipHtml(r.png_path, r.pages_ready)}
           <span class="cnt num">${r.qty_done} / ${r.qty_required}</span></button>`;
       }).join("")}`;
   }
@@ -2526,6 +2612,72 @@ if (typeof document !== "undefined") (function () {
           : opts.allowNone ? "No work order uploaded — this logs against the whole job." : "No sheets."}</span>` : ""}</div>`;
   }
 
+  // ---------- Arrow items as pictures (22 Oct): each sheet sent, as its drawing, its size and how many tables ----------
+  /** The item's sheets from the job's current work order (Delivery's view of a job's sheets); a sheet not found there is null. */
+  function arrowSheets(a) {
+    const all = S.loSheets[a.job_id];
+    return (a.sheet_numbers || []).map(n => ({ n, s: (all || []).find(x => x.sheet_number === n) || null }));
+  }
+  const arrowPics = (a) => arrowSheets(a).filter(x => x.s && x.s.png_path && x.s.pages_ready).map(x => x.s);
+  const arrowJobName = (a) => a.job_name ? `<span class="jn">${esc(a.job_name)}</span>` : "";
+  /** What went: a picture for each sheet with a page; sheets without one, and the typed words, as words, as before. */
+  function arrowSent(a) {
+    const pics = arrowPics(a), rest = arrowSheets(a).filter(x => !pics.includes(x.s)).map(x => x.n);
+    const words = [sheetsText(rest), a.description].filter(Boolean).join(" — ");
+    return (pics.length ? `<div class="arpics">${pics.map(s => `<button class="arpic" data-arwo="${esc(a.id)}" data-arwosheet="${s.sheet_number}">
+        ${snipHtml(s.png_path, s.pages_ready)}<span class="arlab"><b>Sheet ${s.sheet_number}${s.item_code ? ` · ${esc(s.item_code)}` : ""}</b>
+          ${sizeLabel(s) ? `<span>${esc(sizeLabel(s))}</span>` : ""}
+          <span class="n num">× ${s.qty} <small>table${s.qty === 1 ? "" : "s"}</small></span></span></button>`).join("")}</div>` : "")
+      + (words ? `<div${pics.length ? ` style="margin-top:8px"` : ""}>${esc(words)}</div>` : "");
+  }
+  const arrowWoButton = (a) => { const n = arrowPics(a).length;
+    return n ? `<button class="arwo" data-arwo="${esc(a.id)}">Work order${n > 1 ? ` · ${n} sheets` : ""}</button>` : ""; };
+  /** An Arrow item's work order: its sheets' pages, read-only, like Delivery's viewer. */
+  function arrowWoScreen() {
+    const a = S.arrow.find(x => x.id === S.arWo.id), list = a ? arrowPics(a) : [];
+    const i = list.findIndex(x => x.sheet_number === S.arWo.sheet), s = list[i];
+    if (!s) { S.arWo = null; return subTabs() + arrowSection(); }
+    const m = list.length, prev = list[i - 1], next = list[i + 1];
+    return `<button class="back" data-arwoback="1">← Arrow</button>
+      <h1>Work order</h1>
+      <p class="sub">${a.is_test ? "TEST " : ""}${esc(a.project_id)}${a.job_name ? ` · ${esc(a.job_name)}` : ""} · Sheet ${s.sheet_number}${s.item_code ? ` · ${esc(s.item_code)}` : ""}${sizeLabel(s) ? ` · ${esc(sizeLabel(s))}` : ""} · ${s.qty} table${s.qty === 1 ? "" : "s"}</p>
+      ${m > 1 ? `<div class="wopick">${list.map(x => `<button data-arwogo="${x.sheet_number}" aria-pressed="${x.sheet_number === s.sheet_number}" aria-label="Sheet ${x.sheet_number}">${x.sheet_number}</button>`).join("")}</div>` : ""}
+      <div class="lopage" id="arpage"><div class="missing">Loading the page…</div></div>
+      ${m > 1 ? `<div class="wonav"><button class="lowo" data-arwogo="${prev ? prev.sheet_number : ""}" ${prev ? "" : `style="visibility:hidden" tabindex="-1"`}>‹ Sheet ${prev ? prev.sheet_number : ""}</button>
+        <button class="lowo" data-arwogo="${next ? next.sheet_number : ""}" ${next ? "" : `style="visibility:hidden" tabindex="-1"`}>Sheet ${next ? next.sheet_number : ""} ›</button></div>` : ""}
+      <p class="meta2" style="text-align:center">Pinch to zoom.${m > 1 ? " Swipe left or right for the next sheet." : ""}</p>`;
+  }
+  async function showArPage() {
+    const a = S.arWo && S.arrow.find(x => x.id === S.arWo.id), el = document.getElementById("arpage");
+    const s = a && arrowPics(a).find(x => x.sheet_number === S.arWo.sheet);
+    if (!s || !el) return;
+    try {
+      const url = await pageImage(s.png_path);
+      const now = document.getElementById("arpage"); if (!now || !S.arWo || S.arWo.sheet !== s.sheet_number) return;
+      now.innerHTML = `<img alt="Work order ${esc(a.project_id)} sheet ${s.sheet_number}" src="${url}">`;
+    } catch (e) {
+      el.innerHTML = `<div class="missing">${esc(isNetworkError(e) ? "No connection, and this page wasn't saved on this device before. It will show once the connection is back." : friendlyError(e))}</div>`;
+    }
+  }
+  // swipe between the item's sheets, one finger, only when the page isn't zoomed in (as on Delivery's viewer)
+  function initArSwipe() {
+    const el = document.getElementById("arpage");
+    if (!el || !S.arWo || el.dataset.swipe) return;
+    el.dataset.swipe = "1";
+    let st = null;
+    el.addEventListener("touchstart", (e) => { st = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null; }, { passive: true });
+    el.addEventListener("touchmove", (e) => { if (e.touches.length > 1) st = null; }, { passive: true });
+    el.addEventListener("touchend", (e) => {
+      if (!st || e.changedTouches.length !== 1) { st = null; return; }
+      const dx = e.changedTouches[0].clientX - st.x, dy = e.changedTouches[0].clientY - st.y; st = null;
+      if (window.visualViewport && window.visualViewport.scale > 1.05) return;
+      if (Math.abs(dx) < 60 || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
+      const a = S.arWo && S.arrow.find(x => x.id === S.arWo.id); if (!a) return;
+      const list = arrowPics(a), i = list.findIndex(x => x.sheet_number === S.arWo.sheet), to = list[i + (dx < 0 ? 1 : -1)];
+      if (to) { S.arWo = { ...S.arWo, sheet: to.sheet_number }; render(); }
+    }, { passive: true });
+  }
+
   function arrowSection() {
     const f = S.arrowForm;
     const out = arrowOut(S.arrow).sort((a, b) => b.days_out - a.days_out);
@@ -2550,19 +2702,19 @@ if (typeof document !== "undefined") (function () {
     const pickup = wait.length ? `<h2 class="sec" style="margin-top:4px">Waiting to go to Arrow</h2>
       <p class="sub" style="margin:0 2px 10px">Done by Metal, not taken over yet. Tap Gone to Arrow when it leaves.</p>
       ${wait.map(a => `<div class="li"><div class="li-top"><b>${a.is_test ? `<span class="tag">TEST</span>` : ""}${esc(a.project_id)}</b>
-          <span class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent on ${esc(fmtDate(a.queued_on || a.sent_on))} by ${esc(a.queued_by_name || a.sent_by_name)}</span>
+          ${arrowJobName(a)}<span class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent on ${esc(fmtDate(a.queued_on || a.sent_on))} by ${esc(a.queued_by_name || a.sent_by_name)}</span>
           <span class="st">${a.days_out ? `waiting ${a.days_out} day${a.days_out === 1 ? "" : "s"}` : "since today"}</span></div>
-        <div>${esc(what(a))}</div>
-        <div class="rowbtns"><button class="go" data-argone="${esc(a.id)}">Gone to Arrow</button></div></div>`).join("")}
+        ${arrowSent(a)}
+        <div class="rowbtns"><button class="go" data-argone="${esc(a.id)}">Gone to Arrow</button>${arrowWoButton(a)}</div></div>`).join("")}
       ${wait.length > 1 ? `<button class="btn wide" style="margin:4px 0 8px" data-argoneall="1">All ${wait.length} gone to Arrow</button>` : ""}` : "";
     return `${missingNote("arrow")}${pickup}${form}
       <h2 class="sec">At Arrow now</h2>
       ${out.length ? out.map(a => `<div class="li"><div class="li-top"><b>${a.is_test ? `<span class="tag">TEST</span>` : ""}${esc(a.project_id)}</b>
-          <span class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent ${esc(fmtDate(a.sent_on))} by ${esc(a.sent_by_name)}${a.gone_by_name ? ` · taken by ${esc(a.gone_by_name)}` : ""}</span>
+          ${arrowJobName(a)}<span class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent ${esc(fmtDate(a.sent_on))} by ${esc(a.sent_by_name)}${a.gone_by_name ? ` · taken by ${esc(a.gone_by_name)}` : ""}</span>
           <span class="st">${a.days_out} day${a.days_out === 1 ? "" : "s"} out</span></div>
-        <div>${esc(what(a))}</div>
+        ${arrowSent(a)}
         <div class="rowbtns"><button data-arreturn="${esc(a.id)}">Mark returned</button>
-          ${owns(a.department) ? `<button data-arvoid="${esc(a.id)}">Entered by mistake</button>` : ""}</div></div>`).join("")
+          ${owns(a.department) ? `<button data-arvoid="${esc(a.id)}">Entered by mistake</button>` : ""}${arrowWoButton(a)}</div></div>`).join("")
         : `<div class="empty">Nothing at Arrow right now.</div>`}
       ${back.length ? `<h2 class="sec">Returned — last three months</h2>` + back.map(a => `<div class="li">
           <div class="li-top"><b>${esc(a.project_id)}</b><span class="meta2">${esc(fmtDate(a.sent_on))} → ${esc(fmtDate(a.returned_on))} · ${a.days_out} day${a.days_out === 1 ? "" : "s"}${a.returned_by_name ? ` · back by ${esc(a.returned_by_name)}` : ""}</span></div>
@@ -3486,12 +3638,13 @@ if (typeof document !== "undefined") (function () {
     else if (onCountTab() && S.view.screen === "job") body = jobScreen();
     else if (S.tab === "past" && S.view.screen === "sheet") body = pastSheetScreen();
     else if (S.tab === "past" && S.view.screen === "job") body = pastJobScreen();
+    else if (S.tab === "arrow" && S.arWo) body = arrowWoScreen();
     else {
       const top = S.tab === "issues" ? issuesScreen() : S.tab === "tasks" ? tasksScreen() : S.tab === "qc" ? qcScreen() : S.tab === "arrow" ? arrowSection() : S.tab === "supplies" ? suppliesScreen() : S.tab === "inventory" ? inventoryScreen()
                 : S.tab === "loadout" ? loadoutScreen() : S.tab === "past" ? pastScreen() : queueScreen();
       body = subTabs() + top;
     }
-    const topLevel = S.adv ? !S.advJob : !((onCountTab() || S.tab === "past") && S.view.screen !== "queue");
+    const topLevel = S.adv ? !S.advJob : !(((onCountTab() || S.tab === "past") && S.view.screen !== "queue") || (S.tab === "arrow" && S.arWo));
     const foot = topLevel ? `<div class="foot"><button class="link" data-signout="1">Sign out</button></div>` : "";
     const scroll = S.modal ? (document.querySelector(".mdl") || {}).scrollTop : null;
     app.innerHTML = topBar() + deptMenu() + `<main>${banners()}${body}${foot}</main>` + modalHtml()
@@ -3502,6 +3655,8 @@ if (typeof document !== "undefined") (function () {
     if (S.adv) { if (S.advJob && S.advSheet) advShowPage(); }
     else if ((onCountTab() || S.tab === "past") && S.view.screen === "sheet") showPage();
     if (S.tab === "loadout" && S.loWo && !S.adv) { showLoPage(); initWoSwipe(); }
+    if (S.tab === "arrow" && S.arWo && !S.adv) { showArPage(); initArSwipe(); }
+    fillSnips();
     if (S.tab === "loadout" && S.loDoc && !S.adv) showLoDoc();
     if (S.tab === "loadout" && !S.loWo && !S.loDoc && !S.adv && S.loView) initSigPad();
   }
@@ -3559,7 +3714,7 @@ if (typeof document !== "undefined") (function () {
   /** A department tab: exactly what it always did, and it leaves Advance. */
   async function pickDept(dept) {
     S.adv = false; store.set("adv", false);
-    S.dept = dept; store.set("dept", S.dept);
+    S.dept = dept; store.set("dept", S.dept); S.arWo = null;
     if (!tabs().includes(S.tab)) S.tab = tabs()[0];
     const pc = store.get("past_" + S.dept, null); S.past = pc ? pc.rows : []; S.pastAt = pc ? pc.at : null; S.pastLoaded = false;
     S.view = { screen: "queue" }; S.rows = (store.get("rows_" + wd(), { rows: [] })).rows; S.problems = []; S.defects = []; S.supplies = []; S.qcJob = null;
@@ -3639,7 +3794,7 @@ if (typeof document !== "undefined") (function () {
     });
     on("[data-tab]", async (b) => {
       const was = wd();
-      S.tab = b.dataset.tab; store.set("tab", S.tab); S.view = { screen: "queue" }; S.notice = null;
+      S.tab = b.dataset.tab; store.set("tab", S.tab); S.view = { screen: "queue" }; S.notice = null; S.arWo = null;
       if (onCountTab() && wd() !== was) { const c = store.get("rows_" + wd(), null); S.rows = c ? c.rows : []; S.rowsAt = c ? c.at : null; }
       render(); scrollTo(0, 0);
       if (!onCountTab() && !S.pickJobs.length) loadPickJobs();
@@ -4094,6 +4249,14 @@ if (typeof document !== "undefined") (function () {
                   yes: "Gone to Arrow", run: () => send("arrow_gone", { p_items: items.map(a => a.id), p_gone_on: localISO(new Date()) }, "Arrow") };
       render();
     };
+    on("[data-arwo]", (b) => {
+      const a = S.arrow.find(x => x.id === b.dataset.arwo), list = a ? arrowPics(a) : [];
+      const n = Number(b.dataset.arwosheet) || (list[0] && list[0].sheet_number);
+      if (!a || !n) return;
+      S.arWo = { id: a.id, sheet: n }; render(); scrollTo(0, 0);
+    });
+    on("[data-arwogo]", (b) => { if (!S.arWo || !b.dataset.arwogo) return; S.arWo = { ...S.arWo, sheet: Number(b.dataset.arwogo) }; render(); });
+    on("[data-arwoback]", () => { S.arWo = null; render(); });
     on("[data-argone]", (b) => { const a = S.arrow.find(x => x.id === b.dataset.argone); if (a) goneAsk([a]); });
     on("[data-argoneall]", () => { const w = arrowWaiting(S.arrow); if (w.length) goneAsk(w); });
     on("[data-arvoid]", (b) => {
@@ -4293,7 +4456,7 @@ if (typeof document !== "undefined") (function () {
 })();
 
 /* lets the core be tested outside a browser */
-if (typeof module !== "undefined") module.exports = { PAGE_VERSION, versionIn, isNewerVersion, safeToReload, UPDATE_SAFE_TABS, arrowWaiting, arrowWaitFor, arrowOut, waitingText, withSends, routeWords, toSend, ROUTES, SEND_DEPTS, DEPT_NAME, buildPast, pastLine, PAST_DEPTS, withFinishBy, finishWords, dateLine, keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
+if (typeof module !== "undefined") module.exports = { SNIP, snipRect, PAGE_VERSION, versionIn, isNewerVersion, safeToReload, UPDATE_SAFE_TABS, arrowWaiting, arrowWaitFor, arrowOut, waitingText, withSends, routeWords, toSend, ROUTES, SEND_DEPTS, DEPT_NAME, buildPast, pastLine, PAST_DEPTS, withFinishBy, finishWords, dateLine, keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
   daysLeft, daysText, fmtDate, localISO, daysSince, agoText, setPending, flushOutbox, newId, queueEntry, flushLogbox, dueForMe, taskWhen,
   problemState, splitProblems, defectState, splitIssues, withReady, readyOf, readyKnown, waitingText, HAS_UPSTREAM, defectCounts, supplyLine, filterJobs, sheetsText, isNetworkError, friendlyError, DEPTS,
   fitSize, photoPath, photoError, flushPhotobox, sendOutcome, heldTooLong, loadoutSheets, sizeLabel, loadoutPieces, missingText,
