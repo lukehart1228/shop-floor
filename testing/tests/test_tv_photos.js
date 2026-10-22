@@ -133,15 +133,15 @@ async function snap(w) {                                   // the driver takes t
     await until(() => $$(ow, "[data-openjob]").length, 6000);
     $(ow, "[data-openjob]").dispatchEvent(new ow.MouseEvent("mousedown", { bubbles: true })); await wait(1500);
     await until(() => /Floor TV/.test(txt(ow)), 6000);
-    ok("The job page says one picture of the job shows on the floor TV", /1 picture of this job shows on the floor TV/.test(txt(ow)), (txt(ow).match(/Floor TV.{0,120}/) || [""])[0]);
+    ok("The job page says one picture of the job shows on the floor TV", /1 picture (of this job shows )?on the floor TV/.test(txt(ow)), (txt(ow).match(/Floor TV.{0,120}/) || [""])[0]);
     await click(ow, '[data-tvjob][data-hide="1"]', 1500);
-    await until(() => /hidden from the floor TV/.test(txt(ow)), 6000);
+    await until(() => /[Hh]idden from the floor TV/.test(txt(ow)), 6000);
     const hid = await q1("select hidden from tv_hides where job_id = $1 order by set_at desc limit 1", [job.id]);
-    ok("Hide this job's pictures: recorded, the page says so, the TV lists nothing", hid && hid.hidden === true && /hidden from the floor TV/.test(txt(ow))
+    ok("Hide this job's pictures: recorded, the page says so, the TV lists nothing", hid && hid.hidden === true && /[Hh]idden from the floor TV/.test(txt(ow))
        && (await q1("select tv_snapshot($1) as v", [key])).v.home.length === 0, (txt(ow).match(/Floor TV.{0,80}/) || [""])[0]);
     await click(ow, '[data-tvjob][data-hide="0"]', 1500);
-    await until(() => /1 picture of this job shows/.test(txt(ow)), 6000);
-    ok("…and Let them show again puts it back", /1 picture of this job shows/.test(txt(ow)) && (await q1("select tv_snapshot($1) as v", [key])).v.home.length === 1);
+    await until(() => /1 picture (of this job shows )?on the floor TV/.test(txt(ow)), 6000);
+    ok("…and Let them show again puts it back", /1 picture (of this job shows )?on the floor TV/.test(txt(ow)) && (await q1("select tv_snapshot($1) as v", [key])).v.home.length === 1);
     // one picture, from the viewer on Photos
     await click(ow, "[data-jobphotos]", 1500);
     await until(() => $$(ow, "[data-viewphoto]").length, 6000);

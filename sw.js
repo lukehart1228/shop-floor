@@ -1,8 +1,9 @@
 /* Shop Floor — lets the app open with no Wi-Fi.
-   Pages: fetched fresh when there's a connection (so updates arrive), the
-   saved copy when there isn't. Library, fonts and icons: saved copy first.
+   Pages, and the shop's own scripts and stylesheets (sf-common…js, sf-style…css):
+   fetched fresh when there's a connection (so updates arrive), the saved copy when
+   there isn't. Libraries from the CDN, fonts and icons: saved copy first.
    Database requests are never touched — the app handles those itself. */
-const SHELL = "shop-floor-shell-v3";   // v3: the library is checked (integrity), so older saved copies are cleared
+const SHELL = "shop-floor-shell-v4";   // v4 (21 Oct): the shop's own .js and .css are fetched fresh like pages, so a shared file can change in place; older saved copies are cleared
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
@@ -20,12 +21,13 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (url.hostname.endsWith(".supabase.co")) return;          // live data: leave it alone
 
-  const isPage = url.origin === self.location.origin &&
-                 (e.request.mode === "navigate" || url.pathname.endsWith(".html") || url.pathname.endsWith("/"));
-  if (isPage) {
+  const ours = url.origin === self.location.origin;
+  const isPage = ours && (e.request.mode === "navigate" || url.pathname.endsWith(".html") || url.pathname.endsWith("/"));
+  const isOurScript = ours && (url.pathname.endsWith(".js") || url.pathname.endsWith(".css"));
+  if (isPage || isOurScript) {                                 // fresh when connected, saved copy when not
     e.respondWith(fetch(e.request)
       .then((r) => { const copy = r.clone(); caches.open(SHELL).then((c) => c.put(e.request, copy)); return r; })
-      .catch(() => caches.match(e.request).then((hit) => hit || caches.match("./index.html"))));
+      .catch(() => caches.match(e.request).then((hit) => hit || (isPage ? caches.match("./index.html") : Promise.reject(new Error("offline"))))));
     return;
   }
   // a checked library asks for a readable (CORS) copy; a saved copy that can't be read would fail the check, so skip it

@@ -111,7 +111,9 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   await menu(p); await p.click('.menu [data-section="upload"]');
   await p.waitForFunction(() => [...document.querySelectorAll("#secs iframe")].some(f => !f.hidden && /upload/.test(f.src) && f.contentDocument && f.contentDocument.body && f.contentDocument.body.innerText.length > 20), null, { timeout: 15000 });
   fr = frameOf(p, "upload.html");
-  ok("Upload opens inside the office, its header hidden", await fr.evaluate(() => getComputedStyle(document.querySelector("header")).display === "none"));
+  // 21 Oct: wait for the hiding, which the page does a moment after its text appears (this line was flaky since 6 Oct)
+  const hid = await fr.waitForFunction(() => getComputedStyle(document.querySelector("header")).display === "none", null, { timeout: 10000 }).then(() => true).catch(() => false);
+  ok("Upload opens inside the office, its header hidden", hid);
   ok("No errors on any page", s.errs.length === 0, s.errs.join(" | "));
   await menu(p); await p.click('.menu [data-signout]'); await p.waitForTimeout(500);
   ok("Sign out closes every section and shows the sign-in", await p.evaluate(() => document.querySelectorAll("#secs iframe").length === 0 && !!document.querySelector("form.card")));

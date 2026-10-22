@@ -45,6 +45,13 @@ unsched
 # every catalogued file installed, in order — the same test as the first line of check_everything()
 bad=$($P -At -d sync -c "select string_agg(file || ': ' || detail, '; ') from whats_installed() where result <> 'PASS'" 2>&1 || true)
 if [ -n "$bad" ]; then echo "FAILED: whats_installed() isn't all PASS in the sandbox: $bad"; exit 1; fi
+# 21 Oct: a file that registers itself (sql_file_register) must also have its line in install_log.sql's master list;
+# the database itself refuses the file if the two disagree, and this catches a line that was never added
+for n in $ORDER; do
+  if grep -q "sql_file_register('$n.sql'" $L/$n.sql 2>/dev/null; then
+    grep -q "('$n.sql'," $L/install_log.sql || { echo "FAILED: sql/$n.sql registers itself but install_log.sql's master list has no line for it. Add the line (run order, fingerprint, check, replaces)."; exit 1; }
+  fi
+done
 echo "LOADED $(echo $ORDER | wc -w) files from sql/README.md"
 
 for f in "$@"; do echo "== loading $f (twice)"; $P -d sync -f "$f" >/dev/null; $P -d sync -f "$f" > /tmp/last_load.out; done

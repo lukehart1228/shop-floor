@@ -1,6 +1,6 @@
 -- =====================================================================
 -- install_log.sql — what's installed, guards, one check for everything,
--- which page each tablet runs (30 Sep 2026)
+-- which page each tablet runs (30 Sep 2026; 21 Oct: files register themselves)
 --
 -- 1. The install log. From now on every SQL file writes a line here
 --    when it runs. This file also looks for every file that ran before
@@ -15,7 +15,13 @@
 -- 4. select * from check_everything();  every check in one paste, one
 --    line each. Nothing any check does is kept.
 -- 5. select * from devices();           which page each tablet and
---    phone is running, and when it last opened it.
+--    phone is running, and when it last opened it. A device not opened
+--    in 14 days is listed but not counted (21 Oct).
+-- 6. Since 21 Oct a new SQL file registers itself (sql_file_register):
+--    its run order, fingerprint, check and what it replaces. So a
+--    release is one paste, and this file is re-run only when it changes
+--    itself. This file still keeps the master list below; a file whose
+--    own line disagrees with it stops before changing anything.
 --
 -- Run after delivery_types.sql. Safe to run twice. Nothing anyone sees
 -- on a tablet, the office or the TV changes. Ends with
@@ -44,6 +50,8 @@ create table if not exists sql_file_catalog (
   replaces    text[] not null default '{}',
   added_at    timestamptz not null default now()
 );
+-- the check check_everything() runs for the file (null: the file has none)
+alter table sql_file_catalog add column if not exists check_fn text;
 
 -- One line per run (or per file found at the start). Kept for good.
 create table if not exists sql_file_runs (
@@ -71,52 +79,53 @@ alter table sql_file_allow   enable row level security;
 revoke all on sql_file_catalog, sql_file_runs, sql_file_allow from anon, authenticated;
 revoke all on sequence sql_file_runs_id_seq, sql_file_allow_id_seq from anon, authenticated;
 
-insert into sql_file_catalog (file, run_order, fingerprint, replaces) values
-  ('schema.sql',           1,  'my_role',                '{}'),
-  ('verify_setup.sql',     2,  'verify_setup',           '{}'),
-  ('upload_function.sql',  3,  'can_upload_work_orders', '{}'),
-  ('monday_sync.sql',      4,  'monday_sync_log',        '{}'),
-  ('tablet.sql',           5,  'v_floor_sheets',         '{}'),
-  ('office.sql',           6,  'check_office',           '{monday_sync.sql}'),
-  ('test_lane.sql',        7,  'check_test_lane',        '{tablet.sql}'),
-  ('catch_up.sql',         8,  'check_catch_up',         '{schema.sql}'),
-  ('problems.sql',         9,  'check_job_sheet',        '{}'),
-  ('flags.sql',            10, 'clear_flag',             '{}'),
-  ('routine_tasks.sql',    11, 'add_routine_task',       '{}'),
-  ('supplies.sql',         12, 'cancel_supply',          '{}'),
-  ('arrow_qc.sql',         13, 'arrow_departments',      '{}'),
-  ('tv.sql',               14, 'new_tv_link',            '{}'),
-  ('check_floor.sql',      15, 'check_floor',            '{}'),
-  ('photos.sql',           16, 'add_photo',              '{}'),
-  ('check_photos.sql',     17, 'check_photos',           '{}'),
-  ('advance.sql',          18, 'check_advance',          '{}'),
-  ('supply_lists.sql',     19, 'check_supply_lists',     '{}'),
-  ('loadouts_v2.sql',      20, 'check_loadouts',         '{photos.sql}'),
-  ('deliveries.sql',       21, 'add_delivery_doc',       '{photos.sql,loadouts_v2.sql}'),
-  ('deliveries_v2.sql',    22, 'check_deliveries_v2',    '{photos.sql,deliveries.sql}'),
-  ('ready_issues.sql',     23, 'answer_defect',          '{schema.sql,problems.sql}'),
-  ('finish_by.sql',        24, 'check_finish_by',        '{}'),
-  ('inventory.sql',        25, 'check_inventory',        '{}'),
-  ('pace.sql',             26, 'check_pace',             '{}'),
-  ('send_routes.sql',      27, 'check_send_routes',      '{schema.sql,ready_issues.sql}'),
-  ('arrow_pickup.sql',     28, 'check_arrow_pickup',     '{arrow_qc.sql}'),
-  ('delivery_types.sql',   29, 'check_delivery_types',   '{photos.sql,loadouts_v2.sql,deliveries.sql,deliveries_v2.sql}'),
-  ('install_log.sql',      30, 'sql_file_start',         '{}'),
-  ('tv_pace.sql',          31, 'check_tv',               '{tv.sql}'),
-  ('handoff_recent.sql',   32, 'check_handoff_recent',   '{schema.sql,ready_issues.sql,send_routes.sql}'),
-  ('feedback.sql',         33, 'check_feedback',         '{}'),
-  ('trip_types.sql',       34, 'check_trip_types',       '{deliveries.sql,deliveries_v2.sql,delivery_types.sql,tv_pace.sql}'),
-  ('onedrive_save.sql',    35, 'check_onedrive_save',    '{}'),
-  ('counts_safety.sql',    36, 'check_counts_safety',    '{}'),
-  ('connector_safety.sql', 37, 'check_connector_safety', '{}'),
-  ('tv_photos.sql',        38, 'check_tv_photos',        '{trip_types.sql,tv_pace.sql}'),
-  ('delivery_extras.sql',  39, 'check_delivery_extras',  '{upload_function.sql}'),
-  ('lab.sql',              40, 'check_lab',              '{}'),
-  ('machine_files.sql',    41, 'check_machine_files',    '{}'),
-  ('look_only.sql',        42, 'check_look_only',        '{}'),
-  ('feedback_close.sql',   43, 'check_feedback_close',   '{}'),
-  ('tv_coming.sql',        44, 'check_tv_coming',        '{tv_photos.sql}')
-on conflict (file) do update set run_order = excluded.run_order, fingerprint = excluded.fingerprint, replaces = excluded.replaces;
+insert into sql_file_catalog (file, run_order, fingerprint, check_fn, replaces) values
+  ('schema.sql',           1, 'my_role',                 null,                       '{}'),
+  ('verify_setup.sql',     2, 'verify_setup',            'verify_setup',             '{}'),
+  ('upload_function.sql',  3, 'can_upload_work_orders',  null,                       '{}'),
+  ('monday_sync.sql',      4, 'monday_sync_log',         'check_monday_sync',        '{}'),
+  ('tablet.sql',           5, 'v_floor_sheets',          null,                       '{}'),
+  ('office.sql',           6, 'check_office',            'check_office',             '{monday_sync.sql}'),
+  ('test_lane.sql',        7, 'check_test_lane',         'check_test_lane',          '{tablet.sql}'),
+  ('catch_up.sql',         8, 'check_catch_up',          'check_catch_up',           '{schema.sql}'),
+  ('problems.sql',         9, 'check_job_sheet',         null,                       '{}'),
+  ('flags.sql',            10, 'clear_flag',              null,                       '{}'),
+  ('routine_tasks.sql',    11, 'add_routine_task',        null,                       '{}'),
+  ('supplies.sql',         12, 'cancel_supply',           null,                       '{}'),
+  ('arrow_qc.sql',         13, 'arrow_departments',       null,                       '{}'),
+  ('tv.sql',               14, 'new_tv_link',             null,                       '{}'),
+  ('check_floor.sql',      15, 'check_floor',             'check_floor',              '{}'),
+  ('photos.sql',           16, 'add_photo',               null,                       '{}'),
+  ('check_photos.sql',     17, 'check_photos',            'check_photos',             '{}'),
+  ('advance.sql',          18, 'check_advance',           'check_advance',            '{}'),
+  ('supply_lists.sql',     19, 'check_supply_lists',      'check_supply_lists',       '{}'),
+  ('loadouts_v2.sql',      20, 'check_loadouts',          'check_loadouts',           '{photos.sql}'),
+  ('deliveries.sql',       21, 'add_delivery_doc',        'check_deliveries',         '{photos.sql,loadouts_v2.sql}'),
+  ('deliveries_v2.sql',    22, 'check_deliveries_v2',     'check_deliveries_v2',      '{photos.sql,deliveries.sql}'),
+  ('ready_issues.sql',     23, 'answer_defect',           'check_ready_issues',       '{schema.sql,problems.sql}'),
+  ('finish_by.sql',        24, 'check_finish_by',         'check_finish_by',          '{}'),
+  ('inventory.sql',        25, 'check_inventory',         'check_inventory',          '{}'),
+  ('pace.sql',             26, 'check_pace',              'check_pace',               '{}'),
+  ('send_routes.sql',      27, 'check_send_routes',       'check_send_routes',        '{schema.sql,ready_issues.sql}'),
+  ('arrow_pickup.sql',     28, 'check_arrow_pickup',      'check_arrow_pickup',       '{arrow_qc.sql}'),
+  ('delivery_types.sql',   29, 'check_delivery_types',    'check_delivery_types',     '{photos.sql,loadouts_v2.sql,deliveries.sql,deliveries_v2.sql}'),
+  ('install_log.sql',      30, 'sql_file_start',          null,                       '{}'),
+  ('tv_pace.sql',          31, 'check_tv',                'check_tv',                 '{tv.sql}'),
+  ('handoff_recent.sql',   32, 'check_handoff_recent',    'check_handoff_recent',     '{schema.sql,ready_issues.sql,send_routes.sql}'),
+  ('feedback.sql',         33, 'check_feedback',          'check_feedback',           '{}'),
+  ('trip_types.sql',       34, 'check_trip_types',        'check_trip_types',         '{deliveries.sql,deliveries_v2.sql,delivery_types.sql,tv_pace.sql}'),
+  ('onedrive_save.sql',    35, 'check_onedrive_save',     'check_onedrive_save',      '{}'),
+  ('counts_safety.sql',    36, 'check_counts_safety',     'check_counts_safety',      '{}'),
+  ('connector_safety.sql', 37, 'check_connector_safety',  'check_connector_safety',   '{}'),
+  ('tv_photos.sql',        38, 'check_tv_photos',         'check_tv_photos',          '{trip_types.sql,tv_pace.sql}'),
+  ('delivery_extras.sql',  39, 'check_delivery_extras',   'check_delivery_extras',    '{upload_function.sql}'),
+  ('lab.sql',              40, 'check_lab',               'check_lab',                '{}'),
+  ('machine_files.sql',    41, 'check_machine_files',     'check_machine_files',      '{}'),
+  ('look_only.sql',        42, 'check_look_only',         'check_look_only',          '{}'),
+  ('feedback_close.sql',   43, 'check_feedback_close',    'check_feedback_close',     '{}'),
+  ('tv_coming.sql',        44, 'check_tv_coming',         'check_tv_coming',          '{tv_photos.sql}'),
+  ('direct_counts_off.sql', 45, 'check_direct_counts_off', 'check_direct_counts_off', '{verify_setup.sql,test_lane.sql,counts_safety.sql,tv_photos.sql}')
+on conflict (file) do update set run_order = excluded.run_order, fingerprint = excluded.fingerprint, check_fn = excluded.check_fn, replaces = excluded.replaces;
 
 -- does the database already have this file's fingerprint?
 create or replace function sql_file_found(p_fingerprint text) returns boolean
@@ -196,7 +205,35 @@ begin
          else 'It was replaced by ' || newer || ', so newer files will need running again afterwards to go forward — in the order Claude gives you.' end);
 end $$;
 
+-- A new file's first lines (21 Oct): it registers itself, then the guard.
+--   perform sql_file_register('x.sql', 46, 'check_x', 'check_x', '{y.sql}');
+--   perform sql_file_start('x.sql', '{y.sql}');
+-- run order, fingerprint, check, replaces. If the master list above already
+-- has the file and says something different, the file stops here and
+-- changes nothing: one of the two is wrong, and a chat sorts out which.
+create or replace function sql_file_register(p_file text, p_run_order numeric, p_fingerprint text, p_check_fn text, p_replaces text[] default '{}')
+returns void language plpgsql security definer set search_path = public as $$
+declare c sql_file_catalog;
+begin
+  select * into c from sql_file_catalog where file = p_file;
+  if found and c.fingerprint is not null
+     and (c.run_order <> p_run_order or c.fingerprint is distinct from p_fingerprint
+          or c.check_fn is distinct from p_check_fn or c.replaces <> coalesce(p_replaces, '{}')) then
+    raise exception '%', format(
+      'Stop — nothing was changed. %s describes itself as run order %s, fingerprint %s, check %s, replacing %s, '
+      'but install_log.sql''s list says run order %s, fingerprint %s, check %s, replacing %s. One of the two is wrong: bring this to Claude in a chat.',
+      p_file, p_run_order, p_fingerprint, coalesce(p_check_fn, '(none)'), coalesce(p_replaces, '{}')::text,
+      c.run_order, c.fingerprint, coalesce(c.check_fn, '(none)'), c.replaces::text)
+      using errcode = 'P0001';
+  end if;
+  insert into sql_file_catalog (file, run_order, fingerprint, check_fn, replaces)
+  values (p_file, p_run_order, p_fingerprint, p_check_fn, coalesce(p_replaces, '{}'))
+  on conflict (file) do update
+    set run_order = excluded.run_order, fingerprint = excluded.fingerprint, check_fn = excluded.check_fn, replaces = excluded.replaces;
+end $$;
+
 revoke all on function sql_file_start(text, text[]), allow_older_file(text), sql_file_found(text) from public, anon, authenticated;
+revoke all on function sql_file_register(text, numeric, text, text, text[]) from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------
 -- 3. What's installed
@@ -216,10 +253,12 @@ begin
     select * into last from sql_file_runs r where r.file = c.file order by r.id desc limit 1;
 
     -- a newer file that replaces this one ran BEFORE this file's latest run
+    -- (21 Oct: a newer file only "found" — it ran before the log existed — counts as before any logged run)
     select string_agg(g.file, ' and ' order by g.run_order) into late
     from sql_file_catalog g
     where c.file = any (g.replaces) and last.ran_at is not null
-      and (select max(r.ran_at) from sql_file_runs r where r.file = g.file) < last.ran_at;
+      and exists (select 1 from sql_file_runs r where r.file = g.file)
+      and coalesce((select max(r.ran_at) from sql_file_runs r where r.file = g.file), '-infinity'::timestamptz) < last.ran_at;
 
     if last.id is null and not sql_file_found(c.fingerprint) then
       result := 'FAIL'; detail := 'Not installed. Run it (in the order of the sql folder''s README).';
@@ -277,7 +316,7 @@ end $$;
 revoke all on function report_device(text, text, text, text) from public, anon;
 grant execute on function report_device(text, text, text, text) to authenticated;
 
--- select * from devices();   newest page first; "older page" = not the newest any device has
+-- select * from devices();   newest page first; "older page" = not the newest any device has; a device not opened in 14 days is listed but not counted (an old row can never update)
 create or replace function devices()
 returns table (person text, login text, page text, version text, last_opened text, note text)
 language sql security definer set search_path = public as $$
@@ -285,7 +324,8 @@ language sql security definer set search_path = public as $$
   select coalesce(p.full_name, '(no profile)') || case when p.is_test then ' (test)' else '' end,
          u.email, d.page, d.version,
          to_char(d.last_seen at time zone 'America/Indiana/Indianapolis', 'Mon DD, HH12:MI am'),
-         case when d.version < n.v then 'Older page — close the app fully and reopen it on Wi-Fi'
+         case when d.last_seen < now() - interval '14 days' then 'Not opened in 14 days — not counted'
+              when d.version < n.v then 'Older page — close the app fully and reopen it on Wi-Fi'
               else 'Newest page' end
   from device_versions d
   join newest n on n.page = d.page
@@ -305,14 +345,7 @@ create or replace function check_everything()
 returns table (step int, check_name text, result text, detail text)
 language plpgsql set search_path = public as $$
 declare
-  fns text[] := array['verify_setup', 'check_monday_sync', 'check_office', 'check_test_lane', 'check_catch_up',
-                      'check_floor', 'check_photos', 'check_advance', 'check_supply_lists', 'check_loadouts',
-                      'check_deliveries', 'check_deliveries_v2', 'check_ready_issues', 'check_finish_by',
-                      'check_inventory', 'check_pace', 'check_send_routes', 'check_arrow_pickup', 'check_delivery_types',
-                      'check_tv', 'check_handoff_recent', 'check_feedback', 'check_trip_types',
-                      'check_onedrive_save', 'check_counts_safety', 'check_connector_safety', 'check_tv_photos',
-                      'check_delivery_extras', 'check_lab',
-                      'check_machine_files', 'check_look_only', 'check_feedback_close', 'check_tv_coming'];
+  fns   text[];           -- every catalogued file's check, in run order (21 Oct: from the catalog, not a list here)
   fn    text;
   rows  jsonb;
   total int; passed int; firstbad text;
@@ -320,6 +353,7 @@ declare
   n     int := 1;
   stale int; seen int;
 begin
+  select coalesce(array_agg(c.check_fn order by c.run_order), '{}') into fns from sql_file_catalog c where c.check_fn is not null;
   step := 1; check_name := 'Every SQL file installed, in order';
   select count(*) filter (where w.result <> 'PASS'), count(*),
          (array_agg(w.file || ': ' || w.detail order by w.step) filter (where w.result <> 'PASS'))[1]
@@ -362,13 +396,16 @@ begin
   end loop;
 
   n := n + 1; step := n; check_name := 'Every device on the newest page';     -- tablets, phones and (from 5 Oct) office computers
-  select count(*) filter (where d.note <> 'Newest page'), count(*),
-         string_agg(case when d.note <> 'Newest page' then d.person || ' (' || d.version || ', opened ' || d.last_opened || ')' end, '; ')
-    into stale, seen, firstbad
+  select count(*) filter (where d.note like 'Older page%'), count(*) filter (where d.note not like 'Not opened%'),
+         string_agg(case when d.note like 'Older page%' then d.person || ' (' || d.version || ', opened ' || d.last_opened || ')' end, '; '),
+         count(*) filter (where d.note like 'Not opened%')
+    into stale, seen, firstbad, total
   from devices() d;
   result := case when stale = 0 then 'PASS' else 'FAIL' end;
-  detail := case when seen = 0 then 'No device has reported yet — each one does the first time it opens a page.'
-                 when stale = 0 then seen || ' device' || case when seen = 1 then '' else 's' end || ', all on the newest page'
+  detail := case when seen = 0 and total = 0 then 'No device has reported yet — each one does the first time it opens a page.'
+                 when seen = 0 then 'No device has opened a page in 14 days (' || total || ' older rows not counted).'
+                 when stale = 0 then seen || ' device' || case when seen = 1 then '' else 's' end || ' opened in the last 14 days, all on the newest page'
+                                    || case when total > 0 then ' (' || total || ' not opened in 14 days, not counted)' else '' end
                  else stale || ' on an older page: ' || firstbad || '. Close the app fully and reopen it on Wi-Fi (on a computer, reload the page).  (select * from devices(); for all)' end;
   return next;
 end $$;

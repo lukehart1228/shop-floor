@@ -17,7 +17,7 @@ const { JSDOM } = require("jsdom");
 const { makeClient, users, admin } = require("./pgsupa");
 const strip = (h) => h.replace(/<script src="[^"]+"[^>]*><\/script>/g, "");
 const NEW = strip(fs.readFileSync(process.env.NEWPAGE || "/home/claude/sf/out/index.html", "utf8"));
-const LIVE = strip(fs.readFileSync(process.env.LIVEPAGE || "/home/claude/sf/repo/index.html", "utf8"));
+const LIVE = process.env.LIVEPAGE ? strip(fs.readFileSync(process.env.LIVEPAGE, "utf8")) : null;   // 21 Oct: a page from before 6 Oct, to show the old behaviour beside the new; without it those lines are skipped
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 let pass = 0, fail = 0;
 const ok = (n, c, x = "") => { c ? pass++ : fail++; console.log(`${c ? "PASS" : "FAIL"}  ${n}${x ? "  — " + x : ""}`); };
@@ -67,7 +67,7 @@ async function part1(api, live) {
     if (live) {
       const lb = box({ p1: { qty: 2, at: "x" } });
       await live.flushOutbox(lb, { from: () => ({ update: () => ({ eq: () => ({ select: async () => R[k] }) }) }) });
-      if (k !== "network") ok(`  (the live page loses it: proves the test)`, !lb.get().p1);
+      if (k !== "network") ok(`  (the page before loses it: proves the test)`, !lb.get().p1);
     }
   }
   { const b = box({ p1: { qty: 2, at: "x" } }); const db = fakeDb(R.missing);
@@ -96,7 +96,7 @@ async function part1(api, live) {
   for (const k of ["reload", "jwt", "s503", "nologin"]) {
     const b = entries(); const r = await api.flushLogbox(b, fakeDb(R[k]));
     ok(`entries answered "${k}" all stay waiting`, !!b.get().a && !!b.get().b && r.refused.length === 0);
-    if (live) { const lb = entries(); await live.flushLogbox(lb, fakeDb(R[k])); ok("  (the live page loses them)", !lb.get().a && !lb.get().b); }
+    if (live) { const lb = entries(); await live.flushLogbox(lb, fakeDb(R[k])); ok("  (the page before loses them)", !lb.get().a && !lb.get().b); }
   }
   { const b = entries(); const r = await api.flushLogbox(b, fakeDb(R.business));
     ok("an entry refused for a reason comes back whole (function and what was typed), to be kept", r.refused.length === 2 && r.refused[0].payload.fn === "send_feedback" && r.refused[0].payload.args.p_client_id === "a"); }
@@ -107,7 +107,7 @@ async function part1(api, live) {
     const st = memStore([signed()]); const r = await api.flushPhotobox(st, fakeDb(R[k]));
     const rec = st.m.get("d1");
     ok(`a signed delivery answered "${k}" stays waiting, signature and all`, rec && !rec.failed && rec.blob && r.refused.length === 0);
-    if (live) { const ls = memStore([signed()]); await live.flushPhotobox(ls, fakeDb(R[k])); ok("  (the live page deletes it)", !ls.m.get("d1")); }
+    if (live) { const ls = memStore([signed()]); await live.flushPhotobox(ls, fakeDb(R[k])); ok("  (the page before deletes it)", !ls.m.get("d1")); }
   }
   { const st = memStore([signed(), { id: "x2", kind: "defect", parent: "zz", projectId: "PROJ-00418", label: "Photo", at: "2026-10-06T10:02:00Z", blob: new Blob(["j"]) }]);
     const r = await api.flushPhotobox(st, fakeDb((fn) => fn === "complete_delivery" ? R.business : { data: { ok: true }, error: null }));
@@ -157,9 +157,9 @@ async function openSheet(w, progressId) {
 async function part2() {
   console.log("--- Part 2: a change order arrives while Mike's tablets have PROJ-00418 open (database with counts_safety.sql)");
   const s4 = await prog(4, true), s5 = await prog(5, true), s6 = await prog(6, true);
-  const t1 = boot(NEW, users.mike), t2 = boot(NEW, users.mike), t3 = boot(LIVE, users.mike);
-  await openSheet(t1.w, s4.id); await openSheet(t2.w, s5.id); await openSheet(t3.w, s6.id);
-  ok("three of Mike's tablets have the job open (two new pages, one live)", !!$(t1.w, "[data-step]") && !!$(t2.w, "[data-step]") && !!$(t3.w, "[data-step]"));
+  const t1 = boot(NEW, users.mike), t2 = boot(NEW, users.mike), t3 = LIVE ? boot(LIVE, users.mike) : null;
+  await openSheet(t1.w, s4.id); await openSheet(t2.w, s5.id); if (t3) await openSheet(t3.w, s6.id);
+  ok("Mike's tablets have the job open (two new pages" + (t3 ? ", one on the page before)" : ")"), !!$(t1.w, "[data-step]") && !!$(t2.w, "[data-step]") && (!t3 || !!$(t3.w, "[data-step]")));
   await q(CHANGE_ORDER);
   ok("the change order is in: version 2 current", !!(await prog(4, true)) && (await prog(4, true)).id !== s4.id);
 
@@ -197,17 +197,20 @@ async function part2() {
   await click(t2.w, "[data-confirm]", 300);
   ok("…then it's gone from the list and the bar", !/couldn't be sent/.test(text(t2.w)) && !$(t2.w, ".mdl"));
 
-  // the live page on the new database
-  await click(t3.w, '[data-step="1"]', 400);
-  await until(() => /replaced by a newer version/.test(text(t3.w)));
-  ok("live page, replaced version: refused with a plain message instead of quietly saving to the old version",
-     /replaced by a newer version/.test(text(t3.w)) && (await prog(6, false)).qty_done === 0 && (await prog(6, true)).qty_done === 0, text(t3.w).slice(0, 200));
-  t3.w.close();
-  const t4 = boot(LIVE, users.mike); const c6 = await prog(6, true);
-  await openSheet(t4.w, c6.id); await click(t4.w, '[data-step="1"]', 400);
-  await until(async () => (await prog(6, true)).qty_done === 1);
-  ok("live page, current version: the count saves as before", (await prog(6, true)).qty_done === 1);
-  for (const t of [t1, t2, t4]) t.w.close();
+  // the page from before 6 Oct on the new database (only when LIVEPAGE= names one)
+  if (t3) {
+    await click(t3.w, '[data-step="1"]', 400);
+    await until(() => /replaced by a newer version/.test(text(t3.w)));
+    ok("page before, replaced version: refused with a plain message instead of quietly saving to the old version",
+       /replaced by a newer version/.test(text(t3.w)) && (await prog(6, false)).qty_done === 0 && (await prog(6, true)).qty_done === 0, text(t3.w).slice(0, 200));
+    t3.w.close();
+    const t4 = boot(LIVE, users.mike); const c6 = await prog(6, true);
+    await openSheet(t4.w, c6.id); await click(t4.w, '[data-step="1"]', 400);
+    await until(async () => (await prog(6, true)).qty_done === 1);
+    ok("page before, current version: the count saves as before", (await prog(6, true)).qty_done === 1);
+    t4.w.close();
+  } else console.log("  (LIVEPAGE= a page from before 6 Oct adds the lines showing that page refused on a replaced version: skipped)");
+  for (const t of [t1, t2]) t.w.close();
 }
 
 async function part3() {
@@ -225,10 +228,11 @@ async function part3() {
 }
 
 (async () => {
-  const a = boot(NEW, users.mike), l = boot(LIVE, users.mike);
+  const a = boot(NEW, users.mike), l = LIVE ? boot(LIVE, users.mike) : null;
   await wait(300);
-  await part1(a.api, l.api);
-  a.w.close(); l.w.close();
+  if (!l) console.log("  (LIVEPAGE= a page from before 6 Oct adds the \"the page before loses it\" lines: skipped)");
+  await part1(a.api, l && l.api);
+  a.w.close(); if (l) l.w.close();
   if (process.env.OLDDB) await part3(); else await part2();
   console.log(`\n${pass} PASS, ${fail} FAIL`); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

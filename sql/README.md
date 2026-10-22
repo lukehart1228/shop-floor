@@ -10,6 +10,8 @@ Every SQL file the database is built from, one current copy of each. To run one,
 
 Every file starts by writing a line in the install log. If a newer file has already replaced some of its pieces, it stops before changing anything, with a message saying so. So an old file can't quietly undo newer work. Rolling back on purpose is done with Claude in a chat.
 
+Since 21 Oct a new file also **registers itself** when it runs (its run order, its check and what it replaces), so running a new file is **one paste**: there's no need to run `install_log.sql` again after it. `install_log.sql` keeps the master list all the same, and is run again only when it changes itself; a file whose own line disagrees with that list stops before changing anything.
+
 ## The order they were run
 
 On the live database these have all run. The order matters only when building a new database from nothing.
@@ -45,7 +47,7 @@ On the live database these have all run. The order matters only when building a 
 | 27 | `send_routes.sql` | |
 | 28 | `arrow_pickup.sql` | |
 | 29 | `delivery_types.sql` | |
-| 30 | `install_log.sql` | The install log, guards, `check_everything()`, `devices()` |
+| 30 | `install_log.sql` | The install log, guards, `check_everything()`, `devices()`. 21 Oct: files register themselves, `check_everything()` reads its list of checks from the catalog, and a device not opened in 14 days is listed but not counted |
 | 31 | `tv_pace.sql` | The floor TV with pace, work stopped and going out. Replaces `tv.sql`'s TV function. Run `install_log.sql` again after it |
 | 32 | `handoff_recent.sql` | Milling, Metal and Full Custom wait for Monday's Handed Off; the tablets' Recently completed tab. Replaces `send_routes.sql`'s ready view, so `send_routes.sql` now stops. Run `install_log.sql` again after it |
 | 33 | `feedback.sql` | The Feedback button's table and `send_feedback()`; the office's Feedback list reads it. Run `install_log.sql` again after it |
@@ -60,5 +62,6 @@ On the live database these have all run. The order matters only when building a 
 | 42 | `look_only.sql` | Look-only departments: a supervisor can be given another department's Work orders and Recently completed to look at on the tablet, never to change (Sam on CNC looks at Milling, 20 Oct). `set_look_only(email, departments)` from the SQL Editor; who may count doesn't change. Run `install_log.sql` again after it |
 | 43 | `feedback_close.sql` | Closing feedback notes: the office marks a note Solved or Not relevant (or puts it back), and it moves to a folded Closed list. Nothing is deleted: the note stays, with who closed it and when. Managers only. Needs `feedback.sql`. Run `install_log.sql` again after it |
 | 44 | `tv_coming.sql` | Coming up on the floor TV: the next 10 jobs In Production by Monday's delivery date (today or later), with PROJ number, name and date, in place of the department rows. `tv_snapshot` sends them as `coming` (version 4); nothing else it sends changes. Replaces `tv_snapshot` from `tv_photos.sql`, so that file now stops. Run `install_log.sql` again after it |
+| 45 | `direct_counts_off.sql` | The old direct count route is closed (review finding R-4): no login changes a count except through `set_count()` (managers also through Advance). Also carries `check_counts_safety()` and `check_tv_photos()` rewritten so the live `check_everything()` is all PASS: the first now expects the direct route refused, the second looks only at its own practice jobs (a real job's picture was on the TV). Replaces pieces of `counts_safety.sql` and `tv_photos.sql`, so those now stop. Registers itself: one paste, nothing to run after it |
 
 Not here on purpose: **`set_up_logins.sql`**, which has everyone's login addresses. Keep it on your own computer, not on GitHub.

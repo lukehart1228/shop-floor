@@ -12,7 +12,7 @@ const { JSDOM } = require("jsdom");
 const { makeClient, users, admin } = require("./pgsupa");
 const strip = (h) => h.replace(/<script src="[^"]+"[^>]*><\/script>/g, "");
 const NEW = strip(fs.readFileSync(process.env.PAGE || "/home/claude/sf/out/index.html", "utf8"));
-const LIVE = strip(fs.readFileSync(process.env.LIVEPAGE || "/home/claude/sf/repo/index.html", "utf8"));
+const LIVE = process.env.LIVEPAGE ? strip(fs.readFileSync(process.env.LIVEPAGE, "utf8")) : null;   // 21 Oct: a page from before 20 Oct, to show it ignoring the list; without it that line is skipped
 const OLDDB = !!process.env.OLDDB;
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 let pass = 0, fail = 0;
@@ -75,10 +75,12 @@ const actions = "[data-step], [data-all], [data-send], [data-sendall], [data-uns
   const r = await admin.query("select set_look_only('sam@example.com', '{milling}') m");
   ok("set_look_only() gives Sam Milling to look at", /look at Milling/.test(r.rows[0].m), r.rows[0].m);
 
-  // the live page on the new database ignores the list
-  const old = boot(LIVE, SAM); await settled(old.w);
-  ok("The live page on the new database: Sam sees only CNC, as before", !$(old.w, '[data-dept="milling"]') && body(old.w) === cncBefore);
-  old.w.close();
+  // the page from before 20 Oct on the new database ignores the list (only when LIVEPAGE= names one)
+  if (LIVE) {
+    const old = boot(LIVE, SAM); await settled(old.w);
+    ok("The page before on the new database: Sam sees only CNC, as before", !$(old.w, '[data-dept="milling"]') && body(old.w) === cncBefore);
+    old.w.close();
+  } else console.log("  (LIVEPAGE= a page from before 20 Oct adds the line showing it ignoring the list: skipped)");
 
   // the new page
   const s = boot(NEW, SAM); await settled(s.w);

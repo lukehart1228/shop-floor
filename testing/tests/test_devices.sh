@@ -23,5 +23,13 @@ no $MIKE   "select allow_older_file('schema.sql')" "a login can't grant a rollba
 no anon    "select * from check_everything()" "no login: check_everything refused"
 P="psql -h /tmp/pg -p 5433 -U postgres -q -At -d sync"
 echo "rows: $($P -c "select count(*) from device_versions") (expect 2)"
-$P -c "select person||' | '||version||' | '||note from devices()"
-$P -c "select result||' '||detail from check_everything() where check_name like 'Tablets%'"
+$P -c "select '  devices(): '||person||' | '||version||' | '||note from devices()"
+$P -c "select '  the check''s line: '||result||' '||detail from check_everything() where check_name like 'Every device%'"
+echo "--- 21 Oct: a device not opened in 14 days is listed but not counted"
+$P -c "update device_versions set last_seen = now() - interval '15 days' where device_id='dev-willie-01'" >/dev/null
+r=$($P -c "select result||' | '||detail from check_everything() where check_name like 'Every device%'"); echo "$r" | grep -q "^PASS" && echo "$r" | grep -q "1 not opened in 14 days" && echo "PASS Willie's older page, last opened 15 days ago, doesn't count" || echo "FAIL: $r"
+r=$($P -c "select note from devices() where person like 'Willie%'"); [ "$r" == "Not opened in 14 days — not counted" ] && echo "PASS devices() says so on his row" || echo "FAIL note: $r"
+$P -c "update device_versions set last_seen = now() - interval '13 days' where device_id='dev-willie-01'" >/dev/null
+r=$($P -c "select result||' | '||detail from check_everything() where check_name like 'Every device%'"); echo "$r" | grep -q "^FAIL" && echo "$r" | grep -q "Willie" && echo "PASS opened 13 days ago, his older page counts again" || echo "FAIL: $r"
+$P -c "update device_versions set last_seen = now() - interval '15 days'" >/dev/null
+r=$($P -c "select result||' | '||detail from check_everything() where check_name like 'Every device%'"); echo "$r" | grep -q "^PASS | No device has opened a page in 14 days (2 older rows not counted)" && echo "PASS with every device old, the line says so instead of failing" || echo "FAIL: $r"

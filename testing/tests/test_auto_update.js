@@ -4,6 +4,7 @@
 // Playwright's clock jumps time forward. Seed first, then:
 //   PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS=1 TZ=America/Indiana/Indianapolis node test_auto_update.js
 // PAGE=/home/claude/sf/repo/index.html runs it on the page before, where every "reloads" line fails.
+// ROOT=/tmp/allpages serves the other files (sw.js, icons) from there instead of the live repo.
 const fs = require("fs"), http = require("http"), path = require("path");
 const { chromium } = require("/home/claude/.npm-global/lib/node_modules/playwright");
 const { makeClient, users, admin } = require("./pgsupa");
@@ -42,7 +43,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "max-age=600" });
     return res.end(nav ? gh.nav : gh.check);
   }
-  const file = path.join("/home/claude/sf/repo", p);
+  const file = path.join(process.env.ROOT || "/home/claude/sf/repo", p);   // ROOT=a folder with every page: to test a changed sw.js (21 Oct)
   if (!fs.existsSync(file)) { res.writeHead(404); return res.end(); }
   res.writeHead(200, { "Content-Type": file.endsWith(".js") ? "application/javascript" : "application/octet-stream" });
   res.end(fs.readFileSync(file));
