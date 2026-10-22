@@ -38,8 +38,14 @@ SQL
 $P -f /tmp/realpic.sql >/dev/null
 n=$($P -c "select count(*) from tv_home_pictures()"); [ "$n" -ge 1 ] && echo "PASS the real job's picture is on the TV's home list ($n listed)" || echo "FAIL no picture listed"
 r=$(score check_tv_photos); [ "$r" == "9/9" ] && echo "PASS the new check_tv_photos is 9/9 with it there" || echo "FAIL $r (steps $(fails check_tv_photos))"
+# 22 Oct: once direct_counts_off.sql is live, the old template has the new check too, so the 20 Oct result can't be shown any more
+defn() { psql -h /tmp/pg -p 5433 -U postgres -q -d $1 -tAc "select md5(pg_get_functiondef('check_tv_photos()'::regprocedure))" 2>/dev/null; }
+if [ "$(defn sync_base_old)" == "$(defn sync_base_new)" ]; then
+  echo "SKIP the old check_tv_photos: direct_counts_off.sql is live, so the old database has the new check (7/9 was shown on 21 Oct)"
+else
 TEMPLATE=sync_base_old bash /home/claude/sf/base/fresh.sh >/dev/null && $P -f /tmp/realpic.sql >/dev/null
 r=$(score check_tv_photos); [ "$r" == "7/9" ] && echo "PASS the old check_tv_photos is 7/9 with it there (the 20 Oct live result)" || echo "FAIL old check $r"
+fi
 echo "--- the file on the old database: runs, registers itself the old way, install_log.sql after it makes it whole"
 $P -1 -f $F >/dev/null 2>/tmp/f.err && echo "PASS runs on a database with the 30 Sep install log" || { echo "FAIL $(head -2 /tmp/f.err)"; }
 r=$($P -c "select run_order||' '||coalesce(fingerprint,'(none)') from sql_file_catalog where file='direct_counts_off.sql'"); echo "  catalogued as: $r (the old guard: next number, no fingerprint)"

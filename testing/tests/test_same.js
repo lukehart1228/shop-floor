@@ -1,5 +1,6 @@
 // Every supervisor's tablet: each screen byte-for-byte the same on the new index.html as on the live one,
-// and the new page reports its version once per start. NAV=ignore sets the tab strip aside (for a build that adds a tab).
+// and the new page reports its version once per start. NAV=ignore sets the tab strip aside (for a build that adds a tab);
+// PICTURES=ignore sets the drawing pictures aside (for a build that adds or moves them).
 // Run on a seeded database; set NEWPAGE / LIVEPAGE to compare other files.
 const fs = require("fs");
 const { JSDOM } = require("jsdom");
@@ -29,7 +30,10 @@ async function screens(html, user) {
   const out = [];
   const snap = async (name) => { await wait(350); out.push([name, $(w, "#app").innerHTML]); };
   await snap("queue");
-  const job = $(w, "button.qrow, button.job");   // 20 Oct: the queue is rows (.qrow); .job stays on Recently completed if (job) { await click(w, job); await snap("job"); const sh = $(w, "button.sheet"); if (sh) { await click(w, sh); await snap("sheet"); } }
+  // 20 Oct: the queue is rows (.qrow); .job stays on Recently completed. (22 Oct: this comment had swallowed the line below,
+  // so from 20 to 22 Oct the job and sheet screens weren't compared at all.)
+  const job = $(w, "button.qrow, button.job");
+  if (job) { await click(w, job); await snap("job"); const sh = $(w, "button.sheet"); if (sh) { await click(w, sh); await snap("sheet"); } }
   const back = $(w, "[data-back]"); if (back) { await click(w, back); const b2 = $(w, "[data-back]"); if (b2) await click(w, b2); }
   for (const t of [...w.document.querySelectorAll("[data-tab]")].map(b => b.dataset.tab)) { await click(w, `[data-tab="${t}"]`); await snap("tab " + t); }
   await wait(500);
@@ -44,7 +48,11 @@ async function screens(html, user) {
   const before = hasFn ? Number((await admin.query("select count(*) n from device_versions")).rows[0].n) : 0;
   for (const [who, user] of [["Mike", users.mike], ["Donnie", users.donnie], ["Willie", users.willie], ["KP", users.kp], ["Jim", users.jim], ["Eric", users.eric], ["Shawn", users.shawn]]) {
     const a = await screens(LIVE, user), b = await screens(NEW, user);
-    const norm = (h) => { h = h.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "ID"); return process.env.NAV === "ignore" ? h.replace(/<nav[\s\S]*?<\/nav>/g, "NAV") : h; };
+    const norm = (h) => { h = h.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "ID");
+      // 22 Oct: a drawing picture's frame is compared; whether it has been filled in yet, and the picture's address, are not
+      h = h.replace(/<span class="snip(?: none)?" (data-snip="[^"]*" aria-hidden="true")(?: style="[^"]*")?><\/span>/g, '<span class="snip" $1></span>');
+      if (process.env.PICTURES === "ignore") h = h.replace(/<span class="snip" data-snip="[^"]*" aria-hidden="true"><\/span>/g, "");
+      return process.env.NAV === "ignore" ? h.replace(/<nav[\s\S]*?<\/nav>/g, "NAV") : h; };
     const only = (o) => o.filter(([n]) => !(process.env.SKIP_TABS || "").split(",").includes(n.replace(/^tab /, "")));
     const ao = only(a.out), bo = only(b.out);
     const diffs = ao.filter(([n, h], i) => !bo[i] || bo[i][0] !== n || norm(h) !== norm(bo[i][1])).map(([n]) => n);
