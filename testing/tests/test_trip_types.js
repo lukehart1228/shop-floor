@@ -28,6 +28,24 @@ function boot(page, user) {
 const $ = (w, s) => w.document.querySelector(s), $$ = (w, s) => [...w.document.querySelectorAll(s)];
 const txt = (w, sel = "#app") => (($(w, sel) || {}).textContent || "").replace(/\s+/g, " ");
 async function click(w, sel, pause = 200) { const el = typeof sel === "string" ? $(w, sel) : sel; if (!el) throw new Error("no " + sel); el.click(); await wait(pause); }
+
+// 22 Oct: the Load-out tab is a calendar, a week at a time. The nth trip matching `want` (a PROJ, or a test on the button):
+// this week first, then the next two, since a trip "tomorrow" is next week's on a Sunday. A page with no calendar: the list.
+async function tripButton(w, want, nth = 0) {
+  const match = () => [...w.document.querySelectorAll("#app [data-loopen]")].filter(b => typeof want === "function" ? want(b) : b.textContent.includes(want));
+  const cal = () => w.document.querySelector("#app [data-calnext]");
+  await until(() => match().length > nth || cal(), 8000);
+  if (!cal()) return match()[nth] || null;
+  w.document.querySelector("#app [data-caltoday]").click(); await wait(150);
+  const found = [];
+  for (let k = 0; k < 3; k++) {
+    await until(() => match().some(b => !found.includes(b.dataset.loopen)), k ? 500 : 6000);
+    for (const b of match()) if (!found.includes(b.dataset.loopen)) found.push(b.dataset.loopen);
+    if (found.length > nth) return match().find(b => b.dataset.loopen === found[nth]) || null;
+    cal().click(); await wait(250);
+  }
+  return null;
+}
 function type(w, sel, v) { const el = typeof sel === "string" ? $(w, sel) : sel; el.value = v; el.dispatchEvent(new w.Event("input", { bubbles: true })); }
 const q1 = async (sql, a = []) => (await admin.query(sql, a)).rows[0];
 const tomorrow = () => { const d = new Date(Date.now() + 86400000); return d.toISOString().slice(0, 10); };
@@ -94,10 +112,10 @@ const tomorrow = () => { const d = new Date(Date.now() + 86400000); return d.toI
 
   // ---- Shawn: the dock to dock trip ----
   t = boot("index.html", users.shawn); w = t.w;
-  await until(() => $$(w, "[data-loopen]").length && $$(w, "[data-taskopen]").length, 8000); await wait(300);
+  await tripButton(w, "PROJ-00418"); await until(() => $$(w, "[data-taskopen]").length, 8000); await wait(300);   // the week holding the trip
   const card = $$(w, "[data-loopen]").find(b => /PROJ-00418/.test(b.textContent));
   ok("Shawn's Load-out lists the dock to dock trip as Dock to dock", card && /Dock to dock/.test(card.textContent), card ? card.textContent.replace(/\s+/g, " ").slice(0, 120) : "");
-  ok("…and a Tasks section with both tasks, soonest first", $$(w, "[data-taskopen]").length === 2 && /Pick up the damaged chair/.test($$(w, "[data-taskopen]")[0].textContent));
+  ok("…and both tasks, soonest first", $$(w, "[data-taskopen]").length === 2 && /Pick up the damaged chair/.test($$(w, "[data-taskopen]")[0].textContent));
   await click(w, card, 800);
   const dtx = txt(w);
   ok("The dock to dock screen: each table before it leaves, then the truck", /1 · At our dock — each table before it leaves/.test(dtx) && /Then the loaded truck/.test(dtx) && $$(w, "[data-loshoot]").length > 0);

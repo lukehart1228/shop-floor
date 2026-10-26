@@ -156,7 +156,9 @@ function judge(name, l, pathOfPage) {
   // ---- 1. Mike, Sanding: a job's sheets ----
   let m = await session(browser, users.mike);
   await m.p.goto(base); await loaded(m.p);
-  ok("the page is 2026-10-22.1", await m.p.evaluate(() => typeof PAGE_VERSION !== "undefined" && PAGE_VERSION) === "2026-10-22.1");
+  // the drawings came in 2026-10-22.1; a later page keeps them (22 Oct: 2026-10-22.2, the Delivery phone's calendar)
+  const pv = await m.p.evaluate(() => typeof PAGE_VERSION !== "undefined" && PAGE_VERSION);
+  ok("the page is 2026-10-22.1 or later", typeof pv === "string" && pv.localeCompare("2026-10-22.1", undefined, { numeric: true }) >= 0, String(pv));
   await m.p.waitForSelector(`[data-job="${job}"]`, { timeout: 15000 }).catch(() => {});
   await m.p.click(`[data-job="${job}"]`).catch(() => {});
   await m.p.waitForSelector(".sheet", { timeout: 10000 }).catch(() => {});

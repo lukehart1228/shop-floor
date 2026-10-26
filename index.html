@@ -294,6 +294,69 @@
   .loslot.here small{color:#E6FAF9}
   .loslot.earlier{background:var(--paper); border-style:dashed; color:var(--ink2)}
   .lowo{margin-top:10px; background:none; border:1.5px solid var(--gray); border-radius:9px; padding:8px 14px; font-weight:600; color:var(--midnight); min-height:44px}
+  /* 22 Oct: the Load-out tab as a calendar (week or month), the trip bar on every Delivery tab, saved for no signal, what changed */
+  .calbar{display:flex; align-items:center; gap:8px; margin:0 0 8px}
+  .calsw{display:inline-flex; border:1px solid var(--gray); border-radius:10px; overflow:hidden; background:#fff}
+  .calsw button{background:none; border:none; padding:10px 18px; font-weight:700; color:var(--ink2); min-height:44px}
+  .calsw button[aria-pressed="true"]{background:var(--midnight); color:var(--sawdust)}
+  .caltoday{margin-left:auto; background:#fff; border:1px solid var(--gray); border-radius:10px; padding:10px 16px; font-weight:700; min-height:44px}
+  .calnav{display:flex; align-items:center; gap:8px; padding:6px 0 10px}
+  .calnav b{flex:1; text-align:center}
+  .calnav button{display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; border:1px solid var(--gray); border-radius:10px; background:#fff}
+  .wkday{display:flex; gap:10px; border-top:1px solid var(--line); padding:10px 0}
+  .wkdate{flex:none; width:52px; text-align:center}
+  .wkdate small{display:block; font-size:13px; font-weight:700; letter-spacing:.06em; color:var(--ink2)}
+  .wkdate .n{display:block; margin:2px auto 0; width:40px; height:40px; line-height:40px; font-size:24px; font-weight:700}
+  .wkday.today .wkdate .n{border-radius:50%; background:var(--midnight); color:var(--sawdust)}
+  .wkitems{flex:1; min-width:0; display:flex; flex-direction:column; gap:6px}
+  .wkempty{color:var(--ink2); font-size:15px; padding-top:18px}
+  .calitem{display:block; width:100%; text-align:left; background:#fff; border:1px solid var(--line); border-radius:10px; padding:8px 12px; color:var(--midnight)}
+  .calitem .t{display:flex; flex-wrap:wrap; align-items:baseline; gap:0 8px}
+  .calitem .t b{font-size:16px}
+  .calitem .t span{font-size:15px; color:var(--ink2)}
+  .calitem .j{display:block; font-size:16px; line-height:1.35}
+  .calitem .j span{color:var(--ink2)}
+  .calitem .l{display:block; margin-top:5px; font-size:14px; font-weight:600}
+  .calitem .l.s{font-weight:700}
+  .calitem .m{display:block; margin-top:2px; font-size:14px; color:var(--ink2)}
+  .calitem.done{background:var(--teal); border-color:var(--teal)}
+  .calitem.done .t span,.calitem.done .j span{color:#0E3A3A}
+  .calitem.off{background:none; border:1.5px dashed var(--gray); color:var(--ink2)}
+  .calitem.off b{color:var(--midnight)}
+  .calitem.off .btn{margin-top:8px; min-height:44px; padding:10px 14px}
+  .saveline{display:block; margin-top:5px; font-size:14px; font-weight:600; color:var(--ink2)}
+  .saveline.ready{font-weight:700; color:var(--teal-ink)}
+  .saveline.not{font-weight:700; color:var(--midnight)}
+  .ctag{display:inline-block; border:1.5px solid var(--midnight); border-radius:4px; font-size:12px; font-weight:700; letter-spacing:.06em; line-height:1.5; padding:0 5px; margin-right:6px; color:var(--midnight)}
+  .mdow,.mgrid{display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:4px}
+  .mdow{margin:0 0 4px; text-align:center; font-size:13px; font-weight:700; letter-spacing:.06em; color:var(--ink2)}
+  .mday{display:flex; flex-direction:column; align-items:center; gap:3px; height:58px; padding:4px 0 0; border-radius:8px; background:#fff; border:1px solid var(--line); color:var(--midnight)}
+  .mday.out{background:transparent; border-color:transparent}
+  .mday.out .n{font-weight:500; color:var(--ink2)}
+  .mday[aria-pressed="true"]{border:2px solid var(--midnight)}
+  .mday .n{display:block; min-width:28px; height:28px; line-height:28px; font-size:16px; font-weight:700}
+  .mday.today .n{border-radius:50%; background:var(--midnight); color:var(--sawdust)}
+  .mmarks{display:flex; gap:3px; align-items:center; height:12px}
+  .mmarks i,.mlegend i{display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--midnight)}
+  .mmarks i.task,.mlegend i.task{background:none; border:1.5px solid var(--midnight)}
+  .mmarks b{font-size:12px; line-height:12px; color:var(--teal-ink)}
+  .mlegend{display:flex; gap:16px; align-items:center; font-size:13px; color:var(--ink2); margin:8px 2px 0}
+  .mlegend span{display:inline-flex; align-items:center; gap:5px}
+  .mlegend b{color:var(--teal-ink)}
+  .mlist{display:flex; flex-direction:column; gap:8px}
+  .netnote{font-size:14px; color:var(--ink2); margin:0 2px 8px}
+  .tripbar{display:flex; align-items:center; gap:12px; width:100%; text-align:left; background:var(--midnight); color:var(--sawdust); border:2px solid var(--midnight); border-radius:12px; padding:10px 12px 10px 14px; margin:0 0 14px}
+  .tripbar .w{flex:1; min-width:0}
+  .tripbar small{display:block; font-size:13px; font-weight:700; letter-spacing:.06em; color:#CFC9B8}
+  .tripbar b{display:block; line-height:1.3}
+  .tripbar .l{display:block; font-size:14px; color:#CFC9B8}
+  .tripbar .open{flex:none; background:var(--orange); color:#fff; border-radius:10px; padding:12px 16px; font-weight:700}
+  .changed{background:#fff; border:1.5px solid var(--midnight); border-radius:10px; padding:10px 14px; margin:0 0 14px}
+  .changed b{display:block}
+  .changed div{font-size:15px; color:var(--ink2); margin-top:4px}
+  .tbhead{display:flex; align-items:center; gap:12px}
+  .tbhead .lotop{flex:1; min-width:0}
+  .tbhead .snip{width:96px}
   .lodet{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px}
   @media (max-width: 600px){ .lodet{grid-template-columns:minmax(0,1fr)} }
   .lopage{background:#fff; border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-top:12px; min-height:200px}
@@ -502,7 +565,7 @@ const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 // This page's version. Change it with every edit (date, then .1, .2 … for more than one that day).
 // Each device reports it when it opens; see  select * from devices();  in the SQL Editor.
-const PAGE_VERSION = "2026-10-22.1";
+const PAGE_VERSION = "2026-10-22.2";
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -1343,6 +1406,53 @@ function fmtWhen(ts) {
   const d = new Date(ts);
   return `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]} ${fmtDate(localISO(d))}, ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(/\s?([AP]M)$/, (m, x) => " " + x.toLowerCase())}`;
 }
+/** A time of day in words: "9:40 am". */
+function fmtTime(ts) {
+  if (!ts) return "";
+  return new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(/\s?([AP]M)$/, (m, x) => " " + x.toLowerCase());
+}
+
+/* ---- 22 Oct: Delivery's calendar. Days are the phone's own calendar days, Monday first. ---- */
+const DOW3 = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function addDays(iso, n) { const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number); return localISO(new Date(y, m - 1, d + n)); }
+function weekStart(iso) { const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number); return addDays(iso, -((new Date(y, m - 1, d).getDay() + 6) % 7)); }
+function monthFirst(iso, offset = 0) { const [y, m] = String(iso).slice(0, 10).split("-").map(Number); return localISO(new Date(y, m - 1 + offset, 1)); }
+function monthName(iso) { const [y, m] = String(iso).slice(0, 10).split("-").map(Number); return `${MONTH_NAMES[m - 1]} ${y}`; }
+function dayName(iso) { const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number); return `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date(y, m - 1, d).getDay()]} ${fmtDate(iso)}`; }
+/** "Oct 19 – 25", or "Oct 26 – Nov 1" across a month. */
+function rangeLabel(a, b) { return a.slice(0, 7) === b.slice(0, 7) ? `${fmtDate(a)} – ${Number(b.slice(8, 10))}` : `${fmtDate(a)} – ${fmtDate(b)}`; }
+/** What the browser says the connection is: "wifi", "cellular", "none" or "unknown". Saving in the background needs a sure "wifi" (Luke, 22 Oct). */
+function netKindOf(c) {
+  const t = c && typeof c.type === "string" ? c.type : "";
+  if (t === "wifi" || t === "ethernet") return "wifi";
+  if (t === "cellular" || t === "wimax" || t === "bluetooth") return "cellular";
+  if (t === "none") return "none";
+  return "unknown";
+}
+/** What the phone remembers of a trip, to tell later what changed. `sheets`: the job's current sheets, when known. */
+function tripSig(d, sheets) {
+  return { when: d.scheduled_for || null, note: d.schedule_note || "", ticket: d.ticket ? d.ticket.id : null,
+           files: (d.files || []).map(f => f.id).sort(),
+           pages: sheets && sheets.length ? sheets.map(x => [x.sheet_number, x.qty, x.png_path || ""].join(":")).join("|") : null };
+}
+/** What changed on a trip since the phone last remembered it: [{ tag, text }], words only. Who and when only where the
+ *  database keeps them (a ticket's or site file's adder); a move, a note or a change order says what, not who. */
+function tripChangeList(d, seen, sheets) {
+  if (!d || !seen) return [];
+  const out = [], now = tripSig(d, sheets);
+  const by = (x) => [x && x.added_by, x && x.added_at ? fmtWhen(x.added_at) : null].filter(Boolean).join(", ");
+  if (seen.when && now.when && new Date(seen.when).getTime() !== new Date(now.when).getTime()) out.push({ tag: "MOVED", text: `from ${fmtWhen(seen.when)}` });
+  if (now.ticket && now.ticket !== (seen.ticket || null)) out.push({ tag: seen.ticket ? "NEW TICKET" : "TICKET ADDED", text: by(d.ticket) });
+  else if (!now.ticket && seen.ticket) out.push({ tag: "TICKET TAKEN OFF", text: "" });
+  const was = seen.files || [];
+  const added = (d.files || []).filter(f => !was.includes(f.id)), gone = was.filter(id => !now.files.includes(id));
+  if (added.length) out.push({ tag: added.length === 1 ? "NEW SITE FILE" : `${added.length} NEW SITE FILES`, text: by(added[added.length - 1]) });
+  if (gone.length) out.push({ tag: gone.length === 1 ? "SITE FILE TAKEN OFF" : `${gone.length} SITE FILES TAKEN OFF`, text: "" });
+  if ((seen.note || "") !== now.note) out.push({ tag: "NOTE CHANGED", text: now.note ? "" : "the note was taken off" });
+  if (seen.pages && now.pages && seen.pages !== now.pages) out.push({ tag: "NEW WORK ORDER", text: "a change order since it was last opened" });
+  return out;
+}
 /** A delivery on the list, in words: "Delivery · truck photographed · 4 of 6 tables at the site · signed" */
 function deliveryLine(lo, plan) {
   if (lo && lo.kind === "dock") {
@@ -1437,6 +1547,10 @@ if (typeof document !== "undefined") (function () {
     // deliveries: scheduled trips (tickets, site files), trucks planned, the customer step per delivery
     deliveries: store.get("deliveries", []), dlReady: !!store.get("deliveries", null), dlTrucks: store.get("dl_trucks", {}), dlSig: {}, dlFiles: {},
     pkReady: store.get("pk_ready", false), pkBolMore: {},
+    // 22 Oct: Load-out as a calendar (week or month, remembered); trips saved for no signal in the background on Wi-Fi;
+    // what changed on a trip since it was last opened; trips called off after the phone saw them, until OK, got it
+    calView: store.get("cal_view", "week") === "month" ? "month" : "week", calWeek: 0, calMonth: 0, calDay: null,
+    bgSave: {}, cancelled: store.get("cancelled_dl", []) || [], tripSeen: store.get("trip_seen", {}) || {}, openChanges: null,
     // Advance (managers only): a job, a sheet on it, and unsaved changes to that sheet
     adv: store.get("adv", false), advJob: null, advSheet: null, advRows: [], advAt: null, advCached: false,
     advEdit: {}, advFilter: "", advLoading: false,
@@ -1738,6 +1852,8 @@ if (typeof document !== "undefined") (function () {
     store.set("pk_ready", S.pkReady);
     const tk = await read("dtasks", db.from("v_delivery_tasks").select("*"), "dtasks");          // trip_types.sql
     if (tk) S.dtasks = tk;
+    const cx = await read("cancelled", db.from("v_cancelled_deliveries").select("*"), "cancelled_dl");   // 22 Oct: called off since the phone saw them
+    if (cx) S.cancelled = cx;
     if (d) {
       // open ones; deliveries still on the road (the truck left, not yet delivered); pickups not yet picked up; the last two weeks
       S.loadouts = d.filter(l => l.is_open || daysSince(l.finished_at) <= 14
@@ -1754,6 +1870,8 @@ if (typeof document !== "undefined") (function () {
       if (lo.id) jobs.push(read("photos", db.from("v_photos").select("*").eq("loadout_id", lo.id), null).then(p => { if (p) S.loPhotos = p.filter(x => !x.voided); }));
       await Promise.all(jobs);
     }
+    noteTripsSeen();
+    saveStateSoon();
   }
   function currentLoadout() {
     if (!S.loView) return null;
@@ -1898,7 +2016,9 @@ if (typeof document !== "undefined") (function () {
     if (data) { S.past = data; S.pastAt = new Date().toISOString(); S.pastLoaded = true; store.set("past_" + dept, { rows: data, at: S.pastAt }); }
     else { const c = store.get("past_" + dept, null); if (c) { S.past = c.rows; S.pastAt = c.at; } S.pastLoaded = true; }
   }
+  let loOtherTabAt = 0;
   async function loadTab() {
+    if (S.tab !== "loadout" && S.dept === "delivery" && Date.now() - loOtherTabAt > 300000) { loOtherTabAt = Date.now(); loadLoadouts().then(render); }   // 22 Oct: the trip bar
     if (S.tab !== "arrow" && ARROW_DEPTS.includes(S.dept)) loadArrow().then(render);   // keeps the Arrow tab's count current
     if (S.tab === "work" || S.tab === "paint") return loadRows();
     if (S.tab === "past") return loadPast();
@@ -2090,6 +2210,8 @@ if (typeof document !== "undefined") (function () {
     snipUrls.set(path, url);
     return url;
   }
+  /** 22 Oct: a table card's head on a trip: the sheet's drawing, then its number, size and how many are photographed. */
+  const tableHead = (s) => `<div class="tbhead">${snipHtml(s.png_path, s.pages_ready)}<div class="lotop"><span class="no num">${s.sheet_number}</span><span class="size">${esc(sizeLabel(s) || s.item_code || "Sheet " + s.sheet_number)}</span><span class="cnt">${s.done} of ${s.qty}</span></div></div>`;
   /** A sheet's picture: ready, or an empty frame fillSnips() fills in. Nothing for a sheet whose page isn't uploaded. */
   function snipHtml(path, ready) {
     if (!path || !ready) return "";
@@ -2869,7 +2991,7 @@ if (typeof document !== "undefined") (function () {
       ${sheets === undefined ? `<div class="meta2">Loading the sheets…</div>` : ""}
       ${p.list.length ? `<div class="lostep">${ship ? "1 · Every table, before it's wrapped" : "Every table"} <span>— ${p.done} of ${p.total}</span></div>
         ${p.list.map(s => `<div class="locard${s.complete ? " done" : ""}">
-          <div class="lotop"><span class="no num">${s.sheet_number}</span><span class="size">${esc(sizeLabel(s) || s.item_code || "Sheet " + s.sheet_number)}</span><span class="cnt">${s.done} of ${s.qty}</span></div>
+          ${tableHead(s)}
           ${loSlots(s)}
           ${s.png_path && s.pages_ready ? `<button class="lowo" data-lowo="${s.sheet_number}">Work order</button>` : ""}</div>`).join("")}` : ""}
       ${ship ? `<div class="lostep">${p.list.length ? "2 · " : ""}Each pallet, once it's wrapped <span>— ${p.palletsHere.length} of ${p.pallets}</span></div>
@@ -2905,36 +3027,277 @@ if (typeof document !== "undefined") (function () {
     const open = all.filter(l => l.is_open);
     const ready = all.filter(l => l.ready_at && isPk(l) && !l.completed_at && !pkPlan(l).done)
       .sort((a, b) => String(a.ready_at).localeCompare(String(b.ready_at)));
-    const scheduled = open.filter(l => l.scheduled_for).sort((a, b) => String(a.scheduled_for).localeCompare(String(b.scheduled_for)));
     const pkDone = (l) => isPk(l) && pkPlan(l).done;           // picked up (maybe still waiting to send)
     const others = open.filter(l => !l.scheduled_for && !ready.includes(l) && !pkDone(l));
-    const road = all.filter(l => !l.is_open && isDl(l) && !l.completed_at);
     const done = all.filter(l => !ready.includes(l) && ((!l.is_open && !(isDl(l) && !l.completed_at)) || pkDone(l))
                               && (!(l.completed_at || l.finished_at) || daysSince(l.completed_at || l.finished_at) <= 14))
       .sort((a, b) => String(b.completed_at || b.finished_at || "~").localeCompare(String(a.completed_at || a.finished_at || "~")));
     const f = S.loForm;
     const already = f.jobId && open.find(l => l.job_id === f.jobId);
-    const tasks = openTasksHere(), tasksDone = S.dtasks.filter(t => t.done_at && !t.voided_at && daysSince(t.done_at) <= 14);
+    const tasksDone = S.dtasks.filter(t => t.done_at && !t.voided_at && daysSince(t.done_at) <= 14);
     const doneWhen = (l) => l.completed_at ? `${isPk(l) ? "Picked up" : "Delivered"} ${esc(fmtWhen(l.completed_at))}`
                           : isPk(l) ? "Picked up · waiting to send" : `Left ${esc(fmtDate(localISO(l.finished_at)))}`;
+    // 22 Oct: the scheduled trips and Delivery's tasks are on the calendar (week or month); pickups have no date, so they stay a list
     return `${missingNote("loadouts")}
-      ${ready.length ? `<h2 class="sec" style="margin-top:4px">Ready for pickup</h2>${ready.map(loCard).join("")}` : ""}
-      ${scheduled.length ? `<h2 class="sec"${ready.length ? "" : ` style="margin-top:4px"`}>Scheduled deliveries</h2>${scheduled.map(loCard).join("")}` : ""}
-      ${road.length ? `<h2 class="sec">On the road</h2>${road.map(loCard).join("")}` : ""}${tasks.length ? `<h2 class="sec">Tasks</h2>${tasks.map(taskCard).join("")}` : ""}
-      <div class="card"${ready.length || scheduled.length || road.length || tasks.length ? ` style="margin-top:22px"` : ""}><h3 style="margin:0 0 4px">Start a load-out</h3>
-        <p class="sub" style="margin:0 0 6px">${S.pkReady ? "For a trip that isn't listed above. Pick the kind, then the job." : "For a trip that isn't scheduled above, or a shipment. Pick the job going on the truck."}</p>
+      ${calendarHtml()}
+      ${ready.length ? `<h2 class="sec">Ready for pickup</h2>${ready.map(loCard).join("")}` : ""}
+      <div class="card" style="margin-top:22px"><h3 style="margin:0 0 4px">Start a load-out</h3>
+        <p class="sub" style="margin:0 0 6px">${S.pkReady ? "For a trip that isn't on the calendar. Pick the kind, then the job." : "For a trip that isn't on the calendar, or a shipment. Pick the job going on the truck."}</p>
         ${kindButtons(f.kind, "lostartkind")}
         ${jobPicker(f.jobId, f.filter)}
         ${already ? `<div class="banner info" style="margin:12px 0 0">${esc(already.project_id)} already has ${already.scheduled_for ? `a delivery scheduled for ${esc(fmtWhen(already.scheduled_for))}` : already.ready_at ? `a ${esc(tripName(already.kind).toLowerCase())} ready` : `a load-out open, started ${esc(agoText(already.started_at))}`}. Carry on with it, or start another for a second trip.
             <div class="rowbtns"><button data-loopen="${esc(already.client_id)}">Carry on with it</button></div></div>` : ""}
         <button class="go wide" style="margin-top:14px" data-lostart="1" ${f.jobId ? "" : "disabled"}>Start load-out</button></div>
-      ${others.length ? `<h2 class="sec">Open load-outs</h2>${others.map(loCard).join("")}`
-        : !scheduled.length && !road.length && !ready.length && !tasks.length ? `<h2 class="sec">Open load-outs</h2><div class="empty"><b>No load-out open</b>Start one above when a truck is being loaded.</div>` : ""}
+      ${others.length ? `<h2 class="sec">Open load-outs</h2>${others.map(loCard).join("")}` : ""}
       ${done.length || tasksDone.length ? `<h2 class="sec">Done in the last two weeks</h2>` + tasksDone.map(t => `<div class="li">
           <div class="li-top"><b>${t.is_test ? `<span class="tag">TEST</span>` : ""}Task</b><span class="meta2">${esc(taskSubject(t) || t.what)}</span></div>
           <div class="meta2">Done ${esc(fmtWhen(t.done_at))}${t.done_by_name ? ` · ${esc(t.done_by_name)}` : ""} · ${esc(t.what)}</div></div>`).join("") + done.map(l => `<div class="li">
           <div class="li-top"><b>${l.is_test ? `<span class="tag">TEST</span>` : ""}${esc(l.project_id)}</b><span class="meta2">${esc(l.job_name)}</span></div>
           <div class="meta2">${doneWhen(l)}${(l.completed_by_name || l.finished_by_name) ? ` · ${esc(l.completed_by_name || l.finished_by_name)}` : ""} · ${esc(isDl(l) ? deliveryLine(l, dlPlan(l)) : loadoutLine(l))}</div></div>`).join("") : ""}`;
+  }
+
+  // ---------- 22 Oct: the Load-out tab as a calendar, the trip bar, saved for no signal, what changed ----------
+  // Designed with Luke on 22 Oct (the spec's Delivery phone tab). All of it reads what the phone already gets:
+  // v_loadouts, v_deliveries, v_delivery_tasks, v_cancelled_deliveries, the sheets and the extras. No database change.
+  const todayISO = () => localISO(new Date());
+  const tomorrowISO = () => addDays(todayISO(), 1);
+  /** Wi-Fi, mobile data, none, or unknown (the phone can't tell). The tests stand in with window.sfNet. */
+  function netKind() {
+    if (window.sfNet) { try { return window.sfNet(); } catch (e) {} }
+    if (!navigator.onLine) return "none";
+    return netKindOf(navigator.connection || navigator.mozConnection || navigator.webkitConnection || null);
+  }
+  const allTrips = () => [...S.localLoadouts.map(l => ({ ...l, local: true, is_open: true })), ...S.loadouts];
+
+  // what changed: the phone remembers each open trip as it was first seen or last opened
+  const sheetsAsked = new Set();
+  function noteTripsSeen() {
+    const seen = S.tripSeen, now = new Date().toISOString(), live = new Set();
+    let changed = false;
+    for (const d of S.deliveries || []) {
+      if (d.is_done) continue;
+      live.add(d.client_id);
+      const sheets = S.loSheets[d.job_id];
+      if (!seen[d.client_id]) { seen[d.client_id] = { ...tripSig(d, sheets), at: now }; changed = true; }
+      else if (!seen[d.client_id].pages && sheets && sheets.length) { seen[d.client_id].pages = tripSig(d, sheets).pages; changed = true; }   // learnt, not changed
+      if (!sheets && !sheetsAsked.has(d.job_id) && S.online) { sheetsAsked.add(d.job_id); loadLoSheets(d.job_id).then(() => { noteTripsSeen(); render(); }).catch(() => {}); }
+    }
+    for (const c of S.cancelled || []) live.add(c.client_id);
+    for (const id of Object.keys(seen)) if (!live.has(id) && daysSince(seen[id].at) > 60) { delete seen[id]; changed = true; }
+    if (changed) store.set("trip_seen", seen);
+  }
+  function markTripSeen(cid) {
+    const d = (S.deliveries || []).find(x => x.client_id === cid);
+    if (!d) return;
+    const prev = S.tripSeen[cid] || {}, sig = tripSig(d, S.loSheets[d.job_id]);
+    S.tripSeen[cid] = { ...sig, pages: sig.pages || prev.pages || null, at: prev.at || new Date().toISOString() };
+    store.set("trip_seen", S.tripSeen);
+  }
+  function changesFor(cid) {
+    const d = (S.deliveries || []).find(x => x.client_id === cid);
+    return d && !d.is_done ? tripChangeList(d, S.tripSeen[cid], S.loSheets[d.job_id]) : [];
+  }
+  /** Dated trips called off after this phone had seen them, until someone taps OK, got it (which forgets the trip here).
+   *  The phone only remembers trips it saw open, so one it remembers was called off since: no clock comparison (a phone's
+   *  clock can be minutes off the database's). */
+  const calledOff = () => (S.cancelled || []).filter(c => c.scheduled_for && (!c.kind || c.kind === "delivery" || c.kind === "dock") && !!S.tripSeen[c.client_id]);
+  const changeLines = (list, el = "span", cls = "l") => list.map(c => `<${el} class="${cls}"><span class="ctag">${esc(c.tag)}</span>${esc(c.text || "")}</${el}>`).join("");
+  /** At the top of a trip just opened: what changed since it was last opened, once. */
+  function changedBox(lo) {
+    const list = S.openChanges && S.openChanges.id === lo.client_id ? S.openChanges.list : [];
+    return list.length ? `<div class="changed"><b>Changed since you last opened it</b>${changeLines(list, "div", "")}</div>` : "";
+  }
+  async function openTrip(cid) {
+    S.loView = cid; S.loWo = null; S.loDoc = null; S.loPhotos = []; S.loItem = "";
+    const pre = changesFor(cid);
+    S.openChanges = { id: cid, list: pre };
+    render(); scrollTo(0, 0);
+    await loadLoadouts();
+    if (S.loView === cid) {
+      const post = changesFor(cid);
+      S.openChanges = { id: cid, list: pre.concat(post.filter(c => !pre.some(x => x.tag === c.tag))) };
+      markTripSeen(cid);
+    }
+    render();
+  }
+
+  // saved for no signal: today's and tomorrow's trips (and any still open from before) save themselves, on Wi-Fi only (Luke, 22 Oct)
+  const keyFor = (kind, path) => new Request(location.origin + (kind === "page" ? "/__sheet-pages__/" : "/__delivery-files__/") + encodeURIComponent(path));
+  const cacheName = (kind) => kind === "page" ? "sheet-pages-v1" : "delivery-files-v1";      // the same copies opening a trip keeps
+  async function onPhone(kind, path) {
+    if (!("caches" in window)) return false;
+    try { return !!(await (await caches.open(cacheName(kind))).match(keyFor(kind, path))); } catch (e) { return false; }
+  }
+  /** Keep one file on the phone, fetched once: a page or delivery file already kept is never fetched again. */
+  async function keepOnPhone(kind, path, mime) {
+    if (await onPhone(kind, path)) return true;
+    if (!("caches" in window)) return false;
+    const { data, error } = await db.storage.from(kind === "page" ? "work-orders" : "deliveries").download(path);
+    if (error) throw error;
+    await (await caches.open(cacheName(kind))).put(keyFor(kind, path), new Response(data, { headers: { "Content-Type": kind === "page" ? "image/png" : (mime || data.type || "application/octet-stream") } }));
+    return true;
+  }
+  const isTripKind = (d) => d && (d.kind === "delivery" || d.kind === "dock");
+  const tripsToSave = () => (S.deliveries || []).filter(d => !d.is_done && d.scheduled_for && isTripKind(d) && localISO(d.scheduled_for) <= tomorrowISO());
+  /** What a trip needs on the phone: its work order pages, its ticket and its site files. */
+  function tripFiles(d) {
+    const pages = (S.loSheets[d.job_id] || []).filter(x => x.png_path && x.pages_ready).map(x => ({ kind: "page", path: x.png_path }));
+    const files = [d.ticket, ...(d.files || [])].filter(x => x && x.in_cloud !== false).map(x => ({ kind: "file", path: x.path, mime: x.mime }));
+    return pages.concat(files);
+  }
+  let saveTimer = null, saveRunning = false;
+  function saveStateSoon() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { refreshSaveState().catch(() => {}); }, 300); }
+  /** Which of those trips are already on the phone (no download to find out); on Wi-Fi, fetch what's missing. */
+  async function refreshSaveState() {
+    if (saveRunning || !S.me || S.dept !== "delivery") return;
+    saveRunning = true;
+    try {
+      for (const d of tripsToSave()) {
+        const wifi = S.online && netKind() === "wifi";
+        if (!S.loSheets[d.job_id] || wifi) await loadLoSheets(d.job_id);     // the sheet list is small; with no signal it's the phone's copy
+        const want = tripFiles(d);
+        const st = S.bgSave[d.client_id] = { total: want.length, saved: 0, busy: false };
+        for (const x of want) if (await onPhone(x.kind, x.path)) st.saved++;
+        if (wifi && st.saved < st.total) {
+          st.busy = true; render();
+          let n = 0;
+          for (const x of want) { try { if (await keepOnPhone(x.kind, x.path, x.mime)) n++; } catch (e) { if (isNetworkError(e)) break; } st.saved = Math.max(st.saved, n); }
+          st.saved = n; st.busy = false;
+          if (want.some(x => x.kind === "file" && isPdfFile(x.path, x.mime)) && Date.now() - pdfjsFailedAt > 60000) loadPdfViewer().catch(() => {});
+        }
+        if (wifi) await loadExtras(d.job_id).catch(() => {});
+      }
+    } finally { saveRunning = false; }
+    render();
+  }
+  const netNote = () => netKind() === "unknown" && tripsToSave().length
+    ? `<p class="netnote">This phone can't tell Wi-Fi from mobile data, so it doesn't save trips by itself. Open each trip on Wi-Fi before the truck leaves, as before.</p>` : "";
+  /** One line on a trip: saved for no signal, saving, or not yet. */
+  function saveLine(d) {
+    if (!d || d.is_done || !d.scheduled_for || !isTripKind(d)) return "";
+    const nk = netKind();
+    if (localISO(d.scheduled_for) > tomorrowISO()) return nk === "unknown" ? "" : `<span class="saveline">Saves itself the day before</span>`;
+    const st = S.bgSave[d.client_id];
+    if (!st || !st.total) return "";
+    if (st.saved >= st.total) return `<span class="saveline ready">✓ Ready for no signal</span>`;
+    if (st.busy) return `<span class="saveline">Saving for no signal · ${st.saved} of ${st.total}</span>`;
+    return `<span class="saveline not">Not saved yet · ${st.saved} of ${st.total} on this phone · ${nk === "unknown" ? "open it on Wi-Fi to save it" : "it saves itself on Wi-Fi"}</span>`;
+  }
+
+  // the trip bar: on every Delivery tab while a trip is in progress (on the road, or started at our dock); none otherwise
+  function tripsInProgress() {
+    if (S.dept !== "delivery" || !lo2()) return [];
+    const started = (l) => (l.photo_count || 0) > 0 || (l.trucks_here || []).length > 0 || (l.pieces_here || []).length > 0
+                        || (l.pallets_here || []).length > 0 || (l.bol_here || 0) > 0 || dlPend(l).length > 0;
+    const out = [];
+    for (const l of allTrips()) {
+      if (l.completed_at) continue;
+      if (!l.is_open && isDl(l)) { if (!dlPlan(l).waitingDone) out.push({ l, road: true }); continue; }
+      if (l.is_open && started(l) && !(isPk(l) && pkPlan(l).done) && !(isDl(l) && dlPlan(l).waitingDone)) out.push({ l, road: false });
+    }
+    return out.sort((a, b) => (b.road ? 1 : 0) - (a.road ? 1 : 0));      // a truck on the road first, then what's loading
+  }
+  function tripBar() {
+    const list = tripsInProgress().filter(x => !(S.tab === "loadout" && S.loView === x.l.client_id));
+    return list.slice(0, 3).map(({ l, road }) => {
+      const left = !l.finished_at ? "" : localISO(l.finished_at) === todayISO() ? fmtTime(l.finished_at) : fmtWhen(l.finished_at);
+      return `<button class="tripbar" data-tripbar="${esc(l.client_id)}"><span class="w"><small>${road ? `ON THE ROAD${left ? ` · LEFT ${esc(left.toUpperCase())}` : ""}` : "LOADING"}</small>
+        <b>${l.is_test ? "TEST · " : ""}${esc(l.project_id)} · ${esc(l.job_name)}</b>
+        <span class="l">${esc(isDl(l) ? deliveryLine(l, dlPlan(l)) : loadoutLine(l))}</span></span><span class="open">Open</span></button>`;
+    }).join("");
+  }
+
+  // the calendar
+  /** Everything on it, by day: trips and tasks in time order; done ones on the day they were done; called-off ones
+   *  until OK, got it. A trip or task still open from an earlier day shows on today, with its own date. */
+  function calEntries() {
+    const today = todayISO(), by = {};
+    const put = (day, e) => (by[day] = by[day] || []).push(e);
+    for (const l of allTrips()) {
+      if (l.completed_at || !l.scheduled_for || !(l.is_open || isDl(l))) continue;
+      const day = localISO(l.scheduled_for);
+      put(day < today ? today : day, { type: "trip", l, at: l.scheduled_for, carried: day < today });
+    }
+    for (const d of S.deliveries || []) if (d.is_done && d.completed_at) put(localISO(d.completed_at), { type: "done", d, at: d.completed_at });
+    for (const t of S.dtasks || []) {
+      if (t.voided_at || !t.scheduled_for) continue;
+      if (t.done_at) { put(localISO(t.done_at), { type: "taskdone", t, at: t.done_at }); continue; }
+      const day = localISO(t.scheduled_for);
+      put(day < today ? today : day, { type: "task", t, at: t.scheduled_for, carried: day < today });
+    }
+    for (const c of calledOff()) put(localISO(c.scheduled_for), { type: "off", c, at: c.scheduled_for });
+    for (const k of Object.keys(by)) by[k].sort((a, b) => (b.carried ? 1 : 0) - (a.carried ? 1 : 0) || new Date(a.at) - new Date(b.at));
+    return by;
+  }
+  function calItem(e, prog) {
+    const rest = (line) => String(line || "").split(" · ").slice(1).join(" · ");
+    if (e.type === "trip") {
+      const l = e.l, plan = isDl(l) ? dlPlan(l) : null, line = isDl(l) ? deliveryLine(l, plan) : loadoutLine(l);
+      const p = prog.find(x => x.l.client_id === l.client_id);
+      const status = p ? `${p.road ? "On the road" : "Loading"}${rest(line) ? " · " + rest(line) : ""}` : plan && plan.waitingDone ? rest(line) : "";
+      return `<button class="calitem" data-loopen="${esc(l.client_id)}"><span class="t"><b>${esc(e.carried ? fmtWhen(l.scheduled_for) : fmtTime(l.scheduled_for))}</b><span>${l.kind === "dock" ? "Dock to dock" : "Delivery"}</span></span>
+        <span class="j">${l.is_test ? `<span class="tag">TEST</span>` : ""}<b>${esc(l.project_id)}</b> <span>${esc(l.job_name)}</span></span>
+        ${status ? `<span class="l s">${esc(status)}</span>` : ""}${changeLines(changesFor(l.client_id))}${saveLine(dlOf(l))}</button>`;
+    }
+    if (e.type === "task") {
+      const t = e.t, sub = [taskSubject(t), t.where_text].filter(Boolean).join(" · ");
+      return `<button class="calitem" data-taskopen="${esc(t.id)}"><span class="t"><b>${esc(e.carried ? fmtWhen(t.scheduled_for) : fmtTime(t.scheduled_for))}</b><span>Task</span></span>
+        <span class="j">${t.is_test ? `<span class="tag">TEST</span>` : ""}<b>${esc(t.what)}</b></span>
+        ${sub ? `<span class="m">${esc(sub)}</span>` : ""}${taskDoneWaiting(t) ? `<span class="l s">Done · waiting to send</span>` : ""}</button>`;
+    }
+    if (e.type === "done") {
+      const d = e.d, pk = d.kind === "shipping" || d.kind === "customer_pickup";
+      return `<div class="calitem done"><span class="t"><b>✓ ${pk ? "Picked up" : "Delivered"} ${esc(fmtTime(d.completed_at))}</b><span>${esc(pk ? tripName(d.kind) : d.kind === "dock" ? "Dock to dock" : "Delivery")}</span></span>
+        <span class="j">${d.is_test ? `<span class="tag">TEST</span>` : ""}<b>${esc(d.project_id)}</b> <span>${esc(d.job_name)}</span></span></div>`;
+    }
+    if (e.type === "taskdone") {
+      const t = e.t;
+      return `<div class="calitem done"><span class="t"><b>✓ Task done ${esc(fmtTime(t.done_at))}</b></span>
+        <span class="j">${t.is_test ? `<span class="tag">TEST</span>` : ""}<b>${esc(t.what)}</b></span></div>`;
+    }
+    const c = e.c;
+    return `<div class="calitem off"><span class="l" style="margin-top:0"><span class="ctag">CALLED OFF</span>was ${esc(fmtTime(c.scheduled_for))}</span>
+      <span class="j">${c.is_test ? `<span class="tag">TEST</span>` : ""}<b>${esc(c.project_id)}</b> ${esc(c.job_name)}</span>
+      <span class="m">${esc([c.voided_by_name, c.voided_at ? fmtWhen(c.voided_at) : null].filter(Boolean).join(", "))}</span>
+      <button class="btn" data-offok="${esc(c.client_id)}">OK, got it</button></div>`;
+  }
+  const chev = (d) => `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+  function calendarHtml() {
+    const month = S.calView === "month";
+    return `<div class="calbar"><div class="calsw"><button data-calview="week" aria-pressed="${!month}">Week</button><button data-calview="month" aria-pressed="${month}">Month</button></div>
+        <button class="caltoday" data-caltoday="1">Today</button></div>${netNote()}${month ? monthHtml() : weekHtml()}`;
+  }
+  function weekHtml() {
+    const by = calEntries(), prog = tripsInProgress(), today = todayISO(), start = addDays(weekStart(today), 7 * S.calWeek), end = addDays(start, 6);
+    const title = `${S.calWeek === 0 ? "This week" : S.calWeek === 1 ? "Next week" : S.calWeek === -1 ? "Last week" : "Week of"} · ${rangeLabel(start, end)}`;
+    let rows = "";
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(start, i), list = by[day] || [];
+      rows += `<div class="wkday${day === today ? " today" : ""}" data-day="${day}"><div class="wkdate"><small>${DOW3[i]}</small><span class="n num">${Number(day.slice(8, 10))}</span></div>
+        <div class="wkitems">${list.length ? list.map(e => calItem(e, prog)).join("") : `<div class="wkempty">Nothing planned</div>`}</div></div>`;
+    }
+    return `<div class="calnav"><button data-calprev="1" aria-label="Previous week">${chev("M10 3L5 8l5 5")}</button><b>${esc(title)}</b><button data-calnext="1" aria-label="Next week">${chev("M6 3l5 5-5 5")}</button></div>${rows}`;
+  }
+  function monthHtml() {
+    const by = calEntries(), prog = tripsInProgress(), today = todayISO(), first = monthFirst(today, S.calMonth), ym = first.slice(0, 7);
+    const last = addDays(monthFirst(today, S.calMonth + 1), -1), end = addDays(weekStart(last), 6);
+    const sel = S.calDay && S.calDay.slice(0, 7) === ym ? S.calDay : today.slice(0, 7) === ym ? today : first;
+    let cells = "";
+    for (let day = weekStart(first); day <= end; day = addDays(day, 1)) {
+      const list = (by[day] || []).filter(e => e.type !== "off");
+      const n = { trip: 0, task: 0, done: 0 };
+      list.forEach(e => { n[e.type === "trip" ? "trip" : e.type === "task" ? "task" : "done"]++; });
+      const marks = list.slice(0, 4).map(e => e.type === "trip" ? "<i></i>" : e.type === "task" ? `<i class="task"></i>` : "<b>✓</b>").join("") + (list.length > 4 ? "<b>+</b>" : "");
+      const label = [dayName(day), n.trip ? `${n.trip} trip${n.trip === 1 ? "" : "s"}` : null, n.task ? `${n.task} task${n.task === 1 ? "" : "s"}` : null, n.done ? `${n.done} done` : null].filter(Boolean).join(", ");
+      cells += `<button class="mday${day.slice(0, 7) === ym ? "" : " out"}${day === today ? " today" : ""}" data-calday="${day}" aria-pressed="${day === sel}" aria-label="${esc(label)}"><span class="n">${Number(day.slice(8, 10))}</span><span class="mmarks">${marks}</span></button>`;
+    }
+    const list = by[sel] || [];
+    return `<div class="calnav"><button data-calprev="1" aria-label="Previous month">${chev("M10 3L5 8l5 5")}</button><b>${esc(monthName(first))}</b><button data-calnext="1" aria-label="Next month">${chev("M6 3l5 5-5 5")}</button></div>
+      <div class="mdow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+      <div class="mgrid">${cells}</div>
+      <div class="mlegend"><span><i></i>trip</span><span><i class="task"></i>task</span><span><b>✓</b>done</span></div>
+      <h2 class="sec">${esc(dayName(sel))}${sel === today ? " · today" : ""}</h2>
+      <div class="mlist">${list.length ? list.map(e => calItem(e, prog)).join("") : `<div class="wkempty" style="padding-top:0">Nothing planned for this day.</div>`}</div>`;
   }
   // ---------- Delivery's tasks (trip_types.sql): what to do, when, where; Done with a note and photos if wanted ----------
   const taskSubject = (t) => [t.project_id ? `${t.project_id}${t.job_name ? " " + t.job_name : ""}` : "", t.for_text || ""].filter(Boolean).join(" · ");
@@ -3017,6 +3380,7 @@ if (typeof document !== "undefined") (function () {
       <h1>${lo.is_test ? `<span class="tag">TEST</span>` : ""}${esc(lo.project_id)}</h1>
       <p class="sub">${esc(lo.job_name)}${lo.scheduled_for ? "" : ` · started ${esc(agoText(lo.started_at))}${lo.started_by_name ? ` by ${esc(lo.started_by_name)}` : ""}`}${lo.id ? "" : " · waiting to send"}</p>
       ${lo.scheduled_for ? `<div class="dlwhen">${dock ? "Dock to dock" : "Delivery"} ${esc(fmtWhen(lo.scheduled_for))}</div>` : ""}
+      ${changedBox(lo)}
       ${left || lo.scheduled_for || plan.delivered ? "" : kindButtons(lo.kind, "lokind")}
       ${ready}
       ${d || wob ? `<div class="dlinfo">${d && d.schedule_note ? `<div style="margin-bottom:8px"><b>Note${d.scheduled_by_name ? ` from ${esc(d.scheduled_by_name)}` : ""}:</b> ${esc(d.schedule_note)}</div>` : ""}
@@ -3026,7 +3390,7 @@ if (typeof document !== "undefined") (function () {
       ${dock ? `<div class="lostep">1 · At our dock — each table before it leaves <span>— ${plan.dock.done} of ${plan.dock.total}</span></div>
         ${sheets === undefined ? `<div class="meta2">Loading the sheets…</div>` : ""}
         ${plan.dock.list.length ? plan.dock.list.map(s => `<div class="locard${s.complete ? " done" : ""}">
-            <div class="lotop"><span class="no num">${s.sheet_number}</span><span class="size">${esc(sizeLabel(s) || s.item_code || "Sheet " + s.sheet_number)}</span><span class="cnt">${s.done} of ${s.qty}</span></div>
+            ${tableHead(s)}
             ${plan.delivered || left ? "" : loSlots(s)}
             ${s.png_path && s.pages_ready ? `<button class="lowo" data-lowo="${s.sheet_number}">Work order</button>` : ""}</div>`).join("")
           : sheets ? `<div class="meta2">No work order uploaded, so there are no tables to tick off. Photograph each item below, with a few words.</div>` : ""}` : ""}
@@ -3043,7 +3407,7 @@ if (typeof document !== "undefined") (function () {
       <div class="lostep">2 · At the site — each table where it ended up <span>— ${p.done} of ${p.total}</span></div>
       ${sheets === undefined ? `<div class="meta2">Loading the sheets…</div>` : ""}
       ${p.list.length ? p.list.map(s => `<div class="locard${s.complete ? " done" : ""}">
-          <div class="lotop"><span class="no num">${s.sheet_number}</span><span class="size">${esc(sizeLabel(s) || s.item_code || "Sheet " + s.sheet_number)}</span><span class="cnt">${s.done} of ${s.qty}</span></div>
+          ${tableHead(s)}
           ${plan.delivered ? "" : siteSlots(s)}
           ${s.png_path && s.pages_ready ? `<button class="lowo" data-lowo="${s.sheet_number}">Work order</button>` : ""}</div>`).join("")
         : sheets ? `<div class="meta2">No work order uploaded, so there are no tables to tick off. Photograph each item below, with a few words.</div>` : ""}
@@ -3077,7 +3441,7 @@ if (typeof document !== "undefined") (function () {
     const tablesStep = `<div class="lostep">1 · ${bol ? "Every table, before it's wrapped" : "Each table as it's handed over"} <span>— ${p.done} of ${p.total}</span></div>
       ${sheets === undefined ? `<div class="meta2">Loading the sheets…</div>` : ""}
       ${p.list.length ? p.list.map(s => `<div class="locard${s.complete ? " done" : ""}">
-          <div class="lotop"><span class="no num">${s.sheet_number}</span><span class="size">${esc(sizeLabel(s) || s.item_code || "Sheet " + s.sheet_number)}</span><span class="cnt">${s.done} of ${s.qty}</span></div>
+          ${tableHead(s)}
           ${done ? "" : slots(s)}
           ${s.png_path && s.pages_ready ? `<button class="lowo" data-lowo="${s.sheet_number}">Work order</button>` : ""}</div>`).join("")
         : sheets ? `<div class="meta2">No work order uploaded, so there are no tables to tick off. Photograph each item below, with a few words.</div>` : ""}`;
@@ -3128,6 +3492,7 @@ if (typeof document !== "undefined") (function () {
       <p class="sub">${esc(lo.job_name)}${lo.ready_at ? "" : ` · started ${esc(agoText(lo.started_at))}${lo.started_by_name ? ` by ${esc(lo.started_by_name)}` : ""}`}${lo.id ? "" : " · waiting to send"}</p>
       ${lo.ready_at ? `<div class="dlwhen">${esc(tripName(lo.kind))} · ready since ${esc(fmtDate(localISO(lo.ready_at)))}</div>`
                     : done ? "" : kindButtons(lo.kind, "lokind")}
+      ${changedBox(lo)}
       ${pg && pg.total ? `<div class="lopages${pg.saved === pg.total ? " ready" : ""}">${pg.saved === pg.total ? `✓ Ready for no signal · ${pg.total} work order page${pg.total === 1 ? "" : "s"} saved on this device`
           : pg.busy ? `Saving the work order pages for no signal… ${pg.saved} of ${pg.total}` : `${pg.saved} of ${pg.total} work order pages saved on this device.`}</div>` : ""}
       ${(d && (d.schedule_note || d.ticket || (d.files || []).length)) || wob ? `<div class="dlinfo">${d && d.schedule_note ? `<div style="margin-bottom:8px"><b>Note${d.scheduled_by_name ? ` from ${esc(d.scheduled_by_name)}` : ""}:</b> ${esc(d.schedule_note)}</div>` : ""}
@@ -3642,7 +4007,7 @@ if (typeof document !== "undefined") (function () {
     else {
       const top = S.tab === "issues" ? issuesScreen() : S.tab === "tasks" ? tasksScreen() : S.tab === "qc" ? qcScreen() : S.tab === "arrow" ? arrowSection() : S.tab === "supplies" ? suppliesScreen() : S.tab === "inventory" ? inventoryScreen()
                 : S.tab === "loadout" ? loadoutScreen() : S.tab === "past" ? pastScreen() : queueScreen();
-      body = subTabs() + top;
+      body = subTabs() + tripBar() + top;           // 22 Oct: the trip in progress, one tap away on every Delivery tab
     }
     const topLevel = S.adv ? !S.advJob : !(((onCountTab() || S.tab === "past") && S.view.screen !== "queue") || (S.tab === "arrow" && S.arWo));
     const foot = topLevel ? `<div class="foot"><button class="link" data-signout="1">Sign out</button></div>` : "";
@@ -4060,8 +4425,17 @@ if (typeof document !== "undefined") (function () {
       delete S.loDet[lo.client_id];
     };
     on("[data-losavedet]", () => { saveDet(); render(); });
-    on("[data-loopen]", async (b) => { S.loView = b.dataset.loopen; S.loWo = null; S.loDoc = null; S.loPhotos = []; S.loItem = ""; render(); scrollTo(0, 0); await loadLoadouts(); render(); });
-    on("[data-loback]", async () => { S.loView = null; S.loWo = null; S.loDoc = null; render(); await loadLoadouts(); render(); });
+    on("[data-loopen]", (b) => openTrip(b.dataset.loopen));
+    on("[data-loback]", async () => { S.loView = null; S.loWo = null; S.loDoc = null; S.openChanges = null; render(); await loadLoadouts(); render(); });
+    // 22 Oct: the trip bar (from any Delivery tab), the calendar, and OK on a called-off trip
+    on("[data-tripbar]", async (b) => { S.tab = "loadout"; store.set("tab", S.tab); S.view = { screen: "queue" }; S.notice = null; S.arWo = null; S.taskView = null; await openTrip(b.dataset.tripbar); });
+    on("[data-calview]", (b) => { S.calView = b.dataset.calview === "month" ? "month" : "week"; store.set("cal_view", S.calView); render(); });
+    on("[data-calprev]", () => { if (S.calView === "month") S.calMonth--; else S.calWeek--; render(); });
+    on("[data-calnext]", () => { if (S.calView === "month") S.calMonth++; else S.calWeek++; render(); });
+    on("[data-caltoday]", () => { S.calWeek = 0; S.calMonth = 0; S.calDay = null; render(); });
+    on("[data-calday]", (b) => { const day = b.dataset.calday, t = todayISO(); S.calDay = day;
+      S.calMonth = (Number(day.slice(0, 4)) - Number(t.slice(0, 4))) * 12 + Number(day.slice(5, 7)) - Number(t.slice(5, 7)); render(); });
+    on("[data-offok]", (b) => { delete S.tripSeen[b.dataset.offok]; store.set("trip_seen", S.tripSeen); render(); });
     // a pickup's photos come straight from the camera, like a delivery's
     const shootFor = (sheet, note, label, extra = {}, fresh = false) => takePhoto(async (shot) => {
       if (!lo) return;
@@ -4410,7 +4784,8 @@ if (typeof document !== "undefined") (function () {
   }
 
   // ---------- keep things current ----------
-  window.addEventListener("online", () => { S.online = true; flush(); flushLog(); loadRows().then(render); });
+  window.addEventListener("online", () => { S.online = true; flush(); flushLog(); loadRows().then(render); saveStateSoon(); });
+  try { const nc = navigator.connection; if (nc && nc.addEventListener) nc.addEventListener("change", () => saveStateSoon()); } catch (e) {}
   window.addEventListener("offline", () => { S.online = false; render(); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden && S.me) { flush(); flushLog(); if (S.view.screen === "queue" && !S.modal) refreshAll().then(render); } });
   setInterval(() => { if (S.me && !document.hidden) { flush(); flushLog(); if (S.view.screen === "queue" && !S.modal) refreshAll().then(render); } }, 60000);

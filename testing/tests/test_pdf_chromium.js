@@ -95,7 +95,13 @@ async function session(browser, base, opts = {}) {
 const app = (p) => p.evaluate(() => document.getElementById("app").innerText);
 async function openTicket(p, pid) {
   await p.waitForFunction(() => /Load-out|Coming up|Delivery/i.test(document.getElementById("app").innerText), null, { timeout: 15000 });
-  await p.waitForFunction((pid) => [...document.querySelectorAll("[data-loopen]")].some(b => b.textContent.includes(pid)), pid, { timeout: 15000 });
+  // 22 Oct: the Load-out tab is a calendar, a week at a time; a trip "tomorrow" is next week's on a Sunday
+  const has = () => p.evaluate((pid) => [...document.querySelectorAll("[data-loopen]")].some(b => b.textContent.includes(pid)), pid);
+  for (let k = 0; k < 3 && !(await has()); k++) {
+    await p.waitForFunction((pid) => [...document.querySelectorAll("[data-loopen]")].some(b => b.textContent.includes(pid)), pid, { timeout: k ? 1500 : 15000 }).catch(() => {});
+    if (await has() || !(await p.$("[data-calnext]"))) break;
+    await p.click("[data-calnext]"); await p.waitForTimeout(300);
+  }
   await p.evaluate((pid) => [...document.querySelectorAll("[data-loopen]")].find(b => b.textContent.includes(pid)).click(), pid);
   await p.waitForSelector("[data-dlopen]", { timeout: 15000 });
 }

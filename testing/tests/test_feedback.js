@@ -39,6 +39,24 @@ const $ = (w, s) => w.document.querySelector(s);
 const $$ = (w, s) => [...w.document.querySelectorAll(s)];
 const txt = (w, sel = "#app") => (($(w, sel) || {}).textContent || "").replace(/\s+/g, " ");
 async function click(w, sel, pause = 150) { const el = typeof sel === "string" ? $(w, sel) : sel; if (!el) throw new Error("no " + sel); el.click(); await wait(pause); }
+
+// 22 Oct: the Load-out tab is a calendar, a week at a time. The nth trip matching `want` (a PROJ, or a test on the button):
+// this week first, then the next two, since a trip "tomorrow" is next week's on a Sunday. A page with no calendar: the list.
+async function tripButton(w, want, nth = 0) {
+  const match = () => [...w.document.querySelectorAll("#app [data-loopen]")].filter(b => typeof want === "function" ? want(b) : b.textContent.includes(want));
+  const cal = () => w.document.querySelector("#app [data-calnext]");
+  await until(() => match().length > nth || cal(), 8000);
+  if (!cal()) return match()[nth] || null;
+  w.document.querySelector("#app [data-caltoday]").click(); await wait(150);
+  const found = [];
+  for (let k = 0; k < 3; k++) {
+    await until(() => match().some(b => !found.includes(b.dataset.loopen)), k ? 500 : 6000);
+    for (const b of match()) if (!found.includes(b.dataset.loopen)) found.push(b.dataset.loopen);
+    if (found.length > nth) return match().find(b => b.dataset.loopen === found[nth]) || null;
+    cal().click(); await wait(250);
+  }
+  return null;
+}
 function type(w, el, value) { el.value = value; el.dispatchEvent(new w.Event("input", { bubbles: true })); }
 const rows = async () => (await admin.query("select f.*, p.full_name from feedback f join profiles p on p.id = f.user_id order by created_at")).rows;
 const OFFICE_PIN = { sfo_pin: JSON.stringify({ none: true }) };
@@ -122,8 +140,7 @@ async function sendShared(w, note) {
   const when = new Date(Date.now() + 86400000); when.setHours(9, 0, 0, 0);
   await luke.rpc("schedule_delivery", { p_job: jid, p_when: when.toISOString(), p_note: null, p_loadout: null, p_client_id: crypto.randomUUID() });
   t = boot("index.html", users.shawn); w = t.w;
-  await until(() => $$(w, "[data-loopen]").some(b => /PROJ-00418/.test(b.textContent)), 8000);
-  await click(w, $$(w, "[data-loopen]").find(b => /PROJ-00418/.test(b.textContent)), 500);
+  await click(w, await tripButton(w, "PROJ-00418"), 500);
   await click(w, "[data-feedback]");
   ok("Shawn's phone names the trip", /Delivery › Load-out › PROJ-00418 white glove/.test(txt(w, ".mdl .sub")), txt(w, ".mdl .sub"));
   await click(w, "[data-close]"); w.close();

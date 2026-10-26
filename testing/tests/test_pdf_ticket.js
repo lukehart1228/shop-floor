@@ -66,6 +66,24 @@ const $ = (w, s) => w.document.querySelector(s);
 const $$ = (w, s) => [...w.document.querySelectorAll(s)];
 const txt = (w) => ($(w, "#app") || {}).textContent.replace(/\s+/g, " ") || "";
 async function click(w, sel, pause = 150) { const el = typeof sel === "string" ? $(w, sel) : sel; if (!el) throw new Error("no " + sel); el.click(); await wait(pause); }
+
+// 22 Oct: the Load-out tab is a calendar, a week at a time. The nth trip matching `want` (a PROJ, or a test on the button):
+// this week first, then the next two, since a trip "tomorrow" is next week's on a Sunday. A page with no calendar: the list.
+async function tripButton(w, want, nth = 0) {
+  const match = () => [...w.document.querySelectorAll("#app [data-loopen]")].filter(b => typeof want === "function" ? want(b) : b.textContent.includes(want));
+  const cal = () => w.document.querySelector("#app [data-calnext]");
+  await until(() => match().length > nth || cal(), 8000);
+  if (!cal()) return match()[nth] || null;
+  w.document.querySelector("#app [data-caltoday]").click(); await wait(150);
+  const found = [];
+  for (let k = 0; k < 3; k++) {
+    await until(() => match().some(b => !found.includes(b.dataset.loopen)), k ? 500 : 6000);
+    for (const b of match()) if (!found.includes(b.dataset.loopen)) found.push(b.dataset.loopen);
+    if (found.length > nth) return match().find(b => b.dataset.loopen === found[nth]) || null;
+    cal().click(); await wait(250);
+  }
+  return null;
+}
 const btn = (w, label) => $$(w, "[data-dlopen]").find(b => b.textContent.trim() === label);
 
 async function addDoc(luke, pid, cid, file, mime, kind, name) {
@@ -77,8 +95,7 @@ async function addDoc(luke, pid, cid, file, mime, kind, name) {
 }
 async function openTrip(w, pid) {
   if ($(w, '[data-tab="loadout"]')) await click(w, '[data-tab="loadout"]', 400);
-  await until(() => $$(w, "[data-loopen]").some(b => b.textContent.includes(pid)));
-  await click(w, $$(w, "[data-loopen]").find(b => b.textContent.includes(pid)), 500);
+  await click(w, await tripButton(w, pid), 500);
   await until(() => $$(w, "[data-dlopen]").length > 0);
 }
 

@@ -18,6 +18,24 @@ const $ = (w, s) => w.document.querySelector(s), $$ = (w, s) => [...w.document.q
 const txt = (w, sel = "#app") => (($(w, sel) || {}).textContent || "").replace(/\s+/g, " ");
 async function click(w, sel, pause = 200) { const el = typeof sel === "string" ? $(w, sel) : sel; if (!el) throw new Error("no " + sel); el.click(); await wait(pause); }
 
+// 22 Oct: the Load-out tab is a calendar, a week at a time. The nth trip matching `want` (a PROJ, or a test on the button):
+// this week first, then the next two, since a trip "tomorrow" is next week's on a Sunday. A page with no calendar: the list.
+async function tripButton(w, want, nth = 0) {
+  const match = () => [...w.document.querySelectorAll("#app [data-loopen]")].filter(b => typeof want === "function" ? want(b) : b.textContent.includes(want));
+  const cal = () => w.document.querySelector("#app [data-calnext]");
+  await until(() => match().length > nth || cal(), 8000);
+  if (!cal()) return match()[nth] || null;
+  w.document.querySelector("#app [data-caltoday]").click(); await wait(150);
+  const found = [];
+  for (let k = 0; k < 3; k++) {
+    await until(() => match().some(b => !found.includes(b.dataset.loopen)), k ? 500 : 6000);
+    for (const b of match()) if (!found.includes(b.dataset.loopen)) found.push(b.dataset.loopen);
+    if (found.length > nth) return match().find(b => b.dataset.loopen === found[nth]) || null;
+    cal().click(); await wait(250);
+  }
+  return null;
+}
+
 // a real JPEG (632 bytes) for the copy, and a bigger "full" photo
 const tvJpg = Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/2wBDARESEhgVGC8aGi9jQjhCY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2P/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwAooorwT6U//9k=", "base64");
 
@@ -71,8 +89,7 @@ async function snap(w) {                                   // the driver takes t
 
   // Shawn: the dock photo, the truck leaves, a table at the site
   let { w } = boot(users.shawn);
-  await until(() => $$(w, "[data-loopen]").length, 8000); await wait(400);
-  await click(w, `[data-loopen="${cid}"]`, 800);
+  await click(w, await tripButton(w, (b) => b.dataset.loopen === cid), 800);
   ok("Shawn opens the white glove delivery: dock, site, customer", /1 · At the dock/.test(txt(w)) && /2 · At the site/.test(txt(w)) && !!$(w, '[data-dltruck="1"]'));
   await click(w, '[data-dltruck="1"]'); await snap(w);
   await until(async () => (await q1("select count(*)::int n from photos where loadout_id = $1 and truck = 1", [lo.id])).n === 1);
