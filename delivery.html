@@ -44,6 +44,9 @@
   button.link{background:none; border:none; padding:4px; color:var(--ink2); text-decoration:underline; font-weight:500}
   .me a.link{color:inherit; text-decoration:underline; font-weight:500}
   .btns{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; align-items:center}
+  .card.rest{border:1.5px solid var(--midnight)}
+  .restform{display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-top:8px; align-items:end}
+  .restform .wide{grid-column:1 / -1}
   .jobs{max-height:260px; overflow:auto; border:1px solid var(--line); border-radius:9px; margin-top:8px}
   .jobs button{display:block; width:100%; text-align:left; border:none; border-bottom:1px solid var(--line); border-radius:0; padding:10px 12px; font-weight:500}
   .jobs button:last-child{border-bottom:none}
@@ -107,7 +110,7 @@
 <script>
 /* The two settings (project address, publishable key), the key check, the connection test, the id maker and the
    Feedback button are in the shared file loaded above, sf-common-2026-10-05.1.js. */
-var PAGE_VERSION = "2026-10-05.2";          // this page's version: bump it with every change (it shows in select * from devices();)
+var PAGE_VERSION = "2026-10-26.1";          // this page's version: bump it with every change (it shows in select * from devices();)
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -215,6 +218,36 @@ function tripLine(d) {
   return parts.join(" · ");
 }
 
+/* ---- 26 Oct: part deliveries and their rests (incomplete_deliveries.sql; design: the Incomplete deliveries tab) ---- */
+/** ["2:5","2:6","7:1"] -> "sheet 2: tables 5, 6 · sheet 7: table 1" */
+function piecesWords(keys) {
+  const by = new Map();
+  for (const k of keys || []) { const [sh, pc] = String(k).split(":").map(Number); if (!by.has(sh)) by.set(sh, []); by.get(sh).push(pc); }
+  return [...by.entries()].sort((a, b) => a[0] - b[0]).map(([sh, ps]) => `sheet ${sh}: table${ps.length === 1 ? "" : "s"} ${ps.sort((a, b) => a - b).join(", ")}`).join(" · ");
+}
+const countWords = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+/** "The rest of Thu Oct 22's delivery · 3 tables and 1 extra · Site not ready" (a trip with rest set: v_deliveries.rest) */
+function restWords(r) {
+  if (!r) return "";
+  const pk = r.of_kind === "shipping" || r.of_kind === "customer_pickup";
+  return `The rest of ${r.of_at ? fmtWhen(r.of_at).replace(/,.*$/, "") : "an earlier trip"}'s ${pk ? "pickup" : "delivery"} · ${countWords(r.count, "table", "tables")}${r.extras ? ` and ${countWords(r.extras, "extra", "extras")}` : ""} · ${r.reason}`;
+}
+/** Where a part delivery's rest is now. */
+function restState(p) {
+  return p.rest_off ? "taken off" : p.rest_done ? `went ${fmtWhen(p.rest_done)}` : p.rest_when ? `goes ${fmtWhen(p.rest_when)}`
+       : p.rest_ready ? "on Ready for pickup" : "needs a new date";
+}
+/** The record page's rows for a trip finished part-way (the customer signs for what went that day). */
+function partRows(d) {
+  const p = d.part;
+  if (!p) return [];
+  const total = p.went + p.left;
+  return [["Today", `${p.went} of ${countWords(total, "table", "tables")} went`],
+          ["Still to come", [p.left ? `${countWords(p.left, "table", "tables")} (${piecesWords(p.left_pieces)})` : null,
+                             p.extras_left ? countWords(p.extras_left, "extra", "extras") : null].filter(Boolean).join(" and ") + ", on a later trip"],
+          ["Why", p.reason]];
+}
+
 /* ---- the signed ticket: the ticket as issued, then one signature page ---- */
 
 // the PDF's built-in font only has the Western European letters: anything else becomes "?"
@@ -264,7 +297,7 @@ async function buildSignedTicket(PDFLib, d, ticket, signature) {
   let y = 738;
   const text = (t, x, yy, size, f = font, color = ink) => page.drawText(pdfText(t), { x, y: yy, size, font: f, color });
   text("PURPOSEFUL DESIGN", L, y, 10, bold, orange);
-  y -= 26; text(pk ? "Customer pickup record" : "Delivery record", L, y, 22, bold);
+  y -= 26; text(d.part ? (pk ? "Part pickup record" : "Part delivery record") : pk ? "Customer pickup record" : "Delivery record", L, y, 22, bold);
   y -= 16; text(ticket ? `Added by the shop floor system after the ${pk ? "" : "delivery "}ticket, which is as it was issued.` : `No ${pk ? "" : "delivery "}ticket was attached, so this record stands on its own.`, L, y, 10, font, grey);
   y -= 28;
   const n = pk ? d.tables_photographed : d.site_photographed;
@@ -276,6 +309,7 @@ async function buildSignedTicket(PDFLib, d, ticket, signature) {
                      ["Scheduled for", d.scheduled_for ? fmtWhen(d.scheduled_for, true) : "Not scheduled"],
                      ["Delivered", `${fmtWhen(d.completed_at, true)}${d.completed_by_name ? ` by ${d.completed_by_name}` : ""}`],
                      ["At the site", d.pieces_total ? `${n || 0} of ${d.pieces_total} table${d.pieces_total === 1 ? "" : "s"} photographed` : `${n || 0} photographed`]];
+  rows.push(...partRows(d));
   if (d.complete_lat !== null && d.complete_lat !== undefined)
     rows.push(["Where", `${Number(d.complete_lat).toFixed(6)}, ${Number(d.complete_lng).toFixed(6)}${d.complete_accuracy ? ` (within ${Math.round(d.complete_accuracy)} m)` : ""}`]);
   for (const [k, v] of rows) {
@@ -286,7 +320,7 @@ async function buildSignedTicket(PDFLib, d, ticket, signature) {
   }
   y -= 10;
   if (d.signed_name) {
-    text("Customer signature", L, y, 11, bold); y -= 10;
+    text(d.part ? "Customer signature, for what went today" : "Customer signature", L, y, 11, bold); y -= 10;
     const boxH = 150;
     page.drawRectangle({ x: L, y: y - boxH, width: W, height: boxH, borderColor: grey, borderWidth: 0.8 });
     if (signature) {
@@ -339,7 +373,8 @@ async function buildBolRecord(PDFLib, d, ticket, bols) {
                 ["Carrier", d.carrier || "Not written down"],
                 ["BOL number", d.tracking || "Not written down"],
                 ["Pallets", `${d.pallets_photographed || 0} photographed wrapped`],
-                ["Tables", d.pieces_total ? `${d.tables_photographed || 0} of ${d.pieces_total} photographed before wrapping` : `${d.tables_photographed || 0} photographed`]];
+                ["Tables", d.pieces_total ? `${d.tables_photographed || 0} of ${d.pieces_total} photographed before wrapping` : `${d.tables_photographed || 0} photographed`],
+                ...partRows(d)];
   for (const [k, v] of rows) {
     text(k, L, y, 11, font, grey);
     for (const ln of wrapText(v, W - 110, (s) => font.widthOfTextAtSize(s, 12))) { text(ln, L + 110, y, 12); y -= 16; }
@@ -382,6 +417,7 @@ if (typeof document !== "undefined") (function () {
   const S = {
     me: null, allowed: null, tab: store.get("tab", "new"), list: [], cancelled: [], jobs: [], loaded: false, missing: false,
     form: blankForm(), busy: false, msg: null, steps: null, edit: null, openAdd: null, showAll: false, pk: false,
+    rest: [], restEdit: {},       // 26 Oct: the rests of part deliveries waiting for a day, and what's typed for each
   };
   function blankForm() { return { kind: "delivery", jobId: null, filter: "", date: "", time: "09:00", note: "", ticket: null, files: [], what: "", where: "", forText: "", taskId: null }; }
   // Can Schedule go? A dated delivery needs its job, date and time; a pickup only the job; a task what to do and when.
@@ -407,6 +443,8 @@ if (typeof document !== "undefined") (function () {
     S.tt = !t.error; S.tasks = t.error ? [] : (t.data || []);
     if (!j.error) S.allJobs = j.data || [];
     if (!S.tt && NEW_KINDS.includes(S.form.kind)) S.form = blankForm();
+    const rw = await db.from("v_rest_waiting").select("*").order("made_at");      // 26 Oct: none on an older database
+    S.rest = rw.error ? [] : (rw.data || []);
     S.loaded = true;
   }
   const deliveries = () => splitDeliveries(S.list);
@@ -574,12 +612,35 @@ if (typeof document !== "undefined") (function () {
              ${x.in_cloud === false ? `<span class="meta">archived</span>` : `<button class="link" data-open="${esc(x.path)}">Open</button>`}
              ${editable ? `<button class="link" data-retire="${esc(x.id)}">Take off</button>` : ""}</li>`).join("")}</ul>`;
   }
+  /** A rest waiting for a day: what's on it, why, what goes with it, and the day (or a pickup) to give it. */
+  function restCard(r) {
+    const e = S.restEdit[r.id] || (S.restEdit[r.id] = { kind: r.kind, date: "", time: "09:00", note: "" });
+    const dated = e.kind === "delivery" || e.kind === "dock", go = dated ? !!whenISO(e.date, e.time) : true;
+    const docs = [r.ticket ? "the ticket" : null, ...(r.files || []).map(f => f.name)].filter(Boolean);
+    return `<div class="card rest" data-restcard="${esc(r.id)}">
+        <div class="top"><span class="pid">${r.is_test ? `<span class="tag">TEST</span>` : ""}${esc(r.project_id)}</span><span>${esc(r.job_name)}</span>
+          <span class="meta">The rest of ${esc(r.rest_of_at ? fmtWhen(r.rest_of_at) : "an earlier trip")}'s ${esc(tripName(r.rest_of_kind).toLowerCase())}</span></div>
+        <div style="margin-top:6px">${esc(countWords(r.owed_count, "table", "tables"))} (${esc(piecesWords(r.owed))})${r.extras_left ? ` and ${esc(countWords(r.extras_left, "extra", "extras"))}` : ""} still to go.
+          ${esc(`${r.went_count} of ${r.went_count + r.owed_count}`)} went; ${r.rest_of_signed_name ? `signed by ${esc(r.rest_of_signed_name)}` : `not signed (${esc(String(r.rest_of_no_sign_reason || "").toLowerCase())})`}.</div>
+        <div class="meta" style="margin-top:4px">Why: ${esc(r.reason)}${r.reason_note ? ` — ${esc(r.made_by_name || "Delivery")}: “${esc(r.reason_note)}”` : ""}</div>
+        <div class="meta" style="margin-top:4px">${docs.length ? `Going with it: ${esc(docs.join(", "))}` : "No ticket or site files on the first trip."}</div>
+        <div class="restform">
+          <div><label class="f" for="rk-${esc(r.id)}">How</label><select class="in" id="rk-${esc(r.id)}" data-restfield="kind" data-for="${esc(r.id)}">
+            ${["delivery", "dock", "customer_pickup", "shipping"].map(k => `<option value="${k}" ${e.kind === k ? "selected" : ""}>${esc(tripName(k))}${k === r.kind ? " (as before)" : ""}</option>`).join("")}</select></div>
+          ${dated ? `<div><label class="f" for="rd-${esc(r.id)}">Day</label><input class="in" id="rd-${esc(r.id)}" type="date" data-restfield="date" data-for="${esc(r.id)}" value="${esc(e.date)}"></div>
+          <div><label class="f" for="rt-${esc(r.id)}">Time</label><input class="in" id="rt-${esc(r.id)}" type="time" data-restfield="time" data-for="${esc(r.id)}" value="${esc(e.time)}"></div>` : ""}
+          <div class="wide"><label class="f" for="rn-${esc(r.id)}">${dated ? "Note for the driver" : "Note for whoever hands it over"} <span class="meta">(optional)</span></label>
+            <input class="in" id="rn-${esc(r.id)}" data-restfield="note" data-for="${esc(r.id)}" maxlength="500" value="${esc(e.note)}"></div></div>
+        <div class="btns"><button class="go" data-restgo="${esc(r.id)}" ${go && !S.busy ? "" : "disabled"}>${dated ? "Schedule it" : "Put it on Ready for pickup"}</button>
+          <button class="link" data-restoff="${esc(r.id)}" ${S.busy ? "disabled" : ""}>Not needed</button></div></div>`;
+  }
   function readyCard(d) {
     const ed = S.edit && S.edit.id === d.id, line = pickupProgress(d);
     return `<div class="card" data-card="${esc(d.id)}">
         <div class="top"><span class="when">${esc(tripName(d.kind))}</span>
           <span class="pid">${d.is_test ? `<span class="tag">TEST</span>` : ""}${esc(d.project_id)}</span><span>${esc(d.job_name)}</span></div>
         <div class="meta" style="margin-top:4px">Ready since ${esc(fmtWhen(d.ready_at))}</div>
+        ${d.rest ? `<div class="meta" style="margin-top:4px"><b>${esc(restWords(d.rest))}</b></div>` : ""}
         ${d.schedule_note ? `<div class="meta" style="margin-top:4px">Note: ${esc(d.schedule_note)}</div>` : ""}
         ${line ? `<div class="meta" style="margin-top:4px">${esc(line)}</div>` : ""}
         ${filesBlock(d, true)}
@@ -594,13 +655,14 @@ if (typeof document !== "undefined") (function () {
   function upScreen() {
     const { up, ready } = deliveries();
     const tasks = openTasks();
-    return `${msgBanner()}${ready.length ? `<h3 class="sec" style="margin-top:0">Ready for pickup</h3>${ready.map(readyCard).join("")}
+    return `${msgBanner()}${S.rest.length ? `<h3 class="sec" style="margin-top:0">Needs a new date</h3>${S.rest.map(restCard).join("")}` : ""}${ready.length ? `<h3 class="sec" style="${S.rest.length ? "" : "margin-top:0"}">Ready for pickup</h3>${ready.map(readyCard).join("")}
         ${up.length ? `<h3 class="sec">Scheduled deliveries</h3>` : ""}` : ""}${up.length ? up.map(d => {
       const ed = S.edit && S.edit.id === d.id;
       const line = tripLine(d);
       return `<div class="card" data-card="${esc(d.id)}">
         <div class="top"><span class="when">${esc(fmtWhen(d.scheduled_for))}</span>
           <span class="pid">${d.is_test ? `<span class="tag">TEST</span>` : ""}${esc(d.project_id)}</span><span>${esc(d.job_name)}</span>${d.kind === "dock" ? `<span class="meta">Dock to dock</span>` : ""}</div>
+        ${d.rest ? `<div class="meta" style="margin-top:4px"><b>${esc(restWords(d.rest))}</b></div>` : ""}
         ${d.schedule_note ? `<div class="meta" style="margin-top:4px">Note for the driver: ${esc(d.schedule_note)}</div>` : ""}
         ${line ? `<div class="meta" style="margin-top:4px">${esc(line)}</div>` : ""}
         ${filesBlock(d, true)}
@@ -613,7 +675,7 @@ if (typeof document !== "undefined") (function () {
                <div class="btns"><button data-editwhen="${esc(d.id)}">Change date, time or note</button>
                  <button class="link" data-cancel="${esc(d.id)}">Cancel this delivery</button></div>`}
         <div class="meta" style="margin-top:8px">Scheduled by ${esc(d.scheduled_by_name || d.started_by_name || "")}</div></div>`; }).join("")
-      : ready.length || tasks.length ? "" : `<div class="empty"><b>Nothing scheduled</b>Schedule a delivery${S.pk ? " or set up a pickup" : ""} and it shows here, and on Delivery's phone.</div>`}
+      : ready.length || tasks.length || S.rest.length ? "" : `<div class="empty"><b>Nothing scheduled</b>Schedule a delivery${S.pk ? " or set up a pickup" : ""} and it shows here, and on Delivery's phone.</div>`}
       ${tasks.length ? `<h3 class="sec">Tasks</h3>${tasks.map(taskCard).join("")}` : ""}${cancelledList()}`;
   }
   const keptLine = (d) => { const k = [d.has_ticket ? "the ticket" : null, d.site_files ? `${d.site_files} site file${d.site_files === 1 ? "" : "s"}` : null].filter(Boolean);
@@ -641,7 +703,9 @@ if (typeof document !== "undefined") (function () {
     return `${msgBanner()}${shown.length ? shown.map(d => d.kind === "shipping" ? bolDoneCard(d) : `<div class="card">
         <div class="top">${d.downloaded_at ? "" : `<span class="tag new">New</span>`}<span class="pid">${d.is_test ? `<span class="tag">TEST</span>` : ""}${esc(d.project_id)}</span><span>${esc(d.job_name)}</span>${isPickup(d) || d.kind === "dock" ? `<span class="meta">${esc(tripName(d.kind))}</span>` : ""}</div>
         <dl class="dl">
-          <dt>${isPickup(d) ? "Picked up" : "Delivered"}</dt><dd>${esc(fmtWhen(d.completed_at, true))}${d.completed_by_name ? ` · ${esc(d.completed_by_name)}` : ""}</dd>
+          <dt>${d.part ? (isPickup(d) ? "Part picked up" : "Part delivered") : isPickup(d) ? "Picked up" : "Delivered"}</dt><dd>${esc(fmtWhen(d.completed_at, true))}${d.completed_by_name ? ` · ${esc(d.completed_by_name)}` : ""}</dd>
+          ${d.part ? `<dt>Still to come</dt><dd>${esc([d.part.left ? `${countWords(d.part.left, "table", "tables")} (${piecesWords(d.part.left_pieces)})` : null, d.part.extras_left ? countWords(d.part.extras_left, "extra", "extras") : null].filter(Boolean).join(" and "))} · the rest ${esc(restState(d.part))}</dd>
+            <dt>Why</dt><dd>${esc(d.part.reason)}${d.part.note ? ` — ${esc(d.part.note)}` : ""}</dd>` : ""}
           <dt>Signature</dt><dd>${d.signed_name ? `<span class="done">Signed</span> by ${esc(d.signed_name)}` : `<b>Not signed</b> — ${esc(d.no_sign_reason || "")}${d.no_sign_note ? `: ${esc(d.no_sign_note)}` : ""}`}</dd>
           ${d.customer_note ? `<dt>Customer's note</dt><dd>${esc(d.customer_note)}</dd>` : ""}
           ${isPickup(d) ? `<dt>Handed over</dt><dd>${esc(d.pieces_total ? `${d.tables_photographed || 0} of ${d.pieces_total} tables photographed` : `${d.tables_photographed || 0} photographed`)}</dd>`
@@ -657,7 +721,9 @@ if (typeof document !== "undefined") (function () {
     return `<div class="card">
         <div class="top">${d.downloaded_at ? "" : `<span class="tag new">New</span>`}<span class="pid">${d.is_test ? `<span class="tag">TEST</span>` : ""}${esc(d.project_id)}</span><span>${esc(d.job_name)}</span><span class="meta">BOL pickup</span></div>
         <dl class="dl">
-          <dt>Picked up</dt><dd>${esc(fmtWhen(d.completed_at, true))}${d.completed_by_name ? ` · ${esc(d.completed_by_name)}` : ""}</dd>
+          <dt>${d.part ? "Part picked up" : "Picked up"}</dt><dd>${esc(fmtWhen(d.completed_at, true))}${d.completed_by_name ? ` · ${esc(d.completed_by_name)}` : ""}</dd>
+          ${d.part ? `<dt>Still to come</dt><dd>${esc([d.part.left ? `${countWords(d.part.left, "table", "tables")} (${piecesWords(d.part.left_pieces)})` : null, d.part.extras_left ? countWords(d.part.extras_left, "extra", "extras") : null].filter(Boolean).join(" and "))} · the rest ${esc(restState(d.part))}</dd>
+            <dt>Why</dt><dd>${esc(d.part.reason)}${d.part.note ? ` — ${esc(d.part.note)}` : ""}</dd>` : ""}
           <dt>Carrier</dt><dd>${esc(d.carrier || "Not written down")}${d.tracking ? ` · BOL ${esc(d.tracking)}` : ""}</dd>
           <dt>BOL</dt><dd>${nb ? `<span class="done">Photographed</span> (${nb} photo${nb === 1 ? "" : "s"})` : "<b>No BOL photo</b>"}</dd>
           <dt>Pallets</dt><dd>${esc(`${d.pallets_photographed || 0} photographed wrapped`)}</dd>
@@ -815,6 +881,30 @@ if (typeof document !== "undefined") (function () {
         S.msg = notes.length ? { ok: false, text: notes.join(" ") } : null;
         render();
       };
+    });
+    // 26 Oct: a rest waiting for a day — how it goes, the day, a note; or not needed
+    app.querySelectorAll("[data-restfield]").forEach(el => el.oninput = el.onchange = () => {
+      const e = S.restEdit[el.dataset.for]; if (!e) return; e[el.dataset.restfield] = el.value;
+      if (el.dataset.restfield === "kind") { render(); return; }
+      const btn = app.querySelector(`[data-restgo="${el.dataset.for}"]`);
+      if (btn) btn.disabled = S.busy || ((e.kind === "delivery" || e.kind === "dock") && !whenISO(e.date, e.time));
+    });
+    on("[data-restgo]", async (b) => {
+      const r = S.rest.find(x => x.id === b.dataset.restgo), e = r && S.restEdit[r.id]; if (!r) return;
+      const dated = e.kind === "delivery" || e.kind === "dock";
+      S.busy = true; render();
+      const res = await db.rpc("schedule_rest", { p_loadout: r.client_id, p_kind: e.kind, p_when: dated ? whenISO(e.date, e.time) : null, p_note: e.note || null });
+      S.busy = false;
+      S.msg = res.error ? { ok: false, text: friendlyError(res.error) } : { ok: true, text: res.data.summary };
+      if (!res.error) delete S.restEdit[r.id];
+      await refresh();
+    });
+    on("[data-restoff]", async (b) => {
+      const r = S.rest.find(x => x.id === b.dataset.restoff); if (!r) return;
+      if (!confirm(`Take the rest of ${r.project_id} off? It comes off the list and stays in history.`)) return;
+      const res = await db.rpc("cancel_rest", { p_loadout: r.client_id, p_reason: null });
+      S.msg = res.error ? { ok: false, text: friendlyError(res.error) } : { ok: true, text: res.data.summary };
+      await refresh();
     });
     on("[data-cancel]", async (b) => {
       const d = S.list.find(x => x.id === b.dataset.cancel); if (!d) return;

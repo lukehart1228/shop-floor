@@ -742,6 +742,29 @@ function wrapText(text, width, measure) {
   }
   return out;
 }
+/* 26 Oct: part deliveries (incomplete_deliveries.sql) — the same words as Julia's page (delivery.html) */
+/** ["2:5","2:6","7:1"] -> "sheet 2: tables 5, 6 · sheet 7: table 1" */
+function piecesWords(keys) {
+  const by = new Map();
+  for (const k of keys || []) { const [sh, pc] = String(k).split(":").map(Number); if (!by.has(sh)) by.set(sh, []); by.get(sh).push(pc); }
+  return [...by.entries()].sort((a, b) => a[0] - b[0]).map(([sh, ps]) => `sheet ${sh}: table${ps.length === 1 ? "" : "s"} ${ps.sort((a, b) => a - b).join(", ")}`).join(" · ");
+}
+const countWords = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+/** Where a part delivery's rest is now. */
+function restState(p) {
+  return p.rest_off ? "taken off" : p.rest_done ? `went ${fmtWhen(p.rest_done)}` : p.rest_when ? `goes ${fmtWhen(p.rest_when)}`
+       : p.rest_ready ? "on Ready for pickup" : "needs a new date";
+}
+/** The record page's rows for a trip finished part-way (the customer signs for what went that day). */
+function partRows(d) {
+  const p = d.part;
+  if (!p) return [];
+  const total = p.went + p.left;
+  return [["Today", `${p.went} of ${countWords(total, "table", "tables")} went`],
+          ["Still to come", [p.left ? `${countWords(p.left, "table", "tables")} (${piecesWords(p.left_pieces)})` : null,
+                             p.extras_left ? countWords(p.extras_left, "extra", "extras") : null].filter(Boolean).join(" and ") + ", on a later trip"],
+          ["Why", p.reason]];
+}
 async function buildSignedTicket(PDFLib, d, ticket, signature) {
   const { PDFDocument, StandardFonts, rgb } = PDFLib;
   let doc;
@@ -764,7 +787,7 @@ async function buildSignedTicket(PDFLib, d, ticket, signature) {
   let y = 738;
   const text = (t, x, yy, size, f = font, color = ink) => page.drawText(pdfText(t), { x, y: yy, size, font: f, color });
   text("PURPOSEFUL DESIGN", L, y, 10, bold, orange);
-  y -= 26; text(pk ? "Customer pickup record" : "Delivery record", L, y, 22, bold);
+  y -= 26; text(d.part ? (pk ? "Part pickup record" : "Part delivery record") : pk ? "Customer pickup record" : "Delivery record", L, y, 22, bold);
   y -= 16; text(ticket ? `Added by the shop floor system after the ${pk ? "" : "delivery "}ticket, which is as it was issued.` : `No ${pk ? "" : "delivery "}ticket was attached, so this record stands on its own.`, L, y, 10, font, grey);
   y -= 28;
   const n = pk ? d.tables_photographed : d.site_photographed;
@@ -776,6 +799,7 @@ async function buildSignedTicket(PDFLib, d, ticket, signature) {
                      ["Scheduled for", d.scheduled_for ? fmtWhen(d.scheduled_for, true) : "Not scheduled"],
                      ["Delivered", `${fmtWhen(d.completed_at, true)}${d.completed_by_name ? ` by ${d.completed_by_name}` : ""}`],
                      ["At the site", d.pieces_total ? `${n || 0} of ${d.pieces_total} table${d.pieces_total === 1 ? "" : "s"} photographed` : `${n || 0} photographed`]];
+  rows.push(...partRows(d));
   if (d.complete_lat !== null && d.complete_lat !== undefined)
     rows.push(["Where", `${Number(d.complete_lat).toFixed(6)}, ${Number(d.complete_lng).toFixed(6)}${d.complete_accuracy ? ` (within ${Math.round(d.complete_accuracy)} m)` : ""}`]);
   for (const [k, v] of rows) {
@@ -786,7 +810,7 @@ async function buildSignedTicket(PDFLib, d, ticket, signature) {
   }
   y -= 10;
   if (d.signed_name) {
-    text("Customer signature", L, y, 11, bold); y -= 10;
+    text(d.part ? "Customer signature, for what went today" : "Customer signature", L, y, 11, bold); y -= 10;
     const boxH = 150;
     page.drawRectangle({ x: L, y: y - boxH, width: W, height: boxH, borderColor: grey, borderWidth: 0.8 });
     if (signature) {
@@ -830,7 +854,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-10-20.2";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-10-26.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -1897,8 +1921,10 @@ if (typeof document !== "undefined") (function () {
               ${ship && (l.carrier || l.tracking) ? `<div class="meta2">${esc([l.carrier, l.tracking ? `${pk ? "BOL" : "tracking"} ${l.tracking}` : ""].filter(Boolean).join(" · "))}</div>` : ""}
               ${l.ready_at && l.scheduled_by_name ? `<div class="meta2">Set up by ${esc(l.scheduled_by_name)}</div>` : ""}
               ${l.scheduled_for ? `<div class="meta2">Scheduled for ${esc(fmtWhen(l.scheduled_for))}${l.scheduled_by_name ? ` by ${esc(l.scheduled_by_name)}` : ""}</div>` : ""}
-              ${l.completed_at && pk && ship ? `<div><b>Picked up ${esc(fmtWhen(l.completed_at))}</b>${l.completed_by_name ? ` · ${esc(l.completed_by_name)}` : ""} · BOL photos: ${l.bol_here || 0}</div>`
-                : l.completed_at ? `<div><b>${pk ? "Picked up" : "Delivered"} ${esc(fmtWhen(l.completed_at))}</b> · ${l.signed_name ? `signed by ${esc(l.signed_name)}` : `not signed (${esc(l.no_sign_reason || "")})`}${(l.site_here || []).length ? ` · ${(l.site_here || []).length} of ${l.pieces_total} tables photographed at the site` : ""}
+              ${l.part ? `<div class="meta2">${esc(`${l.part.went} of ${countWords(l.part.went + l.part.left, "table", "tables")} went · still to come: ${[l.part.left ? `${countWords(l.part.left, "table", "tables")} (${piecesWords(l.part.left_pieces)})` : null, l.part.extras_left ? countWords(l.part.extras_left, "extra", "extras") : null].filter(Boolean).join(" and ")} · the rest ${restState(l.part)} · ${l.part.reason}`)}</div>` : ""}
+              ${l.rest ? `<div class="meta2">${esc(`The rest of ${l.rest.of_at ? fmtWhen(l.rest.of_at) : "an earlier trip"}'s ${l.rest.of_kind === "shipping" || l.rest.of_kind === "customer_pickup" ? "pickup" : "delivery"} · ${countWords(l.rest.count, "table", "tables")}${l.rest.extras ? ` and ${countWords(l.rest.extras, "extra", "extras")}` : ""} · ${l.rest.reason}`)}</div>` : ""}
+              ${l.completed_at && pk && ship ? `<div><b>${l.part ? "Part picked up" : "Picked up"} ${esc(fmtWhen(l.completed_at))}</b>${l.completed_by_name ? ` · ${esc(l.completed_by_name)}` : ""} · BOL photos: ${l.bol_here || 0}</div>`
+                : l.completed_at ? `<div><b>${l.part ? (pk ? "Part picked up" : "Part delivered") : pk ? "Picked up" : "Delivered"} ${esc(fmtWhen(l.completed_at))}</b> · ${l.signed_name ? `signed by ${esc(l.signed_name)}` : `not signed (${esc(l.no_sign_reason || "")})`}${(l.site_here || []).length ? ` · ${(l.site_here || []).length} of ${l.pieces_total} tables photographed at the site` : ""}
                   ${dl ? ` <button class="link" data-signedpdf="${esc(l.id)}">Signed ticket</button>` : ""}</div>
                   ${dl && dl.customer_note ? `<div class="meta2">Customer's note: ${esc(dl.customer_note)}</div>` : ""}` : ""}
               ${v2 && l.site_steps && l.kind === "delivery" ? `<div class="meta2">Truck photos: ${(l.trucks_here || []).length}${l.other_items ? ` · ${l.other_items} other item${l.other_items === 1 ? "" : "s"}` : ""}</div>`

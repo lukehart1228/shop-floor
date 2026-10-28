@@ -8,6 +8,9 @@ const { JSDOM } = require("jsdom");
 const { makeClient, users, admin, setOffline } = require("./pgsupa");
 const OUT = process.env.OUT || "/home/claude/sf/out";
 const OFFICE_V = (require("fs").readFileSync(`${process.env.OUT || "/home/claude/sf/out"}/office.html`, "utf8").match(/const OFFICE_VERSION = "([^"]+)"/) || [])[1];   // 6 Oct: read from the page, not written in here
+// 26 Oct: Julia's page's version, read from the page too (it was pinned to 2026-10-05.2 until incomplete deliveries changed it)
+const DLV_V = (require("fs").readFileSync(fs_exists(`${process.env.OUT || "/home/claude/sf/out"}/delivery.html`) ? `${process.env.OUT || "/home/claude/sf/out"}/delivery.html` : "/home/claude/sf/repo/delivery.html", "utf8").match(/var PAGE_VERSION = "([^"]+)"/) || [])[1];
+function fs_exists(f) { try { return require("fs").existsSync(f); } catch (e) { return false; } }
 const TABLET_V = (require("fs").readFileSync(`${process.env.OUT || "/home/claude/sf/out"}/index.html`, "utf8").match(/const PAGE_VERSION = "([^"]+)"/) || [])[1];   // the same for the tablet page
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 let pass = 0, fail = 0;
@@ -189,7 +192,7 @@ async function sendShared(w, note) {
     ok(`${name}: the header has a Feedback button`, !!$(w, "header [data-sffb]"));
     r = await sendShared(w, `A note from ${key}`);
     f = (await rows()).pop();
-    ok(`${name}: it says thanks and keeps who, the page and the screen`, /Thanks/.test(r.said) && f.body === `A note from ${key}` && f.page === key && f.person_name === "Luke H" && f.screen && f.screen.startsWith(name) && f.page_version === (key === "delivery" ? "2026-10-05.2" : "2026-10-05.1"),
+    ok(`${name}: it says thanks and keeps who, the page and the screen`, /Thanks/.test(r.said) && f.body === `A note from ${key}` && f.page === key && f.person_name === "Luke H" && f.screen && f.screen.startsWith(name) && f.page_version === (key === "delivery" ? DLV_V : "2026-10-05.1"),
        JSON.stringify({ said: r.said, where: r.where, page: f.page, v: f.page_version }));
     w.close();
   }

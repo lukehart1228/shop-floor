@@ -124,7 +124,8 @@ insert into sql_file_catalog (file, run_order, fingerprint, check_fn, replaces) 
   ('look_only.sql',        42, 'check_look_only',         'check_look_only',          '{}'),
   ('feedback_close.sql',   43, 'check_feedback_close',    'check_feedback_close',     '{}'),
   ('tv_coming.sql',        44, 'check_tv_coming',         'check_tv_coming',          '{tv_photos.sql}'),
-  ('direct_counts_off.sql', 45, 'check_direct_counts_off', 'check_direct_counts_off', '{verify_setup.sql,test_lane.sql,counts_safety.sql,tv_photos.sql}')
+  ('direct_counts_off.sql', 45, 'check_direct_counts_off', 'check_direct_counts_off', '{verify_setup.sql,test_lane.sql,counts_safety.sql,tv_photos.sql}'),
+  ('incomplete_deliveries.sql', 46, 'check_incomplete_deliveries', 'check_incomplete_deliveries', '{trip_types.sql,delivery_types.sql,delivery_extras.sql}')
 on conflict (file) do update set run_order = excluded.run_order, fingerprint = excluded.fingerprint, check_fn = excluded.check_fn, replaces = excluded.replaces;
 
 -- does the database already have this file's fingerprint?

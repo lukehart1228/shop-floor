@@ -383,6 +383,25 @@
   .sigclear{position:absolute; top:6px; right:10px}
   .sighint{position:absolute; left:14px; bottom:12px; color:var(--gray); pointer-events:none; font-weight:600}
   .dldone{background:var(--teal-bg); border:1.5px solid var(--teal); color:var(--teal-ink); border-radius:12px; padding:14px 16px}
+  .partbox{background:#fff; border:1.5px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 14px}
+  .partbox.on{border-color:var(--midnight)}
+  .partchk{display:flex; gap:12px; align-items:flex-start; cursor:pointer}
+  .partchk input{flex:none; width:28px; height:28px; margin:2px 0 0; accent-color:var(--midnight)}
+  .partchk small{display:block; font-size:15px; color:var(--ink2); font-weight:500}
+  .partrow{border-top:1px solid var(--line); padding:10px 0}
+  .partbox .f{display:block; font-weight:700; margin:14px 0 6px}
+  .partrow .lotop{display:flex; align-items:baseline; gap:12px}
+  .partrow .no{font-size:26px; font-weight:700; line-height:1; flex:none}
+  .partrow .size{font-size:18px; font-weight:700; flex:1; min-width:0}
+  .partrow .cnt{color:var(--ink2); font-weight:600; white-space:nowrap}
+  .partrow .tbhead .snip{width:72px}
+  .partx{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .partx > span{flex:1; min-width:140px}
+  .partx small{display:block; color:var(--ink2); font-size:14px}
+  .partsum{border:1.5px solid var(--midnight); border-radius:10px; padding:10px 12px; margin-top:14px}
+  .partsum span{display:block; color:var(--ink2); font-size:15px; margin-top:4px}
+  .restbox{background:#fff; border:1.5px solid var(--midnight); border-radius:10px; padding:10px 14px; margin:0 0 14px}
+  .restbox span{display:block; color:var(--ink2); font-size:15px; margin-top:4px}
   .dldone b{display:block; font-size:18px}
   /* phones: the area tabs stay on one row, and a job name may take two lines */
   @media (max-width: 600px){
@@ -565,7 +584,7 @@ const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 // This page's version. Change it with every edit (date, then .1, .2 … for more than one that day).
 // Each device reports it when it opens; see  select * from devices();  in the SQL Editor.
-const PAGE_VERSION = "2026-10-22.2";
+const PAGE_VERSION = "2026-10-26.1";
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -1252,7 +1271,15 @@ async function flushPhotobox(store, db, isPending = () => false) {
     }
     let res;
     try {
-      res = rec.kind === "pickup_done"                             // a pickup: BOL (no signature) or the customer's
+      res = done && rec.part                                       // 26 Oct: finished part-way, and the rest's trip made, in one step
+        ? await db.rpc("complete_trip_part", { p_client_id: rec.id, p_loadout: rec.parent, p_rest_client_id: rec.part.restId,
+                                               p_went: rec.part.went, p_left: rec.part.left, p_extras: rec.part.extras || [],
+                                               p_reason: rec.part.reason, p_reason_note: rec.part.reasonNote || null,
+                                               p_signed_name: rec.signed ? rec.signedName : null, p_customer_note: rec.customerNote || null,
+                                               p_no_sign_reason: rec.signed || rec.bol ? null : rec.reason,
+                                               p_no_sign_note: rec.signed || rec.bol ? null : (rec.reasonNote || null), p_signed_at: rec.signed ? rec.at : null,
+                                               p_lat: rec.lat ?? null, p_lng: rec.lng ?? null, p_accuracy: rec.accuracy ?? null })
+        : rec.kind === "pickup_done"                             // a pickup: BOL (no signature) or the customer's
         ? await db.rpc("complete_pickup", { p_client_id: rec.id, p_loadout: rec.parent, p_signed_name: rec.signed ? rec.signedName : null,
                                             p_customer_note: rec.customerNote || null, p_no_sign_reason: rec.signed || rec.bol ? null : rec.reason,
                                             p_no_sign_note: rec.signed || rec.bol ? null : (rec.reasonNote || null), p_signed_at: rec.signed ? rec.at : null })
@@ -1352,18 +1379,20 @@ function snipRect(w, h) {
 /** A load-out, table by table: every sheet's tables (photographed here, waiting to send, or gone on an earlier truck),
  *  the pallets photographed, and what's still missing. Tables are "sheet:table", e.g. "4:2". */
 function loadoutPieces(sheets, lo, pending = [], planned = 1) {
-  const here = new Set((lo && lo.pieces_here) || []), earlier = new Set((lo && lo.pieces_earlier) || []);
+  // 26 Oct (incomplete_deliveries.sql): the rest of a part delivery carries only its own tables, and none of them went before
+  const owed = lo && Array.isArray(lo.owed) ? new Set(lo.owed) : null;
+  const here = new Set((lo && lo.pieces_here) || []), earlier = owed ? new Set() : new Set((lo && lo.pieces_earlier) || []);
   const mine = pending.filter(p => p.sheet !== null && p.sheet !== undefined);
   const waiting = new Set(mine.map(p => `${p.sheet}:${p.piece || 1}`));
   const list = (sheets || []).map(s => {
-    const qty = Math.max(1, Number(s.qty) || 1);
-    const slots = Array.from({ length: qty }, (_, i) => {
+    const all = Math.max(1, Number(s.qty) || 1);
+    const slots = Array.from({ length: all }, (_, i) => {
       const k = `${s.sheet_number}:${i + 1}`;
       return { piece: i + 1, here: here.has(k) || waiting.has(k), waiting: waiting.has(k) && !here.has(k), earlier: earlier.has(k) && !here.has(k) && !waiting.has(k) };
-    });
-    const done = slots.filter(x => x.here || x.earlier).length;
-    return { ...s, qty, slots, done, complete: done === qty };
-  });
+    }).filter(x => !owed || owed.has(`${s.sheet_number}:${x.piece}`));
+    const qty = slots.length, done = slots.filter(x => x.here || x.earlier).length;
+    return { ...s, qty, sheetQty: all, slots, done, complete: done === qty };      // sheetQty: the sheet's own quantity, for "The table" or "Table 3"
+  }).filter(s => s.slots.length);
   const palletsHere = new Set([...((lo && lo.pallets_here) || []), ...pending.filter(p => p.pallet).map(p => Number(p.pallet))]);
   const pallets = Math.max(planned || 1, ...palletsHere, 1);
   const missing = list.filter(s => !s.complete).map(s => ({ sheet: s.sheet_number, qty: s.qty, pieces: s.slots.filter(x => !x.here && !x.earlier).map(x => x.piece) }));
@@ -1387,7 +1416,7 @@ function missingText(missing) {
 function deliveryPlan(sheets, lo, pending = [], plannedTrucks = 1) {
   const trucksHere = new Set([...((lo && lo.trucks_here) || []), ...pending.filter(p => p.stage === "dock" && p.truck).map(p => Number(p.truck))]);
   const trucks = Math.max(plannedTrucks || 1, ...trucksHere, 1);
-  const site = loadoutPieces(sheets, { pieces_here: (lo && lo.site_here) || [], pieces_earlier: (lo && lo.site_earlier) || [] },
+  const site = loadoutPieces(sheets, { pieces_here: (lo && lo.site_here) || [], pieces_earlier: (lo && lo.site_earlier) || [], owed: lo && lo.owed },
                              pending.filter(p => p.stage === "site"), 1);
   const waitingDone = pending.find(p => p.kind === "delivery_done") || null;
   const dock = loadoutPieces(sheets, lo || {}, pending.filter(p => !p.stage && p.kind === "loadout" && p.piece), 1);   // dock to dock: each table before it leaves
@@ -1456,7 +1485,7 @@ function tripChangeList(d, seen, sheets) {
 /** A delivery on the list, in words: "Delivery · truck photographed · 4 of 6 tables at the site · signed" */
 function deliveryLine(lo, plan) {
   if (lo && lo.kind === "dock") {
-    const t = plan.dock.total || lo.pieces_total || 0, d = plan.dock.total ? plan.dock.done : new Set(lo.pieces_here || []).size;
+    const t = plan.dock.total || (Array.isArray(lo.owed) ? lo.owed.length : lo.pieces_total) || 0, d = plan.dock.total ? plan.dock.done : new Set(lo.pieces_here || []).size;
     return ["Dock to dock", t ? `${d} of ${t} table${t === 1 ? "" : "s"} photographed at our dock` : null,
             plan.trucksHere.length ? `${plan.trucksHere.length === 1 ? "truck" : plan.trucksHere.length + " trucks"} photographed` : "no truck photo yet",
             lo.completed_at ? (lo.signed_name ? `signed by ${lo.signed_name}` : `not signed (${String(lo.no_sign_reason || "").toLowerCase()})`)
@@ -1464,8 +1493,8 @@ function deliveryLine(lo, plan) {
   }
   return ["Delivery",
           plan.trucksHere.length ? `${plan.trucksHere.length === 1 ? "truck" : plan.trucksHere.length + " trucks"} photographed` : "no truck photo yet",
-          (() => { const total = plan.site.total || lo.pieces_total || 0;          // on the list the sheets may not be loaded yet
-                   const done = plan.site.total ? plan.site.done : new Set([...(lo.site_here || []), ...(lo.site_earlier || [])]).size;
+          (() => { const total = plan.site.total || (Array.isArray(lo.owed) ? lo.owed.length : lo.pieces_total) || 0;   // on the list the sheets may not be loaded yet
+                   const done = plan.site.total ? plan.site.done : new Set([...(lo.site_here || []), ...(Array.isArray(lo.owed) ? [] : lo.site_earlier || [])]).size;
                    return total ? `${done} of ${total} table${total === 1 ? "" : "s"} at the site` : null; })(),
           lo.completed_at ? (lo.signed_name ? `signed by ${lo.signed_name}` : `not signed (${String(lo.no_sign_reason || "").toLowerCase()})`)
                           : plan.waitingDone ? "delivered, waiting to send" : null].filter(Boolean).join(" · ");
@@ -1492,8 +1521,8 @@ function pickupPlan(sheets, lo, pending = [], plannedPallets = 1) {
 }
 /** A pickup on the list, in words: "BOL pickup · 4 of 6 tables · 2 pallets · BOL photographed · picked up" */
 function pickupLine(lo, plan) {
-  const total = plan.tables.total || lo.pieces_total || 0;
-  const done = plan.tables.total ? plan.tables.done : new Set([...(lo.pieces_here || []), ...(lo.pieces_earlier || [])]).size;
+  const total = plan.tables.total || (Array.isArray(lo.owed) ? lo.owed.length : lo.pieces_total) || 0;
+  const done = plan.tables.total ? plan.tables.done : new Set([...(lo.pieces_here || []), ...(Array.isArray(lo.owed) ? [] : lo.pieces_earlier || [])]).size;
   const w = plan.waitingDone;
   return [tripName(lo.kind),
           total ? `${done} of ${total} table${total === 1 ? "" : "s"} photographed` : null,
@@ -1551,6 +1580,7 @@ if (typeof document !== "undefined") (function () {
     // what changed on a trip since it was last opened; trips called off after the phone saw them, until OK, got it
     calView: store.get("cal_view", "week") === "month" ? "month" : "week", calWeek: 0, calMonth: 0, calDay: null,
     bgSave: {}, cancelled: store.get("cancelled_dl", []) || [], tripSeen: store.get("trip_seen", {}) || {}, openChanges: null,
+    restWaiting: store.get("rest_waiting", []) || [],      // 26 Oct: the rests of part deliveries, waiting for a day
     // Advance (managers only): a job, a sheet on it, and unsaved changes to that sheet
     adv: store.get("adv", false), advJob: null, advSheet: null, advRows: [], advAt: null, advCached: false,
     advEdit: {}, advFilter: "", advLoading: false,
@@ -1854,6 +1884,8 @@ if (typeof document !== "undefined") (function () {
     if (tk) S.dtasks = tk;
     const cx = await read("cancelled", db.from("v_cancelled_deliveries").select("*"), "cancelled_dl");   // 22 Oct: called off since the phone saw them
     if (cx) S.cancelled = cx;
+    const rw = await read("restwait", db.from("v_rest_waiting").select("*"), "rest_waiting");   // 26 Oct: none on an older database
+    S.restWaiting = S.missing.restwait ? [] : (rw || []);
     if (d) {
       // open ones; deliveries still on the road (the truck left, not yet delivered); pickups not yet picked up; the last two weeks
       S.loadouts = d.filter(l => l.is_open || daysSince(l.finished_at) <= 14
@@ -2965,7 +2997,7 @@ if (typeof document !== "undefined") (function () {
   const loPlanned = (lo) => S.loPallets[lo.client_id] || 1;
   function loSlots(s) {
     return `<div class="loslots">${s.slots.map(x => `<button class="loslot${x.here ? " here" : x.earlier ? " earlier" : ""}" data-loshoot="${s.sheet_number}" data-piece="${x.piece}">
-      ${s.qty === 1 ? "The table" : `Table ${x.piece}`}<small>${x.waiting ? "Waiting to send" : x.here ? "Photographed · tap for another" : x.earlier ? "Went on an earlier truck" : "Tap to photograph"}</small></button>`).join("")}</div>`;
+      ${(s.sheetQty || s.qty) === 1 ? "The table" : `Table ${x.piece}`}<small>${x.waiting ? "Waiting to send" : x.here ? "Photographed · tap for another" : x.earlier ? "Went on an earlier truck" : "Tap to photograph"}</small></button>`).join("")}</div>`;
   }
   function loadoutDetail2(lo) {
     const sheets = S.loSheets[lo.job_id];
@@ -3020,7 +3052,7 @@ if (typeof document !== "undefined") (function () {
     return `<button class="job" data-loopen="${esc(l.client_id)}">
       <div class="job-top"><span class="pid">${l.is_test ? `<span class="tag">TEST</span>` : ""}${esc(l.project_id)}</span><span class="jname">${esc(l.job_name)}</span>
         <span class="due">${l.scheduled_for ? esc(fmtWhen(l.scheduled_for)) : l.ready_at ? `ready since ${esc(fmtDate(localISO(l.ready_at)))}` : `started ${esc(agoText(l.started_at))}${l.started_by_name ? ` by ${esc(l.started_by_name)}` : ""}`}</span></div>
-      <div class="meta2" style="margin-top:6px">${l.local ? "Waiting to send · " : ""}${esc(isDl(l) ? deliveryLine(l, dlPlan(l)) : loadoutLine(l))}</div></button>`;
+      <div class="meta2" style="margin-top:6px">${l.local ? "Waiting to send · " : ""}${l.rest ? `${esc(restLine(l.rest))} · ` : ""}${esc(isDl(l) ? deliveryLine(l, dlPlan(l)) : loadoutLine(l))}</div></button>`;
   }
   function deliveriesList() {
     const all = [...S.localLoadouts.map(l => ({ ...l, local: true, is_open: true })), ...S.loadouts];
@@ -3035,11 +3067,13 @@ if (typeof document !== "undefined") (function () {
     const f = S.loForm;
     const already = f.jobId && open.find(l => l.job_id === f.jobId);
     const tasksDone = S.dtasks.filter(t => t.done_at && !t.voided_at && daysSince(t.done_at) <= 14);
-    const doneWhen = (l) => l.completed_at ? `${isPk(l) ? "Picked up" : "Delivered"} ${esc(fmtWhen(l.completed_at))}`
+    const doneWhen = (l) => l.completed_at ? `${l.part ? (isPk(l) ? "Part picked up" : "Part delivered") : isPk(l) ? "Picked up" : "Delivered"} ${esc(fmtWhen(l.completed_at))}`
                           : isPk(l) ? "Picked up · waiting to send" : `Left ${esc(fmtDate(localISO(l.finished_at)))}`;
     // 22 Oct: the scheduled trips and Delivery's tasks are on the calendar (week or month); pickups have no date, so they stay a list
     return `${missingNote("loadouts")}
-      ${calendarHtml()}
+      ${calendarHtml()}${S.restWaiting.length ? `<h2 class="sec">Waiting for a new date <span class="meta2">— the office picks the day</span></h2>${S.restWaiting.map(r => `<div class="li restwait">
+          <div class="li-top"><b>${r.is_test ? `<span class="tag">TEST</span>` : ""}${esc(r.project_id)}</b><span class="meta2">${esc(r.job_name)}</span></div>
+          <div class="meta2">${esc(restLine({ of_at: r.rest_of_at, count: r.owed_count, extras: r.extras_left }))} · ${esc(r.kind === "dock" ? "dock to dock" : "white glove")} · ${esc(r.reason)}</div></div>`).join("")}` : ""}
       ${ready.length ? `<h2 class="sec">Ready for pickup</h2>${ready.map(loCard).join("")}` : ""}
       <div class="card" style="margin-top:22px"><h3 style="margin:0 0 4px">Start a load-out</h3>
         <p class="sub" style="margin:0 0 6px">${S.pkReady ? "For a trip that isn't on the calendar. Pick the kind, then the job." : "For a trip that isn't on the calendar, or a shipment. Pick the job going on the truck."}</p>
@@ -3229,6 +3263,8 @@ if (typeof document !== "undefined") (function () {
     for (const k of Object.keys(by)) by[k].sort((a, b) => (b.carried ? 1 : 0) - (a.carried ? 1 : 0) || new Date(a.at) - new Date(b.at));
     return by;
   }
+  /** "The rest of Thu Oct 22's · 2 tables" */
+  const restLine = (r) => `The rest of ${r.of_at ? dayName(localISO(r.of_at)) : "an earlier trip"}'s · ${r.count} table${r.count === 1 ? "" : "s"}${r.extras ? ` and ${r.extras} extra${r.extras === 1 ? "" : "s"}` : ""}`;
   function calItem(e, prog) {
     const rest = (line) => String(line || "").split(" · ").slice(1).join(" · ");
     if (e.type === "trip") {
@@ -3237,7 +3273,7 @@ if (typeof document !== "undefined") (function () {
       const status = p ? `${p.road ? "On the road" : "Loading"}${rest(line) ? " · " + rest(line) : ""}` : plan && plan.waitingDone ? rest(line) : "";
       return `<button class="calitem" data-loopen="${esc(l.client_id)}"><span class="t"><b>${esc(e.carried ? fmtWhen(l.scheduled_for) : fmtTime(l.scheduled_for))}</b><span>${l.kind === "dock" ? "Dock to dock" : "Delivery"}</span></span>
         <span class="j">${l.is_test ? `<span class="tag">TEST</span>` : ""}<b>${esc(l.project_id)}</b> <span>${esc(l.job_name)}</span></span>
-        ${status ? `<span class="l s">${esc(status)}</span>` : ""}${changeLines(changesFor(l.client_id))}${saveLine(dlOf(l))}</button>`;
+        ${l.rest ? `<span class="m">${esc(restLine(l.rest))}</span>` : ""}${status ? `<span class="l s">${esc(status)}</span>` : ""}${changeLines(changesFor(l.client_id))}${saveLine(dlOf(l))}</button>`;
     }
     if (e.type === "task") {
       const t = e.t, sub = [taskSubject(t), t.where_text].filter(Boolean).join(" · ");
@@ -3247,8 +3283,10 @@ if (typeof document !== "undefined") (function () {
     }
     if (e.type === "done") {
       const d = e.d, pk = d.kind === "shipping" || d.kind === "customer_pickup";
-      return `<div class="calitem done"><span class="t"><b>✓ ${pk ? "Picked up" : "Delivered"} ${esc(fmtTime(d.completed_at))}</b><span>${esc(pk ? tripName(d.kind) : d.kind === "dock" ? "Dock to dock" : "Delivery")}</span></span>
-        <span class="j">${d.is_test ? `<span class="tag">TEST</span>` : ""}<b>${esc(d.project_id)}</b> <span>${esc(d.job_name)}</span></span></div>`;
+      const pt = d.part;      // 26 Oct: a part delivery or pickup, and where its rest is
+      return `<div class="calitem done"><span class="t"><b>✓ ${pt ? "Part " : ""}${pt ? (pk ? "picked up" : "delivered") : pk ? "Picked up" : "Delivered"} ${esc(fmtTime(d.completed_at))}</b><span>${esc(pk ? tripName(d.kind) : d.kind === "dock" ? "Dock to dock" : "Delivery")}</span></span>
+        <span class="j">${d.is_test ? `<span class="tag">TEST</span>` : ""}<b>${esc(d.project_id)}</b> <span>${esc(d.job_name)}</span></span>
+        ${pt ? `<span class="l s">${pt.went} of ${pt.went + pt.left} table${pt.went + pt.left === 1 ? "" : "s"} · ${pt.rest_done ? "the rest went later" : pt.rest_off ? "the rest was taken off" : `${pt.left} to come`}</span>` : ""}</div>`;
     }
     if (e.type === "taskdone") {
       const t = e.t;
@@ -3334,9 +3372,115 @@ if (typeof document !== "undefined") (function () {
   }
   function siteSlots(s) {
     return `<div class="loslots">${s.slots.map(x => `<button class="loslot${x.here ? " here" : x.earlier ? " earlier" : ""}" data-dlsite="${s.sheet_number}" data-piece="${x.piece}">
-      ${s.qty === 1 ? "The table" : `Table ${x.piece}`}<small>${x.waiting ? "Waiting to send" : x.here ? "In place · tap for another" : x.earlier ? "Delivered earlier" : "Tap to photograph"}</small></button>`).join("")}</div>`;
+      ${(s.sheetQty || s.qty) === 1 ? "The table" : `Table ${x.piece}`}<small>${x.waiting ? "Waiting to send" : x.here ? "In place · tap for another" : x.earlier ? "Delivered earlier" : "Tap to photograph"}</small></button>`).join("")}</div>`;
   }
   const dlCanFinish = (g) => !!g && (g.noSign ? !!g.reason && (g.reason !== "Other" || !!g.reasonNote.trim()) : !!(g.name.trim() && g.strokes.length));
+
+  // ---------- 26 Oct: not everything went (incomplete_deliveries.sql; design: the Incomplete deliveries tab) ----------
+  const PART_REASONS = ["Damaged", "Site not ready", "Wouldn't fit", "Customer asked to wait", "Other"];
+  /** Only on a database that has it: there, every trip on the phone's list carries owed (null for most). */
+  const partOk = (lo) => !!lo && !!lo.id && Object.prototype.hasOwnProperty.call(lo, "owed");
+  /** The trip's tables for the box, each with whether this trip's photo says it went: white glove, the photo at the site;
+   *  dock to dock, the photo at our dock (their end has none of each table); a pickup, the table's own photo. Not ones gone before. */
+  function partTables(lo) {
+    const list = isPk(lo) ? pkPlan(lo).tables.list : lo.kind === "dock" ? dlPlan(lo).dock.list : dlPlan(lo).site.list;
+    const out = [];
+    for (const s of list) for (const x of s.slots) if (!x.earlier) out.push({ key: `${s.sheet_number}:${x.piece}`, sheet: s.sheet_number, piece: x.piece, photo: !!x.here, s });
+    return out;
+  }
+  /** What the box says: on or off (it ticks itself when a table has no photo), what went, what didn't, the extras, why. */
+  function partState(lo, g) {
+    g = g || {};
+    const tables = partTables(lo), noPhoto = tables.filter(t => !t.photo).length;
+    const auto = g.part === undefined || g.part === null, on = auto ? noPhoto > 0 : !!g.part;
+    const pt = g.pt || {}, xw = g.xw || {};
+    const went = tables.filter(t => pt[t.key] === undefined ? t.photo : pt[t.key]), left = tables.filter(t => !went.includes(t));
+    const xp = extrasPlan(lo);
+    const extras = xp ? xp.list.filter(e => e.here > 0).map(e => { const key = `${e.sheet}|${e.name}`;
+      return { ...e, key, went: Math.max(0, Math.min(e.here, xw[key] === undefined ? e.here : Number(xw[key]))) }; }) : [];
+    const owedX = xp ? xp.list.reduce((a, e) => { const x = extras.find(y => y.sheet === e.sheet && y.name === e.name);
+      return a + Math.max(0, e.qty - e.earlier - (x ? x.went : e.here)); }, 0) : 0;
+    const reason = g.partReason || null, note = String(g.partNote || "").trim(), something = left.length > 0 || owedX > 0;
+    return { on, auto, noPhoto, tables, went, left, extras, owedX, reason, note, something,
+             ready: !on || (something && !!reason && (reason !== "Other" || !!note)) };
+  }
+  /** "sheet 2: tables 5, 6 · sheet 3: the table" */
+  function piecesText(list) {
+    const by = new Map();
+    for (const t of list) { if (!by.has(t.sheet)) by.set(t.sheet, []); by.get(t.sheet).push(t); }
+    return [...by.entries()].map(([sh, ts]) => `sheet ${sh}: ${(ts[0].s.sheetQty || ts[0].s.qty) === 1 ? "the table" : `table${ts.length === 1 ? "" : "s"} ${ts.map(t => t.piece).join(", ")}`}`).join(" · ");
+  }
+  const finishOk = (lo, g) => dlCanFinish(g) && (!partOk(lo) || partState(lo, g).ready);
+  /** The box above the signature: off, or the trip's tables ticked from the photos, the extras, why, and what's still to come. */
+  function partSection(lo, g) {
+    if (!partOk(lo)) return "";
+    const st = partState(lo, g), pk = isPk(lo), word = pk ? "picked up" : "delivered";
+    const where = pk ? "" : lo.kind === "dock" ? " at our dock" : " at the site";
+    const goes = pk ? "The rest goes back on Ready for pickup." : "The rest goes on a new trip for the office to give a day.";
+    if (!st.on) return `<div class="partbox"><label class="partchk"><input type="checkbox" data-partbox="1"><span><b>Not everything was ${word}</b>
+      <small>Tick this if anything didn't go. ${goes}</small></span></label></div>`;
+    const why = st.auto && st.noPhoto ? `Ticked because ${st.noPhoto} table${st.noPhoto === 1 ? " has" : "s have"} no photo${where}. ` : "";
+    const sheets = [];
+    for (const t of st.tables) { let x = sheets.find(y => y.s.sheet_number === t.sheet); if (!x) sheets.push(x = { s: t.s, ts: [] }); x.ts.push(t); }
+    const xToday = st.extras.length ? ` · ${st.extras.map(e => `${esc(e.name)} ${e.went} of ${e.here}`).join(", ")}` : "";
+    const still = [st.left.length ? `${st.left.length} table${st.left.length === 1 ? "" : "s"} (${esc(piecesText(st.left))})` : null,
+                   st.owedX ? `${st.owedX} extra${st.owedX === 1 ? "" : "s"}` : null].filter(Boolean).join(" and ");
+    return `<div class="partbox on"><label class="partchk"><input type="checkbox" data-partbox="1" checked><span><b>Not everything was ${word}</b>
+        <small>${why}${goes}</small></span></label>
+      <div class="f">What went today <span class="meta2">— ticked from your photos</span></div>
+      <p class="meta2" style="margin:0 0 4px">Untick anything that came back. Tap one that went with no photo to tick it.</p>
+      ${sheets.map(({ s, ts }) => { const w = ts.filter(t => st.went.includes(t)).length;
+        return `<div class="partrow"><div class="tbhead">${snipHtml(s.png_path, s.pages_ready)}<div class="lotop"><span class="no num">${s.sheet_number}</span><span class="size">${esc(sizeLabel(s) || s.item_code || "Sheet " + s.sheet_number)}</span><span class="cnt">${w} of ${ts.length} went</span></div></div>
+          <div class="loslots">${ts.map(t => { const on = st.went.includes(t);
+            return `<button class="loslot${on ? " here" : ""}" data-partpiece="${esc(t.key)}" aria-pressed="${on}">${on ? "✓ " : ""}${(s.sheetQty || s.qty) === 1 ? "The table" : `Table ${t.piece}`}<small>${on ? (t.photo ? "Went" : "Went · no photo") : t.photo ? "Came back" : "To come"}</small></button>`; }).join("")}</div></div>`; }).join("")}
+      ${st.extras.length ? `<div class="f">Extras <span class="meta2">— how many went</span></div>${st.extras.map(e => `<div class="partrow partx"><span><b>${esc(e.name)}</b><small>sheet ${e.sheet} · ${e.went} of ${e.here} went · ${e.here} loaded</small></span>
+          <button class="xstep" data-partx="${esc(e.key)}" data-to="${e.went - 1}" aria-label="One fewer ${esc(e.name)} went" ${e.went > 0 ? "" : "disabled"}>−</button>
+          <button class="xstep" data-partx="${esc(e.key)}" data-to="${e.went + 1}" aria-label="One more ${esc(e.name)} went" ${e.went < e.here ? "" : "disabled"}>+</button></div>`).join("")}` : ""}
+      <div class="f">Why didn't it all go?</div>
+      ${PART_REASONS.map(r => `<button class="pick" data-partreason="${esc(r)}" aria-pressed="${st.reason === r}">${esc(r)}</button>`).join("")}
+      <label class="f" for="partNote">For the office <span class="meta2">(${st.reason === "Other" ? "needed" : "optional"})</span></label>
+      <textarea class="in" id="partNote" data-partnote="1" maxlength="500" placeholder="${st.reason === "Other" ? "Say why (needed)" : "e.g. the 2nd-floor room is still being carpeted"}">${esc(g.partNote || "")}</textarea>
+      <div class="partsum"><b>Today: ${st.went.length} of ${st.tables.length} table${st.tables.length === 1 ? "" : "s"}${xToday}</b>
+        <span>${st.something ? `Still to come: ${still}. ${pk ? "It goes back on Ready for pickup." : "It goes on a new trip; the office gives it a day."} The ${pk ? "customer" : lo.kind === "dock" ? "receiver" : "customer"} signs for today's.`
+          : "Everything is ticked as gone. Untick what didn't go, or untick the box above."}</span></div>
+    </div>`;
+  }
+  /** What the phone keeps (and sends) with the finish: the lists as Delivery left them. */
+  const partRecord = (st) => ({ went: st.went.map(t => t.key), left: st.left.map(t => t.key),
+                                extras: st.extras.map(e => ({ sheet: e.sheet, name: e.name, went: e.went })),
+                                reason: st.reason, reasonNote: st.note, restId: newId(), wentCount: st.went.length, total: st.tables.length });
+  /** The confirm's words for a part delivery or pickup. */
+  function partConfirmText(lo, st) {
+    const pk = isPk(lo);
+    const today = [`${st.went.length} of ${st.tables.length} table${st.tables.length === 1 ? "" : "s"}`, ...st.extras.map(e => `${e.went} of ${e.here} × ${e.name}`)].join(" and ");
+    const one = st.left.length + st.owedX === 1;           // "The other table goes", "The other 3 tables and 1 extra go"
+    const rest = [st.left.length ? `${st.left.length === 1 ? "table" : `${st.left.length} tables`} (${piecesText(st.left)})` : null,
+                  st.owedX ? `${st.owedX === 1 ? (st.left.length ? "1 extra" : "extra") : `${st.owedX} extras`}` : null].filter(Boolean).join(" and ");
+    return `${today} went today. The other ${rest} ${pk ? (one ? "goes back on Ready for pickup" : "go back on Ready for pickup") : `${one ? "goes" : "go"} on a new trip for ${lo.project_id}; the office gives it a day and time`}. This marks today's trip ${pk ? "picked up" : "delivered"} now${pk || lo.finished_at ? "" : ", and the truck as left"}. It can't be changed afterwards.`;
+  }
+  /** Under a finished trip: how much went, where the rest is now, and (if it was damage) the offer to report it. */
+  function partDoneLines(lo, w) {
+    const p = lo.part, wp = w && w.part;
+    if (!p && !wp) return "";
+    const went = p ? p.went : wp.wentCount, total = p ? p.went + p.left : wp.total;
+    const where = !p ? "The rest gets its own trip once this sends."
+      : p.rest_off ? "The office took the rest off."
+      : p.rest_done ? `The rest went ${fmtWhen(p.rest_done)}.`
+      : p.rest_when ? `The rest goes ${fmtWhen(p.rest_when)}.`
+      : p.rest_ready ? "The rest is on Ready for pickup."
+      : "The rest waits for the office to give it a day.";
+    const dmg = (p ? p.reason : wp.reason) === "Damaged";
+    return `<div class="meta2" style="margin-top:6px">${went} of ${total} table${total === 1 ? "" : "s"} went. ${esc(where)}</div>
+      ${dmg ? `<button class="btn" style="margin-top:10px" data-reportjob="${esc(lo.job_id)}">Report the damage to the office</button>` : ""}`;
+  }
+  /** At the top of a trip that's the rest of another: which, what's on it, and why. */
+  function restBox(lo) {
+    const r = lo.rest;
+    if (!r) return "";
+    const pk = r.of_kind === "shipping" || r.of_kind === "customer_pickup";
+    return `<div class="restbox"><b>The rest of ${esc(r.of_at ? dayName(localISO(r.of_at)) : "an earlier")}'s ${pk ? "pickup" : "delivery"}</b>
+      <span>${r.count} table${r.count === 1 ? "" : "s"}${r.extras ? ` and ${r.extras} extra${r.extras === 1 ? "" : "s"}` : ""} still to go. Why: ${esc(r.reason)}${r.note ? ` — “${esc(r.note)}”` : ""}</span></div>`;
+  }
   function deliveryDetail(lo) {
     const d = dlOf(lo), plan = dlPlan(lo), p = plan.site, sheets = S.loSheets[lo.job_id], left = !!lo.finished_at;
     const pend = dlPend(lo).filter(x => x.kind !== "delivery_done"), photos = S.loPhotos.filter(x => x.loadout_id === lo.id);
@@ -3355,32 +3499,33 @@ if (typeof document !== "undefined") (function () {
     const dock = lo.kind === "dock", who = dock ? "receiver" : "customer";     // dock to dock (trip_types.sql): dropped at their dock
     const noSheet = (x) => x.sheet === null || x.sheet === undefined;
     const drops = photos.filter(x => x.stage === "site" && (x.sheet_number === null || x.sheet_number === undefined)).length + pend.filter(x => x.stage === "site" && noSheet(x)).length;
-    const w = plan.waitingDone;
+    const w = plan.waitingDone, dw = lo.part || (w && w.part) ? "Part delivered" : "Delivered";
+    const partOn = !plan.delivered && partOk(lo) && partState(lo, g).on;
     const customer = plan.delivered
-      ? `<div class="dldone"><b>${lo.completed_at ? (lo.signed_name ? `Delivered · signed by ${esc(lo.signed_name)}` : `Delivered · not signed (${esc(lo.no_sign_reason)})`)
-                                                 : w.signed ? `Delivered · signed by ${esc(w.signedName)}` : `Delivered · not signed (${esc(w.reason)})`}</b>
-          ${lo.completed_at ? `${esc(fmtWhen(lo.completed_at))}${lo.completed_by_name ? ` · ${esc(lo.completed_by_name)}` : ""}` : "Waiting to send — it goes by itself when there's signal."}</div>`
+      ? `<div class="dldone"><b>${lo.completed_at ? (lo.signed_name ? `${dw} · signed by ${esc(lo.signed_name)}` : `${dw} · not signed (${esc(lo.no_sign_reason)})`)
+                                                 : w.signed ? `${dw} · signed by ${esc(w.signedName)}` : `${dw} · not signed (${esc(w.reason)})`}</b>
+          ${lo.completed_at ? `${esc(fmtWhen(lo.completed_at))}${lo.completed_by_name ? ` · ${esc(lo.completed_by_name)}` : ""}` : "Waiting to send — it goes by itself when there's signal."}${partDoneLines(lo, w)}</div>`
       : `<div class="card">
           <label class="f" style="margin-top:0" for="dlNote">The ${who}'s note <span class="meta2">(optional — anything they want written down)</span></label>
           <textarea class="in" id="dlNote" data-dlsig="note" maxlength="1000" placeholder="e.g. Scuff on the leg of table 3">${esc(g.note)}</textarea>
           ${g.noSign ? `<label class="f">Why is there no signature?</label>
               ${NO_SIGN.map(r => `<button class="pick" data-dlreason="${esc(r)}" aria-pressed="${g.reason === r}">${esc(r)}</button>`).join("")}
               <textarea class="in" data-dlsig="reasonNote" maxlength="1000" placeholder="${g.reason === "Other" ? "Say why (needed)" : "Anything to add (optional), e.g. left inside the gym"}">${esc(g.reasonNote)}</textarea>
-              <button class="go wide" style="margin-top:14px" data-dldone="1" ${dlCanFinish(g) ? "" : "disabled"}>Delivered — not signed</button>
+              <button class="go wide" style="margin-top:14px" data-dldone="1" ${finishOk(lo, g) ? "" : "disabled"}>${partOn ? "Part delivered" : "Delivered"} — not signed</button>
               <p style="text-align:center"><button class="linkish" data-dlnosign="0">Get a signature after all</button></p>`
             : `<label class="f" for="dlName">The ${who}'s name</label>
               <input class="in" id="dlName" data-dlsig="name" value="${esc(g.name)}" maxlength="80" autocomplete="off" placeholder="Who is signing">
               <label class="f">Signature</label>
               <div class="sigwrap"><canvas id="sigpad" class="sigpad" aria-label="Sign here"></canvas>
                 <button class="linkish sigclear" data-dlclear="1">Clear</button><span class="sighint">${g.strokes.length ? "" : "Sign here with a finger"}</span></div>
-              <button class="go wide" style="margin-top:14px" data-dldone="1" ${dlCanFinish(g) ? "" : "disabled"}>Delivered — signed</button>
+              <button class="go wide" style="margin-top:14px" data-dldone="1" ${finishOk(lo, g) ? "" : "disabled"}>${partOn ? "Part delivered" : "Delivered"} — signed</button>
               <p style="text-align:center"><button class="linkish" data-dlnosign="1">Can't get a signature?</button></p>`}
         </div>`;
     return `<button class="back" data-loback="1">← Load-outs</button>
       <h1>${lo.is_test ? `<span class="tag">TEST</span>` : ""}${esc(lo.project_id)}</h1>
       <p class="sub">${esc(lo.job_name)}${lo.scheduled_for ? "" : ` · started ${esc(agoText(lo.started_at))}${lo.started_by_name ? ` by ${esc(lo.started_by_name)}` : ""}`}${lo.id ? "" : " · waiting to send"}</p>
       ${lo.scheduled_for ? `<div class="dlwhen">${dock ? "Dock to dock" : "Delivery"} ${esc(fmtWhen(lo.scheduled_for))}</div>` : ""}
-      ${changedBox(lo)}
+      ${changedBox(lo)}${restBox(lo)}
       ${left || lo.scheduled_for || plan.delivered ? "" : kindButtons(lo.kind, "lokind")}
       ${ready}
       ${d || wob ? `<div class="dlinfo">${d && d.schedule_note ? `<div style="margin-bottom:8px"><b>Note${d.scheduled_by_name ? ` from ${esc(d.scheduled_by_name)}` : ""}:</b> ${esc(d.schedule_note)}</div>` : ""}
@@ -3413,7 +3558,7 @@ if (typeof document !== "undefined") (function () {
         : sheets ? `<div class="meta2">No work order uploaded, so there are no tables to tick off. Photograph each item below, with a few words.</div>` : ""}
 `}
       <div class="lostep">3 · The ${dock ? "receiver" : "customer"}</div>
-      ${customer}
+      ${plan.delivered ? "" : partSection(lo, g)}${customer}
       ${plan.delivered ? "" : `<div class="card"><label class="f" style="margin-top:0" for="loItem">Something with no sheet</label>
         <input class="in" id="loItem" data-loitem="1" value="${esc(S.loItem)}" placeholder="e.g. hardware box, 2 of 2">
         <button class="addph" data-loshootitem="1" ${S.loItem.trim() ? "" : "disabled"}>Photograph it</button></div>`}
@@ -3435,9 +3580,10 @@ if (typeof document !== "undefined") (function () {
     const g = S.dlSig[lo.client_id] || (S.dlSig[lo.client_id] = { name: "", note: "", noSign: false, reason: null, reasonNote: "", strokes: [], aspect: 2 });
     const det = S.loDet[lo.client_id] || { carrier: lo.carrier || "", tracking: lo.tracking || "" };
     const changed = (det.carrier || "") !== (lo.carrier || "") || (det.tracking || "") !== (lo.tracking || "");
-    const w = plan.waitingDone, done = plan.done;
+    const w = plan.waitingDone, done = plan.done, pw = lo.part || (w && w.part) ? "Part picked up" : "Picked up";
+    const partOn = !done && partOk(lo) && partState(lo, g).on, partReady = !partOk(lo) || partState(lo, g).ready;
     const slots = (s) => `<div class="loslots">${s.slots.map(x => `<button class="loslot${x.here ? " here" : x.earlier ? " earlier" : ""}" data-loshoot="${s.sheet_number}" data-piece="${x.piece}">
-      ${s.qty === 1 ? "The table" : `Table ${x.piece}`}<small>${x.waiting ? "Waiting to send" : x.here ? "Photographed · tap for another" : x.earlier ? "Went on an earlier trip" : "Tap to photograph"}</small></button>`).join("")}</div>`;
+      ${(s.sheetQty || s.qty) === 1 ? "The table" : `Table ${x.piece}`}<small>${x.waiting ? "Waiting to send" : x.here ? "Photographed · tap for another" : x.earlier ? "Went on an earlier trip" : "Tap to photograph"}</small></button>`).join("")}</div>`;
     const tablesStep = `<div class="lostep">1 · ${bol ? "Every table, before it's wrapped" : "Each table as it's handed over"} <span>— ${p.done} of ${p.total}</span></div>
       ${sheets === undefined ? `<div class="meta2">Loading the sheets…</div>` : ""}
       ${p.list.length ? p.list.map(s => `<div class="locard${s.complete ? " done" : ""}">
@@ -3463,28 +3609,28 @@ if (typeof document !== "undefined") (function () {
           <input class="in" id="loTracking" data-lodet="tracking" value="${esc(det.tracking)}" placeholder="e.g. 44812" maxlength="80" ${done ? "disabled" : ""}></div></div>
         ${done ? "" : `<button class="btn" style="margin-top:10px" data-losavedet="1" ${changed ? "" : "disabled"}>Save carrier and BOL number</button>`}</div>` : "";
     const finish = done
-      ? `<div class="dldone"><b>${lo.completed_at ? (bol ? "Picked up" : lo.signed_name ? `Picked up · signed by ${esc(lo.signed_name)}` : `Picked up · not signed (${esc(lo.no_sign_reason)})`)
-                                                 : bol ? "Picked up" : w.signed ? `Picked up · signed by ${esc(w.signedName)}` : `Picked up · not signed (${esc(w.reason)})`}</b>
-          ${lo.completed_at ? `${esc(fmtWhen(lo.completed_at))}${lo.completed_by_name ? ` · ${esc(lo.completed_by_name)}` : ""}` : "Waiting to send — it goes by itself when there's signal."}</div>`
-      : bol ? `<div class="card">
+      ? `<div class="dldone"><b>${lo.completed_at ? (bol ? pw : lo.signed_name ? `${pw} · signed by ${esc(lo.signed_name)}` : `${pw} · not signed (${esc(lo.no_sign_reason)})`)
+                                                 : bol ? pw : w.signed ? `${pw} · signed by ${esc(w.signedName)}` : `${pw} · not signed (${esc(w.reason)})`}</b>
+          ${lo.completed_at ? `${esc(fmtWhen(lo.completed_at))}${lo.completed_by_name ? ` · ${esc(lo.completed_by_name)}` : ""}` : "Waiting to send — it goes by itself when there's signal."}${partDoneLines(lo, w)}</div>`
+      : bol ? `${partSection(lo, g)}<div class="card">
           <label class="f" style="margin-top:0" for="dlNote">A note <span class="meta2">(optional)</span></label>
           <textarea class="in" id="dlNote" data-dlsig="note" maxlength="1000" placeholder="e.g. 3 pallets, the driver counted them">${esc(g.note)}</textarea>
           ${plan.ready ? "" : `<p class="meta2" style="margin:10px 0 0">Needs ${[plan.palletsHere.length ? null : "a photo of a wrapped pallet", plan.bolHere ? null : "a photo of the BOL"].filter(Boolean).join(" and ")} first.</p>`}
-          <button class="go wide" style="margin-top:14px" data-pkdone="1" ${plan.ready ? "" : "disabled"}>Picked up — BOL pickup done</button></div>`
-      : `<div class="lostep">2 · The customer</div><div class="card">
+          <button class="go wide" style="margin-top:14px" data-pkdone="1" ${plan.ready && partReady ? "" : "disabled"}>${partOn ? "Part picked up" : "Picked up"} — BOL pickup done</button></div>`
+      : `<div class="lostep">2 · The customer</div>${partSection(lo, g)}<div class="card">
           <label class="f" style="margin-top:0" for="dlNote">The customer's note <span class="meta2">(optional — anything they want written down)</span></label>
           <textarea class="in" id="dlNote" data-dlsig="note" maxlength="1000" placeholder="e.g. Scuff on the leg of table 3">${esc(g.note)}</textarea>
           ${g.noSign ? `<label class="f">Why is there no signature?</label>
               ${PK_NO_SIGN.map(r => `<button class="pick" data-dlreason="${esc(r)}" aria-pressed="${g.reason === r}">${esc(r)}</button>`).join("")}
               <textarea class="in" data-dlsig="reasonNote" maxlength="1000" placeholder="${g.reason === "Other" ? "Say why (needed)" : "Anything to add (optional)"}">${esc(g.reasonNote)}</textarea>
-              <button class="go wide" style="margin-top:14px" data-dldone="1" ${dlCanFinish(g) ? "" : "disabled"}>Picked up — not signed</button>
+              <button class="go wide" style="margin-top:14px" data-dldone="1" ${finishOk(lo, g) ? "" : "disabled"}>${partOn ? "Part picked up" : "Picked up"} — not signed</button>
               <p style="text-align:center"><button class="linkish" data-dlnosign="0">Get a signature after all</button></p>`
             : `<label class="f" for="dlName">The customer's name</label>
               <input class="in" id="dlName" data-dlsig="name" value="${esc(g.name)}" maxlength="80" autocomplete="off" placeholder="Who is signing">
               <label class="f">Signature</label>
               <div class="sigwrap"><canvas id="sigpad" class="sigpad" aria-label="Sign here"></canvas>
                 <button class="linkish sigclear" data-dlclear="1">Clear</button><span class="sighint">${g.strokes.length ? "" : "Sign here with a finger"}</span></div>
-              <button class="go wide" style="margin-top:14px" data-dldone="1" ${dlCanFinish(g) ? "" : "disabled"}>Picked up — signed</button>
+              <button class="go wide" style="margin-top:14px" data-dldone="1" ${finishOk(lo, g) ? "" : "disabled"}>${partOn ? "Part picked up" : "Picked up"} — signed</button>
               <p style="text-align:center"><button class="linkish" data-dlnosign="1">Can't get a signature?</button></p>`}
         </div>`;
     return `<button class="back" data-loback="1">← Load-outs</button>
@@ -3492,7 +3638,7 @@ if (typeof document !== "undefined") (function () {
       <p class="sub">${esc(lo.job_name)}${lo.ready_at ? "" : ` · started ${esc(agoText(lo.started_at))}${lo.started_by_name ? ` by ${esc(lo.started_by_name)}` : ""}`}${lo.id ? "" : " · waiting to send"}</p>
       ${lo.ready_at ? `<div class="dlwhen">${esc(tripName(lo.kind))} · ready since ${esc(fmtDate(localISO(lo.ready_at)))}</div>`
                     : done ? "" : kindButtons(lo.kind, "lokind")}
-      ${changedBox(lo)}
+      ${changedBox(lo)}${restBox(lo)}
       ${pg && pg.total ? `<div class="lopages${pg.saved === pg.total ? " ready" : ""}">${pg.saved === pg.total ? `✓ Ready for no signal · ${pg.total} work order page${pg.total === 1 ? "" : "s"} saved on this device`
           : pg.busy ? `Saving the work order pages for no signal… ${pg.saved} of ${pg.total}` : `${pg.saved} of ${pg.total} work order pages saved on this device.`}</div>` : ""}
       ${(d && (d.schedule_note || d.ticket || (d.files || []).length)) || wob ? `<div class="dlinfo">${d && d.schedule_note ? `<div style="margin-bottom:8px"><b>Note${d.scheduled_by_name ? ` from ${esc(d.scheduled_by_name)}` : ""}:</b> ${esc(d.schedule_note)}</div>` : ""}
@@ -3531,7 +3677,7 @@ if (typeof document !== "undefined") (function () {
         if (st.length === 1) ctx.lineTo(st[0][0] * b.w + 0.1, st[0][1] * b.h); ctx.stroke(); }
     };
     const pt = (e) => { const b = box(); return [Math.min(1, Math.max(0, (e.clientX - b.l) / b.w)), Math.min(1, Math.max(0, (e.clientY - b.t) / b.h))]; };
-    const sync = () => { const btn = app.querySelector("[data-dldone]"); if (btn) btn.disabled = !dlCanFinish(g);
+    const sync = () => { const btn = app.querySelector("[data-dldone]"); if (btn) btn.disabled = !finishOk(lo, g);
                          const h = app.querySelector(".sighint"); if (h) h.textContent = g.strokes.length ? "" : "Sign here with a finger"; };
     let cur = null;
     c.addEventListener("pointerdown", (e) => { e.preventDefault(); try { c.setPointerCapture(e.pointerId); } catch (x) {} cur = [pt(e)]; g.strokes.push(cur); draw(); sync(); });
@@ -3564,7 +3710,7 @@ if (typeof document !== "undefined") (function () {
       const k = xKey(r.sheet_number, r.name);
       const mine = x.loaded.find(t => xMine(lo, t) && xKey(t.sheet_number, t.name) === k);
       const earlier = x.loaded.filter(t => !xMine(lo, t) && xKey(t.sheet_number, t.name) === k && (t.finished_at || t.completed_at))
-                              .reduce((a, t) => a + t.loaded, 0);
+                              .reduce((a, t) => a + (typeof t.went === "number" ? t.went : t.loaded), 0);    // 26 Oct: part deliveries say how many went
       const room = Math.max(r.qty - earlier, 0), here = Math.min(mine ? mine.loaded : 0, r.qty);
       const sh = sheets.find(s => s.sheet_number === r.sheet_number);
       return { sheet: r.sheet_number, name: r.name, qty: r.qty, here, earlier: Math.min(earlier, r.qty), room,
@@ -4539,26 +4685,43 @@ if (typeof document !== "undefined") (function () {
     const sig = () => lo && S.dlSig[lo.client_id];
     app.querySelectorAll("[data-dlsig]").forEach(el => el.oninput = () => {
       const g = sig(); if (!g) return; g[el.dataset.dlsig] = el.value;
-      const btn = app.querySelector("[data-dldone]"); if (btn) btn.disabled = !dlCanFinish(g);
+      const btn = app.querySelector("[data-dldone]"); if (btn) btn.disabled = !finishOk(lo, g);
     });
+    // 26 Oct: not everything went — the box, the tables, the extras, why
+    const partG = () => { const g = sig(); if (g) { g.pt = g.pt || {}; g.xw = g.xw || {}; } return g; };
+    app.querySelectorAll("[data-partbox]").forEach(el => el.onchange = () => { const g = partG(); if (!g) return; g.part = el.checked; render(); });
+    on("[data-partpiece]", (b) => { const g = partG(); if (!g || !lo) return;
+      const t = partTables(lo).find(x => x.key === b.dataset.partpiece); if (!t) return;
+      g.pt[t.key] = !(g.pt[t.key] === undefined ? t.photo : g.pt[t.key]); render(); });
+    on("[data-partx]", (b) => { const g = partG(); if (!g) return; g.xw[b.dataset.partx] = Math.max(0, Number(b.dataset.to) || 0); render(); });
+    on("[data-partreason]", (b) => { const g = partG(); if (!g) return; g.partReason = b.dataset.partreason; render(); });
+    app.querySelectorAll("[data-partnote]").forEach(el => el.oninput = () => {
+      const g = partG(); if (!g || !lo) return; g.partNote = el.value;
+      const btn = app.querySelector("[data-dldone]"); if (btn) btn.disabled = !finishOk(lo, g);
+      const pk = app.querySelector("[data-pkdone]"); if (pk) pk.disabled = !(pkPlan(lo).ready && partState(lo, g).ready);
+    });
+    on("[data-reportjob]", (b) => { S.modal = { kind: "report", jobId: b.dataset.reportjob, sheet: null, pick: false, filter: "" }; render(); });
     on("[data-dlnosign]", (b) => { const g = sig(); if (!g) return; g.noSign = b.dataset.dlnosign === "1"; render(); });
     on("[data-dlreason]", (b) => { const g = sig(); if (!g) return; g.reason = b.dataset.dlreason; render(); });
     on("[data-dlclear]", () => { const g = sig(); if (!g) return; g.strokes = []; render(); });
     on("[data-dldone]", () => {
-      const g = sig(); if (!dlCanFinish(g)) return;
+      const g = sig(); if (!finishOk(lo, g)) return;
       if (isPk(lo)) return pickupDone(g);
-      const plan = dlPlan(lo);
-      const gaps = plan.site.missing.length ? `Not photographed at the site — ${missingText(plan.site.missing)}. ` : "";
-      S.modal = { kind: "confirm", title: g.noSign ? "Delivered, not signed?" : `Delivered, signed by ${g.name.trim()}?`,
-        text: `${gaps}This marks ${lo.project_id} delivered now${lo.finished_at ? "" : ", and the truck as left"}.${gaps ? " Finish anyway? That's fine if something is going later." : ""} It can't be changed afterwards.`,
-        yes: "Mark it delivered",
+      const plan = dlPlan(lo), ps = partOk(lo) ? partState(lo, g) : null, part = ps && ps.on ? ps : null;
+      const gaps = !part && plan.site.missing.length && lo.kind !== "dock" ? `Not photographed at the site — ${missingText(plan.site.missing)}. ` : "";
+      S.modal = { kind: "confirm", title: part ? (g.noSign ? "Part delivered, not signed?" : `Part delivered, signed by ${g.name.trim()}?`)
+                                               : g.noSign ? "Delivered, not signed?" : `Delivered, signed by ${g.name.trim()}?`,
+        text: part ? partConfirmText(lo, part)
+                   : `${gaps}This marks ${lo.project_id} delivered now${lo.finished_at ? "" : ", and the truck as left"}.${gaps ? " Finish anyway? That's fine if something is going later." : ""} It can't be changed afterwards.`,
+        yes: part ? "Mark it part delivered" : "Mark it delivered",
         run: async () => {
           const pos = await whereAmI();
           const blob = g.noSign ? null : await signaturePng(g.strokes, g.aspect);
           await photoStore.put({ id: newId(), kind: "delivery_done", parent: lo.client_id, projectId: lo.project_id, label: "Delivery",
                                  at: new Date().toISOString(), tries: 0, blob, type: "image/png", signed: !g.noSign, signedName: g.name.trim(),
                                  customerNote: g.note.trim(), reason: g.noSign ? g.reason : null, reasonNote: g.reasonNote.trim(),
-                                 lat: pos ? pos.lat : null, lng: pos ? pos.lng : null, accuracy: pos ? pos.accuracy : null });
+                                 lat: pos ? pos.lat : null, lng: pos ? pos.lng : null, accuracy: pos ? pos.accuracy : null,
+                                 part: part ? partRecord(part) : null });
           delete S.dlSig[lo.client_id];
           await refreshPending(); render(); flushPhotos();
         } };
@@ -4574,22 +4737,25 @@ if (typeof document !== "undefined") (function () {
         render(); flushPhotos();
       }, { fresh: true }); });
     on("[data-pkbolmore]", () => { if (!lo) return; S.pkBolMore[lo.client_id] = (S.pkBolMore[lo.client_id] || 0) + 1; render(); });
-    on("[data-pkdone]", () => { const g = sig(); if (lo && pkPlan(lo).ready) pickupDone(g || { note: "" }); });
+    on("[data-pkdone]", () => { const g = sig(); if (lo && pkPlan(lo).ready && (!partOk(lo) || partState(lo, g).ready)) pickupDone(g || { note: "" }); });
     const pickupDone = (g) => {
-      const plan = pkPlan(lo), bol = plan.bol;
-      const gaps = [plan.tables.missing.length ? `Not photographed — ${missingText(plan.tables.missing)}.` : "",
+      const plan = pkPlan(lo), bol = plan.bol, ps = partOk(lo) ? partState(lo, g) : null, part = ps && ps.on ? ps : null;
+      const gaps = part ? "" : [plan.tables.missing.length ? `Not photographed — ${missingText(plan.tables.missing)}.` : "",
                     bol && plan.palletsMissing.length ? `No wrapped photo of pallet${plan.palletsMissing.length === 1 ? "" : "s"} ${plan.palletsMissing.join(", ")}.` : "",
                     extrasShortText(lo)].filter(Boolean).join(" ");
       S.modal = { kind: "confirm",
-        title: bol ? `${lo.project_id} picked up?` : g.noSign ? "Picked up, not signed?" : `Picked up, signed by ${g.name.trim()}?`,
-        text: `${gaps ? gaps + " " : ""}This marks ${lo.project_id} picked up now.${gaps ? " Finish anyway? That's fine if something is going later." : ""} It can't be changed afterwards.`,
-        yes: "Mark it picked up",
+        title: part ? (bol ? `${lo.project_id} part picked up?` : g.noSign ? "Part picked up, not signed?" : `Part picked up, signed by ${g.name.trim()}?`)
+                    : bol ? `${lo.project_id} picked up?` : g.noSign ? "Picked up, not signed?" : `Picked up, signed by ${g.name.trim()}?`,
+        text: part ? partConfirmText(lo, part)
+                   : `${gaps ? gaps + " " : ""}This marks ${lo.project_id} picked up now.${gaps ? " Finish anyway? That's fine if something is going later." : ""} It can't be changed afterwards.`,
+        yes: part ? "Mark it part picked up" : "Mark it picked up",
         run: async () => {
           if (S.loDet[lo.client_id]) saveDet();
           const blob = bol || g.noSign ? null : await signaturePng(g.strokes, g.aspect);
           await photoStore.put({ id: newId(), kind: "pickup_done", parent: lo.client_id, projectId: lo.project_id, label: "Pickup",
                                  at: new Date().toISOString(), tries: 0, blob, type: "image/png", bol, signed: !bol && !g.noSign, signedName: (g.name || "").trim(),
-                                 customerNote: (g.note || "").trim(), reason: !bol && g.noSign ? g.reason : null, reasonNote: (g.reasonNote || "").trim() });
+                                 customerNote: (g.note || "").trim(), reason: !bol && g.noSign ? g.reason : null, reasonNote: (g.reasonNote || "").trim(),
+                                 part: part ? partRecord(part) : null });
           delete S.dlSig[lo.client_id];
           await refreshPending(); render(); flushPhotos();
         } };

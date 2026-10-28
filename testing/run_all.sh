@@ -89,6 +89,7 @@ run test_pdf_ticket        seed  PAGE=$PAGE -- node test_pdf_ticket.js
 run test_wo_beside_ticket  seed  PAGE=$PAGE -- node test_wo_beside_ticket.js
 run test_extras_checklist  seed  PAGE=$PAGE -- node test_extras_checklist.js
 run test_delivery_calendar seed  PAGE=$PAGE -- node test_delivery_calendar.js
+run test_incomplete_deliveries seed PAGE=$PAGE OUT=$P -- node test_incomplete_deliveries.js
 fi
 if in_group pages2; then
 run test_handoff_recent    scenario MODE=new PAGE=$PAGE -- node test_handoff_recent.js
