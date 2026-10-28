@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Job status — Shop Floor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sf-style-2026-10-20.1.css">
+<!--
+  status.html — Job status (28 Oct 2026). Look a job up by PROJ number or name; one sentence says where it is,
+  then each department, the delivery and Monday's phase. For supervisors, managers and look-up logins (sales).
+  Everything comes from job_lookup() (job_status.sql, run order 47); the database decides who sees what:
+  look-up logins get no done-by dates and can read nothing else. Sheet number and item code only, never
+  work order content. Design: the spec's Job status tab.
+-->
+<style>
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 60px)}
+html,body{margin:0; background:var(--paper); color:var(--midnight)}
+:root{padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px)}
+body{font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:18px; line-height:1.4; -webkit-text-size-adjust:100%}
+button{font:inherit; color:inherit; cursor:pointer}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--bright); outline-offset:2px}
+.num{font-family:'Barlow Condensed',sans-serif; font-variant-numeric:tabular-nums}
+[hidden]{display:none!important}
+
+/* top bar, as on the tablet: SHOP FLOOR, where you are, a status pill */
+body::before{content:""; position:fixed; inset:0 0 auto; height:env(safe-area-inset-top,0px); z-index:10; background:var(--midnight)}
+.top{position:sticky; top:env(safe-area-inset-top,0px); z-index:10; background:var(--midnight); color:var(--sawdust); padding:0 24px}
+.top-row{display:flex; align-items:center; gap:12px; min-height:52px; max-width:772px; margin:0 auto}
+.brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.14em; color:var(--orange); font-size:16px; white-space:nowrap}
+.place{font-weight:600; font-size:18px; white-space:nowrap}
+.pill{margin-left:auto; font-size:13px; padding:3px 9px; border-radius:99px; background:var(--midnight2); color:#CFC9B8; white-space:nowrap}
+
+main{max-width:820px; margin:0 auto; padding:16px 24px 80px}
+@media (max-width:560px){ .top{padding:0 12px} main{padding:16px 12px 60px} }
+@media (max-width:520px){ .brand{display:none} }
+
+/* search */
+.find{position:relative; margin:8px 0 16px}
+.find svg{position:absolute; left:16px; top:50%; transform:translateY(-50%); width:22px; height:22px; color:var(--ink2); pointer-events:none}
+.find input{width:100%; min-height:60px; font:inherit; font-size:22px; padding:0 16px 0 50px; background:#fff; color:var(--midnight);
+  border:1.5px solid var(--edge); border-radius:6px; -webkit-appearance:none; appearance:none}
+.find input::placeholder{color:var(--ink2); opacity:1}
+.sub{color:var(--ink2); margin:0 2px 16px; font-size:16px}
+.empty{background:#fff; border:1px dashed var(--gray); border-radius:12px; padding:36px 20px; text-align:center; color:var(--ink2)}
+.empty b{display:block; color:var(--midnight); font-size:22px; margin-bottom:4px}
+
+/* a result: one 60px row, like the tablet's job rows */
+.hit{display:grid; grid-template-columns:150px minmax(0,1fr) auto; align-items:center; gap:4px 16px; width:100%; text-align:left;
+  background:#fff; color:var(--midnight); border:none; border-radius:10px; padding:10px 16px; margin-bottom:8px; min-height:60px}
+.hit .pid{font-weight:700; letter-spacing:.02em; white-space:nowrap}
+.hit .jname{font-size:16px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.hit .st{font-size:14px; font-weight:600; color:var(--ink2); text-align:right; white-space:nowrap}
+@media (max-width:560px){
+  .hit{grid-template-columns:minmax(0,1fr) auto; padding:10px 14px}
+  .hit .jname{grid-column:1 / span 2; grid-row:2; white-space:normal}
+}
+
+/* the job */
+.back{background:none; border:none; color:var(--orange-ink); font-weight:700; padding:10px 2px; font-size:18px; min-height:44px}
+h1{font-size:26px; margin:2px 2px 12px; line-height:1.25}
+h1 .jn{font-size:20px; font-weight:600; margin-left:10px}
+@media (max-width:560px){ h1 .jn{display:block; margin-left:0} }
+.say{background:#fff; border-radius:10px; padding:12px 16px; margin:0 0 12px}
+.say p{margin:0; font-size:22px; font-weight:600; line-height:1.3}
+.say small{display:block; margin-top:6px; font-size:14px; color:var(--ink2)}
+
+/* the facts strip, as on the office job page */
+.facts{display:flex; flex-wrap:wrap; margin:0 0 16px; background:#fff; border-radius:10px; overflow:hidden}
+.fact{padding:8px 16px; border-left:1px solid var(--line); min-width:120px; flex:1 1 auto}
+.fact:first-child{border-left:none}
+.fact small{display:block; font-size:13px; color:var(--ink2); text-transform:uppercase; letter-spacing:.06em; font-weight:700}
+.fact b{font-size:17px}
+@media (max-width:560px){ .fact{flex:1 1 100%; border-left:none; border-top:1px solid var(--line)} .fact:first-child{border-top:none} }
+.lbl{font-size:15px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--ink2); margin:16px 2px 8px; display:flex; align-items:baseline; gap:8px}
+.lbl .c{font-family:'Barlow Condensed',sans-serif; color:var(--midnight); font-size:17px; letter-spacing:0}
+
+/* a department: one 60px row; solid turquoise with dark text when it's done */
+.drow{display:grid; grid-template-columns:170px minmax(0,1fr) auto; align-items:center; gap:4px 16px;
+  background:#fff; border-radius:10px; padding:10px 16px; margin-bottom:8px; min-height:60px}
+.drow .dn{font-weight:700; min-width:0}
+.why{display:block; font-size:14px; font-weight:600; color:var(--ink2)}
+.drow .prog{display:flex; flex-direction:column; gap:4px}
+.drow .prog .n{font-size:22px; font-weight:700; line-height:1; white-space:nowrap}
+.drow .prog .n small{font-family:'Barlow',sans-serif; font-size:14px; color:var(--ink2); font-weight:600; margin-left:4px}
+.bar{display:block; width:100%; height:8px; background:var(--paper); border-radius:99px; overflow:hidden}
+.bar i{display:block; height:100%; background:var(--orange); border-radius:99px}
+.bar i.full{background:var(--teal)}
+.due{color:var(--ink2); font-size:14px; text-align:right; white-space:nowrap; line-height:1.3}
+.due b{color:var(--midnight)}
+.drow.done{background:var(--teal); color:var(--midnight)}
+.drow.done .why,.drow.done .due,.drow.done .prog .n small{color:#0E3A3A}
+.drow.done .due b{color:var(--midnight)}
+.drow.done .bar{background:rgba(255,255,255,.5)} .drow.done .bar i{background:var(--midnight)}
+@media (max-width:560px){
+  .drow{grid-template-columns:minmax(0,1fr) auto; padding:10px 14px}
+  .drow .dn{grid-column:1; grid-row:1} .drow .due{grid-column:2; grid-row:1}
+  .drow .prog{grid-column:1 / span 2; grid-row:2}
+}
+
+/* sheet by sheet, folded, with the office grid's cells */
+details.later{margin-top:24px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:4px 0}
+details.later[open]{padding-bottom:12px}
+details.later summary{min-height:44px; display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--ink2)}
+details.later summary .c{font-family:'Barlow Condensed',sans-serif; color:var(--midnight); font-size:17px; letter-spacing:0}
+.grid-wrap{overflow-x:auto; margin:4px 0 10px}
+table.grid{border-collapse:separate; border-spacing:6px; font-size:15px}
+.grid th{font-weight:700; text-align:center; padding:4px 2px; line-height:1.15; vertical-align:bottom}
+.grid th.sh{text-align:left; white-space:nowrap}
+.grid th.sh small{display:block; color:var(--ink2); font-size:14px; font-weight:400}
+.grid td{font-family:'Barlow Condensed',sans-serif; font-variant-numeric:tabular-nums; text-align:center; border-radius:8px; padding:9px 4px; font-weight:700; font-size:18px; min-width:58px}
+.grid td.done{background:var(--teal); color:var(--midnight)}
+.grid td.part{background:var(--sawdust); border:1px solid var(--gray); color:var(--midnight)}
+.grid td.zero{background:#fff; border:1px solid var(--gray); color:var(--ink2)}
+.grid td.no{color:var(--gray); font-weight:600}
+.gkey{display:flex; flex-wrap:wrap; gap:14px; font-size:14px; color:var(--ink2); align-items:center}
+.gkey span{display:inline-flex; align-items:center; gap:6px}
+.gkey i{display:inline-block; width:14px; height:14px; border-radius:3px}
+.note{color:var(--ink2); font-size:13px; margin:24px 2px 0}
+/* status.html only: the header's right side, sign-in, messages */
+.top-row .right{margin-left:auto; display:flex; align-items:center; gap:8px}
+.who{font-size:14px; color:#CFC9B8; white-space:nowrap}
+.out{background:var(--midnight2); border:none; color:var(--sawdust); border-radius:8px; padding:6px 12px; font-weight:600; font-size:14px; min-height:36px}
+.signin{background:#fff; border-radius:10px; padding:16px; max-width:460px; margin:24px auto}
+.signin h1{font-size:26px; margin:0 0 4px}
+.signin label{display:block; font-weight:600; margin-top:12px}
+.signin input{display:block; width:100%; min-height:52px; font:inherit; padding:0 12px; margin-top:4px; border:1.5px solid var(--edge); border-radius:6px; background:#fff; color:var(--midnight)}
+.go{background:var(--orange); color:#fff; border:none; border-radius:10px; padding:12px 20px; font-weight:700; min-height:52px; margin-top:16px; width:100%}
+.banner{border-radius:10px; padding:12px 16px; margin:12px 0 16px; font-weight:600; background:var(--sawdust); color:var(--warn); border-left:5px solid var(--bright)}
+.ttag{display:inline-block; border:1.5px solid var(--midnight); border-radius:4px; font-size:13px; font-weight:700; letter-spacing:.06em; padding:0 5px; margin-right:8px; vertical-align:2px}
+@media (max-width:560px){ .who{display:none} }
+</style>
+</head>
+<body>
+<header class="top"><div class="top-row hrow">
+  <span class="brand">SHOP FLOOR</span><span class="place">Job status</span>
+  <span class="right" id="right"></span>
+</div></header>
+<main id="app"></main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+<script src="sf-common-2026-10-05.1.js"></script>
+<script>
+/* Connection settings, the key check, the device report and the Feedback button are in sf-common-2026-10-05.1.js. */
+var PAGE_VERSION = "2026-10-28.1";          // this page's version: bump it with every change (it shows in select * from devices();)
+(function () {
+  const app = document.getElementById("app");
+  const right = document.getElementById("right");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const problem = keyProblem(SUPABASE_URL, SUPABASE_KEY);
+  if (problem) {
+    app.innerHTML = `<div class="banner">${problem.secret ? "Stop — wrong key in this file" : "This page isn't set up yet"}: ${esc(problem.text)}</div>`;
+    return;
+  }
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  sfEmbed("header .hrow");                                        // inside the office app: the office's header is above
+  sfReportDevice(db, "status", PAGE_VERSION);
+
+  // ---------- dates, in the words the shop pages already use ----------
+  const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const d = (s) => { const [y, m, dd] = String(s).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, dd); };
+  const today = () => { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); };
+  const diffDays = (s) => Math.round((d(s) - today()) / 86400000);
+  const fmtDate = (s) => { const x = d(s); return `${MON[x.getMonth()]} ${x.getDate()}`; };
+  const days = (n) => `${n} ${n === 1 ? "day" : "days"}`;
+  const daysText = (n) => n < 0 ? `${days(-n)} late` : n === 0 ? "due today" : `${days(n)} left`;     // the office's delivery words
+  const finishWords = (n) => n > 0 ? `${days(n)} left` : n === 0 ? "today" : `${days(-n)} past`;   // the tablet's done-by words
+  const andList = (a) => a.length <= 1 ? (a[0] || "") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const pieces = (n) => `${n} ${n === 1 ? "piece" : "pieces"}`;
+  const clock = (iso) => { const t = new Date(iso); let h = t.getHours(); const m = String(t.getMinutes()).padStart(2, "0"); const ap = h < 12 ? "am" : "pm"; h = h % 12 || 12; return `${h}:${m} ${ap}`; };
+
+  // ---------- working out where a job is (from job_lookup's reply) ----------
+  const out = (j) => (j.arrow || []).filter(a => !a.waiting);
+  const isComplete = (j, D) => D.done >= D.total && !(D.key === "metal" && out(j).length);
+  const overall = (L) => {
+    const done = L.reduce((a, D) => a + D.done, 0), total = L.reduce((a, D) => a + D.total, 0);
+    let pct = total ? Math.round(100 * done / total) : 0;
+    if (done > 0 && pct === 0) pct = 1; if (done < total && pct === 100) pct = 99;
+    return { done, total, pct };
+  };
+  const trips = (j) => {
+    const T = j.trips || [], went = T.filter(t => t.done_on).reduce((a, t) => a + (t.went || 0), 0);
+    const of = T.length ? Math.max(...T.map(t => t.of || 0)) : 0;
+    return { T, done: T.filter(t => t.done_on), open: T.find(t => !t.done_on), went, of };
+  };
+  const tripPhrase = (t) => t.day
+    ? `${t.kind.toLowerCase()} ${fmtDate(t.day)}${t.time ? " at " + t.time : ""}, ${daysText(diffDays(t.day))}`
+    : `ready for ${t.kind.toLowerCase().replace(/ delivery$/, "")}, not picked up yet`;
+  const dateClause = (j, open) => {
+    if (open && open.day) return cap(tripPhrase(open)) + ".";
+    if (!j.delivery) return "No delivery date on Monday yet.";
+    return `Delivery ${fmtDate(j.delivery)}, ${daysText(diffDays(j.delivery))}.`;
+  };
+  function why(j, D) {
+    if (D.key === "metal" && D.done >= D.total && out(j).length) { const a = out(j)[0]; return `At Arrow since ${fmtDate(a.since)} · ${days(Math.max(0, -diffDays(a.since)))} out`; }
+    if (D.done > 0 || D.done >= D.total) return "";
+    if (D.ready > 0) return `${pieces(D.ready)} ready`;
+    if (D.held) return "Waiting on hand-off";
+    if ((D.waiting || []).length) return "Waiting on " + andList(D.waiting.map(w => w === "arrow" ? "Arrow" : w));
+    return "Not started";
+  }
+  function dateOf(D) {
+    if (D.done >= D.total) return { main: D.done_on ? `Done ${fmtDate(D.done_on)}` : "Done", when: "" };
+    if (D.finish_by) return { main: `Done by ${fmtDate(D.finish_by)}`, when: finishWords(diffDays(D.finish_by)) };
+    return null;                                                   // look-up logins get no done-by dates
+  }
+  function summary(j, L) {
+    if (!(j.sheets || []).length)
+      return j.phase && j.phase !== "In Production" ? `Not on the floor yet. Monday shows ${j.phase}. ${dateClause(j, null)}`
+                                                    : `In production on Monday; its work order isn't uploaded yet. ${dateClause(j, null)}`;
+    const t = trips(j), built = L.some(D => D.key === "assembly_qc") ? "Built and through QC." : "Built.";
+    if (t.done.length && t.went >= t.of) return `Delivered ${fmtDate(t.done[t.done.length - 1].done_on)}. All ${pieces(t.of)}${t.done.length > 1 ? `, in ${t.done.length} trips` : ""}.`;
+    const allDone = L.every(D => isComplete(j, D));
+    if (t.done.length) {
+      const rest = t.of - t.went, who = rest === 1 ? "The last one is" : `The other ${rest} are`;
+      const head = `Part delivered ${fmtDate(t.done[t.done.length - 1].done_on)}: ${t.went} of ${pieces(t.of)} went.`;
+      if (allDone) return `${head} ${who} built${t.open ? ": " + tripPhrase(t.open) : ", not scheduled yet"}.`;
+      const act = L.filter(D => D.done > 0 && D.done < D.total);
+      return `${head} ${who} in ${andList((act.length ? act : L.filter(D => !isComplete(j, D))).map(D => D.name))}.`;
+    }
+    if (allDone) {
+      if (t.open) return `${built} ${cap(tripPhrase(t.open))}.`;
+      if (!j.active) return `${built} Monday shows ${j.phase || "it's left production"}.`;
+      return `${built} Not scheduled for delivery yet.${j.delivery ? ` Monday’s date is ${fmtDate(j.delivery)}.` : ""}`;
+    }
+    const o = overall(L);
+    if (o.done === 0) return j.handed_off === false ? `Not handed off to the floor yet. ${dateClause(j, t.open)}` : `On the floor, nothing started yet. ${dateClause(j, t.open)}`;
+    const active = L.filter(D => D.done > 0 && D.done < D.total);
+    let s;
+    if (active.length) s = `In ${andList(active.map(D => D.name))}, ${o.pct}% done overall.`;
+    else { const ready = L.filter(D => D.done === 0 && D.ready > 0); s = ready.length ? `Ready for ${andList(ready.map(D => D.name))}, ${o.pct}% done overall.` : `${o.pct}% done overall.`; }
+    if (out(j).length) s += ` Part of it is at Arrow, ${days(Math.max(0, -diffDays(out(j)[0].since)))} so far.`;
+    const late = L.filter(D => D.done < D.total && D.finish_by).map(D => ({ D, n: -diffDays(D.finish_by) })).filter(x => x.n > 0).sort((a, b) => b.n - a.n)[0];
+    if (late) s += ` ${late.D.name} is ${days(late.n)} past its done-by date.`;
+    return `${s} ${dateClause(j, t.open)}`;
+  }
+  function shortStatus(j) {
+    const L = j.departments || [];
+    if (!(j.sheets || []).length) return j.phase || "No work order yet";
+    const t = trips(j);
+    if (t.done.length && t.went >= t.of) return `Delivered ${fmtDate(t.done[t.done.length - 1].done_on)}`;
+    if (t.done.length) return "Part delivered";
+    if (L.every(D => isComplete(j, D))) return t.open ? (t.open.day ? `${t.open.kind.replace(/ delivery$/, "")} ${fmtDate(t.open.day)}` : "Ready for pickup") : "Built, not scheduled";
+    const o = overall(L);
+    if (o.done === 0) return j.handed_off === false ? "Not handed off" : "Not started";
+    const active = L.filter(D => D.done > 0 && D.done < D.total);
+    return active.length ? `In ${active[0].name}${active.length > 1 ? " +" + (active.length - 1) : ""} · ${o.pct}%` : `${o.pct}% done`;
+  }
+  function tripFact(j) {
+    const t = trips(j); if (!t.T.length) return "Not scheduled yet";
+    const parts = [];
+    if (t.done.length) parts.push(`${t.went} of ${t.of} delivered ${fmtDate(t.done[t.done.length - 1].done_on)}`);
+    if (t.open) parts.push(t.open.day ? `${t.open.kind} ${fmtDate(t.open.day)}${t.open.time ? ", " + t.open.time : ""}` : `${t.open.kind}, ready`);
+    else if (t.went < t.of) parts.push("rest not scheduled");
+    return cap(parts.join("; "));
+  }
+
+  // ---------- the screens ----------
+  const S = { me: null, q: "", jobs: [], busy: false, msg: null, at: null, open: null, seq: 0 };
+  const testTag = (j) => j.test ? `<span class="ttag">TEST</span>` : "";
+
+  function bar(done, total) {
+    const pct = total ? Math.round(100 * done / total) : 0;
+    return `<span class="bar" role="img" aria-label="${done} of ${total} pieces done"><i class="${done >= total ? "full" : ""}" style="width:${pct}%"></i></span>`;
+  }
+  function renderSearch() {
+    const hint = S.q.trim() ? "" : `<p class="sub">Type a PROJ number (just 451 works) or part of the job name.</p>`;
+    let list = "";
+    if (S.msg) list = `<div class="banner">${esc(S.msg)}</div>`;
+    else if (S.q.trim() && !S.busy && !S.jobs.length) list = `<div class="empty"><b>No job matches “${esc(S.q.trim())}”</b>Try the PROJ number, or fewer letters of the name.</div>`;
+    else list = S.jobs.map((j, i) => `<button type="button" class="hit" data-open="${i}"><span class="pid">${testTag(j)}${esc(j.proj || "(no PROJ number)")}</span>
+        <span class="jname">${esc(j.name)}</span><span class="st">${esc(shortStatus(j))}</span></button>`).join("");
+    const box = document.getElementById("results");
+    if (box) { box.innerHTML = hint + list; return; }
+    app.innerHTML = `<section id="search"><div class="find">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
+        <input id="q" type="search" inputmode="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="PROJ number or job name" aria-label="Find a job by PROJ number or name" value="${esc(S.q)}">
+      </div><div id="results">${hint + list}</div></section>`;
+    const q = document.getElementById("q");
+    q.addEventListener("input", () => { S.q = q.value; clearTimeout(S.t); S.t = setTimeout(search, 250); });
+    q.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); clearTimeout(S.t); search().then(() => { if (S.jobs.length) openJob(S.jobs[0]); }); } });
+    q.focus();
+  }
+  app.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-open]"); if (b) return openJob(S.jobs[+b.dataset.open]);
+    if (e.target.closest("[data-back]")) return backToSearch();
+  });
+
+  async function lookup(q) {
+    const r = await db.rpc("job_lookup", { p_q: q });
+    if (r.error) {
+      const e = r.error, m = String(e.message || "");
+      if (e.code === "42883" || e.code === "PGRST202" || /does not exist|Could not find the function/.test(m)) throw new Error("This part isn't set up in the database yet: job_status.sql hasn't been run.");
+      if (isNetworkError(e)) throw new Error("No connection right now. Check the Wi-Fi and try again.");
+      throw new Error(m || "Something went wrong. Try again.");
+    }
+    return r.data;
+  }
+  async function search() {
+    const q = S.q.trim(), my = ++S.seq;
+    if (!q) { S.jobs = []; S.msg = null; return renderSearch(); }
+    S.busy = true;
+    try { const r = await lookup(q); if (my !== S.seq) return; S.jobs = r.jobs || []; S.at = r.at; S.msg = null; }
+    catch (err) { if (my !== S.seq) return; S.jobs = []; S.msg = err.message; }
+    S.busy = false; renderSearch();
+  }
+  function renderJob(j) {
+    const L = j.departments || [];
+    const delivery = j.delivery ? `${fmtDate(j.delivery)} · ${daysText(diffDays(j.delivery))}` : "no date";
+    const rows = L.map(D => {
+      const w = why(j, D), dt = dateOf(D), done = isComplete(j, D);
+      return `<div class="drow${done ? " done" : ""}"><div class="dn">${esc(D.name)}${w ? `<span class="why">${esc(w)}</span>` : ""}</div>
+        <div class="prog"><span class="n num">${D.done}/${D.total}<small>pieces</small></span>${bar(D.done, D.total)}</div>
+        <div class="due">${dt ? `<b>${esc(dt.main)}</b>${dt.when ? "<br>" + esc(dt.when) : ""}` : ""}</div></div>`;
+    }).join("");
+    const keys = L.map(D => D.key);
+    const grid = (j.sheets || []).length ? `<details class="later"><summary>Sheet by sheet<span class="c">${j.sheets.length}</span></summary>
+      <div class="grid-wrap"><table class="grid"><thead><tr><th class="sh">Sheet</th>${L.map(D => `<th scope="col">${esc(D.name)}</th>`).join("")}</tr></thead><tbody>
+      ${j.sheets.map(s => `<tr><th class="sh" scope="row">Sheet ${s.n}<small>${esc(s.code || "")}${s.code ? " · " : ""}${pieces(s.qty)}</small></th>${keys.map(k => {
+          const v = (s.p || {})[k]; if (!v) return `<td class="no" aria-label="not this department">—</td>`;
+          if (v.done >= v.of) return `<td class="done" aria-label="done">${v.done}</td>`;
+          if (v.done > 0) return `<td class="part" aria-label="${v.done} of ${v.of}">${v.done}/${v.of}</td>`;
+          return `<td class="zero" aria-label="not started">0</td>`; }).join("")}</tr>`).join("")}
+      </tbody></table></div><div class="gkey"><span><i style="background:var(--teal)"></i>Done</span><span><i style="background:var(--sawdust);border:1px solid var(--gray)"></i>Started</span>
+      <span><i style="background:#fff;border:1px solid var(--gray)"></i>Not started</span><span>— not this department</span></div></details>` : "";
+    app.innerHTML = `<section id="job"><button type="button" class="back" data-back>← Search</button>
+      <h1>${testTag(j)}${esc(j.proj || "(no PROJ number)")}<span class="jn">${esc(j.name)}</span></h1>
+      <div class="say"><p>${esc(summary(j, L))}</p><small>Updated ${S.at ? esc(clock(S.at)) : ""}</small></div>
+      <div class="facts"><div class="fact"><small>Phase</small><b>${esc(j.phase || "—")}</b></div>
+        <div class="fact"><small>Delivery</small><b>${esc(delivery)}</b></div>
+        <div class="fact"><small>Trip</small><b>${esc(tripFact(j))}</b></div></div>
+      ${L.length ? `<h2 class="lbl">Departments<span class="c">${L.length}</span></h2>${rows}` : ""}${grid}</section>`;
+  }
+  async function openJob(j) {
+    S.open = j.job_id; renderJob(j); window.scrollTo(0, 0);
+    const b = app.querySelector(".back"); if (b) b.focus({ preventScroll: true });
+    try { if (j.proj) history.replaceState(null, "", "#" + j.proj); } catch (e) {}
+    try {                                                          // fetch it fresh, so "Updated" is now
+      const r = await lookup(j.proj || j.name); const f = (r.jobs || []).find(x => x.job_id === j.job_id);
+      if (f && S.open === j.job_id) { S.at = r.at; renderJob(f); }
+    } catch (e) {}
+  }
+  function backToSearch() {
+    S.open = null; try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+    app.innerHTML = ""; renderSearch();
+  }
+
+  // ---------- start ----------
+  async function start(user) {
+    const { data } = await db.from("profiles").select("*").eq("id", user.id).maybeSingle();
+    S.me = { id: user.id, email: user.email, name: (data && data.full_name) || user.email };
+    right.innerHTML = `<span class="who">${esc(S.me.name)}</span><span id="fbm"></span><button type="button" class="out" id="signout">Sign out</button>`;
+    if (!SF_EMBEDDED) sfFeedbackSetup({ db, page: "status", version: PAGE_VERSION, mount: "#fbm" });
+    document.getElementById("signout").onclick = async () => { await db.auth.signOut(); location.reload(); };
+    if (!data) { app.innerHTML = `<div class="banner">This login can't look up jobs. Sign in with your own shop login.</div>`; return; }
+    const h = decodeURIComponent((location.hash || "").slice(1));
+    if (/^[A-Za-z]+-\d+$/.test(h)) {
+      S.q = h; renderSearch(); await search();
+      const f = S.jobs.find(x => x.proj === h); if (f) return openJob(f);
+      return;
+    }
+    renderSearch();
+  }
+  (async () => {
+    const { data } = await db.auth.getSession();
+    if (data && data.session) return start(data.session.user);
+    app.innerHTML = `<form class="signin" id="f"><h1>Job status</h1><p class="sub">Sign in with your shop login.</p>
+      <label>Email<input id="e" type="email" autocomplete="username" required></label>
+      <label>Password<input id="p" type="password" autocomplete="current-password" required></label>
+      <button class="go" type="submit">Sign in</button><div id="err" class="banner" hidden></div></form>`;
+    document.getElementById("f").onsubmit = async (e) => {
+      e.preventDefault();
+      const r = await db.auth.signInWithPassword({ email: document.getElementById("e").value.trim(), password: document.getElementById("p").value });
+      if (r.error) { const el = document.getElementById("err"); el.hidden = false; el.textContent = /invalid/i.test(r.error.message || "") ? "That email and password don't match. Try again." : (r.error.message || "Couldn't sign in."); return; }
+      start(r.data.user);
+    };
+  })();
+})();
+</script>
+</body>
+</html>

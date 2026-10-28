@@ -73,8 +73,8 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   let s = await session(browser, users.luke), p = s.p;
   await p.goto(base); await p.waitForSelector("header.top [data-tab]", { timeout: 15000 }).catch(async (e) => { console.log("APP:", (await p.evaluate(() => document.body.innerText)).slice(0, 400)); console.log("ERRS:", s.errs.join(" | ")); throw e; });
   const items = await menu(p);
-  ok("Luke's ☰ menu: the office's tabs, then Deliveries, Upload, Inventory, Pace inside the office; Tablet app, Setup, Feedback",
-     JSON.stringify(items) === JSON.stringify(["Operations, Arrow, Photos", "Deliveries", "Upload a work order", "Inventory", "Pace", "Tablet app", "Setup", "Feedback", "Sign out"]), JSON.stringify(items));
+  ok("Luke's ☰ menu: the office's tabs, then Deliveries, Upload, Inventory, Pace, Job status (28 Oct) inside the office; Tablet app, Setup, Feedback",
+     JSON.stringify(items) === JSON.stringify(["Operations, Arrow, Photos", "Deliveries", "Upload a work order", "Inventory", "Pace", "Job status", "Tablet app", "Setup", "Feedback", "Sign out"]), JSON.stringify(items));
   await p.click('.menu [data-section="deliveries"]');
   await p.waitForFunction(() => { const f = document.querySelector("#secs iframe"); return f && f.contentDocument && f.contentDocument.querySelector("#app") && f.contentDocument.querySelector("#app").textContent.length > 20; }, null, { timeout: 15000 });
   let fr = frameOf(p, "delivery.html");

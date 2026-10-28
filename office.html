@@ -854,7 +854,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-10-26.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-10-28.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -952,6 +952,7 @@ if (typeof document !== "undefined") (function () {
     { key: "upload", label: "Upload a work order", file: "upload.html", page: "upload", note: "The generator's upload file" },
     { key: "inventory", label: "Inventory", file: "inventory.html", page: "inventory", note: "Month-end counts, scrap rate" },
     { key: "pace", label: "Pace", file: "pace.html", page: "pace", note: "Square feet a week, time in stage" },
+    { key: "status", label: "Job status", file: "status.html", page: "status", note: "Where a job is, in one sentence" },
     { key: "lab", label: "Prototype lab", file: "lab.html", page: "lab", note: "Trying new generators. Only you see this", lab: true },
   ];
   const sectionOf = (k) => SECTIONS.find(x => x.key === k) || null;
