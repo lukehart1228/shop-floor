@@ -79,6 +79,7 @@ fi
 if in_group pages1; then
 run test_csv_cell          none  OUT=$P -- node test_csv_cell.js
 run test_style_same        none  OUT=$P -- node test_style_same.js
+run test_builder_catch     none  OUT=$P -- node test_builder_catch.js   # 2 Nov: real supabase-js requests have no .catch
 run test_lab_reference     none  LAB=$P/lab.html -- node test_lab_reference.js
 if [ -f $OUT/index.html ]; then run test_same seed NEWPAGE=$OUT/index.html -- node test_same.js; else want test_same && row test_same skipped "no tablet page in OUT"; fi
 run test_same_office       seed  OUT=$P PHOTOSPACE=ignore ARROWPOS=ignore -- node test_same_office.js   # 31 Oct: the Photos tab changed on purpose; 1 Nov: the Arrow POs panel

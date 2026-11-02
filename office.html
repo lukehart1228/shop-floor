@@ -958,7 +958,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-11-01.3";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-11-02.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -2329,7 +2329,10 @@ if (typeof document !== "undefined") (function () {
       S.save.perm[k] = h ? await h.queryPermission({ mode: "readwrite" }).catch(() => "prompt") : null;
     }
   }
-  function saveShow(text) { S.save.progress = text; const el = document.getElementById("saveProgress"); if (el) el.textContent = text; }
+  function saveShow(text) {
+    S.save.progress = text; const el = document.getElementById("saveProgress"); if (el) el.textContent = text;
+    const b = document.querySelector("[data-savenow]"); if (b) b.disabled = !!S.save.running;   // a save is running (the half-hourly one too)
+  }
   async function saveStart() {
     if (S.save.started || !isManager(S.me) || !S.save.supported) return;
     S.save.started = true;
@@ -2480,7 +2483,7 @@ if (typeof document !== "undefined") (function () {
   }
   async function saveRun(how) {
     if (S.save.running || !S.save.supported || !S.me || !isManager(S.me) || S.save.missing || !S.save.od) return;
-    const go = async () => {
+    const body = async () => {
       S.save.running = true; S.save.result = null;
       if (how === "button") render(); else saveShow("Saving…");
       const started = new Date().toISOString();
@@ -2508,7 +2511,7 @@ if (typeof document !== "undefined") (function () {
         const jobs = new Map((list.jobs || []).map(j => [j.job_id, j]));
         for (const r of st.retry || []) if (!jobs.has(r.job_id)) jobs.set(r.job_id, r);
         // jobs with files due off Supabase are looked at in both places even when nothing changed (off_supabase.sql; none before it)
-        const due = new Set(), dj = await db.rpc("save_due_jobs").catch(e => ({ error: e }));
+        const due = new Set(), dj = await Promise.resolve(db.rpc("save_due_jobs")).catch(e => ({ error: e }));
         if (!dj.error) for (const j of dj.data || []) { due.add(j.job_id); if (!jobs.has(j.job_id)) jobs.set(j.job_id, j); }
         const all = [...jobs.values()];
         for (let i = 0; i < all.length; i += SAVE_BATCH) {
@@ -2545,9 +2548,9 @@ if (typeof document !== "undefined") (function () {
       }
       if (stopped !== "permission") {
         if (stopped) { res.od = false; res.problems.unshift(stopped); }
-        const r = await db.rpc("record_save_run", { p: { client_id: newId(), how, started_at: started, onedrive_ok: res.od, backup_ok: res.bk,
+        const r = await Promise.resolve(db.rpc("record_save_run", { p: { client_id: newId(), how, started_at: started, onedrive_ok: res.od, backup_ok: res.bk,
           jobs_checked: res.checked, jobs_saved: res.saved, files_written: res.files, bytes: res.bytes,
-          skipped: res.skipped.map(x => ({ project_id: x.project_id, why: x.why })), problems: res.problems.slice(0, 50), page_version: OFFICE_VERSION } }).catch(e => ({ error: e }));
+          skipped: res.skipped.map(x => ({ project_id: x.project_id, why: x.why })), problems: res.problems.slice(0, 50), page_version: OFFICE_VERSION } })).catch(e => ({ error: e }));
         if (r.error && res.problems.length < 50) res.problems.push(`This save couldn't be logged: ${friendlyError(r.error)}`);
       }
       S.save.result = { ...res, stopped, at: new Date().toISOString() };
@@ -2556,6 +2559,13 @@ if (typeof document !== "undefined") (function () {
       if (res.off || S.tab === "photos") await loadPhotoStatus();      // what's left on Supabase
       render();
     };
+    // whatever happens, a save never stays marked as running (2 Nov: one that threw stayed "running" for good, so Save now
+    // and the half-hourly save did nothing until the page was reloaded)
+    const go = async () => {
+      try { await body(); }
+      catch (e) { const why = friendlyError(e); S.save.result = { od: false, bk: false, checked: 0, saved: 0, files: 0, bytes: 0, skipped: [], problems: [why], copies: [], stopped: why, at: new Date().toISOString() }; }
+      finally { if (S.save.running) { S.save.running = false; S.save.progress = ""; render(); } }
+    };
     if (navigator.locks && navigator.locks.request) await navigator.locks.request("sf-save", { ifAvailable: true }, async (lock) => { if (lock) await go(); });
     else await go();
   }
@@ -2563,11 +2573,11 @@ if (typeof document !== "undefined") (function () {
    *  says may go, through Supabase's storage, and record them (off_supabase.sql). Anything refused simply stays for next time. */
   async function saveOff(res) {
     for (let i = 0; i < res.copies.length; i += 1000) {
-      const r = await db.rpc("record_filed_copies", { p: res.copies.slice(i, i + 1000) }).catch(e => ({ error: e }));
+      const r = await Promise.resolve(db.rpc("record_filed_copies", { p: res.copies.slice(i, i + 1000) })).catch(e => ({ error: e }));
       if (r.error) { if (res.problems.length < 50) res.problems.push(`What was saved couldn't be recorded, so nothing came off Supabase this time (${friendlyError(r.error)}).`); return; }
     }
     saveShow("Taking saved files off Supabase…");
-    const r = await db.rpc("files_ready_to_remove", { p_limit: 1000 }).catch(e => ({ error: e }));
+    const r = await Promise.resolve(db.rpc("files_ready_to_remove", { p_limit: 1000 })).catch(e => ({ error: e }));
     if (r.error || !r.data || !r.data.length) return;
     const gone = [];
     for (const bucket of ["photos", "deliveries"]) {
@@ -2580,7 +2590,7 @@ if (typeof document !== "undefined") (function () {
       }
     }
     for (let i = 0; i < gone.length; i += 1000) {
-      const m = await db.rpc("mark_filed_removed", { p: gone.slice(i, i + 1000) }).catch(e => ({ error: e }));
+      const m = await Promise.resolve(db.rpc("mark_filed_removed", { p: gone.slice(i, i + 1000) })).catch(e => ({ error: e }));
       if (m.error) { if (res.problems.length < 50) res.problems.push(`Files came off Supabase but couldn't be recorded (${friendlyError(m.error)}); the next save records them.`); return; }
       res.off += (m.data.photos || 0) + (m.data.files || 0);
     }
@@ -2597,7 +2607,7 @@ if (typeof document !== "undefined") (function () {
    *  overwrites another: if a different file has its name, it's filed with the date it was dropped added. A library file
    *  replaces the one at its path only when the zip said replaces (or Luke said so on the drop section). */
   async function saveParked(res, index, bk) {
-    const r = await db.rpc("parked_to_file").catch(e => ({ error: e }));
+    const r = await Promise.resolve(db.rpc("parked_to_file")).catch(e => ({ error: e }));
     const sys = S.save.sys && await S.save.sys.queryPermission({ mode: "readwrite" }).catch(() => "prompt") === "granted" ? S.save.sys : null;
     if (r.error || !Array.isArray(r.data)) { await saveLibraryIndex(res, sys); return; }
     if (r.data.length) saveShow(`Filing ${r.data.length} file${r.data.length === 1 ? "" : "s"} from dropped zips…`);
@@ -2654,12 +2664,12 @@ if (typeof document !== "undefined") (function () {
       res.problems.push(`${waitSys.length} library file${waitSys.length === 1 ? " waits" : "s wait"} for Claudes Shop System Folder: choose it below (Production › Production Software › Claudes Shop System Folder).`);
     for (const p of waitJob) if (res.problems.length < 50) res.problems.push(`${p}: files from its zip wait in the backup folder and on Supabase until its OneDrive folder is there (one folder).`);
     for (let i = 0; i < filed.length; i += 1000) {
-      const x = await db.rpc("record_parked_filed", { p: filed.slice(i, i + 1000) }).catch(e => ({ error: e }));
+      const x = await Promise.resolve(db.rpc("record_parked_filed", { p: filed.slice(i, i + 1000) })).catch(e => ({ error: e }));
       if (x.error) { if (res.problems.length < 50) res.problems.push(`What was filed couldn't be recorded, so nothing from the zips came off Supabase this time (${friendlyError(x.error)}).`); return; }
     }
-    for (let i = 0; i < holds.length; i += 1000) await db.rpc("hold_parked", { p: holds.slice(i, i + 1000) }).catch(() => null);
+    for (let i = 0; i < holds.length; i += 1000) await Promise.resolve(db.rpc("hold_parked", { p: holds.slice(i, i + 1000) })).catch(() => null);
     // off Supabase: the database says which may go (filed in both, at their size, within the day)
-    const ready = await db.rpc("parked_ready_to_remove").catch(e => ({ error: e }));
+    const ready = await Promise.resolve(db.rpc("parked_ready_to_remove")).catch(e => ({ error: e }));
     if (!ready.error && ready.data && ready.data.length) {
       const gone = [];
       for (let i = 0; i < ready.data.length; i += 100) {
@@ -2669,7 +2679,7 @@ if (typeof document !== "undefined") (function () {
         gone.push(...part.map(f => f.id));
       }
       if (gone.length) {
-        const m = await db.rpc("mark_parked_removed", { p: gone }).catch(e => ({ error: e }));
+        const m = await Promise.resolve(db.rpc("mark_parked_removed", { p: gone })).catch(e => ({ error: e }));
         if (!m.error && m.data) res.off += m.data.removed || 0;
       }
     }
@@ -2677,7 +2687,7 @@ if (typeof document !== "undefined") (function () {
   }
   /** Each real Arrow PO as a PDF in Claudes Shop System Folder › Arrow (and the backup's Claudes Shop System Folder › Arrow), once */
   async function saveArrowPos(res, bk) {
-    const r = await db.rpc("arrow_pos_to_file").catch(e => ({ error: e }));
+    const r = await Promise.resolve(db.rpc("arrow_pos_to_file")).catch(e => ({ error: e }));
     if (r.error || !Array.isArray(r.data) || !r.data.length) return;
     const sys = S.save.sys && await S.save.sys.queryPermission({ mode: "readwrite" }).catch(() => "prompt") === "granted" ? S.save.sys : null;
     if (!sys && res.problems.length < 50) res.problems.push(`${r.data.length} Arrow PO${r.data.length === 1 ? " waits" : "s wait"} for Claudes Shop System Folder to be chosen below.`);
@@ -2697,7 +2707,7 @@ if (typeof document !== "undefined") (function () {
         } catch (e) { if (res.problems.length < 50) res.problems.push(`${po.name} couldn't be saved to ${place === "backup" ? "the backup folder" : "the Arrow folder"} (${e && e.message ? e.message : e}). It's tried again next time.`); }
       }
     }
-    if (done.length) await db.rpc("record_arrow_po_filed", { p: done }).catch(() => null);
+    if (done.length) await Promise.resolve(db.rpc("record_arrow_po_filed", { p: done })).catch(() => null);
     res.pos = (res.pos || 0) + new Set(done.filter(d => d.place === "onedrive").map(d => d.id)).size;
   }
   /** Database index.csv, rewritten from what's actually in the library whenever it changes (the Outputs project reads it first) */

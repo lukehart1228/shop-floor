@@ -90,7 +90,7 @@ details.parts summary{min-height:40px; display:flex; align-items:center; font-we
 <script src="sf-common-2026-10-05.1.js"></script>
 <script>
 /* Connection settings, the key check, the device report and the Feedback button are in sf-common-2026-10-05.1.js. */
-var PAGE_VERSION = "2026-10-31.1";          // this page's version: bump it with every change (it shows in select * from devices();)
+var PAGE_VERSION = "2026-11-02.1";          // this page's version: bump it with every change (it shows in select * from devices();)
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
 var StepCore = (function () {
@@ -458,7 +458,7 @@ var StepCore = (function () {
     S.user = user;
     right.innerHTML = `<span class="who">${esc(user.email || "")}</span><button class="out" id="out">Sign out</button>`;
     document.getElementById("out").onclick = async () => { await db.auth.signOut(); location.reload(); };
-    const r = await db.rpc("my_role").catch(() => ({ data: null }));
+    const r = await Promise.resolve(db.rpc("my_role")).catch(() => ({ data: null }));
     S.manager = r && (r.data === "manager" || r.data === "admin");
     render(); await loadSaved(); render();
   }

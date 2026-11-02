@@ -146,7 +146,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
 <script src="sf-common-2026-10-05.1.js"></script>
 <script>
-var PAGE_VERSION = "2026-11-01.3";          // this page's version: bump it with every change (it shows in select * from devices();)
+var PAGE_VERSION = "2026-11-02.1";          // this page's version: bump it with every change (it shows in select * from devices();)
 
 /* ---- core: no screen code in here, so it can be tested on its own ----
    The zip format is 11_SHOP_FLOOR_ZIP.md (format 1, and format 2 with Design/). The database checks it all again
@@ -535,28 +535,39 @@ if (typeof document !== "undefined") (function () {
     sum.unchanged = drop.files.filter(x => x.unchanged).length;
     // 2. the floor, from the upload file
     if (plan.pkg) {
-      let skip = false;
+      let skip = false, prevFloor = null;
       if (ids.get(plan.upload.path).unchanged) {         // loaded before by an earlier zip? then not again
         const prev = await db.from("parked_files").select("drop_id").eq("project_id", plan.job).eq("zip_path", plan.upload.path).eq("sha256", plan.upload.sha256).is("same_as", null).limit(1);
         const d = prev.data && prev.data[0] ? await db.from("zip_drops").select("summary").eq("id", prev.data[0].drop_id).maybeSingle() : null;
         skip = !!(d && d.data && d.data.summary && d.data.summary.floor && d.data.summary.floor.ok);
+        if (skip) prevFloor = d.data.summary.floor;
       }
-      if (skip) { sum.floor = { ok: true, skipped: true }; lines.push("The floor already has this upload file, so it wasn’t loaded again."); }
-      else {
+      // each sheet's Arrow lines, for the Arrow POs (arrow_pos.sql, 1 Nov); a database without it simply doesn't keep them yet.
+      // Saved after the floor whether it loaded now or before (R-27, 2 Nov: a zip whose lines didn't save gets them when dropped
+      // again), and outside the floor's own step, so a problem with the lines never reads as the floor not loading
+      const saveArrowLines = async (woid) => {
+        const ar = await Promise.resolve(db.rpc("set_sheet_arrow", { p_work_order: woid,
+          p_sheets: plan.pkg.payload.sheets.map(s => ({ sheet_number: s.sheet_number, arrow: s.arrow })) })).catch(e => ({ error: e }));
+        if (ar.error && !/set_sheet_arrow|PGRST202|42883|schema cache/i.test(String(ar.error.message) + " " + String(ar.error.code)))
+          sum.problems.push(`The Arrow lines weren't saved (${friendly(ar.error)}). Drop the zip again.`);
+        else if (!ar.error && ar.data) { sum.floor.arrow_lines = ar.data.lines; if (ar.data.lines) lines.push(`${ar.data.lines} Arrow line${ar.data.lines === 1 ? "" : "s"} saved for the POs.`); }
+      };
+      if (skip) {
+        sum.floor = { ok: true, skipped: true, work_order_id: prevFloor.work_order_id || null };
+        lines.push("The floor already has this upload file, so it wasn’t loaded again.");
+        if (prevFloor.work_order_id) await saveArrowLines(prevFloor.work_order_id);
+      } else {
+        let res = null;
         try {
-          const res = await runUpload(plan.pkg, db, (t) => msg(`Loading the floor: ${t}…`));
+          res = await runUpload(plan.pkg, db, (t) => msg(`Loading the floor: ${t}…`));
           sum.floor = { ok: true, version: res.version, sheets: res.sheets, work_order_id: res.work_order_id };
           lines.push(...explainResult(res));
-          // each sheet's Arrow lines, for the Arrow POs (arrow_pos.sql, 1 Nov); a database without it simply doesn't keep them yet
-          const ar = await db.rpc("set_sheet_arrow", { p_work_order: res.work_order_id,
-            p_sheets: plan.pkg.payload.sheets.map(s => ({ sheet_number: s.sheet_number, arrow: s.arrow })) }).catch(e => ({ error: e }));
-          if (ar.error && !/set_sheet_arrow|PGRST202|42883|schema cache/i.test(String(ar.error.message) + " " + String(ar.error.code)))
-            sum.problems.push(`The Arrow lines weren't saved (${friendly(ar.error)}). Drop the zip again.`);
-          else if (!ar.error) { sum.floor.arrow_lines = ar.data.lines; if (ar.data.lines) lines.push(`${ar.data.lines} Arrow line${ar.data.lines === 1 ? "" : "s"} saved for the POs.`); }
         } catch (e) {
+          res = null;
           sum.floor = { ok: false, error: friendly(e) };
           sum.problems.push(e.saved ? `The work order was saved, but its pages didn’t all arrive (${friendly(e)}). Drop the zip again.` : `The floor wasn’t loaded: ${friendly(e)}`);
         }
+        if (res) await saveArrowLines(res.work_order_id);
       }
     }
     // 3. machine files, through Machine files (machine_files.sql)
@@ -582,7 +593,7 @@ if (typeof document !== "undefined") (function () {
       sum.designs = (await makeViews(designs, ids, msg)).map(o => ({ item: o.item, state: o.state, why: o.why || null }));
     }
     msg("");
-    await db.rpc("zip_drop_finished", { p_id: drop.id, p_summary: sum }).catch(() => null);
+    await Promise.resolve(db.rpc("zip_drop_finished", { p_id: drop.id, p_summary: sum })).catch(() => null);
     busy = false;
     const sent = sum.machines.filter(m => !m.already), already = sum.machines.filter(m => m.already);
     const html = `${sum.problems.length ? `<div class="bad" style="margin-top:12px">${sum.problems.map(p => `<p>${esc(p)}</p>`).join("")}</div>` : ""}
@@ -645,7 +656,7 @@ if (typeof document !== "undefined") (function () {
       try { Object.assign(one, { state: "ready" }, await makeOne(reg, f.data, one.file)); }
       catch (e) {
         Object.assign(one, { state: "failed", why: why3d(e) });
-        await db.rpc("design_view_failed", { p_id: reg.id, p_why: one.why }).catch(() => null);
+        await Promise.resolve(db.rpc("design_view_failed", { p_id: reg.id, p_why: one.why })).catch(() => null);
       }
     }
     lastMade = out;
@@ -712,7 +723,7 @@ if (typeof document !== "undefined") (function () {
     const go = async (data) => {
       say(`<p class="prog">Making the 3D view of ${esc(d.item)}… the first time, the STEP engine downloads (7.6 MB).</p>`);
       try { const m = await makeOne(d, data, d.step_name); say(`<p>Made: ${esc(sizeText(m.size))} in, ${m.parts} part${m.parts === 1 ? "" : "s"}, in ${(m.ms / 1000).toFixed(1)} s.</p>`); }
-      catch (e) { const w = why3d(e); await db.rpc("design_view_failed", { p_id: d.id, p_why: w }).catch(() => null); say(`<div class="bad"><p>${esc(w)}</p></div>`); }
+      catch (e) { const w = why3d(e); await Promise.resolve(db.rpc("design_view_failed", { p_id: d.id, p_why: w })).catch(() => null); say(`<div class="bad"><p>${esc(w)}</p></div>`); }
       await loadDesigns();
     };
     if (bytes) return go(bytes);
