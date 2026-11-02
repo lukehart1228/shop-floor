@@ -61,6 +61,7 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
 
 (async () => {
   await new Promise(r => server.listen(0, "127.0.0.1", r));
+  await admin.query("select lab_allow('luke@example.com')");      // 1 Nov: Drop a job's zip is for logins let into the lab
   const base = `http://127.0.0.1:${server.address().port}/shop-floor/office.html`;
   const browser = await chromium.launch();
   // a Julia: not a manager, schedules deliveries
@@ -73,8 +74,8 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   let s = await session(browser, users.luke), p = s.p;
   await p.goto(base); await p.waitForSelector("header.top [data-tab]", { timeout: 15000 }).catch(async (e) => { console.log("APP:", (await p.evaluate(() => document.body.innerText)).slice(0, 400)); console.log("ERRS:", s.errs.join(" | ")); throw e; });
   const items = await menu(p);
-  ok("Luke's ☰ menu: the office's tabs, then Deliveries, Upload, Inventory, Pace, Job status (28 Oct) inside the office; Tablet app, Setup, Feedback",
-     JSON.stringify(items) === JSON.stringify(["Operations, Arrow, Photos", "Deliveries", "Upload a work order", "Inventory", "Pace", "Job status", "Tablet app", "Setup", "Feedback", "Sign out"]), JSON.stringify(items));
+  ok("Luke's ☰ menu: the office's tabs, then Deliveries, Upload, Inventory, Pace, Job status, the lab and Drop a job's zip (1 Nov, he's let into the lab) inside the office; Tablet app, Setup, Feedback",
+     JSON.stringify(items) === JSON.stringify(["Operations, Arrow, Photos", "Deliveries", "Upload a work order", "Inventory", "Pace", "Job status", "Prototype lab", "Drop a job's zip", "Tablet app", "Setup", "Feedback", "Sign out"]), JSON.stringify(items));
   await p.click('.menu [data-section="deliveries"]');
   await p.waitForFunction(() => { const f = document.querySelector("#secs iframe"); return f && f.contentDocument && f.contentDocument.querySelector("#app") && f.contentDocument.querySelector("#app").textContent.length > 20; }, null, { timeout: 15000 });
   let fr = frameOf(p, "delivery.html");
@@ -111,12 +112,17 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   const dev = await p.evaluate(() => JSON.parse(localStorage.getItem("sf_device")));
   const rep = (await admin.query("select page, version from device_versions where device_id = $1 order by page", [dev])).rows.map(r => r.page + " " + r.version);
   ok("Every page reports its version, as one device", [`delivery ${DLV_V}`, "inventory 2026-10-05.1", `office ${OFFICE_V}`, "pace 2026-10-05.1"].every(x => rep.includes(x)), rep.join(", "));
-  await menu(p); await p.click('.menu [data-section="upload"]');
-  await p.waitForFunction(() => [...document.querySelectorAll("#secs iframe")].some(f => !f.hidden && /upload/.test(f.src) && f.contentDocument && f.contentDocument.body && f.contentDocument.body.innerText.length > 20), null, { timeout: 15000 });
-  fr = frameOf(p, "upload.html");
+  // 1 Nov: Drop a job's zip joins the menu for logins let into the lab; Upload and the lab stay
+  await menu(p);
+  const menuItems = await p.$$eval(".menu [data-section]", bs => bs.map(b => b.dataset.section));
+  ok("The ☰ menu has Drop a job's zip beside Upload and the Prototype lab (both kept, Luke 1 Nov)", menuItems.includes("drop") && menuItems.includes("upload") && menuItems.includes("lab"), menuItems.join(", "));
+  await p.click('.menu [data-section="drop"]');
+  await p.waitForFunction(() => [...document.querySelectorAll("#secs iframe")].some(f => !f.hidden && /drop/.test(f.src) && f.contentDocument && f.contentDocument.body && f.contentDocument.body.innerText.length > 20), null, { timeout: 15000 });
+  fr = frameOf(p, "drop.html");
+  ok("…it opens inside the office, signed in, with the drop zone and Machine files", await fr.waitForSelector("#dropArea:not([hidden]) #fSend", { timeout: 15000 }).then(() => true).catch(() => false));
   // 21 Oct: wait for the hiding, which the page does a moment after its text appears (this line was flaky since 6 Oct)
   const hid = await fr.waitForFunction(() => getComputedStyle(document.querySelector("header")).display === "none", null, { timeout: 10000 }).then(() => true).catch(() => false);
-  ok("Upload opens inside the office, its header hidden", hid);
+  ok("…its header hidden", hid);
   ok("No errors on any page", s.errs.length === 0, s.errs.join(" | "));
   await menu(p); await p.click('.menu [data-signout]'); await p.waitForTimeout(500);
   ok("Sign out closes every section and shows the sign-in", await p.evaluate(() => document.querySelectorAll("#secs iframe").length === 0 && !!document.querySelector("form.card")));

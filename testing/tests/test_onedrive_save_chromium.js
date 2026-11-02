@@ -2,6 +2,8 @@
 // which has the very same folder API (entries, getDirectoryHandle, createWritable, getFile, resolve), and the folders
 // are remembered in the browser's real IndexedDB. Checks what jsdom can't: real writes and read-backs, a spreadsheet's
 // leading marker surviving the "unchanged?" comparison, and the folders remembered across a reload with an automatic save.
+// 31 Oct: the Production layout, and the one-time move of an old "shop-floor data" folder with the browser's own
+// removeEntry (the in-memory stand-in in test_onedrive_save.js has its own; this proves the real one).
 //   bash /home/claude/sf/base/fresh.sh <feedback.sql> <trip_types.sql> <onedrive_save.sql> <install_log.sql>
 //   OUT=<folder with the new pages> PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers TZ=America/Indiana/Indianapolis node test_onedrive_save_chromium.js
 const fs = require("fs"), http = require("http"), path = require("path"), crypto = require("crypto");
@@ -79,10 +81,16 @@ const LIST = async (p, name) => p.evaluate(async (name) => {
   p.on("pageerror", e => errs.push(e.message));
   await p.goto(base);
   await p.waitForSelector("[data-savepick]", { timeout: 15000 });
-  // the OneDrive projects folder: PROJ-00418 at the top, PROJ-00501 in a hundreds folder
-  await p.evaluate(async () => { let r = await navigator.storage.getDirectory();
-    const od = await r.getDirectoryHandle("od", { create: true }); await od.getDirectoryHandle("PROJ-00418 Enid's Table", { create: true });
-    await (await od.getDirectoryHandle("500s", { create: true })).getDirectoryHandle("Proj-00501 Hotel", { create: true }); });
+  // the OneDrive projects folder: PROJ-00418 at the top, with an old "shop-floor data" folder from before 31 Oct;
+  // PROJ-00501 in a hundreds folder
+  const oldName = (await admin.query("select folder, file_name from v_filing where storage_path = $1", [PATH])).rows[0];
+  await p.evaluate(async ([folder, file]) => { let r = await navigator.storage.getDirectory();
+    const od = await r.getDirectoryHandle("od", { create: true }); const j = await od.getDirectoryHandle("PROJ-00418 Enid's Table", { create: true });
+    const old = await j.getDirectoryHandle("shop-floor data", { create: true });
+    const put = async (d, n, text) => { const w = await (await d.getFileHandle(n, { create: true })).createWritable(); await w.write(text); await w.close(); };
+    await put(old, "Production record.csv", "OLD RECORD"); await put(old, "Thumbs.db", "thumbnails");
+    await put(await old.getDirectoryHandle(folder, { create: true }), file, "OLD PHOTO COPY");
+    await (await od.getDirectoryHandle("500s", { create: true })).getDirectoryHandle("Proj-00501 Hotel", { create: true }); }, [oldName.folder, oldName.file_name]);
 
   await p.evaluate(() => localStorage.setItem("pick", JSON.stringify(["od"]))); await p.click('[data-savepick="od"]');
   await p.waitForFunction(() => /OneDrive projects folder chosen: od/.test(document.body.innerText));
@@ -97,15 +105,19 @@ const LIST = async (p, name) => p.evaluate(async (name) => {
   await p.waitForFunction(() => /Saved .*files? written/.test(document.body.innerText), null, { timeout: 30000 });
   let r = (await runs()).slice(-1)[0];
   const od = await LIST(p, "od"), bk = await LIST(p, "bk");
-  const odKeys = Object.keys(od).filter(k => /^PROJ-00418/.test(k)).map(k => k.replace(/^[^/]+\/shop-floor data\//, "")).sort();
-  const bkKeys = Object.keys(bk).filter(k => /^PROJ-00418\//.test(k)).map(k => k.replace(/^[^/]+\/shop-floor data\//, "")).sort();
-  ok("Real browser: the save wrote PROJ-00418's photo and records into its OneDrive folder", odKeys.some(k => /Load-out Picture\.jpg$|\.jpg$/.test(k)) && odKeys.includes("Production record.csv"), odKeys.join(", "));
-  ok("…the same files in the backup folder", JSON.stringify(odKeys) === JSON.stringify(bkKeys), bkKeys.join(", "));
-  const photo = Object.entries(od).find(([k]) => /\.jpg$/.test(k));
-  ok("…the photo is the full file", photo && photo[1].size === BYTES.length);
-  const prod = od["PROJ-00418 Enid's Table/shop-floor data/Production record.csv"];
-  ok("…the spreadsheet starts with its marker (so Excel reads it right)", prod && prod.head.join() === "239,187,191");
-  ok("…PROJ-00501 was found inside 500s", Object.keys(od).some(k => /^500s\/Proj-00501 Hotel\/shop-floor data\/Production record\.csv$/.test(k)));
+  const odKeys = Object.keys(od).filter(k => /^PROJ-00418/.test(k)).map(k => k.replace(/^[^/]+\/Production\//, "")).sort();
+  const bkKeys = Object.keys(bk).filter(k => /^PROJ-00418\//.test(k)).map(k => k.replace(/^[^/]+\/Production\//, "")).sort();
+  ok("Real browser: the save wrote PROJ-00418's photo into Production › Delivery and its records into Job Data",
+     odKeys.includes(`Delivery/${oldName.folder}/${oldName.file_name}`) && odKeys.includes("Job Data/Production record.csv"), odKeys.join(", "));
+  ok("…the old “shop-floor data” folder was moved across and removed by the browser's own removeEntry, Thumbs.db with it",
+     !Object.keys(od).some(k => /shop-floor data/.test(k)) && !Object.keys(od).some(k => /Thumbs\.db/.test(k)), Object.keys(od).join(", "));
+  const moved = od[`PROJ-00418 Enid's Table/Production/Delivery/${oldName.folder}/${oldName.file_name}`];
+  ok("…the photo saved before 31 Oct was copied across from the old folder (not downloaded again)", moved && moved.size === "OLD PHOTO COPY".length);
+  ok("…the backup folder has the same files, and the photo there is the full file from Supabase",
+     JSON.stringify(odKeys) === JSON.stringify(bkKeys) && bk[`PROJ-00418/Production/Delivery/${oldName.folder}/${oldName.file_name}`].size === BYTES.length, bkKeys.join(", "));
+  const prod = od["PROJ-00418 Enid's Table/Production/Job Data/Production record.csv"];
+  ok("…the spreadsheet starts with its marker (so Excel reads it right), and replaced the old record", prod && prod.head.join() === "239,187,191" && prod.size > 20);
+  ok("…PROJ-00501 was found inside 500s", Object.keys(od).some(k => /^500s\/Proj-00501 Hotel\/Production\/Job Data\/Production record\.csv$/.test(k)));
   ok("…and the log says both places were reached", r && r.onedrive_ok && r.backup_ok && r.how === "button" && (await runs()).length === n0 + 1);
 
   await p.click("[data-savenow]");
@@ -124,7 +136,7 @@ const LIST = async (p, name) => p.evaluate(async (name) => {
   while (Date.now() - t0 < 40000 && (await runs()).length === n0) await p.waitForTimeout(500);
   r = (await runs()).slice(-1)[0];
   const flags = await p.evaluate(async () => { const r = await navigator.storage.getDirectory();
-    const d = await (await (await r.getDirectoryHandle("od")).getDirectoryHandle("PROJ-00418 Enid's Table")).getDirectoryHandle("shop-floor data");
+    const d = await (await (await (await r.getDirectoryHandle("od")).getDirectoryHandle("PROJ-00418 Enid's Table")).getDirectoryHandle("Production")).getDirectoryHandle("Job Data");
     return (await (await d.getFileHandle("Flags.csv")).getFile()).text(); }).catch(e => "missing: " + e.message);
   ok("…it saved by itself after opening (marked auto), and the new flag is in Flags.csv", r && r.how === "auto" && r.onedrive_ok && r.backup_ok && /Seen after the reload/.test(flags), flags.slice(0, 120));
   ok("No page errors", errs.length === 0, errs.join(" | "));

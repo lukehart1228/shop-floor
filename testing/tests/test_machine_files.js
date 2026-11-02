@@ -1,4 +1,5 @@
-// 18 Oct: machine files (machine_files.sql, machine.html, the lab's Machine files card) in Chromium through the bridge.
+// 18 Oct: machine files (machine_files.sql, machine.html, the Machine files card) in Chromium through the bridge.
+// 1 Nov: the card moved from the Prototype lab (lab.html) to Drop a job's zip (drop.html); SENDER=lab.html runs it on the old page.
 // Luke sends STEP files and a program from the lab; the Bend-Tech and the Homag router each get only theirs on machine.html,
 // into a folder chosen on their computer (Chrome's private folder stands in for the real one), checked byte for byte; the
 // file then leaves storage and its record stays; revisions; a file changed on the way is refused; people and the wrong
@@ -8,6 +9,7 @@
 const fs = require("fs"), http = require("http"), path = require("path"), crypto = require("crypto");
 const { chromium } = require("/home/claude/.npm-global/lib/node_modules/playwright");
 const { makeClient, users, admin, files } = require("./pgsupa");
+const SENDER = process.env.SENDER || "drop.html", AREA = SENDER === "lab.html" ? "#labArea" : "#dropArea";
 const OUT = process.env.OUT || "/home/claude/sf/newrepo", REPO = "/home/claude/sf/repo", MODE = process.env.MODE || "new";
 let pass = 0, fail = 0;
 const ok = (n, c, x = "") => { c ? pass++ : fail++; console.log(`${c ? "PASS" : "FAIL"}  ${n}${x ? "  — " + x : ""}`); };
@@ -79,7 +81,7 @@ const folderFiles = (p, name) => p.evaluate(async (name) => { const out = {}; co
   const BT = await userOf("bendtech@example.com"), HO = await userOf("homag@example.com");
 
   if (MODE === "nofiles") {
-    let s = await session(browser, users.luke); await s.p.goto(base + "lab.html"); await s.p.waitForSelector("#labArea:not([hidden])");
+    let s = await session(browser, users.luke); await s.p.goto(base + SENDER); await s.p.waitForSelector(AREA + ":not([hidden])");
     await s.p.waitForFunction(() => /machine_files\.sql hasn’t run/.test(document.querySelector("#files").textContent), null, { timeout: 10000 });
     ok("Lab without machine_files.sql: the Machine files card says it isn’t set up yet, and the rest works", true);
     s = await session(browser, BT); await s.p.goto(base + "machine.html"); await s.p.waitForSelector("#notMachine:not([hidden])");
@@ -91,7 +93,7 @@ const folderFiles = (p, name) => p.evaluate(async (name) => { const out = {}; co
 
   // ---- Luke sends files from the lab ----
   const L = await session(browser, users.luke); let p = L.p;
-  await p.goto(base + "lab.html"); await p.waitForSelector("#fSend", { timeout: 15000 });
+  await p.goto(base + SENDER); await p.waitForSelector("#fSend", { timeout: 15000 });
   const legs = { "Leg-Long.step": "ISO-10303-21; leg long " + "x".repeat(5000), "Leg-Upper-Half.step": "ISO-10303-21; upper", "V-Arm.step": "ISO-10303-21; v arm r1" };
   await p.fill("#fJob", "PROJ-00451"); await p.fill("#fItem", "TA-02"); await p.selectOption("#fMachine", "bendtech"); await p.fill("#fNote", "Starfish base tubes");
   await p.setInputFiles("#fFiles", Object.entries(legs).map(([n, c]) => tmp(n, c)));

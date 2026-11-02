@@ -2,9 +2,9 @@
 # run_all.sh — every test in the kit, each in its right mode, one score table at the end (21 Oct 2026).
 #
 #   bash /home/claude/sf/repo/testing/run_all.sh all          after setup.sh; changed files in /home/claude/sf/out
-#   bash run_all.sh build | sql | pages1 | pages2 | browser1 | browser2 | table
+#   bash run_all.sh build | sql | pages1 | pages2 | browser1 | browser2 | browser3 | table
 #        the same in sections: in Claude's sandbox one command may run 5 minutes, and "all" takes about 15,
-#        so run build, sql, pages1, pages2, browser1, browser2 one per command, then table prints the whole score sheet
+#        so run build, sql, pages1, pages2, browser1, browser2, browser3 one per command, then table prints the whole score sheet
 #   OUT=/some/folder bash run_all.sh …                        another folder of changed files (laid out like the repo)
 #   ONLY="test_same test_feedback" bash run_all.sh pages1     a few tests by name (no .js/.sh)
 #
@@ -29,7 +29,7 @@ if [ "$G" != table ]; then
 rm -rf /tmp/allpages && mkdir -p /tmp/allpages
 cp $REPO/*.html $REPO/*.js $REPO/*.css $REPO/*.png $REPO/manifest.webmanifest /tmp/allpages/ 2>/dev/null
 [ -d $OUT ] && cp $OUT/*.html $OUT/*.js $OUT/*.css $OUT/*.png $OUT/manifest.webmanifest /tmp/allpages/ 2>/dev/null
-for f in $OUT/testing/tests/*.js $OUT/testing/tests/*.sh; do [ -f "$f" ] && cp "$f" $T/ && cp "$f" $B/ 2>/dev/null; done
+for f in $OUT/testing/tests/*.js $OUT/testing/tests/*.sh $OUT/testing/tests/*.py; do [ -f "$f" ] && cp "$f" $T/ && cp "$f" $B/ 2>/dev/null; done
 for f in $OUT/testing/helpers/*; do [ -f "$f" ] && cp "$f" $B/; done
 [ -f $OUT/testing/helpers/pgsupa.js ] && cp $OUT/testing/helpers/pgsupa.js $T/
 chmod +x $B/*.sh 2>/dev/null
@@ -43,7 +43,7 @@ if in_group build; then
   $PSQL -d postgres -c "drop database if exists sync_base_old with (force)" -c "create database sync_base_old template sync_base" >/dev/null 2>&1
   echo "== building sync_base_new (live sql/ + $OUT/sql)"; LIVE=$NEWSQL bash $B/load.sh 2>&1 | grep -E "FAILED|LOADED [0-9]" || { echo "BUILD FAILED (new)"; exit 1; }
   $PSQL -d postgres -c "drop database if exists sync_base_new with (force)" -c "create database sync_base_new template sync_base" >/dev/null 2>&1
-  [ "$G" == build ] && { echo "built; now: sql, pages1, pages2, browser1, browser2, then table"; exit 0; }
+  [ "$G" == build ] && { echo "built; now: sql, pages1, pages2, browser1, browser2, browser3, then table"; exit 0; }
 fi
 fresh() { TEMPLATE=sync_base_new bash $B/fresh.sh "$@" >/dev/null 2>&1 || echo "  (fresh.sh failed)"; }
 scenario() { local f=$OUT/testing/tests/$1; [ -f "$f" ] || f=$REPO/testing/tests/$1; $PSQL -d sync -f "$f" >/dev/null 2>&1 || echo "  (scenario $1 failed to load)"; }
@@ -81,7 +81,7 @@ run test_csv_cell          none  OUT=$P -- node test_csv_cell.js
 run test_style_same        none  OUT=$P -- node test_style_same.js
 run test_lab_reference     none  LAB=$P/lab.html -- node test_lab_reference.js
 if [ -f $OUT/index.html ]; then run test_same seed NEWPAGE=$OUT/index.html -- node test_same.js; else want test_same && row test_same skipped "no tablet page in OUT"; fi
-run test_same_office       seed  OUT=$P -- node test_same_office.js
+run test_same_office       seed  OUT=$P PHOTOSPACE=ignore ARROWPOS=ignore -- node test_same_office.js   # 31 Oct: the Photos tab changed on purpose; 1 Nov: the Arrow POs panel
 run test_feedback          seed  OUT=$P -- node test_feedback.js
 run test_feedback_close    seed  OUT=$P -- node test_feedback_close.js
 run test_trip_types        seed  OUT=$P -- node test_trip_types.js
@@ -115,7 +115,15 @@ run test_pdf_chromium      seed  $PW -- node test_pdf_chromium.js
 run test_onedrive_save_chromium seed OUT=$P $PW -- node test_onedrive_save_chromium.js
 run test_tv_coming         seed  OUT=$P $PW -- node test_tv_coming.js
 run test_machine_files     seed  OUT=$P $PW -- node test_machine_files.js
-if ls $T/PROJ-00212*.pdf >/dev/null 2>&1; then run test_lab seed OUT=$P $PW -- node test_lab.js; else want test_lab && row test_lab skipped "needs the three work orders beside it in t/ (ask Luke; never on GitHub)"; fi
+run test_step_chromium     seed  OUT=$P $PW -- node test_step_chromium.js
+run test_zip_drop          seed  OUT=$P $PW -- node test_zip_drop.js
+run test_zip_filing_chromium seed OUT=$P $PW -- node test_zip_filing_chromium.js
+run test_arrow_po          seed  PAGE=$PAGE $PW -- node test_arrow_po.js
+want test_lab && row test_lab skipped "needs the three work orders beside it (customer documents, ask Luke)"
+fi
+# 1 Nov: the 3D design viewer, on its own: real STEP files through the real engine take a few minutes
+if in_group browser3; then
+run test_design_viewer_chromium seed OUT=$P $PW -- node test_design_viewer_chromium.js
 fi
 
 if in_group table; then

@@ -124,7 +124,9 @@ const shot = async (p, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
   { const { p, errs, ctx } = await session(browser, users.luke, { width: 1366, height: 860 });
     await p.goto(`${BASE}/office.html`); await p.waitForSelector("[data-menu]", { timeout: 8000 });
     await p.click("[data-menu]"); await p.waitForSelector(".menu");
-    const items = await p.$$eval(".menu .mitem, .menu a", els => els.map(e => e.innerText.split("\n")[0].trim()));
+    // each item's own label (its first text), not innerText: the office re-draws as its data arrives, and an item caught
+    // mid-redraw has no layout, so its label and note ran together and the check failed at random (31 Oct)
+    const items = await p.$$eval(".menu .mitem, .menu a", els => els.map(e => ((e.firstChild && e.firstChild.textContent) || e.textContent).trim()));
     ok("Luke's office ☰ menu lists Job status", items.includes("Job status"), items.join(", "));
     await p.click(".menu >> text=Job status"); await p.waitForTimeout(1500);
     const fr = p.frames().find(f => f.url().includes("status.html"));

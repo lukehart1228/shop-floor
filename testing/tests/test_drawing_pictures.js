@@ -233,7 +233,7 @@ function judge(name, l, pathOfPage) {
   await w.p.click('[data-tab="arrow"]'); await w.p.waitForSelector("#app .arpic", { timeout: 10000 }).catch(() => {});
   ok("Willie: the pictures fill in on their own", await settled(w.p));
   const info = await w.p.evaluate(() => [...document.querySelectorAll("#app .li")].map(c => ({ text: c.innerText.replace(/\s+/g, " ").trim(),
-    pics: c.querySelectorAll(".arpic").length, gone: !!c.querySelector("[data-argone]"), wo: c.querySelector(".arwo") ? c.querySelector(".arwo").innerText.trim() : null,
+    pics: c.querySelectorAll(".arpic").length, gone: !!c.querySelector("[data-argone],[data-arpick]"), wo: c.querySelector(".arwo") ? c.querySelector(".arwo").innerText.trim() : null,
     ret: !!c.querySelector("[data-arreturn]"), voidb: !!c.querySelector("[data-arvoid]"), arwo: !!c.querySelector("[data-arwo]"),
     w: c.querySelector(".snip") ? c.querySelector(".snip").getBoundingClientRect().width : 0 })));
   const names = await text(w.p, "#app .li-top .jn");
@@ -241,7 +241,7 @@ function judge(name, l, pathOfPage) {
   const waitC = info.find(c => c.gone) || { text: "" };
   ok("Willie: the waiting item is one picture, 'Sheet 5 · TB-04', its size and × 3 tables",
      waitC.pics === 1 && /Sheet 5 · TB-04/.test(waitC.text) && /30 × 72 · 29\.5 H/.test(waitC.text) && /× 3 tables/.test(waitC.text), waitC.text);
-  ok("Willie: Gone to Arrow is still there, beside a Work order button", waitC.gone && waitC.wo === "Work order", String(waitC.wo));
+  ok("Willie: Gone to Arrow (Going to Arrow, with Arrow POs) is still there, beside a Work order button", waitC.gone && waitC.wo === "Work order", String(waitC.wo));
   judge("Willie, the waiting item", await look(w.p, { arrow: 5 }), "PROJ-00418/v1/sheet-5.png");
   ok("Willie: an Arrow picture is 236 wide on the tablet", Math.abs(waitC.w - 236) < 1, String(waitC.w));
   const two = info.find(c => c.pics === 2) || { text: "" };

@@ -123,9 +123,12 @@ const actions = "[data-step], [data-all], [data-send], [data-sendall], [data-uns
   const sam = makeClient(SAM);
   const ref = await sam.rpc("set_count", { p_progress: mill.find(x => x.project_id === "PROJ-00502").progress_id, p_qty: 1 });
   ok("The database refuses a Milling count from Sam's login", !!ref.error && /isn't allowed to change/.test(ref.error.message), ref.error ? ref.error.message : "saved!");
-  const cnc = (await admin.query(`select progress_id from v_floor_sheets where department = 'cnc' and not is_test limit 1`)).rows[0];
-  const own = await sam.rpc("set_count", { p_progress: cnc.progress_id, p_qty: 1 });
+  const cnc = (await admin.query(`select progress_id, qty_done from v_floor_sheets where department = 'cnc' and not is_test order by project_id, sheet_number limit 1`)).rows[0];
+  const own = await sam.rpc("set_count", { p_progress: cnc.progress_id, p_qty: cnc.qty_done === 1 ? 2 : 1 });
   ok("…and still takes his CNC counts", !own.error, own.error && own.error.message);
+  // 1 Nov: put it back (counts are absolute), so the CNC screen below is compared with the same numbers as before
+  const back = await sam.rpc("set_count", { p_progress: cnc.progress_id, p_qty: cnc.qty_done });
+  if (back.error) console.log("      (couldn't put the practice count back: " + back.error.message + ")");
 
   // switching back to CNC: his own tab, counters and all
   await click(s.w, '[data-dept="cnc"]'); await settled(s.w);

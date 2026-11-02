@@ -1,5 +1,6 @@
 // 5 Oct: office, delivery, inventory, pace and upload drawn as Luke, live (repo/) vs new (out/): every screen the same apart from
-// the Feedback button, the ☰ Feedback item, the office app's empty section holder and the version label. Seed first.  TZ=America/Indiana/Indianapolis node test_same_office.js
+// the Feedback button, the ☰ Feedback item, the office app's empty section holder and the version label. Seed first.
+// PHOTOSPACE=ignore sets aside what the 31 Oct build changed on the Photos tab (below).  TZ=America/Indiana/Indianapolis node test_same_office.js
 const fs = require("fs"); const { JSDOM } = require("jsdom");
 const { makeClient, users } = require("./pgsupa");
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
@@ -23,11 +24,20 @@ async function draw(file, page, pre) {
 }
 const norm = (h) => h.replace(/<div id="secs" hidden="">[\s\S]*?<\/div>/g, "").replace(/<button data-kind="(dock|task)"[\s\S]*?<\/button>/g, "").replace(/<button[^>]*data-sffb[^>]*>[\s\S]*?<\/button>/g, "").replace(/<button class="mitem" data-tab="feedback"[\s\S]*?<\/button>\s*/g, "")
   .replace(/Version [^<]*</g, "Version X<").replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "ID").replace(/<script[\s\S]*?<\/script>/g, "").replace(/\s+/g, " ").replace(/> </g, "><");
+// PHOTOSPACE=ignore (31 Oct, off_supabase.sql): sets aside the Photos tab's space panel (Photo archive → Space on Supabase)
+// and the saving panel's last line (the Production layout), the two things that build changed on purpose
+// ARROWPOS=ignore (1 Nov, arrow_pos.sql): sets aside the Arrow tab's Arrow POs panel, which that build added on purpose
+const aside = (h) => {
+  if (process.env.PHOTOSPACE === "ignore") h = h.replace(/<section class="panel"><h2>(Photo archive|Space on Supabase)<\/h2>[\s\S]*?<\/section>/g, "")
+     .replace(/<p class="meta2" style="margin-top:10px">Each job's photos[\s\S]*?<\/p>/g, "");
+  if (process.env.ARROWPOS === "ignore") h = h.replace(/<section class="panel"><h2>Arrow POs<\/h2>[\s\S]*?<\/section>/g, "");
+  return h;
+};
 (async () => {
   let bad = 0;
   for (const [page, pre] of [["office.html", { sfo_pin: JSON.stringify({ none: true }) }], ["delivery.html", {}], ["inventory.html", {}], ["pace.html", {}], ["upload.html", {}]]) {
     const a = await draw("/home/claude/sf/repo/" + page, page, pre), b = await draw((process.env.OUT || "/home/claude/sf/out") + "/" + page, page, pre);
-    const diff = a.map((h, i) => norm(h) === norm(b[i] || "") ? null : i).filter(x => x !== null);
+    const diff = a.map((h, i) => norm(aside(h)) === norm(aside(b[i] || "")) ? null : i).filter(x => x !== null);
     console.log(`${diff.length || a.length !== b.length ? "FAIL" : "PASS"}  ${page}: ${a.length} screens the same apart from the Feedback button${diff.length ? " — differ: " + diff : ""}`);
     if (diff.length) { bad++; const i = diff[0]; const x = norm(a[i]), y = norm(b[i]); let k = 0; while (x[k] === y[k]) k++; console.log("   live: " + x.slice(k - 80, k + 120) + "\n   new:  " + y.slice(k - 80, k + 120)); }
   }

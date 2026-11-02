@@ -126,7 +126,12 @@ insert into sql_file_catalog (file, run_order, fingerprint, check_fn, replaces) 
   ('tv_coming.sql',        44, 'check_tv_coming',         'check_tv_coming',          '{tv_photos.sql}'),
   ('direct_counts_off.sql', 45, 'check_direct_counts_off', 'check_direct_counts_off', '{verify_setup.sql,test_lane.sql,counts_safety.sql,tv_photos.sql}'),
   ('incomplete_deliveries.sql', 46, 'check_incomplete_deliveries', 'check_incomplete_deliveries', '{trip_types.sql,delivery_types.sql,delivery_extras.sql}'),
-  ('job_status.sql',       47, 'check_job_status',        'check_job_status',         '{problems.sql}')
+  ('job_status.sql',       47, 'check_job_status',        'check_job_status',         '{problems.sql}'),
+  ('off_supabase.sql',     48, 'check_off_supabase',      'check_off_supabase',       '{}'),
+  ('designs.sql',          49, 'check_designs',           'check_designs',            '{}'),
+  ('zip_drop.sql',         50, 'check_zip_drop',          'check_zip_drop',           '{}'),
+  ('arrow_pos.sql',        51, 'check_arrow_pos',         'check_arrow_pos',          '{arrow_pickup.sql}'),
+  ('design_viewer.sql',    52, 'check_design_viewer',     'check_design_viewer',      '{}')
 on conflict (file) do update set run_order = excluded.run_order, fingerprint = excluded.fingerprint, check_fn = excluded.check_fn, replaces = excluded.replaces;
 
 -- does the database already have this file's fingerprint?

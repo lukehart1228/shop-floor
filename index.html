@@ -205,6 +205,7 @@
   .page .missing{padding:60px 20px; text-align:center; color:var(--ink2)}
   .actions{display:flex; gap:10px; flex-wrap:wrap; margin:6px 0 14px}
   .actions button{flex:1 1 200px; background:#fff; border:1px solid var(--gray); border-radius:12px; padding:14px; font-weight:700; min-height:56px}
+  .d3host{margin:4px 0 10px} .d3host .missing{min-height:220px; display:flex; align-items:center; justify-content:center; text-align:center}
 
   /* log entries and lists */
   .li{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:10px}
@@ -561,6 +562,16 @@
     #printArea img{display:block; max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain;
                    break-inside:avoid; page-break-inside:avoid}
   }
+  /* 1 Nov: an Arrow PO prints as a page of text, not a picture */
+  .po{font:12px/1.35 Arial, Helvetica, sans-serif; color:#000; background:#fff}
+  .po h1{font-size:22px; margin:0 0 10px} .po table{border-collapse:collapse; width:100%}
+  .po .hd{display:flex; justify-content:space-between; gap:20px; margin-bottom:12px} .po .hd div{white-space:pre-line}
+  .po .kv td{padding:1px 6px 1px 0} .po .kv td:first-child{font-weight:700; white-space:nowrap}
+  .po .row3{margin:8px 0} .po .row3 td, .po .row3 th{border:1px solid #000; padding:3px 5px; text-align:left}
+  .po .ln th, .po .ln td{border:1px solid #000; padding:3px 5px; text-align:left; vertical-align:top}
+  .po .ln tr.rule td{border-top:2.5px solid #000} .po .ln td.n{text-align:right}
+  .po .ft{margin-top:10px} .po .ft p{margin:4px 0}
+  @media print{ #printArea.po{display:block!important; width:auto; height:auto; padding:.4in; overflow:visible} }
   @media print and (orientation: portrait){
     #printArea{padding:0}
     #printArea img{max-width:none; max-height:none; width:calc(100vh - .5in); height:calc(100vw - .5in); transform:rotate(90deg)}
@@ -584,7 +595,7 @@ const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 // This page's version. Change it with every edit (date, then .1, .2 … for more than one that day).
 // Each device reports it when it opens; see  select * from devices();  in the SQL Editor.
-const PAGE_VERSION = "2026-10-26.1";
+const PAGE_VERSION = "2026-11-01.2";
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -1093,6 +1104,33 @@ function filterJobs(jobs, text) {
     .sort((a, b) => (b.is_active - a.is_active) || (a.delivery_date || "9999").localeCompare(b.delivery_date || "9999")
                  || String(a.project_id).localeCompare(String(b.project_id)));
 }
+/** An Arrow PO as HTML, laid out like the NEW form in ARROW_PO_Template.xlsx (arrow_pos.sql, 1 Nov). `po` is what
+ *  arrow_po_make() returned (or an arrow_pos row): its header and lines, exactly as made; nothing is looked up or typed. */
+function arrowPoHtml(po, escf) {
+  const h = po.header || {}, e = (x) => escf(x == null ? "" : String(x));
+  const day = (d) => { if (!d) return ""; const [y, m, dd] = String(d).slice(0, 10).split("-"); return `${Number(m)}/${Number(dd)}/${y}`; };
+  let prev = null;
+  const rows = (po.lines || []).map(l => { const rule = prev !== null && l.pd_color !== prev; prev = l.pd_color;
+    return `<tr${rule ? ' class="rule"' : ""}><td class="n">${l.qty == null ? "" : e(l.qty)}</td><td>${e(l.base)}</td><td>${e(l.description)}</td><td>${e(l.pd_color)}</td>
+      <td>${e(l.arrow_color)}</td><td>${e(l.project)}</td><td></td><td></td></tr>`; }).join("");
+  return `<div class="po"><h1>Purchase Order</h1>
+    <div class="hd"><div>${e(h.address)}</div><table class="kv">
+      <tr><td>PO Number:</td><td>${e(po.name)}</td></tr><tr><td>Date Issued:</td><td>${e(day(h.date_issued))}</td></tr>
+      <tr><td>Issued by:</td><td>${e(h.issued_by)}</td></tr><tr><td>Contact Number:</td><td>${e(h.phone)}</td></tr>
+      <tr><td>Contact e-mail:</td><td>${e(h.email)}</td></tr></table></div>
+    <table class="kv"><tr><td>To:</td><td>${e(h.to)}</td><td style="padding-left:40px"><b>Ship To:</b></td><td>${e(h.ship_to)}</td></tr></table>
+    <table class="row3"><tr><th>Date</th><th>Date Required</th><th>Terms</th><th>How Shipped</th><th>PO# / Job Number</th></tr>
+      <tr><td>${e(day(h.date_issued))}</td><td>${e(day(h.date_required))}</td><td></td><td>${e(h.how_shipped)}</td><td>${e(h.po_jobs)}</td></tr></table>
+    <table class="ln"><tr><th>Quantity</th><th>Base ID</th><th>Base Description</th><th>PD Color</th><th>Arrow Color</th><th>Project #</th><th>Unit Price</th><th>Amount</th></tr>
+      ${rows}<tr><td colspan="7"><b>Total</b></td><td></td></tr></table>
+    <div class="ft"><p><b><i>*BLAST AND COAT ALL BASES*</i></b></p>${h.tax_line ? `<p>${e(h.tax_line)}</p>` : ""}
+      <p>Authorized Signature: ${e(h.issued_by)}</p></div></div>`;
+}
+/** What an Arrow row holds, in words: "7 of 15" (one line) or "7 of 15, 2 of 2"; "" without Arrow lines */
+function arrowCountText(a) {
+  const c = (a && a.arrow_counts) || [];
+  return c.map(x => `${x.holds} of ${x.total}`).join(", ");
+}
 /** The Arrow pick-up list: items waiting to go, oldest first. */
 function arrowWaiting(arrow) {
   return (arrow || []).filter(a => a.waiting && !a.voided).sort((a, b) => String(a.queued_on || a.sent_on).localeCompare(String(b.queued_on || b.sent_on)) || String(a.project_id).localeCompare(String(b.project_id)));
@@ -1559,11 +1597,12 @@ if (typeof document !== "undefined") (function () {
     failed: store.get("failed", []) || [],          // counts and entries the database refused, kept until someone deals with them (R-1)
     held: null,                                     // why things are waiting though there's a connection, in words
     view: { screen: "queue", jobId: null, progressId: null },
+    d3: null, d3rows: store.get("d3rows", {}) || {},   // 1 Nov: the 3D design open on a sheet; each job's 3D models as last read
     online: navigator.onLine, notice: null, loading: false,
     // the log side
     flags: store.get("flags", []), tasks: store.get("tasks", []), types: store.get("types", []),
     problems: [], probScope: "mine", defects: [], supplies: [], arrow: [], pickJobs: store.get("pickjobs", []),
-    pickSheets: {}, piece: {}, qcJob: null, qcEntries: [], arrowForm: null, arWo: null, supplyForm: { item: "", qty: 1, note: "", pick: null, picked: {} }, supplyItems: [],
+    pickSheets: {}, piece: {}, qcJob: null, qcEntries: [], arrowForm: null, arWo: null, arrowPos: null, arPick: {}, supplyForm: { item: "", qty: 1, note: "", pick: null, picked: {} }, supplyItems: [],
     openTask: null, modal: null, toast: null, missing: {},
     invLists: store.get("invlists", []), invItems: [], invDrafts: store.get("invdrafts", {}),
     // photos and load-outs
@@ -1741,6 +1780,7 @@ if (typeof document !== "undefined") (function () {
                        look: Array.isArray(data.look_departments) ? data.look_departments : [] }
                     : store.get("me", null);
     if (!me) return null;
+    if (data) me.d3 = await designAccess(me);
     store.set("me", me);
     S.me = me;
     S.depts = departmentsFor(me);
@@ -1987,6 +2027,9 @@ if (typeof document !== "undefined") (function () {
   }
   async function loadArrow() {
     const d = await read("arrow", db.from("v_outside_jobs").select("*").eq("voided", false), "arrow");
+    { const p = await db.from("arrow_pos").select("id, client_id, name, file_name, gone_on, jobs, header, lines, made_at, made_by_name")
+        .order("made_at", { ascending: false }).limit(5).then(r => r, e => ({ error: e }));
+      S.arrowPos = p.error ? null : (p.data || []); }
     if (d) S.arrow = d;
     if (S.tab === "arrow") await loadArrowSheets();
   }
@@ -2566,7 +2609,7 @@ if (typeof document !== "undefined") (function () {
       <div class="page" id="page">${r.png_path && r.pages_ready ? `<div class="missing">Loading the page…</div>` : `<div class="missing">This sheet's page hasn't been uploaded yet.</div>`}</div>
       <div class="actions">
         <button data-print="1" ${r.png_path && r.pages_ready ? "" : "disabled"}>Print this sheet</button>
-        <button data-pdf="1" ${r.pdf_path && r.pages_ready ? "" : "disabled"}>Open the PDF</button>
+        <button data-pdf="1" ${r.pdf_path && r.pages_ready ? "" : "disabled"}>Open the PDF</button>${designBtn(r)}
       </div>
       ${lookOnly(S.dept) ? "" : `<div class="actions">
         <button data-report="here">Report a defect or issue</button>
@@ -2639,7 +2682,7 @@ if (typeof document !== "undefined") (function () {
       <div class="page" id="page">${r.png_path && r.pages_ready ? `<div class="missing">Loading the page…</div>` : `<div class="missing">This sheet's page hasn't been uploaded yet.</div>`}</div>
       <div class="actions">
         <button data-print="1" ${r.png_path && r.pages_ready ? "" : "disabled"}>Print this sheet</button>
-        <button data-pdf="1" ${r.pdf_path && r.pages_ready ? "" : "disabled"}>Open the PDF</button>
+        <button data-pdf="1" ${r.pdf_path && r.pages_ready ? "" : "disabled"}>Open the PDF</button>${designBtn(r)}
       </div>
       ${lookOnly(S.dept) ? "" : `<div class="actions"><button data-report="here">Report a defect or issue</button></div>`}
       ${pager}
@@ -2839,6 +2882,23 @@ if (typeof document !== "undefined") (function () {
     const back = S.arrow.filter(a => !a.at_vendor && a.returned_on && daysSince(a.returned_on) <= 92)
       .sort((a, b) => String(b.returned_on).localeCompare(String(a.returned_on)));
     const what = (a) => [sheetsText(a.sheet_numbers), a.description].filter(Boolean).join(" — ");
+    // Arrow POs (arrow_pos.sql, 1 Nov): tick what's going, how many of each line, one PO for the trip
+    const poMode = Array.isArray(S.arrowPos);
+    const nPicked = wait.filter(a => S.arPick[a.id]).length;
+    const pickBlock = (a) => {
+      const p = S.arPick[a.id], c = a.arrow_counts || [];
+      return `<div class="rowbtns"><button class="${p ? "go" : "btn"}" data-arpick="${esc(a.id)}" aria-pressed="${!!p}">${p ? "Going ✓" : "Going to Arrow"}</button>${arrowWoButton(a)}</div>
+        ${p ? c.map(x => { const k = `${x.sheet}:${x.pos}`, v = p[k] ?? x.holds, two = c.filter(y => y.sheet === x.sheet).length > 1;
+          return `<div class="rowbtns arq" style="align-items:center"><span>Sheet ${x.sheet}${two ? `, line ${x.pos}` : ""}</span>
+            <button data-arqty="${esc(a.id)}|${k}|-1" ${v <= 0 ? "disabled" : ""} aria-label="One fewer">−</button><b style="min-width:2em; text-align:center">${v}</b>
+            <button data-arqty="${esc(a.id)}|${k}|1" ${v >= x.holds ? "disabled" : ""} aria-label="One more">+</button>
+            <span class="meta2">of ${x.holds} left${x.holds !== x.total ? ` (${x.total} in all)` : ""}</span></div>`; }).join("") : ""}`;
+    };
+    const recentPos = poMode ? S.arrowPos.filter(p => daysSince(p.gone_on) <= 7) : [];
+    const poList = recentPos.length ? `<h2 class="sec" style="margin-top:4px">Arrow POs this week</h2>
+      ${recentPos.map(p => `<div class="li"><div class="li-top"><b>${esc(p.name)}</b><span class="meta2">${esc((p.jobs || []).join(", "))} · ${esc(fmtDate(p.gone_on))}${p.made_by_name ? ` · by ${esc(p.made_by_name)}` : ""}</span>
+          ${S.arNewPo === p.client_id ? `<span class="st">made just now</span>` : ""}</div>
+        <div class="rowbtns"><button class="${S.arNewPo === p.client_id ? "go" : "btn"}" data-arpoprint="${esc(p.id)}">Print the PO</button></div></div>`).join("")}` : "";
     const form = f ? `<div class="card">
         <h3 style="margin:0 0 6px">Send to Arrow</h3>
         <label class="f">Job</label>${jobPicker(f.jobId, f.filter)}
@@ -2854,17 +2914,18 @@ if (typeof document !== "undefined") (function () {
           <button class="go" data-arsend="1" ${f.jobId && (f.sheets.length || f.description.trim()) ? "" : "disabled"}>Send to Arrow</button></div>
       </div>` : `<button class="btn wide" data-aropen="1">Send something to Arrow</button>`;
     const pickup = wait.length ? `<h2 class="sec" style="margin-top:4px">Waiting to go to Arrow</h2>
-      <p class="sub" style="margin:0 2px 10px">Done by Metal, not taken over yet. Tap Gone to Arrow when it leaves.</p>
+      <p class="sub" style="margin:0 2px 10px">${poMode ? "Done by Metal, not taken over yet. Tick what's going and how many, then Make the PO: it marks them gone and prints one PO for the trip." : "Done by Metal, not taken over yet. Tap Gone to Arrow when it leaves."}</p>
       ${wait.map(a => `<div class="li"><div class="li-top"><b>${a.is_test ? `<span class="tag">TEST</span>` : ""}${esc(a.project_id)}</b>
-          ${arrowJobName(a)}<span class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent on ${esc(fmtDate(a.queued_on || a.sent_on))} by ${esc(a.queued_by_name || a.sent_by_name)}</span>
+          ${arrowJobName(a)}<span class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent on ${esc(fmtDate(a.queued_on || a.sent_on))} by ${esc(a.queued_by_name || a.sent_by_name)}${arrowCountText(a) ? ` · ${esc(arrowCountText(a))} to go` : ""}</span>
           <span class="st">${a.days_out ? `waiting ${a.days_out} day${a.days_out === 1 ? "" : "s"}` : "since today"}</span></div>
         ${arrowSent(a)}
-        <div class="rowbtns"><button class="go" data-argone="${esc(a.id)}">Gone to Arrow</button>${arrowWoButton(a)}</div></div>`).join("")}
-      ${wait.length > 1 ? `<button class="btn wide" style="margin:4px 0 8px" data-argoneall="1">All ${wait.length} gone to Arrow</button>` : ""}` : "";
-    return `${missingNote("arrow")}${pickup}${form}
+        ${poMode ? pickBlock(a) : `<div class="rowbtns"><button class="go" data-argone="${esc(a.id)}">Gone to Arrow</button>${arrowWoButton(a)}</div>`}</div>`).join("")}
+      ${poMode ? (nPicked ? `<button class="go wide" style="margin:4px 0 8px" data-armake="1">Make the PO: ${nPicked} item${nPicked === 1 ? "" : "s"} going</button>` : "")
+        : wait.length > 1 ? `<button class="btn wide" style="margin:4px 0 8px" data-argoneall="1">All ${wait.length} gone to Arrow</button>` : ""}` : "";
+    return `${missingNote("arrow")}${poList}${pickup}${form}
       <h2 class="sec">At Arrow now</h2>
       ${out.length ? out.map(a => `<div class="li"><div class="li-top"><b>${a.is_test ? `<span class="tag">TEST</span>` : ""}${esc(a.project_id)}</b>
-          ${arrowJobName(a)}<span class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent ${esc(fmtDate(a.sent_on))} by ${esc(a.sent_by_name)}${a.gone_by_name ? ` · taken by ${esc(a.gone_by_name)}` : ""}</span>
+          ${arrowJobName(a)}<span class="meta2">${esc(a.service === "paint" ? "Paint" : "Powdercoat")} · sent ${esc(fmtDate(a.sent_on))} by ${esc(a.sent_by_name)}${a.gone_by_name ? ` · taken by ${esc(a.gone_by_name)}` : ""}${a.po_name ? ` · ${esc(a.po_name)}` : ""}${arrowCountText(a) ? ` · ${esc(arrowCountText(a))}` : ""}</span>
           <span class="st">${a.days_out} day${a.days_out === 1 ? "" : "s"} out</span></div>
         ${arrowSent(a)}
         <div class="rowbtns"><button data-arreturn="${esc(a.id)}">Mark returned</button>
@@ -4141,13 +4202,103 @@ if (typeof document !== "undefined") (function () {
     }
   }
 
+  // ---------- 3D designs (1 Nov): an item's 3D model on Full Custom's tablet, to turn and measure ----------
+  // Who sees them is the database's (design_viewer.sql): managers, and supervisors in the departments on one setting,
+  // Full Custom to start. A job's list of models is read when its sheets are drawn (at most every 10 minutes, never
+  // on a timer); a view file is fetched only when 3D design is tapped, then kept on the tablet for no signal. The
+  // viewer (sf-3d-viewer.js, then three.js from jsDelivr, checked) loads the first time; the offline helper keeps it.
+  const D3_TTL = 10 * 60 * 1000;
+  const D3_COLS = "id, project_id, item, status, up, detail, view_path, view_bytes, size_in, parts, step_name, step_bytes, step_path, failed_why, made_at, registered_at";
+  const d3Busy = new Set(), d3Failed = new Map();
+  /** true when this login sees 3D designs: the setting's there (design_viewer.sql has run), and it's a manager or works in a department on it */
+  async function designAccess(me) {
+    let set;                                                    // undefined: couldn't ask; null: not set up; an array: the departments
+    try { const r = await db.from("app_settings").select("value").eq("key", "design_departments").maybeSingle();
+          if (!r.error) set = r.data ? (Array.isArray(r.data.value) ? r.data.value : []) : null; } catch (e) { set = undefined; }
+    if (set === undefined) { const old = store.get("me", null); return !!(old && old.id === me.id && old.d3); }   // no answer: as last time
+    if (set === null) return false;
+    return me.role === "manager" || me.role === "admin" || (me.departments || []).some(d => set.includes(d));
+  }
+  function designsFor(pid) {
+    if (!S.me || !S.me.d3 || !pid) return;
+    const have = S.d3rows[pid];
+    if (have && Date.now() - have.at < D3_TTL) return;
+    if (d3Busy.has(pid) || Date.now() - (d3Failed.get(pid) || 0) < 60000) return;
+    d3Busy.add(pid);
+    (async () => {
+      let r; try { r = await db.from("item_designs").select(D3_COLS).eq("project_id", pid).is("superseded_at", null); } catch (e) { r = { error: e }; }
+      d3Busy.delete(pid);
+      if (!r || r.error || !Array.isArray(r.data)) { d3Failed.set(pid, Date.now()); return; }
+      const before = JSON.stringify(have ? have.rows : []);
+      S.d3rows[pid] = { at: Date.now(), rows: r.data };
+      for (const [k, v] of Object.entries(S.d3rows)) if (Date.now() - v.at > 30 * 86400000) delete S.d3rows[k];   // untouched for a month: let go
+      store.set("d3rows", S.d3rows);
+      if (JSON.stringify(r.data) !== before) render();
+    })();
+  }
+  const d3Norm = (x) => String(x || "").trim().toLowerCase();
+  function designOf(r) { const e = r && S.d3rows[r.project_id]; return e && r.item_code ? e.rows.find(x => d3Norm(x.item) === d3Norm(r.item_code)) || null : null; }
+  function designBtn(r) {
+    if (!S.me || !S.me.d3) return "";
+    designsFor(r.project_id);
+    const d = designOf(r);
+    return d ? `<button data-d3="${esc(d.id)}">3D design</button>` : "";
+  }
+  const d3Open = () => !!S.d3 && S.d3.progressId === S.view.progressId && S.d3.tab === S.tab && S.view.screen === "sheet";
+  function designScreen() {
+    const r = rowsHere().find(x => x.progress_id === S.view.progressId), d = designOf(r);
+    if (!r || !d) { S.d3 = null; return S.tab === "past" ? pastSheetScreen() : sheetScreen(); }
+    return `<div class="head"><button class="back" data-d3close="1">← Sheet ${r.sheet_number}${r.item_code ? " · " + esc(r.item_code) : ""}</button>
+      <h1>3D design · ${esc(r.item_code || "")}</h1>
+      <span class="hsub">${r.is_test ? "TEST " : ""}${esc(r.project_id)} · ${esc(r.job_name)}</span></div>
+      <div class="d3host" id="d3host"><div class="missing"${S.d3.error ? ' data-d3err="1"' : ""}>${esc(S.d3.msg || "Opening the design…")}</div></div>
+      <p class="meta2" id="d3from" style="text-align:center">${esc(S.d3.from || "")}</p>`;
+  }
+  let d3Lib = null;
+  function loadViewerLib() {
+    if (window.SF3D) return Promise.resolve(window.SF3D);
+    if (!d3Lib) d3Lib = new Promise((res, rej) => {
+      const el = document.createElement("script"); el.src = "sf-3d-viewer.js";
+      el.onload = () => window.SF3D ? res(window.SF3D) : rej(new Error("viewer"));
+      el.onerror = () => { el.remove(); rej(new Error("viewer")); };
+      document.head.appendChild(el);
+    }).catch((e) => { d3Lib = null; throw e; });
+    return d3Lib;
+  }
+  async function showDesign() {
+    const st = S.d3, host = document.getElementById("d3host");
+    if (!st || !host) return;
+    if (st.view && window.SF3D) { try { SF3D.viewer().attach(host); } catch (e) {} return; }      // open already: it carries over
+    if (st.busy || st.error) return;
+    st.busy = true;
+    const row = ((S.d3rows[st.pid] || {}).rows || []).find(x => x.id === st.id);
+    const say = (t, final) => { if (S.d3 !== st) return; st.msg = t; const h = document.getElementById("d3host"); if (h && !st.view) h.innerHTML = `<div class="missing"${final ? ' data-d3err="1"' : ""}>${esc(t)}</div>`; };
+    try {
+      if (!row) throw new Error("That 3D model is no longer on this job.");
+      const lib = await loadViewerLib().catch(() => { throw new Error("The 3D viewer couldn't load. It needs a connection the first time; after that it's kept on this tablet."); });
+      const got = await lib.openDesign({ db, row, keep: true, onStatus: say });
+      if (S.d3 !== st) return;                                  // closed while it opened
+      const kb = got.bytes >= 1048576 ? `${(got.bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(got.bytes / 1024))} KB`;
+      st.view = got.view;
+      st.from = got.from === "kept" ? "Opened from this tablet's copy: it works with no signal."
+              : got.from === "made" ? `Made on this tablet from ${row.step_name || "its STEP file"} in ${(got.ms / 1000).toFixed(1)} s, and kept here.`
+              : `Downloaded (${kb}) and kept on this tablet.`;
+      const h = document.getElementById("d3host"), v = lib.viewer();
+      if (h) { v.attach(h); v.show(got.view, { up: row.up }); }
+      const f = document.getElementById("d3from"); if (f) f.textContent = st.from;
+    } catch (e) {
+      if (S.d3 === st) { st.error = true; say(e && e.message ? e.message : String(e), true); }
+    } finally { st.busy = false; }
+  }
+
   function render() {
     if (!S.me) return;
     let body;
+    if (S.d3 && !d3Open()) S.d3 = null;              // left the sheet: the design closes with it
     if (S.adv) body = advScreen();
-    else if (onCountTab() && S.view.screen === "sheet") body = sheetScreen();
+    else if (onCountTab() && S.view.screen === "sheet") body = S.d3 ? designScreen() : sheetScreen();
     else if (onCountTab() && S.view.screen === "job") body = jobScreen();
-    else if (S.tab === "past" && S.view.screen === "sheet") body = pastSheetScreen();
+    else if (S.tab === "past" && S.view.screen === "sheet") body = S.d3 ? designScreen() : pastSheetScreen();
     else if (S.tab === "past" && S.view.screen === "job") body = pastJobScreen();
     else if (S.tab === "arrow" && S.arWo) body = arrowWoScreen();
     else {
@@ -4164,7 +4315,7 @@ if (typeof document !== "undefined") (function () {
     wire();
     fillPhotos();
     if (S.adv) { if (S.advJob && S.advSheet) advShowPage(); }
-    else if ((onCountTab() || S.tab === "past") && S.view.screen === "sheet") showPage();
+    else if ((onCountTab() || S.tab === "past") && S.view.screen === "sheet") { if (S.d3) showDesign(); else showPage(); }
     if (S.tab === "loadout" && S.loWo && !S.adv) { showLoPage(); initWoSwipe(); }
     if (S.tab === "arrow" && S.arWo && !S.adv) { showArPage(); initArSwipe(); }
     fillSnips();
@@ -4182,7 +4333,7 @@ if (typeof document !== "undefined") (function () {
       const now = document.getElementById("page");
       if (!now) return;
       now.innerHTML = `<img alt="Work order ${esc(r.project_id)} sheet ${r.sheet_number}" src="${url}">`;
-      document.getElementById("printArea").innerHTML = `<img alt="" src="${url}">`;
+      document.getElementById("printArea").className = ""; document.getElementById("printArea").innerHTML = `<img alt="" src="${url}">`;
     } catch (e) {
       el.innerHTML = `<div class="missing">${esc(isNetworkError(e) ? "No connection, and this page hasn't been opened on this tablet before. It will show once the connection is back." : friendlyError(e))}</div>`;
     }
@@ -4329,6 +4480,9 @@ if (typeof document !== "undefined") (function () {
       if (prev < r.qty_required) offerUndo(r, prev);
     });
     on("[data-print]", () => window.print());
+    on("[data-d3]", (b) => { const r = current(); if (!r) return;
+      S.d3 = { id: b.dataset.d3, pid: r.project_id, progressId: r.progress_id, tab: S.tab, msg: "Opening the design…" }; render(); scrollTo(0, 0); });
+    on("[data-d3close]", () => { S.d3 = null; render(); });
     // ---- send routes: a finished Full Custom or Metal sheet goes on; shown as sent at once, sent when the connection allows
     const markSent = (ids, route) => {
       const upd = (rows) => rows.map(r => ids.includes(r.progress_id) ? { ...r, send: { route, pending: true, at: new Date().toISOString() } } : r);
@@ -4799,6 +4953,31 @@ if (typeof document !== "undefined") (function () {
     on("[data-arwoback]", () => { S.arWo = null; render(); });
     on("[data-argone]", (b) => { const a = S.arrow.find(x => x.id === b.dataset.argone); if (a) goneAsk([a]); });
     on("[data-argoneall]", () => { const w = arrowWaiting(S.arrow); if (w.length) goneAsk(w); });
+    on("[data-arpick]", (b) => { const id = b.dataset.arpick; if (S.arPick[id]) delete S.arPick[id]; else S.arPick[id] = {}; render(); });
+    on("[data-arqty]", (b) => {
+      const [id, k, d] = b.dataset.arqty.split("|"), a = S.arrow.find(x => x.id === id), p = S.arPick[id];
+      const line = a && (a.arrow_counts || []).find(x => `${x.sheet}:${x.pos}` === k); if (!line || !p) return;
+      p[k] = Math.max(0, Math.min(line.holds, (p[k] ?? line.holds) + Number(d))); render();
+    });
+    on("[data-armake]", () => {
+      const items = arrowWaiting(S.arrow).filter(a => S.arPick[a.id]).map(a => ({ id: a.id,
+        lines: (a.arrow_counts || []).map(x => ({ sheet: x.sheet, pos: x.pos, qty: S.arPick[a.id][`${x.sheet}:${x.pos}`] ?? x.holds })) }));
+      if (!items.length) return;
+      if (items.some(it => it.lines.length && it.lines.every(l => !l.qty))) { showToast("One of the ticked items has nothing going: set a count, or untick it."); return; }
+      const what = items.map(it => { const a = S.arrow.find(x => x.id === it.id); const n = it.lines.reduce((t, l) => t + l.qty, 0);
+        return `${a.project_id}${(a.sheet_numbers || []).length ? " " + sheetsText(a.sheet_numbers) : ""}${it.lines.length ? ` (${n})` : ""}`; }).join(", ");
+      const cid = newId();
+      S.modal = { kind: "confirm", title: "Make the PO?", text: `${what}. Marks ${items.length === 1 ? "it" : "them"} gone to Arrow today, under your name, and makes one PO for the trip to print.`,
+                  yes: "Make the PO", run: async () => {
+                    await send("arrow_po_make", { p_client_id: cid, p_gone_on: localISO(new Date()), p_items: items }, "Arrow PO", () => { S.arPick = {}; S.arNewPo = cid; });
+                    await loadArrow(); render(); } };
+      render();
+    });
+    on("[data-arpoprint]", (b) => {
+      const po = (S.arrowPos || []).find(p => p.id === b.dataset.arpoprint); if (!po) return;
+      const area = document.getElementById("printArea"); area.className = "po"; area.innerHTML = arrowPoHtml(po, esc);
+      window.print();
+    });
     on("[data-arvoid]", (b) => {
       S.modal = { kind: "confirm", title: "Entered by mistake?", text: "It comes off the Arrow lists and stays in history.", yes: "Yes, a mistake",
                   run: () => send("void_arrow", { p_item: b.dataset.arvoid }, "Arrow") };
@@ -4968,7 +5147,7 @@ if (typeof document !== "undefined") (function () {
     const tried = store.get("update_tried", null);
     if (tried && tried.v === updateTo && Date.now() - tried.at < UPDATE_RETRY_MS) return;
     const waiting = Object.keys(S.outbox).length + Object.keys(S.logbox).length + S.pending.length;
-    if (!safeToReload({ me: S.me, screen: S.view.screen, tab: S.tab, modal: S.modal, viewer: S.viewer, loView: S.loView, taskView: S.taskView,
+    if (!safeToReload({ me: S.me, screen: S.view.screen, tab: S.tab, modal: S.modal || (Object.keys(S.arPick || {}).length ? "arpick" : null), viewer: S.viewer, loView: S.loView, taskView: S.taskView,
                         openTask: S.openTask, adv: S.adv, waiting, typed: typedSomething(), idle: Date.now() - lastTouch })) return;
     store.set("update_tried", { v: updateTo, at: Date.now() });
     location.reload();

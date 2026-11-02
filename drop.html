@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#181D2E">
+<title>Drop a job's zip · Shop Floor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --midnight:#181D2E; --orange:#ED5E0F; --bright:#F0A721; --teal:#00B4B2;
+    --teal-ink:#00807E; --teal-bg:#DDF2F1; --sawdust:#FFF4D5; --gray:#C2BAA0;
+    --paper:#EFEDE6; --line:#E4DFCF; --ink2:#6B7082; --warn:#7A4400;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--paper); color:var(--midnight); font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:17px; line-height:1.45}
+  header{background:var(--midnight); color:var(--sawdust); padding:16px 20px; display:flex; align-items:baseline; gap:14px; flex-wrap:wrap}
+  .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.16em; color:var(--orange)}
+  .brand span{color:var(--sawdust)}
+  header h1{margin:0; font-size:20px; font-weight:600}
+  header .toofc{margin-left:auto; color:var(--sawdust); font-weight:600; text-decoration:none; border-bottom:1.5px solid var(--orange)}
+  main{max-width:900px; margin:0 auto; padding:22px 16px 70px}
+  .card{background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin-bottom:16px}
+  h2{margin:0 0 4px; font-size:22px} h3{margin:0 0 8px; font-size:18px}
+  .sub{color:var(--ink2); margin:0 0 12px}
+  label.f{display:block; font-weight:600; margin:12px 0 4px}
+  input[type=email],input[type=password],input[type=text],select{font:inherit; padding:9px 11px; border:1px solid var(--gray); border-radius:9px; background:#fff; color:var(--midnight)}
+  input[type=email],input[type=password]{width:100%}
+  button{font:inherit; font-weight:600; border-radius:9px; padding:10px 16px; cursor:pointer; border:1px solid var(--gray); background:#fff; color:var(--midnight)}
+  button.go{background:var(--orange); color:#fff; border-color:transparent}
+  button.wide{width:100%; margin-top:16px; padding:13px 18px}
+  button:disabled{opacity:.45; cursor:default}
+  button.link{background:none; border:none; padding:4px; color:var(--ink2); text-decoration:underline; font-weight:500}
+  button:focus-visible,.drop:focus-within,select:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--bright); outline-offset:2px}
+  .who{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; color:var(--ink2); margin-bottom:14px}
+  .who b{color:var(--midnight)}
+  .drop{position:relative; display:block; border:2px dashed var(--gray); border-radius:12px; background:#fff; padding:30px 20px; text-align:center; cursor:pointer; margin-bottom:16px}
+  .drop.over{border-color:var(--orange); background:var(--sawdust)}
+  .drop b{display:block; font-size:19px; margin-bottom:4px} .drop span{color:var(--ink2)}
+  .drop input{position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer}
+  .bad{background:var(--sawdust); color:var(--warn); border-left:5px solid var(--bright); border-radius:10px; padding:14px 16px}
+  .bad p{margin:0 0 6px} .bad p:last-child{margin:0}
+  .alarm{background:var(--midnight); color:var(--sawdust); border-radius:12px; padding:20px}
+  .alarm h2{color:var(--bright)}
+  .tally{display:flex; gap:10px; flex-wrap:wrap; margin:12px 0 0}
+  .t{border-radius:9px; padding:8px 12px; min-width:120px}
+  .t b{display:block; font-family:'Barlow Condensed',sans-serif; font-size:30px; line-height:1}
+  .t span{font-size:14px}
+  .st-made{background:var(--teal-bg); color:var(--teal-ink)}
+  .st-flag{background:var(--sawdust); color:var(--warn); box-shadow:inset 4px 0 0 var(--bright)}
+  .st-stuck{background:transparent; color:#4A5063; border:1.5px dashed var(--gray)}
+  .need{border-left:5px solid var(--orange)}
+  .need ul{margin:6px 0 0; padding-left:20px} .need li{margin:10px 0}
+  .ctl{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:6px}
+  .small{font-size:15px; color:var(--ink2)}
+  ul.checks{list-style:none; padding:0; margin:0}
+  ul.checks li{display:flex; gap:10px; align-items:baseline; padding:7px 0; border-bottom:1px solid var(--line)}
+  ul.checks li:last-child{border-bottom:none}
+  .badge{font-size:13px; font-weight:700; border-radius:6px; padding:2px 8px; white-space:nowrap; flex-shrink:0}
+  details.sheet{border-top:1px solid var(--line)} details.sheet:first-of-type{border-top:none}
+  details.sheet>summary{list-style:none; cursor:pointer; padding:12px 0; display:flex; gap:12px; align-items:center; flex-wrap:wrap}
+  details.sheet>summary::-webkit-details-marker{display:none}
+  .sn{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:20px; min-width:30px; color:var(--ink2)}
+  .sid{font-weight:700} .sdim{color:var(--ink2)}
+  .chips{margin-left:auto; display:flex; gap:6px; flex-wrap:wrap}
+  .chip{font-size:14px; font-weight:600; border-radius:7px; padding:3px 9px}
+  .out{margin:0 0 14px 42px}
+  .out h4{margin:10px 0 4px; font-size:16px; display:flex; gap:8px; align-items:center}
+  .out p{margin:4px 0}
+  .scroll{overflow-x:auto}
+  table.math{border-collapse:collapse; font-size:15px; margin:6px 0}
+  table.math th,table.math td{padding:4px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap}
+  table.math th:first-child,table.math td:first-child{text-align:left}
+  table.math tr.win td{font-weight:700; color:var(--teal-ink)}
+  table.math tr.no td{color:var(--ink2)}
+  .flagline{color:var(--warn)}
+  ul.taught{list-style:none; padding:0; margin:8px 0 0}
+  ul.taught li{display:flex; gap:10px; align-items:baseline; padding:8px 0; border-bottom:1px solid var(--line); flex-wrap:wrap}
+  ul.taught li:last-child{border-bottom:none}
+  ul.taught .what{flex:1; min-width:220px}
+  .saved{font-size:14px; color:var(--ink2); margin:-8px 0 14px}
+  .fform{display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:4px 14px; align-items:end}
+  .fform label{display:block; font-weight:600; font-size:15px; margin:8px 0 4px}
+  .fform input[type=text],.fform select{width:100%}
+  .tag{font-size:13px; font-weight:700; border-radius:6px; padding:2px 8px; white-space:nowrap}
+  [hidden]{display:none!important}
+  @media (max-width:600px){ .out{margin-left:0} .chips{margin-left:0} }
+  @media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+  .plan{margin:8px 0 0; padding:0; list-style:none}
+  .plan li{padding:6px 0; border-bottom:1px solid var(--line)}
+  .plan li:last-child{border-bottom:none}
+  .grp{margin-top:14px} .grp h4{margin:0 0 2px; font-size:16px}
+  .prog{font-weight:600}
+  table.lines{border-collapse:collapse; width:100%; font-size:15px; margin-top:6px}
+  table.lines th, table.lines td{text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); vertical-align:top}
+  table.lines th{color:var(--ink2); font-weight:600}
+  .d3lookhead{display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin:6px 0 8px}
+  #d3look:not(:empty){margin:10px 0 16px; padding-bottom:12px; border-bottom:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">PURPOSEFUL <span>DESIGN</span></div>
+  <h1>Drop a job's zip</h1>
+  <a class="toofc" href="office.html#drop">← Office</a>
+</header>
+
+<main>
+  <section id="configProblem" class="alarm" hidden><h2 id="configTitle">This page isn’t set up yet</h2><p id="configBody"></p></section>
+
+  <section id="signIn" class="card" hidden>
+    <h2>Sign in</h2>
+    <p class="sub">Dropping zips and sending machine files is only for the logins let into the lab.</p>
+    <form id="signInForm">
+      <label class="f" for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" required>
+      <label class="f" for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button class="go wide" type="submit" id="signInBtn">Sign in</button>
+    </form>
+    <div id="signInError" class="bad" style="margin-top:14px" hidden></div>
+  </section>
+
+  <section id="notAllowed" class="card" hidden>
+    <h2>Not let in</h2>
+    <p id="notAllowedBody"></p>
+    <button class="link" id="signOutBtn2">Sign out</button>
+  </section>
+
+  <section id="dropArea" hidden>
+    <div class="who"><span>Signed in as <b id="whoName"></b></span><button class="link" id="signOutBtn">Sign out</button></div>
+    <label class="drop" id="drop"><input type="file" id="pick" accept=".zip,application/zip"><b>Choose a job's zip</b><span>Tap here to pick one, or drop it here: the PROJ-#####.zip the Outputs project made (or a Database YYYY-MM-DD.zip). It’s read on this computer first; nothing is sent until you press Send.</span></label>
+    <div id="out"></div>
+    <section class="card" id="waiting"></section>
+    <section class="card" id="designs"><h3>3D views</h3>
+      <p class="small">Each 3D model in a zip’s Design folder is made into a 3D view here when you press Send: Fine detail (curves within 0.002 in), Z up to start, the way your Fusion designs are drawn (change it under 3D views if one lies down). Full Custom’s tablet and the office open it, turn it and measure. If one is lying down, Look at it and change Up: the tablets show it that way from their next look.</p>
+      <div id="d3look"></div><div id="d3list"><p class="small">Loading…</p></div></section>
+    <section class="card" id="files"></section>
+    <p class="small" id="foot"></p>
+  </section>
+</main>
+
+<!-- the Supabase library, checked: the browser refuses it if even one byte differs from the published file -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+<script src="sf-common-2026-10-05.1.js"></script>
+<script>
+var PAGE_VERSION = "2026-11-01.3";          // this page's version: bump it with every change (it shows in select * from devices();)
+
+/* ---- core: no screen code in here, so it can be tested on its own ----
+   The zip format is 11_SHOP_FLOOR_ZIP.md (format 1, and format 2 with Design/). The database checks it all again
+   (zip_drop_new() in zip_drop.sql); the page checks first so Luke sees what's wrong before anything is sent. */
+
+const ZIP_MAX = 52428800;                     // 50 MB a file: the free plan's limit
+const FILES_SUBS = ["Metal drawings", "KI", "Arrow", "Other"];
+const LIB_SUBS = ["Metal/Cut sheets", "Metal/STEP files", "CNC/KI", "CNC/Other"];
+
+/** CRC-32, as a zip records it */
+const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u) { let c = 0xffffffff; for (let i = 0; i < u.length; i++) c = CRC_TABLE[(c ^ u[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
+
+async function inflateRaw(raw) {
+  if (typeof DecompressionStream !== "function") throw new Error("This browser can't open zips. Use Chrome or Edge.");
+  const s = new Blob([raw]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+
+/** Reads a zip in the browser: [{ path, bytes, data }] for every file (folders left out). Each file's size and CRC are
+ *  checked, so a damaged zip is refused rather than half-read. Stored and deflated files, as Windows and Python make them. */
+async function readZip(buf) {
+  const u = new Uint8Array(buf), dv = new DataView(u.buffer, u.byteOffset, u.byteLength);
+  let eocd = -1;
+  for (let i = u.length - 22; i >= Math.max(0, u.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error("That file isn't a zip, or it's damaged. Make it again in the Outputs project.");
+  const count = dv.getUint16(eocd + 10, true), cdOff = dv.getUint32(eocd + 16, true);
+  if (count === 0xffff || cdOff === 0xffffffff) throw new Error("This zip is too big for the page to read (over 4 GB, or over 65,000 files).");
+  const utf8 = new TextDecoder("utf-8"), latin = new TextDecoder("latin1");
+  const out = [];
+  let p = cdOff;
+  for (let k = 0; k < count; k++) {
+    if (p + 46 > u.length || dv.getUint32(p, true) !== 0x02014b50) throw new Error("This zip is damaged (its list of files can't be read).");
+    const flags = dv.getUint16(p + 8, true), method = dv.getUint16(p + 10, true), crc = dv.getUint32(p + 16, true);
+    const csize = dv.getUint32(p + 20, true), usize = dv.getUint32(p + 24, true);
+    const nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), lho = dv.getUint32(p + 42, true);
+    const name = ((flags & 0x800) ? utf8 : latin).decode(u.subarray(p + 46, p + 46 + nlen)).replace(/\\/g, "/");
+    p += 46 + nlen + xlen + clen;
+    if (name.endsWith("/")) continue;                                   // a folder
+    if (flags & 1) throw new Error(`${name} is password-protected. Make the zip without a password.`);
+    if (usize > ZIP_MAX) throw new Error(`${name} is over 50 MB, the most Supabase's free plan takes for one file.`);
+    if (dv.getUint32(lho, true) !== 0x04034b50) throw new Error(`This zip is damaged (${name} can't be found in it).`);
+    const start = lho + 30 + dv.getUint16(lho + 26, true) + dv.getUint16(lho + 28, true);
+    const raw = u.subarray(start, start + csize);
+    let data;
+    if (method === 0) data = raw.slice();
+    else if (method === 8) { try { data = await inflateRaw(raw); } catch (e) { throw new Error(`${name} in this zip is damaged and can't be opened.`); } }
+    else throw new Error(`${name} is packed in a way the page can't open (method ${method}). Make the zip again with ordinary compression.`);
+    if (data.length !== usize || crc32(data) !== crc) throw new Error(`${name} in this zip is damaged (it doesn't match its own checksum).`);
+    out.push({ path: name, bytes: usize, data });
+  }
+  return out;
+}
+
+const hexOf = (buf) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+async function sha256(data) { return hexOf(await crypto.subtle.digest("SHA-256", data)); }
+
+/** Checks an upload file (Floor/), as the Upload page did, plus the arrow list on each sheet (11_SHOP_FLOOR_ZIP.md §6) */
+function readPackage(text) {
+  let pkg;
+  try { pkg = JSON.parse(text); }
+  catch (e) { throw new Error("The upload file in Floor/ isn't valid JSON, so it couldn't be read. Make it again."); }
+  if (!pkg || pkg.kind !== "shop-floor-work-order") throw new Error("The .json in Floor/ isn't an upload file (its kind isn't shop-floor-work-order).");
+  if (pkg.format > 1) throw new Error("The upload file was made by a newer generator than this page understands. The page needs updating.");
+  const p = pkg.payload || {};
+  if (!p.project_id || !Array.isArray(p.sheets) || p.sheets.length === 0) throw new Error("The upload file is missing its project number or sheets. Make it again.");
+  if (!Array.isArray(pkg.files) || pkg.files.length !== p.sheets.length) throw new Error("The upload file has a different number of pages than sheets. Make it again.");
+  for (const f of pkg.files) if (!f.sheet_number || !f.png || !f.pdf) throw new Error(`Sheet ${f.sheet_number || "?"} in the upload file is missing its page image or PDF. Make it again.`);
+  for (const s of p.sheets) {
+    const at = `Sheet ${s.sheet_number || "?"} in the upload file`;
+    if (!Array.isArray(s.arrow)) throw new Error(`${at} has no arrow list. Every sheet needs one ("arrow": [] when nothing goes to Arrow).`);
+    for (const a of s.arrow) {
+      if (!a || typeof a !== "object") throw new Error(`${at}: an Arrow line isn't an object.`);
+      if (!Number.isInteger(a.qty) || a.qty < 1) throw new Error(`${at}: an Arrow line's qty should be a whole number, 1 or more.`);
+      for (const k of ["base", "description", "pd_color", "arrow_color"])
+        if (typeof a[k] !== "string" || !a[k].trim() || a[k].length > 200) throw new Error(`${at}: an Arrow line is missing its ${k}.`);
+    }
+  }
+  return pkg;
+}
+
+const winBad = (seg) => !seg || /[\u0000-\u001f\\:*?"<>|]/.test(seg) || /[. ]$/.test(seg) || seg === "." || seg === ".." || seg.length > 200;
+const extOf = (p) => (String(p).match(/\.([A-Za-z0-9]+)$/) || [, ""])[1].toLowerCase();
+
+/** Where a path in the zip goes: { place: job|library, rel, folder }, or throws with the reason (the database's zip_path_place) */
+function placeOf(path, format) {
+  const segs = String(path).split("/"), top = segs[0], n = segs.length, name = segs[n - 1], ext = extOf(path);
+  const folders = format >= 2 ? "Floor, Files, Router, Bend-Tech, Design, Database" : "Floor, Files, Router, Bend-Tech, Database";
+  if (n < 2) throw new Error(`${path}: every file goes in one of the zip's folders (${folders}).`);
+  if (segs.some(winBad)) throw new Error(`${path}: that name isn't one Windows accepts.`);
+  if (["Floor", "Router", "Bend-Tech", "Design"].includes(top) && n !== 2) throw new Error(`${path}: ${top} holds files only, no folders.`);
+  switch (top) {
+    case "Floor": if (!["json", "pdf"].includes(ext)) throw new Error(`${path}: Floor holds only the upload file and the work order PDF.`); return { place: "job", rel: name, folder: top };
+    case "Router": if (!["mprx", "mpr"].includes(ext)) throw new Error(`${path}: Router takes .mprx or .mpr only.`); return { place: "job", rel: "Router/" + name, folder: top };
+    case "Bend-Tech": if (!["step", "stp", "dxf"].includes(ext)) throw new Error(`${path}: Bend-Tech takes .step, .stp or .dxf only.`); return { place: "job", rel: "Bend-Tech/" + name, folder: top };
+    case "Design":
+      if (format < 2) throw new Error(`${path}: Design is new in format 2, and this zip says format 1.`);
+      if (!["step", "stp"].includes(ext)) throw new Error(`${path}: Design takes .step or .stp only.`);
+      return { place: "job", rel: "Design/" + name, folder: top };
+    case "Files":
+      if (n < 3 || !FILES_SUBS.includes(segs[1])) throw new Error(`${path}: Files holds only the folders ${FILES_SUBS.join(", ")}, and nothing loose.`);
+      return { place: "job", rel: segs.slice(1).join("/"), folder: top };
+    case "Database": {
+      const rest = segs.slice(1).join("/");
+      if (n < 4 || !LIB_SUBS.some(s => rest.startsWith(s + "/"))) throw new Error(`${path}: library files go in Database/${LIB_SUBS.join(", ")}.`);
+      return { place: "library", rel: rest, folder: top };
+    }
+  }
+  throw new Error(`${path}: ${top} isn't one of the zip's folders (${folders}).`);
+}
+
+/** Checks a whole zip against its contents.json. Returns the plan (what goes where), or throws with the first reason. */
+function checkZip(entries) {
+  const cj = entries.find(e => e.path === "contents.json");
+  if (!cj) throw new Error("There's no contents.json at the top of this zip, so it isn't a shop floor zip.");
+  let c; try { c = JSON.parse(new TextDecoder().decode(cj.data)); } catch (e) { throw new Error("contents.json isn't valid JSON."); }
+  if (!c || c.kind !== "shop-floor-zip") throw new Error(`contents.json's kind isn't "shop-floor-zip", so this isn't a shop floor zip.`);
+  if (c.format !== 1 && c.format !== 2) throw new Error(`contents.json says format ${c.format}; this page reads formats 1 and 2. If it's newer, the page needs updating.`);
+  const job = c.job === null ? null : c.job;
+  if (job !== null && !/^(PROJ|TEST)-\d{5}$/.test(String(job))) throw new Error("contents.json's job should look like PROJ-00512 (or null for a library-only zip).");
+  if (typeof c.made_at !== "string" || isNaN(Date.parse(c.made_at)) || !/(Z|[+-]\d{2}:?\d{2})$/.test(c.made_at))
+    throw new Error("contents.json's made_at needs a date, time and offset, like 2026-11-03T14:05:00-05:00.");
+  if (!Array.isArray(c.files) || !c.files.length) throw new Error("contents.json lists no files.");
+  if (c.files.length > 500) throw new Error("A zip holds 500 files at most.");
+  const byPath = new Map(entries.map(e => [e.path, e])), seen = new Set(), pairs = new Set();
+  const plan = { job, format: c.format, made_at: c.made_at, contents: c, upload: null, workOrder: null, files: [] };
+  for (const f of c.files) {
+    if (!f || typeof f.path !== "string" || !f.path || f.path === "contents.json") throw new Error("contents.json lists a file with no path.");
+    if (seen.has(f.path)) throw new Error(`${f.path} is listed twice in contents.json.`);
+    seen.add(f.path);
+    const e = byPath.get(f.path);
+    if (!e) throw new Error(`${f.path} is listed in contents.json but isn't in the zip.`);
+    if (f.bytes !== e.bytes) throw new Error(`${f.path} is ${e.bytes} bytes in the zip, but contents.json says ${f.bytes}.`);
+    if (!e.bytes) throw new Error(`${f.path} is empty.`);
+    if (typeof f.what !== "string" || !f.what.trim() || f.what.length > 40) throw new Error(`${f.path}: "what" is missing or over 40 letters.`);
+    const pl = placeOf(f.path, c.format);
+    if (job === null && pl.folder !== "Database") throw new Error(`${f.path}: a zip with no job (job: null) holds only Database files.`);
+    if (pl.folder === "Router" || pl.folder === "Bend-Tech") {
+      const want = pl.folder === "Router" ? "homag" : "bendtech";
+      if (f.machine !== want) throw new Error(`${f.path}: machine should be "${want}", matching its folder.`);
+      if (typeof f.item !== "string" || !f.item.trim() || f.item.length > 80) throw new Error(`${f.path}: say which item it's for (the sheet's item_code).`);
+      if (typeof f.part !== "string" || !f.part.trim() || f.part.length > 60) throw new Error(`${f.path}: say which part it is (a few words, like Top or V-Arm).`);
+      if (!Number.isInteger(f.revision) || f.revision < 1) throw new Error(`${f.path}: revision should be 1 the first time, one more each time after.`);
+      const k = `${f.machine}|${f.item}|${f.part}`;
+      if (pairs.has(k)) throw new Error(`${f.path}: two files for the same machine, item and part (${f.item}, ${f.part}).`);
+      pairs.add(k);
+    } else if (f.machine !== undefined && f.machine !== null) throw new Error(`${f.path}: only Router and Bend-Tech files name a machine.`);
+    if (pl.folder === "Design") {
+      if (typeof f.item !== "string" || !f.item.trim() || f.item.length > 80) throw new Error(`${f.path}: say which item it's the 3D model of (the sheet's item_code).`);
+      if (pairs.has("design|" + f.item)) throw new Error(`${f.path}: there's already a 3D model for item ${f.item} in this zip (one per item).`);
+      pairs.add("design|" + f.item);
+    }
+    if ("replaces" in f && pl.folder !== "Database") throw new Error(`${f.path}: only Database files say replaces.`);
+    if ("replaces" in f && typeof f.replaces !== "boolean") throw new Error(`${f.path}: replaces is true or false.`);
+    const one = { ...pl, path: f.path, what: f.what.trim(), bytes: e.bytes, data: e.data, machine: f.machine || null, item: f.item ? String(f.item).trim() : null,
+                  part: f.part ? String(f.part).trim() : null, revision: f.revision || null, replaces: f.replaces === true };
+    if (pl.folder === "Floor") {
+      if (extOf(f.path) === "json") { if (plan.upload) throw new Error("Floor holds one upload file; this zip has two."); plan.upload = one; }
+      else { if (plan.workOrder) throw new Error("Floor holds one work order PDF; this zip has two."); plan.workOrder = one; }
+    }
+    plan.files.push(one);
+  }
+  for (const e of entries) if (e.path !== "contents.json" && !seen.has(e.path)) throw new Error(`${e.path} is in the zip but not listed in contents.json.`);
+  if (plan.upload) {
+    plan.pkg = readPackage(new TextDecoder().decode(plan.upload.data));
+    if (plan.pkg.payload.project_id !== job) throw new Error(`The upload file is for ${plan.pkg.payload.project_id}, but the zip is for ${job}.`);
+    const items = new Set(plan.pkg.payload.sheets.map(s => String(s.item_code || "").trim()));
+    for (const f of plan.files) if (f.item && !items.has(f.item))
+      throw new Error(`${f.path} is for item ${f.item}, but no sheet in the upload file has that item code (${[...items].join(", ")}).`);
+  }
+  return plan;
+}
+
+/** The plan in groups, for the screen and for the tests */
+function planGroups(plan) {
+  const g = { floor: [], machines: [], design: [], filed: [], library: [] };
+  for (const f of plan.files) {
+    if (f.place === "library") g.library.push(f);
+    else { g.filed.push(f); if (f.machine) g.machines.push(f); if (f.folder === "Design") g.design.push(f); }
+  }
+  if (plan.pkg) g.floor.push(plan.upload);
+  return g;
+}
+const MACH = { homag: "Homag router", bendtech: "Bend-Tech" };
+
+/* Loading the floor: the Upload page's own steps (upload.html, 5 Oct), unchanged */
+function b64ToBlob(b64, type) {
+  const bin = atob(b64); const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type });
+}
+async function runUpload(pkg, db, report) {
+  report("working");
+  const { data: result, error } = await db.rpc("upload_work_order", { payload: pkg.payload });
+  if (error) throw error;
+  const total = pkg.files.length, recorded = [];
+  try {
+    for (let i = 0; i < total; i++) {
+      const f = pkg.files[i]; report(`sheet ${i + 1} of ${total}`);
+      const paths = {};
+      for (const [ext, type] of [["png", "image/png"], ["pdf", "application/pdf"]]) {
+        const path = `${result.file_folder}/sheet-${f.sheet_number}.${ext}`;
+        const { error: upErr } = await db.storage.from("work-orders").upload(path, b64ToBlob(f[ext], type), { contentType: type, upsert: true });
+        if (upErr) throw upErr;
+        paths[ext] = path;
+      }
+      recorded.push({ sheet_number: f.sheet_number, png_path: paths.png, pdf_path: paths.pdf });
+    }
+    const { error: mErr } = await db.rpc("mark_sheet_files", { p_work_order: result.work_order_id, files: recorded });
+    if (mErr) throw mErr;
+  } catch (err) { err.saved = true; throw err; }
+  return result;
+}
+function sheetList(nums) { const n = [...nums]; return n.length === 1 ? `sheet ${n[0]}` : `sheets ${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`; }
+function explainResult(r) {
+  const out = [`Saved ${r.project_id} — version ${r.version}, ${r.sheets} sheets, ${r.pieces} pieces.`];
+  if (r.carried_forward?.length) out.push(`Counts kept on ${sheetList(r.carried_forward)}, because ${r.carried_forward.length === 1 ? "its drawing hasn't" : "their drawings haven't"} changed.`);
+  if (r.clamped_to_new_qty?.length) out.push(`${sheetList(r.clamped_to_new_qty)} had more pieces finished than now needed, so capped at the new quantity.`);
+  if (r.reset_by_change?.length) out.push(`${sheetList(r.reset_by_change)} changed, so ${r.reset_by_change.length === 1 ? "its count starts" : "their counts start"} again from zero.`);
+  if (r.removed?.length) out.push(`${sheetList(r.removed)} ${r.removed.length === 1 ? "is" : "are"} no longer on the work order.`);
+  for (const w of r.warnings || []) out.push(w);
+  return out;
+}
+/* ---- end core ---- */
+</script>
+<script>
+/* ---- the screen ---- */
+if (typeof document !== "undefined") (function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const show = (id, on = true) => { $(id).hidden = !on; };
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fday = (t) => new Date(t).toLocaleDateString([], { month: "short", day: "numeric" });
+  const fwhen = (t) => new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const kb = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+
+  const problem = keyProblem(SUPABASE_URL, SUPABASE_KEY);
+  if (problem) {
+    $("configTitle").textContent = problem.secret ? "Stop — wrong key in this file" : "This page isn’t set up yet";
+    $("configBody").textContent = problem.text; show("configProblem"); return;
+  }
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  sfEmbed("header");
+  sfReportDevice(db, "drop", PAGE_VERSION);
+  $("foot").textContent = `Drop page ${PAGE_VERSION}. Zips follow 11_SHOP_FLOOR_ZIP.md, formats 1 and 2.`;
+
+  const notSetUp = (e) => /zip_drop|parked_files|zip_drops|lab_allowed|machine_files|schema cache|does not exist|PGRST202|PGRST205|42883|42P01/i.test(String((e && (e.message || e.code)) || "") + " " + String((e && e.code) || ""));
+  function friendly(e) {
+    const m = String((e && (e.message || e.error_description)) || e || "");
+    if (isNetworkError(e)) return "Couldn’t reach the database. Check the internet connection and try again.";
+    if (/invalid login credentials/i.test(m)) return "That email and password didn’t match. Check them and try again.";
+    if (/jwt expired|refresh token/i.test(m)) return "Your sign-in has expired. Sign out, sign back in, and try again.";
+    if (/row-level security|permission denied/i.test(m)) return "The database refused it: this login isn’t let in.";
+    if (/zip_drop_new|parked_file_stored|zip_drop_finished|PGRST202|42883/i.test(m + " " + (e && e.code))) return "The zip drop isn’t set up in the database yet: zip_drop.sql hasn’t run.";
+    return m || "Something went wrong, with no further detail.";
+  }
+
+  // ---------- signing in: only logins let into the lab (the same ones that send machine files) ----------
+  let dropReady = true;
+  async function enter(user) {
+    show("signIn", false);
+    let ok = null, err = null;
+    try { const r = await db.rpc("lab_allowed", {}); err = r.error; ok = r.data === true; } catch (e) { err = e; }
+    if (err || !ok) {
+      $("notAllowedBody").textContent = err && notSetUp(err)
+        ? "This isn’t set up in the database yet: lab.sql hasn’t run."
+        : err ? friendly(err)
+        : `${user.email} isn’t let in. Being a manager isn’t enough: in the Supabase SQL Editor, run  select lab_allow('${user.email}');  and reload.`;
+      show("notAllowed"); show("dropArea", false); return;
+    }
+    const { data: me } = await db.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+    $("whoName").textContent = me ? me.full_name : user.email;
+    show("notAllowed", false); show("dropArea");
+    await Promise.all([loadWaiting(), loadFiles(), loadDesigns()]);
+  }
+  function leave() { show("dropArea", false); show("notAllowed", false); show("signIn"); $("out").innerHTML = ""; current = null; }
+  db.auth.getSession().then(({ data }) => data.session ? enter(data.session.user) : leave());
+  $("signInForm").addEventListener("submit", async (e) => {
+    e.preventDefault(); show("signInError", false); $("signInBtn").disabled = true;
+    const { data, error } = await db.auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value });
+    $("signInBtn").disabled = false;
+    if (error) { $("signInError").textContent = friendly(error); show("signInError"); return; }
+    $("password").value = ""; enter(data.user);
+  });
+  for (const b of ["signOutBtn", "signOutBtn2"]) $(b).addEventListener("click", async () => { await db.auth.signOut(); leave(); });
+
+  // ---------- a zip, read here, checked, shown; nothing sent until Send ----------
+  let current = null, busy = false;
+  const dropEl = $("drop");
+  ["dragenter", "dragover"].forEach(ev => dropEl.addEventListener(ev, (e) => { e.preventDefault(); dropEl.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(ev => dropEl.addEventListener(ev, () => dropEl.classList.remove("over")));
+  dropEl.addEventListener("drop", (e) => { e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) takeZip(f); });
+  $("pick").addEventListener("change", () => { const f = $("pick").files[0]; $("pick").value = ""; if (f) takeZip(f); });
+
+  async function takeZip(file) {
+    if (busy) return;
+    current = null;
+    $("out").innerHTML = `<section class="card"><p class="prog">Reading ${esc(file.name)}…</p></section>`;
+    let plan;
+    try {
+      const entries = await readZip(await file.arrayBuffer());
+      plan = checkZip(entries);
+      for (const f of plan.files) f.sha256 = await sha256(f.data);
+    } catch (e) {
+      $("out").innerHTML = `<section class="card"><div class="bad"><p><b>${esc(file.name)} wasn’t used.</b> ${esc(e.message || e)}</p>
+        <p>Nothing was sent. Fix it in the Outputs project and drop the new zip.</p></div></section>`;
+      return;
+    }
+    plan.zipName = file.name;
+    // what's unchanged since an earlier zip (the database decides again at Send)
+    plan.unchanged = new Set(); plan.sentBefore = new Set();
+    try {
+      const jobRows = plan.job ? await db.from("parked_files").select("zip_path, sha256, stored_at, same_as").eq("project_id", plan.job) : { data: [] };
+      const libRows = plan.files.some(f => f.place === "library")
+        ? await db.from("parked_files").select("rel_path, sha256, stored_at, same_as").eq("place", "library") : { data: [] };
+      for (const f of plan.files) {
+        const hit = f.place === "library"
+          ? (libRows.data || []).some(r => r.rel_path === f.rel && r.sha256 === f.sha256 && r.stored_at && !r.same_as)
+          : (jobRows.data || []).some(r => r.zip_path === f.path && r.sha256 === f.sha256 && r.stored_at && !r.same_as);
+        if (hit) plan.unchanged.add(f.path);
+      }
+      const mach = plan.files.filter(f => f.machine);
+      if (mach.length) {
+        const r = await db.from("machine_files").select("item_id, part, machine, sha256").eq("project_id", plan.job);
+        for (const f of mach) if ((r.data || []).some(x => x.item_id === f.item && x.part === f.part && x.machine === f.machine && x.sha256 === f.sha256)) plan.sentBefore.add(f.path);
+      }
+    } catch (e) { /* the database says at Send */ }
+    current = plan; showPlan();
+  }
+
+  function showPlan(result) {
+    const plan = current; if (!plan) return;
+    const g = planGroups(plan), same = (f) => plan.unchanged.has(f.path);
+    const tagSame = (f) => same(f) ? ` <span class="tag st-made">unchanged, skipped</span>` : "";
+    const li = (f, extra = "") => `<li><b>${esc(f.rel)}</b> <span class="small">· ${esc(f.what)} · ${kb(f.bytes)}${extra}</span>${tagSame(f)}</li>`;
+    const sheets = plan.pkg ? plan.pkg.payload.sheets : [];
+    const arrowLines = sheets.reduce((n, s) => n + s.arrow.length, 0);
+    $("out").innerHTML = `<section class="card">
+      <h2>${esc(plan.job || "The library")} <span class="small">· ${esc(plan.zipName)} · format ${plan.format} · made ${esc(fwhen(plan.made_at))}</span></h2>
+      <p class="sub">${plan.files.length} file${plan.files.length === 1 ? "" : "s"}, checked against contents.json. Here’s what Send does:</p>
+      ${plan.pkg ? `<div class="grp"><h4>Loads the floor</h4><p class="small" style="margin:0">${sheets.length} sheet${sheets.length === 1 ? "" : "s"} from the upload file (${esc(sheets.map(s => s.item_code).join(", "))}), as Upload did.
+        ${arrowLines ? `${arrowLines} Arrow line${arrowLines === 1 ? "" : "s"} ride along.` : "No Arrow lines."}${same(plan.upload) ? " It’s the same upload file as before, so the floor isn’t loaded again." : ""}</p></div>` : ""}
+      ${g.machines.length ? `<div class="grp"><h4>To the machines</h4><ul class="plan">${g.machines.map(f => `<li><b>${esc(f.path.split("/").pop())}</b>
+        <span class="small">· ${esc(MACH[f.machine])} · item ${esc(f.item)} · ${esc(f.part)} · revision ${f.revision} in the zip</span>${plan.sentBefore.has(f.path) ? ` <span class="tag st-made">already sent</span>` : ""}</li>`).join("")}</ul></div>` : ""}
+      ${g.design.length ? `<div class="grp"><h4>3D models</h4><p class="small" style="margin:0">${g.design.map(f => esc(f.item)).join(", ")}: each made into a 3D view on this PC for Full Custom’s tablet and the office (Fine detail, Z up to start), and filed under Files › Design.</p></div>` : ""}
+      ${g.filed.length ? `<div class="grp"><h4>Filed in ${esc(plan.job)} › Production › Files</h4><ul class="plan">${g.filed.map(f => li(f)).join("")}</ul></div>` : ""}
+      ${g.library.length ? `<div class="grp"><h4>Filed in the library (Claudes Shop System Folder › Database)</h4><ul class="plan">${g.library.map(f => li(f, f.replaces ? " · replaces the one there" : "")).join("")}</ul></div>` : ""}
+      <p class="small" style="margin-top:12px">Every file waits on Supabase until the office’s save, on your PC, has filed it in OneDrive and the backup folder; then it comes off Supabase.${plan.job && plan.job.startsWith("TEST-") ? " A TEST- job is never filed." : ""}</p>
+      <div class="ctl" style="margin-top:12px"><button class="go" id="send" ${result ? "disabled" : ""}>Send</button><button id="cancel" ${result ? "hidden" : ""}>Don’t send</button><span id="sendMsg" class="prog"></span></div>
+      <div id="result">${result || ""}</div></section>`;
+    if (!result) { $("send").onclick = send; $("cancel").onclick = () => { current = null; $("out").innerHTML = ""; }; }
+  }
+
+  async function send() {
+    const plan = current; if (!plan || busy) return;
+    busy = true; $("send").disabled = true; $("cancel").hidden = true;
+    const msg = (t) => { const el = $("sendMsg"); if (el) el.textContent = t; };
+    const sum = { job: plan.job, format: plan.format, parked: 0, unchanged: 0, floor: null, machines: [], problems: [] };
+    const lines = []; lastMade = [];
+    let drop;
+    try {
+      msg("Checking it with the database…");
+      const r = await db.rpc("zip_drop_new", { p_zip_name: plan.zipName, p_contents: plan.contents,
+        p_files: plan.files.map(f => ({ path: f.path, bytes: f.bytes, sha256: f.sha256 })) });
+      if (r.error) throw r.error;
+      drop = r.data;
+    } catch (e) {
+      busy = false; current = null;
+      $("out").innerHTML = `<section class="card"><div class="bad"><p><b>${esc(plan.zipName)} wasn’t used.</b> ${esc(friendly(e))}</p><p>Nothing was sent.</p></div></section>`;
+      return;
+    }
+    // 1. park every file that isn't unchanged
+    const ids = new Map(drop.files.map(x => [x.path, x]));
+    const toStore = plan.files.filter(f => ids.get(f.path) && ids.get(f.path).storage_path);
+    let i = 0;
+    for (const f of toStore) {
+      const x = ids.get(f.path); msg(`Parking files ${++i} of ${toStore.length}…`);
+      try {
+        const up = await db.storage.from("parked-files").upload(x.storage_path, new Blob([f.data], { type: "application/octet-stream" }), { contentType: "application/octet-stream" });
+        if (up.error) throw up.error;
+        const st = await db.rpc("parked_file_stored", { p_id: x.id });
+        if (st.error) throw st.error;
+        sum.parked++;
+      } catch (e) { sum.problems.push(`${f.path} wasn’t parked (${friendly(e)}). Drop the zip again: what arrived is skipped.`); }
+    }
+    sum.unchanged = drop.files.filter(x => x.unchanged).length;
+    // 2. the floor, from the upload file
+    if (plan.pkg) {
+      let skip = false;
+      if (ids.get(plan.upload.path).unchanged) {         // loaded before by an earlier zip? then not again
+        const prev = await db.from("parked_files").select("drop_id").eq("project_id", plan.job).eq("zip_path", plan.upload.path).eq("sha256", plan.upload.sha256).is("same_as", null).limit(1);
+        const d = prev.data && prev.data[0] ? await db.from("zip_drops").select("summary").eq("id", prev.data[0].drop_id).maybeSingle() : null;
+        skip = !!(d && d.data && d.data.summary && d.data.summary.floor && d.data.summary.floor.ok);
+      }
+      if (skip) { sum.floor = { ok: true, skipped: true }; lines.push("The floor already has this upload file, so it wasn’t loaded again."); }
+      else {
+        try {
+          const res = await runUpload(plan.pkg, db, (t) => msg(`Loading the floor: ${t}…`));
+          sum.floor = { ok: true, version: res.version, sheets: res.sheets, work_order_id: res.work_order_id };
+          lines.push(...explainResult(res));
+          // each sheet's Arrow lines, for the Arrow POs (arrow_pos.sql, 1 Nov); a database without it simply doesn't keep them yet
+          const ar = await db.rpc("set_sheet_arrow", { p_work_order: res.work_order_id,
+            p_sheets: plan.pkg.payload.sheets.map(s => ({ sheet_number: s.sheet_number, arrow: s.arrow })) }).catch(e => ({ error: e }));
+          if (ar.error && !/set_sheet_arrow|PGRST202|42883|schema cache/i.test(String(ar.error.message) + " " + String(ar.error.code)))
+            sum.problems.push(`The Arrow lines weren't saved (${friendly(ar.error)}). Drop the zip again.`);
+          else if (!ar.error) { sum.floor.arrow_lines = ar.data.lines; if (ar.data.lines) lines.push(`${ar.data.lines} Arrow line${ar.data.lines === 1 ? "" : "s"} saved for the POs.`); }
+        } catch (e) {
+          sum.floor = { ok: false, error: friendly(e) };
+          sum.problems.push(e.saved ? `The work order was saved, but its pages didn’t all arrive (${friendly(e)}). Drop the zip again.` : `The floor wasn’t loaded: ${friendly(e)}`);
+        }
+      }
+    }
+    // 3. machine files, through Machine files (machine_files.sql)
+    for (const f of plan.files.filter(x => x.machine)) {
+      if (plan.sentBefore.has(f.path)) { sum.machines.push({ path: f.path, already: true }); continue; }
+      msg(`Sending ${f.path.split("/").pop()} to the ${MACH[f.machine]}…`);
+      try {
+        const note = `${f.what} (from ${plan.zipName}, revision ${f.revision} there)`.slice(0, 2000);
+        const n = await db.rpc("machine_file_new", { p_project: plan.job, p_item: f.item, p_part: f.part, p_machine: f.machine, p_original_name: f.path.split("/").pop(),
+          p_size: f.bytes, p_sha256: f.sha256, p_note: note });
+        if (n.error) throw n.error;
+        const up = await db.storage.from("machine-files").upload(n.data.path, new Blob([f.data], { type: "application/octet-stream" }), { contentType: "application/octet-stream" });
+        if (up.error) throw up.error;
+        const st = await db.rpc("machine_file_stored", { p_id: n.data.id });
+        if (st.error) throw st.error;
+        await clearPaths(st.data.clear || []);
+        sum.machines.push({ path: f.path, name: n.data.file_name, rev: n.data.rev });
+      } catch (e) { sum.problems.push(`${f.path} didn’t reach the ${MACH[f.machine]} (${friendly(e)}). Send it from Machine files below, or drop the zip again.`); }
+    }
+    // 4. 3D views (design_viewer.sql): each Design/ STEP made into a view file here; one that can't be made says why
+    const designs = plan.files.filter(f => f.folder === "Design");
+    if (designs.length) {
+      sum.designs = (await makeViews(designs, ids, msg)).map(o => ({ item: o.item, state: o.state, why: o.why || null }));
+    }
+    msg("");
+    await db.rpc("zip_drop_finished", { p_id: drop.id, p_summary: sum }).catch(() => null);
+    busy = false;
+    const sent = sum.machines.filter(m => !m.already), already = sum.machines.filter(m => m.already);
+    const html = `${sum.problems.length ? `<div class="bad" style="margin-top:12px">${sum.problems.map(p => `<p>${esc(p)}</p>`).join("")}</div>` : ""}
+      <div style="margin-top:12px">${lines.map(l => `<p style="margin:4px 0">${esc(l)}</p>`).join("")}
+      ${sent.length ? `<p style="margin:4px 0">Sent to the machines: ${sent.map(m => esc(m.name)).join(", ")}.</p>` : ""}
+      ${already.length ? `<p style="margin:4px 0">${already.length} machine file${already.length === 1 ? " was" : "s were"} sent before, the same, so not again.</p>` : ""}
+      <p style="margin:4px 0">${sum.parked} file${sum.parked === 1 ? "" : "s"} parked for the save${sum.unchanged ? `; ${sum.unchanged} unchanged, skipped` : ""}.</p></div>
+      ${viewsHtml(lastMade)}
+      ${sum.problems.length ? "" : `<p class="tag st-made" style="display:inline-block; margin-top:8px">Done</p>`}`;
+    showPlan(html); wireLooks($("out"));
+    await Promise.all([loadWaiting(), loadFiles(), loadDesigns()]);
+  }
+
+  // ---------- 3D views (1 Nov): made here, on this PC, when a zip is dropped (design: the 3D design viewer tab) ----------
+  // The page has the STEP's bytes from the zip, so it makes the view itself: sf-3d-viewer.js, then the STEP engine
+  // (occt-import-js, 7.6 MB from jsDelivr, checked; kept after the first time). The view file goes to the design-views
+  // storage at the place its database row names; the database checks it arrived. A model that can't be made keeps its
+  // reason, and Make it again tries later (from its parked STEP, or the file picked from OneDrive, checked against it).
+  const d3NotSetUp = (e) => /design_register|design_view|item_designs|set_design_up|PGRST202|PGRST205|42883|42P01|schema cache|does not exist/i.test(String((e && (e.message || e.code)) || "") + " " + String((e && e.code) || ""));
+  const sizeText = (a) => (a || []).map(x => Number(x).toFixed(3)).join(" × ");
+  let d3Lib = null, d3rows = [], lastMade = [], lookId = null;
+  function loadViewerLib() {
+    if (window.SF3D) return Promise.resolve(window.SF3D);
+    if (!d3Lib) d3Lib = new Promise((res, rej) => {
+      const el = document.createElement("script"); el.src = "sf-3d-viewer.js";
+      el.onload = () => window.SF3D ? res(window.SF3D) : rej(new Error("The 3D viewer's file (sf-3d-viewer.js) didn't load."));
+      el.onerror = () => { el.remove(); rej(new Error("The 3D viewer's file (sf-3d-viewer.js) couldn't be loaded. Check the connection, or that it's on GitHub.")); };
+      document.head.appendChild(el);
+    }).catch((e) => { d3Lib = null; throw e; });
+    return d3Lib;
+  }
+  /** one model: made from its STEP's bytes, put in storage where its row says, and recorded. Throws in words. */
+  async function makeOne(reg, bytes, file) {
+    const lib = await loadViewerLib();
+    const c = await lib.convertStep(bytes, { file, detail: reg.detail || "fine", up: reg.up || "z" });
+    const up = await db.storage.from("design-views").upload(reg.view_path, c.gz, { contentType: "application/gzip" });
+    if (up.error && !/already exists|duplicate|409/i.test(String(up.error.message) + " " + String(up.error.statusCode))) throw up.error;   // there from a try that didn't finish: fine
+    const st = await db.rpc("design_view_stored", { p_id: reg.id, p_facts: c.facts });
+    if (st.error) throw st.error;
+    return { size: c.facts.size_in, parts: c.facts.parts, ms: c.facts.convert_ms, bytes: c.gz.size };
+  }
+  const why3d = (e) => e && e.kind === "convert" ? `It couldn’t be made: ${e.message}` : e && e.kind ? e.message : friendly(e);
+  async function makeViews(files, ids, msg) {
+    const out = []; let setUp = true;
+    for (const f of files) {
+      const one = { item: f.item, file: f.path.split("/").pop() }; out.push(one);
+      const x = ids.get(f.path);
+      if (!setUp) { Object.assign(one, { state: "notsetup", why: "The database doesn’t have the 3D viewer yet: design_viewer.sql hasn’t run." }); continue; }
+      if (!x) { Object.assign(one, { state: "failed", why: "The database didn’t take it in." }); continue; }
+      msg(`Making the 3D view of ${f.item}… the first time, the STEP engine downloads (7.6 MB).`);
+      let reg;
+      try { const r = await db.rpc("design_register", { p_parked: x.id }); if (r.error) throw r.error; reg = r.data; }
+      catch (e) {
+        if (d3NotSetUp(e)) { setUp = false; Object.assign(one, { state: "notsetup", why: "The database doesn’t have the 3D viewer yet: design_viewer.sql hasn’t run." }); }
+        else Object.assign(one, { state: "failed", why: friendly(e) });
+        continue;
+      }
+      one.id = reg.id;
+      if (!reg.needs_view) { Object.assign(one, { state: reg.unchanged ? "unchanged" : "ready", size: reg.size_in, parts: reg.parts }); continue; }
+      try { Object.assign(one, { state: "ready" }, await makeOne(reg, f.data, one.file)); }
+      catch (e) {
+        Object.assign(one, { state: "failed", why: why3d(e) });
+        await db.rpc("design_view_failed", { p_id: reg.id, p_why: one.why }).catch(() => null);
+      }
+    }
+    lastMade = out;
+    return out;
+  }
+  function viewsHtml(list) {
+    if (!list || !list.length) return "";
+    const tag = (o) => o.state === "ready" ? `<span class="tag st-made">Made</span>` : o.state === "unchanged" ? `<span class="tag st-made">Unchanged, kept</span>`
+      : o.state === "notsetup" ? `<span class="tag st-stuck">Not set up yet</span>` : `<span class="tag st-flag">Not made</span>`;
+    return `<div class="grp"><h4>3D views</h4><ul class="plan">${list.map(o => `<li><b>${esc(o.item)}</b> <span class="small">· ${esc(o.file)}${o.size ? ` · ${esc(sizeText(o.size))} in · ${o.parts} part${o.parts === 1 ? "" : "s"}` : ""}${o.ms ? ` · made in ${(o.ms / 1000).toFixed(1)} s` : ""}</span> ${tag(o)}
+      ${o.id && (o.state === "ready" || o.state === "unchanged") ? `<button class="link" data-d3look="${esc(o.id)}">Look at it</button>` : ""}${o.why ? `<br><span class="small flagline">${esc(o.why)}</span>` : ""}</li>`).join("")}</ul></div>`;
+  }
+  function wireLooks(box) {
+    box.querySelectorAll("[data-d3look]").forEach(b => b.onclick = () => look(b.dataset.d3look));
+    box.querySelectorAll("[data-d3make]").forEach(b => b.onclick = () => remake(b.dataset.d3make));
+  }
+  async function loadDesigns() {
+    const r = await db.from("item_designs").select("id, project_id, item, status, up, detail, view_path, step_path, step_name, step_bytes, step_sha256, size_in, parts, failed_why, registered_at, made_at")
+      .is("superseded_at", null).order("registered_at", { ascending: false }).limit(30);
+    if (r.error) { d3rows = []; $("d3list").innerHTML = `<p class="small">${esc(d3NotSetUp(r.error) ? "Not set up in the database yet: design_viewer.sql hasn’t run." : friendly(r.error))}</p>`; return; }
+    d3rows = r.data || [];
+    $("d3list").innerHTML = d3rows.length ? `<ul class="taught">${d3rows.map(d => `<li><span class="what"><b>${esc(d.project_id)}</b> · ${esc(d.item)}<br>
+        <span class="small">${esc(d.step_name)} · ${kb(d.step_bytes)}${d.status === "ready" ? ` · ${esc(sizeText(d.size_in))} in · ${d.parts} part${d.parts === 1 ? "" : "s"} · ${esc(d.up.toUpperCase())} up` : ""} · ${esc(fwhen(d.registered_at))}</span>
+        ${d.status === "failed" && d.failed_why ? `<br><span class="small flagline">${esc(d.failed_why)}</span>` : ""}</span>
+        <span class="tag ${d.status === "ready" ? "st-made" : d.status === "failed" ? "st-flag" : "st-stuck"}">${d.status === "ready" ? "Ready" : d.status === "failed" ? "Not made" : "Waiting to be made"}</span>
+        ${d.status === "ready" ? `<button class="link" data-d3look="${esc(d.id)}">Look</button>` : `<button class="link" data-d3make="${esc(d.id)}">Make it again</button>`}</li>`).join("")}</ul>`
+      : `<p class="small">None yet. A zip with a Design folder (11_SHOP_FLOOR_ZIP.md v2) brings them.</p>`;
+    wireLooks($("d3list"));
+  }
+  const lookSay = (t) => { const el = $("d3say"); if (el) el.textContent = t; };
+  async function look(id) {
+    const d = d3rows.find(x => x.id === id) || await db.from("item_designs").select("*").eq("id", id).maybeSingle().then(r => r.data).catch(() => null);
+    if (!d) return;
+    lookId = id;
+    $("d3look").innerHTML = `<div class="d3lookhead"><b>${esc(d.project_id)} · ${esc(d.item)} <span class="small">· ${esc(d.step_name)}</span></b><button class="link" id="d3close">Close</button></div>
+      <div id="d3host"><p class="prog">Opening it…</p></div><p class="small" id="d3say"></p>`;
+    $("d3close").onclick = () => { lookId = null; $("d3look").innerHTML = ""; };
+    $("designs").scrollIntoView({ block: "start" });
+    try {
+      const lib = await loadViewerLib();
+      const got = await lib.openDesign({ db, row: d, keep: false, onStatus: (t) => { const h = $("d3host"); if (h && lookId === id) h.innerHTML = `<p class="prog">${esc(t)}</p>`; } });
+      if (lookId !== id) return;
+      const v = lib.viewer(); v.attach($("d3host"));
+      v.show(got.view, { up: d.up, upChoice: true, onUp: async (up) => {
+        const r = await db.rpc("set_design_up", { p_id: d.id, p_up: up });
+        if (r.error) { lookSay(`Not saved: ${friendly(r.error)}`); return; }
+        d.up = up; lookSay(`Saved: ${up.toUpperCase()} is up. The tablets show it this way from their next look.`);
+      } });
+      lookSay("Turn it with the mouse; scroll to zoom. If it’s lying down, change Up.");
+    } catch (e) { const h = $("d3host"); if (h && lookId === id) h.innerHTML = `<div class="bad"><p>${esc(why3d(e))}</p></div>`; }
+  }
+  async function remake(id) {
+    const d = d3rows.find(x => x.id === id); if (!d) return;
+    lookId = null;
+    const box = $("d3look"), say = (html) => { box.innerHTML = `<div class="d3lookhead"><b>${esc(d.project_id)} · ${esc(d.item)} <span class="small">· ${esc(d.step_name)}</span></b><button class="link" id="d3close">Close</button></div>${html}`;
+      $("d3close").onclick = () => { box.innerHTML = ""; }; };
+    $("designs").scrollIntoView({ block: "start" });
+    let bytes = null;
+    if (d.step_path) {
+      say(`<p class="prog">Fetching its STEP file from Supabase…</p>`);
+      const r = await db.storage.from("parked-files").download(d.step_path).catch(e => ({ error: e }));
+      if (!r.error) bytes = new Uint8Array(await r.data.arrayBuffer());
+    }
+    const go = async (data) => {
+      say(`<p class="prog">Making the 3D view of ${esc(d.item)}… the first time, the STEP engine downloads (7.6 MB).</p>`);
+      try { const m = await makeOne(d, data, d.step_name); say(`<p>Made: ${esc(sizeText(m.size))} in, ${m.parts} part${m.parts === 1 ? "" : "s"}, in ${(m.ms / 1000).toFixed(1)} s.</p>`); }
+      catch (e) { const w = why3d(e); await db.rpc("design_view_failed", { p_id: d.id, p_why: w }).catch(() => null); say(`<div class="bad"><p>${esc(w)}</p></div>`); }
+      await loadDesigns();
+    };
+    if (bytes) return go(bytes);
+    say(`<p>Its STEP file isn’t on Supabase any more: the save filed it in OneDrive. Pick <b>${esc(d.step_name)}</b> from ${esc(d.project_id)} › Production › Files › Design (the same file, unchanged).</p>
+      <div class="ctl"><input type="file" id="d3file" accept=".step,.stp,.STEP,.STP"></div>`);
+    $("d3file").onchange = async () => {
+      const file = $("d3file").files[0]; if (!file) return;
+      const data = new Uint8Array(await file.arrayBuffer());
+      if (await sha256(data) !== d.step_sha256) { say(`<div class="bad"><p>${esc(file.name)} isn’t the file that was dropped (its fingerprint is different). Pick ${esc(d.step_name)} from the job’s Design folder, or drop a new zip with the new file.</p></div>`); return; }
+      await go(data);
+    };
+  }
+
+  // ---------- what's waiting for the save, and the zips dropped ----------
+  async function loadWaiting() {
+    const [p, d] = await Promise.all([
+      db.from("parked_files").select("id, project_id, place, rel_path, what, size_bytes, stored_at, onedrive_at, backup_at, held, replaces, replace_ok_at, removed_at, filed_name")
+        .is("removed_at", null).is("same_as", null).order("project_id", { nullsFirst: true }).order("rel_path").limit(300),
+      db.from("zip_drops").select("id, project_id, zip_name, format, dropped_at, finished_at, summary").order("dropped_at", { ascending: false }).limit(15)]);
+    if (p.error || d.error) {
+      dropReady = false;
+      $("waiting").innerHTML = `<h3>Waiting for the save</h3><p class="small">${esc(notSetUp(p.error || d.error) ? "Not set up in the database yet: zip_drop.sql hasn’t run." : friendly(p.error || d.error))}</p>`;
+      return;
+    }
+    dropReady = true;
+    p.data = (p.data || []).filter(f => f.stored_at);              // a file whose upload didn't finish isn't waiting for anything
+    const st = (f) => f.held ? [f.held, "st-flag"]
+      : f.project_id && f.project_id.startsWith("TEST-") ? ["A test job: never filed", "st-stuck"]
+      : f.onedrive_at && f.backup_at ? ["Filed in both; comes off Supabase at the next save", "st-made"]
+      : f.onedrive_at || f.backup_at ? [`Filed in ${f.onedrive_at ? "OneDrive" : "the backup folder"}; the other next save`, "st-stuck"]
+      : ["Waiting for the save on your PC", "st-stuck"];
+    $("waiting").innerHTML = `<h3>Waiting for the save</h3>
+      <p class="small">Files from dropped zips stay on Supabase until the office’s save on your PC has put them in OneDrive and the backup folder. Then they come off; the record stays.</p>
+      ${(p.data || []).length ? `<ul class="taught">${p.data.map(f => { const [t, c] = st(f); return `<li><span class="what"><b>${esc(f.project_id || "Library")}</b> · ${esc(f.rel_path)}<br>
+        <span class="small">${esc(f.what)} · ${kb(f.size_bytes)}${f.filed_name && f.filed_name !== f.rel_path.split("/").pop() ? ` · filed as ${esc(f.filed_name)}` : ""}</span></span>
+        <span class="tag ${c}">${esc(t)}</span>${f.place === "library" && f.held && !f.replace_ok_at ? `<button class="link" data-replace="${esc(f.id)}">Replace the library’s copy</button>` : ""}</li>`; }).join("")}</ul>`
+        : `<p class="small">Nothing waiting.</p>`}
+      ${(d.data || []).length ? `<h3 style="margin-top:16px">Zips dropped</h3><ul class="taught">${d.data.map(z => { const s = z.summary || {}; return `<li><span class="what"><b>${esc(z.zip_name)}</b><br>
+        <span class="small">${esc(fwhen(z.dropped_at))} · format ${z.format}${s.parked !== undefined ? ` · ${s.parked} parked${s.unchanged ? `, ${s.unchanged} unchanged` : ""}` : ""}${s.floor ? (s.floor.ok ? (s.floor.skipped ? " · floor already had it" : ` · floor: version ${esc(s.floor.version)}`) : " · floor not loaded") : ""}${(s.machines || []).length ? ` · ${s.machines.length} machine file${s.machines.length === 1 ? "" : "s"}` : ""}</span></span>
+        <span class="tag ${!z.finished_at ? "st-flag" : (s.problems || []).length ? "st-flag" : "st-made"}">${!z.finished_at ? "Didn’t finish" : (s.problems || []).length ? `${s.problems.length} problem${s.problems.length === 1 ? "" : "s"}` : "Done"}</span></li>`; }).join("")}</ul>` : ""}`;
+    document.querySelectorAll("[data-replace]").forEach(b => b.onclick = async () => {
+      if (!confirm("Replace the file in the library with this one? OneDrive keeps the old one in its version history.")) return;
+      const r = await db.rpc("parked_replace_ok", { p_id: b.dataset.replace });
+      if (r.error) alert(friendly(r.error));
+      await loadWaiting();
+    });
+  }
+
+  // ---------- Machine files: one file (or a few) to a machine, by hand (from the Prototype lab, 18–20 Oct) ----------
+  let fileRows = [], filesReady = false;
+  async function loadFiles() {
+    const r = await db.from("machine_files").select("*").order("uploaded_at", { ascending: false }).limit(100);
+    if (r.error) { filesReady = false; $("files").innerHTML = `<h3>Machine files</h3><p class="small">${esc(/machine_files|schema cache|does not exist|PGRST20|42P01/i.test(String(r.error.message) + String(r.error.code)) ? "Not set up in the database yet: machine_files.sql hasn’t run." : friendly(r.error))}</p>`; return; }
+    fileRows = r.data || []; filesReady = true; renderFiles();
+  }
+  function fileStatus(f) {
+    const byRev = (id) => (fileRows.find(x => x.id === id) || {}).rev;
+    if (f.replaced_by) return [`Replaced by r${byRev(f.replaced_by) || "?"}${f.picked_up_at ? ", after the machine got it" : ""}`, "st-flag"];
+    if (f.picked_up_at) return [`On the ${MACH[f.machine]} since ${fday(f.picked_up_at)}`, "st-made"];
+    if (f.stored_at) return [`Waiting for the ${MACH[f.machine]}`, "st-stuck"];
+    return ["Didn’t finish uploading: send it again", "st-flag"];
+  }
+  function renderFiles() {
+    if (!filesReady) return;
+    const items = current && current.pkg ? current.pkg.payload.sheets.map(s => s.item_code) : [];
+    const keep = (id) => { const el = $(id); return el ? el.value : ""; };
+    const job = keep("fJob") || (current && current.job) || "", prevMachine = keep("fMachine");
+    const wasAssembly = !!($("fAssembly") && $("fAssembly").checked);
+    $("files").innerHTML = `<h3>Machine files</h3>
+      <p class="small">Send a STEP file or program to a machine by hand, outside a zip. On the Bend-Tech they’re filed by hundreds › job › item, with each item’s whole assembly beside its parts. Each machine gets them with its own login on its own computer (machine.html). Once a machine has a file, it’s cleared from the app’s storage; the record below stays. A new file for the same part is the next revision.</p>
+      <div class="fform">
+        <div><label for="fJob">Job</label><input type="text" id="fJob" placeholder="PROJ-00451" value="${esc(job)}"></div>
+        <div><label for="fItem">Item</label><input type="text" id="fItem" list="fItems" placeholder="TA-02" value="${esc(keep("fItem"))}"><datalist id="fItems">${[...new Set(items)].map(i => `<option value="${esc(i)}">`).join("")}</datalist></div>
+        <div><label for="fMachine">Machine</label><select id="fMachine"><option value="bendtech">Bend-Tech (STEP, DXF)</option><option value="homag">Homag router (.mprx)</option></select></div>
+        <div><label for="fPart">Part</label><input type="text" id="fPart" placeholder="Leg Long, or Program" value="${esc(keep("fPart"))}">
+          <label class="small" style="font-weight:500"><input type="checkbox" id="fAssembly"${wasAssembly ? " checked" : ""}> This is the whole assembly</label></div>
+        <div style="grid-column:1/-1"><label for="fNote">What it is, or what changed</label><input type="text" id="fNote" style="width:100%" placeholder="Cope to X per STEP file" value="${esc(keep("fNote"))}"></div>
+        <div style="grid-column:1/-1"><label for="fFiles">Files</label><input type="file" id="fFiles" multiple accept=".step,.stp,.dxf,.mprx,.mpr"> <span class="small">Several files at once: each file’s own name is its part.</span></div>
+      </div>
+      <div class="ctl" style="margin-top:12px"><button class="go" id="fSend">Send to the machine</button><span id="fMsg" class="small"></span></div>
+      ${fileRows.length ? `<ul class="taught">${fileRows.map(f => { const [t, c] = fileStatus(f); return `<li><span class="what"><b>${esc(f.file_name)}</b><br>
+        <span class="small">${esc(MACH[f.machine])} · revision ${f.rev} · sent ${esc(fday(f.uploaded_at))}${f.note ? " · " + esc(f.note) : ""}${f.picked_up_at && !f.cleared_at ? " · still in storage" : ""}</span></span>
+        <span class="tag ${c}">${esc(t)}</span>${f.picked_up_at && !f.cleared_at ? `<button class="link" data-clear="${esc(f.id)}">Clear it</button>` : ""}</li>`; }).join("")}</ul>` : `<p class="small">Nothing sent yet.</p>`}`;
+    if (prevMachine) $("fMachine").value = prevMachine;
+    const syncPart = () => { const a = $("fAssembly").checked; $("fPart").disabled = a; if (a) $("fPart").value = "Assembly"; };
+    $("fAssembly").onchange = syncPart; if (wasAssembly) syncPart();
+    $("fSend").onclick = sendFiles;
+    document.querySelectorAll("[data-clear]").forEach(b => b.onclick = async () => { const f = fileRows.find(x => x.id === b.dataset.clear); await clearPaths([f.path]); await loadFiles(); });
+  }
+  async function clearPaths(paths) {
+    if (!paths.length) return;
+    await db.storage.from("machine-files").remove(paths);
+    const { data } = await db.from("machine_files").select("id, path").in("path", paths);
+    for (const r of data || []) await db.rpc("machine_file_cleared", { p_id: r.id });
+  }
+  async function sendFiles() {
+    const files = [...($("fFiles").files || [])], msg = $("fMsg");
+    const job = $("fJob").value.trim().toUpperCase(), item = $("fItem").value.trim(), machine = $("fMachine").value, note = $("fNote").value.trim();
+    const assembly = $("fAssembly").checked, partTyped = assembly ? "Assembly" : $("fPart").value.trim();
+    if (!/^(PROJ|TEST)-\d{5}$/.test(job)) { msg.textContent = "The job should look like PROJ-00451 (TEST-… on the test lane)."; return; }
+    if (!item) { msg.textContent = "Say which item it’s for (the Item ID on the work order)."; return; }
+    if (!files.length) { msg.textContent = "Choose the file or files first."; return; }
+    if (assembly && files.length > 1) { msg.textContent = "An item has one whole-assembly file: choose just that file with the box ticked, and send the parts without it."; return; }
+    $("fSend").disabled = true; const done = [], bad = [];
+    for (const file of files) {
+      const part = (files.length === 1 && partTyped) ? partTyped : file.name.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").trim().slice(0, 60);
+      msg.textContent = `Sending ${file.name}…`;
+      try {
+        const buf = await file.arrayBuffer();
+        const sha = hexOf(await crypto.subtle.digest("SHA-256", buf));
+        const n = await db.rpc("machine_file_new", { p_project: job, p_item: item, p_part: part, p_machine: machine, p_original_name: file.name, p_size: file.size, p_sha256: sha, p_note: note || null });
+        if (n.error) throw n.error;
+        const up = await db.storage.from("machine-files").upload(n.data.path, new Blob([buf], { type: "application/octet-stream" }), { contentType: "application/octet-stream" });
+        if (up.error) throw up.error;
+        const st = await db.rpc("machine_file_stored", { p_id: n.data.id });
+        if (st.error) throw st.error;
+        await clearPaths(st.data.clear || []);
+        done.push(`${n.data.file_name}`);
+      } catch (e) { bad.push(`${file.name}: ${friendly(e)}`); }
+    }
+    $("fSend").disabled = false;
+    await loadFiles();
+    $("fMsg").textContent = (done.length ? `Sent: ${done.join(", ")}.` : "") + (bad.length ? ` Not sent: ${bad.join("; ")}` : "");
+  }
+  window.sfDropDebug = { get current() { return current; } };
+})();
+</script>
+</body>
+</html>
