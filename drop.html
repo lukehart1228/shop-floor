@@ -146,14 +146,17 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
 <script src="sf-common-2026-10-05.1.js"></script>
 <script>
-var PAGE_VERSION = "2026-11-02.1";          // this page's version: bump it with every change (it shows in select * from devices();)
+var PAGE_VERSION = "2026-11-02.3";          // this page's version: bump it with every change (it shows in select * from devices();)
 
 /* ---- core: no screen code in here, so it can be tested on its own ----
-   The zip format is 11_SHOP_FLOOR_ZIP.md (format 1, and format 2 with Design/). The database checks it all again
-   (zip_drop_new() in zip_drop.sql); the page checks first so Luke sees what's wrong before anything is sent. */
+   The zip format is 11_SHOP_FLOOR_ZIP.md (format 1; format 2 with Design/; format 3, 3 Nov: Files/Metal, one folder per item
+   in Bend-Tech and inside Files' folders, each job file's path as filed 45 characters at most). The database checks it all again
+   (zip_drop_new() in short_names.sql); the page checks first so Luke sees what's wrong before anything is sent. */
 
 const ZIP_MAX = 52428800;                     // 50 MB a file: the free plan's limit
-const FILES_SUBS = ["Metal drawings", "KI", "Arrow", "Other"];
+const FILES_SUBS = ["Metal drawings", "KI", "Arrow", "Other"];   // formats 1 and 2 (Metal drawings is filed as Metal)
+const FILES_SUBS3 = ["Metal", "KI", "Arrow", "Other"];             // format 3
+const REL_MAX = { job: 45, library: 60 };                           // format 3: a path as filed, so it fits Windows on the office PC
 const LIB_SUBS = ["Metal/Cut sheets", "Metal/STEP files", "CNC/KI", "CNC/Other"];
 
 /** CRC-32, as a zip records it */
@@ -233,29 +236,51 @@ const extOf = (p) => (String(p).match(/\.([A-Za-z0-9]+)$/) || [, ""])[1].toLower
 
 /** Where a path in the zip goes: { place: job|library, rel, folder }, or throws with the reason (the database's zip_path_place) */
 function placeOf(path, format) {
-  const segs = String(path).split("/"), top = segs[0], n = segs.length, name = segs[n - 1], ext = extOf(path);
+  const segs = String(path).split("/"), top = segs[0], n = segs.length, name = segs[n - 1], ext = extOf(path), f3 = format >= 3;
   const folders = format >= 2 ? "Floor, Files, Router, Bend-Tech, Design, Database" : "Floor, Files, Router, Bend-Tech, Database";
   if (n < 2) throw new Error(`${path}: every file goes in one of the zip's folders (${folders}).`);
   if (segs.some(winBad)) throw new Error(`${path}: that name isn't one Windows accepts.`);
-  if (["Floor", "Router", "Bend-Tech", "Design"].includes(top) && n !== 2) throw new Error(`${path}: ${top} holds files only, no folders.`);
+  if ((["Floor", "Router", "Design"].includes(top) || (top === "Bend-Tech" && !f3)) && n !== 2) throw new Error(`${path}: ${top} holds files only, no folders.`);
+  let pl;
   switch (top) {
-    case "Floor": if (!["json", "pdf"].includes(ext)) throw new Error(`${path}: Floor holds only the upload file and the work order PDF.`); return { place: "job", rel: name, folder: top };
-    case "Router": if (!["mprx", "mpr"].includes(ext)) throw new Error(`${path}: Router takes .mprx or .mpr only.`); return { place: "job", rel: "Router/" + name, folder: top };
-    case "Bend-Tech": if (!["step", "stp", "dxf"].includes(ext)) throw new Error(`${path}: Bend-Tech takes .step, .stp or .dxf only.`); return { place: "job", rel: "Bend-Tech/" + name, folder: top };
+    case "Floor": if (!["json", "pdf"].includes(ext)) throw new Error(`${path}: Floor holds only the upload file and the work order PDF.`); pl = { place: "job", rel: name, folder: top }; break;
+    case "Router": if (!["mprx", "mpr"].includes(ext)) throw new Error(`${path}: Router takes .mprx or .mpr only.`); pl = { place: "job", rel: "Router/" + name, folder: top }; break;
+    case "Bend-Tech":
+      if (f3 && n !== 3) throw new Error(`${path}: Bend-Tech holds one folder per item, named for the item, with its files in it (Bend-Tech/TB-01/Post.step).`);
+      if (!["step", "stp", "dxf"].includes(ext)) throw new Error(`${path}: Bend-Tech takes .step, .stp or .dxf only.`);
+      pl = { place: "job", rel: segs.join("/"), folder: top }; break;
     case "Design":
       if (format < 2) throw new Error(`${path}: Design is new in format 2, and this zip says format 1.`);
       if (!["step", "stp"].includes(ext)) throw new Error(`${path}: Design takes .step or .stp only.`);
-      return { place: "job", rel: "Design/" + name, folder: top };
+      pl = { place: "job", rel: "Design/" + name, folder: top }; break;
     case "Files":
-      if (n < 3 || !FILES_SUBS.includes(segs[1])) throw new Error(`${path}: Files holds only the folders ${FILES_SUBS.join(", ")}, and nothing loose.`);
-      return { place: "job", rel: segs.slice(1).join("/"), folder: top };
+      if (f3) {
+        if ((n !== 3 && n !== 4) || !FILES_SUBS3.includes(segs[1]))
+          throw new Error(`${path}: Files holds only the folders ${FILES_SUBS3.join(", ")} (each with its files, or one folder per item), and nothing loose.`);
+        pl = { place: "job", rel: segs.slice(1).join("/"), folder: top };
+      } else {
+        if (n < 3 || !FILES_SUBS.includes(segs[1])) throw new Error(`${path}: Files holds only the folders ${FILES_SUBS.join(", ")}, and nothing loose.`);
+        pl = { place: "job", rel: segs[1] === "Metal drawings" ? ["Metal", ...segs.slice(2)].join("/") : segs.slice(1).join("/"), folder: top };
+      }
+      break;
     case "Database": {
       const rest = segs.slice(1).join("/");
       if (n < 4 || !LIB_SUBS.some(s => rest.startsWith(s + "/"))) throw new Error(`${path}: library files go in Database/${LIB_SUBS.join(", ")}.`);
-      return { place: "library", rel: rest, folder: top };
+      pl = { place: "library", rel: rest, folder: top }; break;
     }
+    default: throw new Error(`${path}: ${top} isn't one of the zip's folders (${folders}).`);
   }
-  throw new Error(`${path}: ${top} isn't one of the zip's folders (${folders}).`);
+  if (f3 && pl.rel.length > REL_MAX[pl.place])
+    throw new Error(`${path}: too long once filed (${pl.rel} is ${pl.rel.length} characters; ${REL_MAX[pl.place]} at most). The folders already say the job and the item, so the name needn't.`);
+  return pl;
+}
+/** The item folder a format-3 path is in, or null: Bend-Tech/TB-01/x → TB-01, Files/Metal/TB-01/x → TB-01 */
+function itemFolderOf(path, format) {
+  if (format < 3) return null;
+  const segs = String(path).split("/");
+  if (segs[0] === "Bend-Tech" && segs.length === 3) return segs[1];
+  if (segs[0] === "Files" && segs.length === 4) return segs[2];
+  return null;
 }
 
 /** Checks a whole zip against its contents.json. Returns the plan (what goes where), or throws with the first reason. */
@@ -264,7 +289,7 @@ function checkZip(entries) {
   if (!cj) throw new Error("There's no contents.json at the top of this zip, so it isn't a shop floor zip.");
   let c; try { c = JSON.parse(new TextDecoder().decode(cj.data)); } catch (e) { throw new Error("contents.json isn't valid JSON."); }
   if (!c || c.kind !== "shop-floor-zip") throw new Error(`contents.json's kind isn't "shop-floor-zip", so this isn't a shop floor zip.`);
-  if (c.format !== 1 && c.format !== 2) throw new Error(`contents.json says format ${c.format}; this page reads formats 1 and 2. If it's newer, the page needs updating.`);
+  if (![1, 2, 3].includes(c.format)) throw new Error(`contents.json says format ${c.format}; this page reads formats 1 to 3. If it's newer, the page needs updating.`);
   const job = c.job === null ? null : c.job;
   if (job !== null && !/^(PROJ|TEST)-\d{5}$/.test(String(job))) throw new Error("contents.json's job should look like PROJ-00512 (or null for a library-only zip).");
   if (typeof c.made_at !== "string" || isNaN(Date.parse(c.made_at)) || !/(Z|[+-]\d{2}:?\d{2})$/.test(c.made_at))
@@ -299,6 +324,8 @@ function checkZip(entries) {
       if (pairs.has("design|" + f.item)) throw new Error(`${f.path}: there's already a 3D model for item ${f.item} in this zip (one per item).`);
       pairs.add("design|" + f.item);
     }
+    const itemDir = itemFolderOf(f.path, c.format);
+    if (itemDir !== null && "item" in f && itemDir !== String(f.item ?? "").trim()) throw new Error(`${f.path}: its folder (${itemDir}) should be its item (${f.item}).`);
     if ("replaces" in f && pl.folder !== "Database") throw new Error(`${f.path}: only Database files say replaces.`);
     if ("replaces" in f && typeof f.replaces !== "boolean") throw new Error(`${f.path}: replaces is true or false.`);
     const one = { ...pl, path: f.path, what: f.what.trim(), bytes: e.bytes, data: e.data, machine: f.machine || null, item: f.item ? String(f.item).trim() : null,
@@ -391,7 +418,7 @@ if (typeof document !== "undefined") (function () {
   const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   sfEmbed("header");
   sfReportDevice(db, "drop", PAGE_VERSION);
-  $("foot").textContent = `Drop page ${PAGE_VERSION}. Zips follow 11_SHOP_FLOOR_ZIP.md, formats 1 and 2.`;
+  $("foot").textContent = `Drop page ${PAGE_VERSION}. Zips follow 11_SHOP_FLOOR_ZIP.md, formats 1 to 3.`;
 
   const notSetUp = (e) => /zip_drop|parked_files|zip_drops|lab_allowed|machine_files|schema cache|does not exist|PGRST202|PGRST205|42883|42P01/i.test(String((e && (e.message || e.code)) || "") + " " + String((e && e.code) || ""));
   function friendly(e) {
@@ -629,7 +656,9 @@ if (typeof document !== "undefined") (function () {
   async function makeOne(reg, bytes, file) {
     const lib = await loadViewerLib();
     const c = await lib.convertStep(bytes, { file, detail: reg.detail || "fine", up: reg.up || "z" });
-    const up = await db.storage.from("design-views").upload(reg.view_path, c.gz, { contentType: "application/gzip" });
+    // a Blob is sent as its own type (supabase-js ignores contentType for a Blob), and design-views takes gzip only: so the
+    // view goes up typed (2 Nov: an untyped one came back "mime type application/octet-stream is not supported")
+    const up = await db.storage.from("design-views").upload(reg.view_path, new Blob([c.gz], { type: "application/gzip" }), { contentType: "application/gzip" });
     if (up.error && !/already exists|duplicate|409/i.test(String(up.error.message) + " " + String(up.error.statusCode))) throw up.error;   // there from a try that didn't finish: fine
     const st = await db.rpc("design_view_stored", { p_id: reg.id, p_facts: c.facts });
     if (st.error) throw st.error;

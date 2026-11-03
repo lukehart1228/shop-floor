@@ -131,7 +131,8 @@ insert into sql_file_catalog (file, run_order, fingerprint, check_fn, replaces) 
   ('designs.sql',          49, 'check_designs',           'check_designs',            '{}'),
   ('zip_drop.sql',         50, 'check_zip_drop',          'check_zip_drop',           '{}'),
   ('arrow_pos.sql',        51, 'check_arrow_pos',         'check_arrow_pos',          '{arrow_pickup.sql}'),
-  ('design_viewer.sql',    52, 'check_design_viewer',     'check_design_viewer',      '{}')
+  ('design_viewer.sql',    52, 'check_design_viewer',     'check_design_viewer',      '{}'),
+  ('short_names.sql',      53, 'check_short_names',       'check_short_names',        '{trip_types.sql,zip_drop.sql,delivery_types.sql}')
 on conflict (file) do update set run_order = excluded.run_order, fingerprint = excluded.fingerprint, check_fn = excluded.check_fn, replaces = excluded.replaces;
 
 -- does the database already have this file's fingerprint?

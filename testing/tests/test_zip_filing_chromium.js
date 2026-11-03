@@ -133,13 +133,14 @@ const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
   const F = "400s/PROJ-00418 Enid's Table/Production/Files/", B = "PROJ-00418/Production/Files/";
   ok("Job files are filed in OneDrive's Production › Files (the job in a hundreds folder): the work order at the top, the rest in the zip's folders",
      od[F + "PROJ-00418_Production_Sheets.pdf"] === "%PDF work order 418" && od[F + "Router/418-A.mpr"] === "program A" && od[F + "Design/A whole.step"] === "ISO-10303-21; A", Object.keys(od).join(", "));
-  ok("…a different file already called A base.pdf is left alone, and the new one is filed beside it with the drop date",
-     od[F + "Metal drawings/A base.pdf"] === "%PDF the OLD base drawing" && od[F + `Metal drawings/A base ${day}.pdf`] === "%PDF the NEW base drawing");
-  ok("…the backup folder has the same files under the same names", bk[B + `Metal drawings/A base ${day}.pdf`] === "%PDF the NEW base drawing" && bk[B + "Design/A whole.step"] === "ISO-10303-21; A"
-     && !bk[B + "Metal drawings/A base.pdf"], Object.keys(bk).filter(k => /Files/.test(k)).join(", "));
+  ok("…the old Metal drawings folder moved into Metal (3 Nov); a different file already called A base.pdf is left alone, and the new one is filed beside it as A base r2.pdf",
+     od[F + "Metal/A base.pdf"] === "%PDF the OLD base drawing" && od[F + "Metal/A base r2.pdf"] === "%PDF the NEW base drawing"
+     && !Object.keys(od).some(k => k.includes("Metal drawings")), Object.keys(od).filter(k => /Files/.test(k)).join(", "));
+  ok("…the backup folder has the same files under the same names", bk[B + "Metal/A base r2.pdf"] === "%PDF the NEW base drawing" && bk[B + "Design/A whole.step"] === "ISO-10303-21; A"
+     && !bk[B + "Metal/A base.pdf"], Object.keys(bk).filter(k => /Files/.test(k)).join(", "));
   const gone = await q("select rel_path, filed_name, removed_at from parked_files where place = 'job' and project_id = 'PROJ-00418' order by rel_path");
   ok("…every job file came off Supabase once it was in both places; the records stay, with the name it was filed under",
-     gone.length === 4 && gone.every(r => r.removed_at) && gone.find(r => r.rel_path === "Metal drawings/A base.pdf").filed_name === `A base ${day}.pdf`
+     gone.length === 4 && gone.every(r => r.removed_at) && gone.find(r => r.rel_path === "Metal/A base.pdf").filed_name === "A base r2.pdf"
      && (await q("select count(*) n from storage.objects where bucket_id = 'parked-files' and name like 'PROJ-00418/%'"))[0].n == 0, JSON.stringify(gone));
   const lib1 = await q("select rel_path, held, removed_at, backup_at from parked_files where place = 'library' order by rel_path");
   ok("Library files wait for the third folder (filed in the backup meanwhile), and the save says so",

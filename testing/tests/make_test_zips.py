@@ -58,7 +58,19 @@ open(os.path.join(out, "badcrc.zip"), "wb").write(raw); os.remove(os.path.join(o
 def variant(name, i, path=None, meta=None, data=None, **kw):
     v = copy.deepcopy(base); pth, d, m = v[i]
     v[i] = (path or pth, data if data is not None else d, meta(m) if meta else m); make(name, v, **kw)
-variant("format3.zip", 2, fmt=3)
+variant("format4.zip", 2, fmt=4)
+# format 3 (3 Nov): Files/Metal, one folder per item in Bend-Tech and inside Files' folders, short names
+base3 = [base[0], base[1],
+  ("Files/Metal/X-1/Base.pdf", b"%PDF-1.4 drawing v3\n", {"what": "metal drawing", "item": "X-1"}),
+  ("Files/Metal/Cut sheet.pdf", b"%PDF-1.4 cut sheet of the job\n", {"what": "metal cut sheet"}),
+  ("Bend-Tech/X-1/V-Arm.step", base[5][1], base[5][2])]
+make("PROJ-00502-v3.zip", base3, fmt=3)
+def variant3(name, i, path):
+    v = copy.deepcopy(base3); v[i] = (path, v[i][1], v[i][2]); make(name, v, fmt=3)
+variant3("bt-noitem3.zip", 4, "Bend-Tech/V-Arm.step")
+variant3("wrongfolder3.zip", 4, "Bend-Tech/X-2/V-Arm.step")
+variant3("toolong3.zip", 2, "Files/Metal/X-1/" + "A" * 32 + ".pdf")
+variant3("metaldrawings3.zip", 3, "Files/Metal drawings/Cut sheet.pdf")
 variant("badjob.zip", 2, job="PROJ-512")
 variant("loose.zip", 2, path="Files/X-1 base.pdf")
 variant("wrongext.zip", 4, path="Router/00502-X1.txt")

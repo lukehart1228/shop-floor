@@ -603,6 +603,7 @@ function fileCsv(list, batch) {
 /** A v_filing row as a file for the zip: PROJ-00418/TB-03/TB-03-2 Delivery Picture.jpg */
 function filingItem(f) {
   return { source: f.source, id: f.id, bucket: f.bucket, path: f.storage_path, in_cloud: f.in_cloud, name: `${f.project_id}/${f.folder}/${f.file_name}`,
+           old_name: f.old_file_name && f.old_file_name !== f.file_name ? `${f.project_id}/${f.folder}/${f.old_file_name}` : null,   // the longer name before 3 Nov
            project_id: f.project_id, job_name: f.job_name, sheet: f.sheet_number, table: f.table_no, kind: f.what, note: f.note, by: f.by_name,
            loadout_id: f.loadout_id, at: f.at, mistake: f.mistake, test: f.is_test, archive_batch: f.archive_batch, bytes: f.bytes,
            gps: f.lat !== null && f.lat !== undefined ? `${Number(f.lat).toFixed(6)}, ${Number(f.lng).toFixed(6)}` : "" };
@@ -612,7 +613,8 @@ function filingItem(f) {
 const SAVE_DIR = "Production";                    // inside each job's folder, and each PROJ folder in the backup (31 Oct)
 const SAVE_DIR_OLD = "shop-floor data";           // the layout until 31 Oct: the save moves it into Production, then removes it
 const SAVE_SUB = { delivery: "Delivery", photos: "Photos", data: "Job Data", files: "Files" };
-const SAVE_LAYOUT = 2;                            // a browser that last saved an older layout looks at every job once
+const METAL_OLD = "Metal drawings", METAL = "Metal";   // Files › Metal drawings became Files › Metal (3 Nov): the save moves it
+const SAVE_LAYOUT = 3;                            // a browser that last saved an older layout looks at every job once (3: the short names, 3 Nov)
 const RECORD_FILES = ["Production record.csv", "Issues and defects.csv", "Flags.csv", "Arrow.csv", "Photos and files.csv"];
 const JUNK_FILE = /^(thumbs\.db|desktop\.ini|\.ds_store)$/i;
 // the shop's own folders (1 Nov): Claudes Shop System Folder, chosen once as the save's third folder, holds the library
@@ -667,8 +669,10 @@ async function arrowPoPdf(PDFLib, po) {
   doc.setTitle(po.name || "Arrow PO"); doc.setCreator("Purposeful Design shop floor");
   return await doc.save({ useObjectStreams: false });
 }
-/** "Arrow PO.xlsx" + "2026-11-03" → "Arrow PO 2026-11-03.xlsx": a revised job file is filed beside the old one */
-function datedName(name, stamp) { const m = String(name).match(/^(.*?)(\.[^.]*)?$/); return `${m[1]} ${stamp}${m[2] || ""}`; }   // made by Windows or a Mac, never by the save: they go with the old folder
+/** "Post.step" + 2 → "Post r2.step": a revised job file is filed beside the old one (3 Nov: was the drop date, 11 letters longer) */
+function revName(name, k) { const m = String(name).match(/^(.*?)(\.[^.]*)?$/); return `${m[1]} r${k}${m[2] || ""}`; }
+/** A path inside Production › Files: Metal drawings/… is Metal/… now */
+function metalRel(rel) { const s = String(rel); return s.startsWith(METAL_OLD + "/") ? METAL + s.slice(METAL_OLD.length) : s; }
 /** Which folder inside Production a file goes in: everything from a trip (its photos, tickets, signature, site files and
  *  signed ticket) in Delivery; defect and issue photos in Photos. Records go in Job Data. */
 function saveTop(x) { return x.source === "photo" && !x.loadout_id ? SAVE_SUB.photos : SAVE_SUB.delivery; }
@@ -754,6 +758,8 @@ async function indexProjectFolders(root) {
   return found;
 }
 async function fsDir(base, segs, create) { let d = base; for (const x of segs) d = await d.getDirectoryHandle(x, { create }); return d; }
+/** The folder if it's there, else null (never made) */
+async function fsDirIf(base, segs) { try { return await fsDir(base, segs, false); } catch (e) { if (fsMissing(e)) return null; throw e; } }
 const fsMissing = (e) => e && (e.name === "NotFoundError" || e.name === "TypeMismatchError");
 async function fsSize(dir, name) { try { return (await (await dir.getFileHandle(name)).getFile()).size; } catch (e) { if (fsMissing(e)) return -1; throw e; } }
 /** Is the file already exactly this text? Compared byte for byte: reading a file back as text drops the marker that starts a spreadsheet file */
@@ -780,7 +786,11 @@ async function fsWrite(dir, name, data) {
 async function moveOldSave(jobDir, files) {
   let old;
   try { old = await jobDir.getDirectoryHandle(SAVE_DIR_OLD); } catch (e) { if (fsMissing(e)) return null; throw e; }
-  const top = new Map((files || []).map(x => [saveRelPath(x.name).join("/"), saveTop(x)]));
+  const top = new Map();                                              // a path in the old folder → [Delivery or Photos, its path there now]
+  for (const x of files || []) {
+    const to = saveRelPath(x.name).join("/"); top.set(to, [saveTop(x), to]);
+    if (x.old_name) { const o = saveRelPath(x.old_name).join("/"); if (!top.has(o)) top.set(o, [saveTop(x), to]); }   // its name before 3 Nov
+  }
   const kept = [], dirs = new Map();
   let moved = 0;
   const dest = async (segs) => { const k = segs.join("/"); if (!dirs.has(k)) dirs.set(k, await fsDir(jobDir, [SAVE_DIR, ...segs], true)); return dirs.get(k); };
@@ -789,13 +799,14 @@ async function moveOldSave(jobDir, files) {
       const here = segs.concat(name);
       if (h.kind === "directory") { await walk(h, here); continue; }
       if (JUNK_FILE.test(name)) continue;
-      const rel = here.join("/"), record = !segs.length && RECORD_FILES.includes(name);
+      const rel = here.join("/"), record = !segs.length && RECORD_FILES.includes(name), file = await h.getFile();
+      if (!file.size) continue;                                       // an empty file left by a write that failed: it holds nothing
       // a photo marked "entered by mistake" after it was saved has a new name now: it's the same photo
-      const key = record || top.has(rel) ? rel : rel.replace(/(\.[A-Za-z0-9]+)$/, " (entered by mistake)$1");
-      if (!record && !top.has(key)) { kept.push(rel); continue; }
-      const to = key.split("/"), toName = to[to.length - 1];
-      const folder = await dest(record ? [SAVE_SUB.data] : [top.get(key), ...to.slice(0, -1)]);
-      const there = await fsSize(folder, toName), file = await h.getFile();
+      const hit = record ? null : top.get(rel) || top.get(rel.replace(/(\.[A-Za-z0-9]+)$/, " (entered by mistake)$1"));
+      if (!record && !hit) { kept.push(rel); continue; }
+      const to = (record ? rel : hit[1]).split("/"), toName = to[to.length - 1];
+      const folder = await dest(record ? [SAVE_SUB.data] : [hit[0], ...to.slice(0, -1)]);
+      const there = await fsSize(folder, toName);
       if (record ? there >= 0 : there === file.size) continue;          // already in Production
       if (there >= 0) { kept.push(rel); continue; }                       // a different file of that name is there: keep both
       await fsWrite(folder, toName, new Uint8Array(await file.arrayBuffer())); moved++;
@@ -803,6 +814,28 @@ async function moveOldSave(jobDir, files) {
   };
   await walk(old, []);
   if (!kept.length) await jobDir.removeEntry(SAVE_DIR_OLD, { recursive: true });
+  return { moved, kept, removed: !kept.length };
+}
+/** A folder renamed by the save (Files › Metal drawings → Metal, 3 Nov): each file in it moves into the new one (already there
+ *  at the same size counts as moved; an empty file holds nothing). A different file of the same name keeps the old folder, listed.
+ *  Returns null when there's no old folder, else { moved, kept, removed }. */
+async function mergeOldFolder(parent, from, to) {
+  const old = await fsDirIf(parent, [from]); if (!old) return null;
+  const kept = []; let moved = 0;
+  const walk = async (dir, segs) => {
+    for await (const [name, h] of dir.entries()) {
+      const here = segs.concat(name);
+      if (h.kind === "directory") { await walk(h, here); continue; }
+      if (JUNK_FILE.test(name)) continue;
+      const file = await h.getFile(); if (!file.size) continue;
+      const dest = await fsDir(parent, [to, ...segs], true), there = await fsSize(dest, name);
+      if (there === file.size) continue;
+      if (there > 0) { kept.push(here.join("/")); continue; }
+      await fsWrite(dest, name, new Uint8Array(await file.arrayBuffer())); moved++;
+    }
+  };
+  await walk(old, []);
+  if (!kept.length) await parent.removeEntry(from, { recursive: true });
   return { moved, kept, removed: !kept.length };
 }
 /** "2026-10-14 09:05" or an ISO timestamp → a Date for the zip */
@@ -958,7 +991,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-11-02.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-11-02.2";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -2451,6 +2484,17 @@ if (typeof document !== "undefined") (function () {
           const segs = saveRelPath(x.name); if (!segs.length) continue;
           const folder = await sub([saveTop(x), ...segs.slice(0, -1)]), name = segs[segs.length - 1];
           let size = await fsSize(folder, name);
+          if (x.old_name) {                                            // filed under its longer name before 3 Nov: renamed here, not downloaded again
+            const o = saveRelPath(x.old_name), oname = o[o.length - 1];
+            const ofolder = o.slice(0, -1).join("/") === segs.slice(0, -1).join("/") ? folder : await fsDirIf(dir, [saveTop(x), ...o.slice(0, -1)]);
+            const osize = ofolder ? await fsSize(ofolder, oname) : -1;
+            if (osize === 0) await ofolder.removeEntry(oname);          // an empty file left by a write that failed: it holds nothing
+            else if (osize > 0 && size <= 0) {
+              const old = await (await ofolder.getFileHandle(oname)).getFile();
+              size = await fsWrite(folder, name, new Uint8Array(await old.arrayBuffer()));
+              await ofolder.removeEntry(oname); res.renamed++; wrote++;
+            } else if (osize > 0 && osize === size) { await ofolder.removeEntry(oname); res.renamed++; }   // both there, the same: the old one goes
+          }
           if (size <= 0) {                                             // already saved files are never touched again
             if (x.in_cloud === false) continue;                       // off Supabase already (an archive zip, or saved here and in the backup)
             let data;
@@ -2488,7 +2532,7 @@ if (typeof document !== "undefined") (function () {
       if (how === "button") render(); else saveShow("Saving…");
       const started = new Date().toISOString();
       const res = { od: true, bk: true, checked: 0, saved: 0, files: 0, bytes: 0, skipped: [], problems: [], retry: new Map(),
-                    moved: 0, oldGone: 0, copies: [], off: 0, filed: 0, library: null };
+                    moved: 0, oldGone: 0, renamed: 0, copies: [], off: 0, filed: 0, library: null };
       let stopped = null;
       try {
         if (await S.save.od.queryPermission({ mode: "readwrite" }) !== "granted") { S.save.perm.od = "prompt"; throw { stop: "permission" }; }
@@ -2612,8 +2656,19 @@ if (typeof document !== "undefined") (function () {
     if (r.error || !Array.isArray(r.data)) { await saveLibraryIndex(res, sys); return; }
     if (r.data.length) saveShow(`Filing ${r.data.length} file${r.data.length === 1 ? "" : "s"} from dropped zips…`);
     const filed = [], holds = [], waitSys = [], waitJob = new Set();
+    const merged = new Map();                                       // Files › Metal drawings moved into Metal once per job and place
+    const filesDir = async (key, label, root, pid) => {
+      const d = await fsDir(root, [SAVE_DIR, SAVE_SUB.files], true);
+      if (!merged.has(`${key}|${pid}`)) {
+        merged.set(`${key}|${pid}`, true);
+        const m = await mergeOldFolder(d, METAL_OLD, METAL);
+        if (m && m.kept.length && res.problems.length < 50)
+          res.problems.push(`${pid}: the old “${METAL_OLD}” folder in ${label} (${SAVE_DIR} › ${SAVE_SUB.files}) is kept: ${m.kept.slice(0, 3).join(", ")} ${m.kept.length === 1 ? "is" : "are"} different from the file${m.kept.length === 1 ? "" : "s"} of the same name in “${METAL}”. Keep the right one in “${METAL}” and delete the old folder.`);
+      }
+      return d;
+    };
     for (const x of r.data) {
-      const segs = String(x.rel_path).split("/").map(safeSeg), base = segs.pop(), lib = x.place === "library";
+      const segs = (x.place === "library" ? String(x.rel_path) : metalRel(x.rel_path)).split("/").map(safeSeg), base = segs.pop(), lib = x.place === "library";
       const targets = [];
       let why = null;
       if (lib) {
@@ -2622,8 +2677,8 @@ if (typeof document !== "undefined") (function () {
         else { why = "Waiting for Claudes Shop System Folder to be chosen on the office's saving panel."; waitSys.push(x.rel_path); }
       } else {
         const num = projNumber(x.project_id), m = num === null ? [] : (index.get(num) || []);
-        if (bk) targets.push(["backup", "the backup folder", () => fsDir(bk, [safeSeg(x.project_id), SAVE_DIR, SAVE_SUB.files, ...segs], true)]);
-        if (m.length === 1) targets.push(["onedrive", "OneDrive", () => fsDir(m[0].dir, [SAVE_DIR, SAVE_SUB.files, ...segs], true)]);
+        if (bk) targets.push(["backup", "the backup folder", async () => fsDir(await filesDir("backup", "the backup folder", await fsDir(bk, [safeSeg(x.project_id)], true), x.project_id), segs, true)]);
+        if (m.length === 1) targets.push(["onedrive", "OneDrive", async () => fsDir(await filesDir("onedrive", "OneDrive", m[0].dir, x.project_id), segs, true)]);
         else { why = m.length ? `Waiting: ${x.project_id} has two OneDrive folders. Move or rename one.` : `Waiting for ${x.project_id}'s OneDrive folder to be made.`; waitJob.add(x.project_id); }
       }
       let data = null;
@@ -2634,13 +2689,12 @@ if (typeof document !== "undefined") (function () {
         let name = x.filed_name;
         if (!name && lib) name = base;
         if (!name) {                                                    // the plain name, unless a different file has it in either place
-          const stamp = stampShop(x.dropped_at).slice(0, 10);
-          for (const c of [base, datedName(base, stamp), ...[2, 3, 4, 5, 6, 7, 8, 9].map(k => datedName(base, `${stamp}-${k}`))]) {
+          for (const c of [base, ...Array.from({ length: 19 }, (_, i) => revName(base, i + 2))]) {
             let free = true;
             for (const [, , d] of dirs) if (await fsMatch(d, c, x.bytes, x.sha256) === "other") { free = false; break; }
             if (free) { name = c; break; }
           }
-          if (!name) throw new Error("ten files of that name are already there");
+          if (!name) throw new Error("twenty files of that name are already there");
         }
         let wrote = false;
         for (const [place, label, d] of dirs) {
@@ -2760,7 +2814,8 @@ if (typeof document !== "undefined") (function () {
           <span class="meta2" id="saveProgress">${esc(sv.running ? sv.progress || "Saving…" : "Saves by itself every 30 minutes while this page is open on this computer.")}</span></div>`
         : `<p class="sub" style="margin-top:12px">Choose the OneDrive projects folder (the one holding every PROJ folder) and a backup folder outside OneDrive. After that, this page saves by itself while it's open.</p>`}
       ${r && !r.stopped ? `<div class="banner ok">Saved ${esc(fmtWhen(r.at))}: ${r.checked} job${r.checked === 1 ? "" : "s"} checked, ${r.saved} with something new, ${r.files} file${r.files === 1 ? "" : "s"} written (${esc(fmtBytes(r.bytes))}).${r.oldGone
-          ? ` ${r.oldGone} old “${SAVE_DIR_OLD}” folder${r.oldGone === 1 ? " was" : "s were"} moved into “${SAVE_DIR}” and removed (${r.moved} file${r.moved === 1 ? "" : "s"} copied across).` : ""}${r.off
+          ? ` ${r.oldGone} old “${SAVE_DIR_OLD}” folder${r.oldGone === 1 ? " was" : "s were"} moved into “${SAVE_DIR}” and removed (${r.moved} file${r.moved === 1 ? "" : "s"} copied across).` : ""}${r.renamed
+          ? ` ${r.renamed} file${r.renamed === 1 ? " was" : "s were"} renamed to the shorter names.` : ""}${r.off
           ? ` ${r.off} file${r.off === 1 ? "" : "s"} came off Supabase: ${r.off === 1 ? "it's" : "they're"} in both OneDrive and the backup folder.` : ""}${r.filed
           ? ` ${r.filed} file${r.filed === 1 ? "" : "s"} from dropped zips filed.` : ""}${r.pos ? ` ${r.pos} Arrow PO${r.pos === 1 ? "" : "s"} saved in the Arrow folder.` : ""}${r.library !== null && r.library !== undefined
           ? ` The library holds ${r.library} file${r.library === 1 ? "" : "s"}.` : ""}</div>` : ""}

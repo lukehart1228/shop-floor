@@ -42,7 +42,8 @@ const FAKE = (user) => `window.supabase = { createClient: () => {
     rpc: async (fn, args) => call({ kind: "rpc", fn, args }),
     storage: { from: (b) => ({
       list: async (prefix, opts) => call({ kind: "list", b, prefix, opts }),
-      upload: async (p, blob, opts) => call({ kind: "up", b, p, b64: await toB64(blob), type: (opts || {}).contentType }),
+      upload: async (p, blob, opts) => call({ kind: "up", b, p, b64: await toB64(blob),   // the type supabase-js really sends: a Blob as its own type (2 Nov)
+        type: (typeof Blob !== "undefined" && blob instanceof Blob) ? (blob.type || "application/octet-stream") : ((opts || {}).contentType || "text/plain;charset=UTF-8") }),
       download: async (p) => { const r = await call({ kind: "dl", b, p }); if (r.error) return { data: null, error: r.error };
         const bin = Uint8Array.from(atob(r.b64), c => c.charCodeAt(0)); return { data: new Blob([bin], { type: r.type }), error: null }; } }) } };
 } };`;

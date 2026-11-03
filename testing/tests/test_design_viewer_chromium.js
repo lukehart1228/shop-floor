@@ -75,7 +75,8 @@ const FAKE = (user) => `window.supabase = { createClient: () => {
                    signInWithPassword: async () => ({ data: null, error: { message: "not here" } }) },
     from: builder, rpc: (fn, args) => call({ kind: "rpc", fn, args }),
     storage: { from: (bucket) => ({
-      upload: async (path, body, opts) => call({ kind: "storage", op: "upload", bucket, path, b64: await b64(body), opts }),
+      upload: async (path, body, opts) => call({ kind: "storage", op: "upload", bucket, path, b64: await b64(body),   // the type supabase-js really sends: a Blob as its own type, anything else as contentType (2 Nov)
+        opts: Object.assign({}, opts, { contentType: (typeof Blob !== "undefined" && body instanceof Blob) ? (body.type || "application/octet-stream") : ((opts && opts.contentType) || "text/plain;charset=UTF-8") }) }),
       download: async (path) => { const r = await call({ kind: "storage", op: "download", bucket, path });
         if (r.error) return { data: null, error: r.error }; const bin = atob(r.b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return { data: new Blob([u], { type: r.type }), error: null }; },
       createSignedUrl: async () => ({ data: null, error: { message: "not in this test" } }),

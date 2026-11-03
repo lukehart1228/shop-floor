@@ -23,7 +23,8 @@ const FAKE = (user) => `window.supabase = { createClient: () => {
                    signInWithPassword: async () => ({ data: null, error: { message: "not here" } }) },
     from: builder, rpc: (fn, args) => call({ kind: "rpc", fn, args }),
     storage: { from: (bucket) => ({
-      upload: async (path, body, opts) => call({ kind: "storage", op: "upload", bucket, path, b64: await b64(body), opts }),
+      upload: async (path, body, opts) => call({ kind: "storage", op: "upload", bucket, path, b64: await b64(body),   // the type supabase-js really sends: a Blob as its own type, anything else as contentType (2 Nov)
+        opts: Object.assign({}, opts, { contentType: (typeof Blob !== "undefined" && body instanceof Blob) ? (body.type || "application/octet-stream") : ((opts && opts.contentType) || "text/plain;charset=UTF-8") }) }),
       download: async (path) => { const r = await call({ kind: "storage", op: "download", bucket, path });
         if (r.error) return r; const bin = atob(r.b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return { data: new Blob([u]), error: null }; },
       remove: async (paths) => call({ kind: "storage", op: "remove", bucket, paths }) }) } };
@@ -112,7 +113,11 @@ const OLDDB = process.env.OLDDB === "1", ZIPS = "/tmp/zips";
       ["wrongitem.zip", /item Z-9, but no sheet in the upload file has that item code/, "a machine file for an item not on the sheets"],
       ["design-v1.zip", /Design is new in format 2, and this zip says format 1/, "Design/ in a format 1 zip"],
       ["badcrc.zip", /X-1 base\.pdf in this zip is damaged/, "a file that doesn't match its checksum"],
-      ["format3.zip", /says format 3; this page reads formats 1 and 2/, "a newer format"],
+      ["format4.zip", /says format 4; this page reads formats 1 to 3/, "a newer format"],
+      ["bt-noitem3.zip", /Bend-Tech holds one folder per item/, "format 3: a Bend-Tech file with no item folder"],
+      ["wrongfolder3.zip", /its folder \(X-2\) should be its item \(X-1\)/, "format 3: an item folder that isn't its item"],
+      ["toolong3.zip", /too long once filed \(Metal\/X-1\/A+\.pdf is 46 characters; 45 at most\)/, "format 3: a path too long once filed"],
+      ["metaldrawings3.zip", /Files holds only the folders Metal, KI, Arrow, Other/, "format 3: the old Metal drawings folder"],
       ["badjob.zip", /job should look like PROJ-00512/, "a job number that isn't PROJ-#####"],
       ["loose.zip", /Files holds only the folders/, "a loose file in Files"],
       ["wrongext.zip", /Router takes \.mprx or \.mpr only/, "a Router file that isn't a program"],
@@ -130,7 +135,7 @@ const OLDDB = process.env.OLDDB === "1", ZIPS = "/tmp/zips";
   ok("A good zip shows what Send does: the floor (2 sheets, 1 Arrow line), both machines, Files and the library",
      /Loads the floor/.test(t) && /2 sheets from the upload file \(X-1, X-2\)/.test(t) && /1 Arrow line ride/.test(t)
      && /Homag router · item X-1 · Top/.test(t) && /Bend-Tech · item X-1 · V-Arm/.test(t)
-     && /Filed in PROJ-00502 › Production › Files/.test(t) && /Metal drawings\/X-1 base\.pdf/.test(t) && /Router\/00502-X1\.mpr/.test(t)
+     && /Filed in PROJ-00502 › Production › Files/.test(t) && /Metal\/X-1 base\.pdf/.test(t) && /Router\/00502-X1\.mpr/.test(t)
      && /library \(Claudes Shop System Folder › Database\)/.test(t) && /Metal\/Cut sheets\/SAM 30x60\.pdf/.test(t), t.slice(0, 400));
   ok("…and nothing is sent before Send", await n("select count(*) n from zip_drops") === 0);
   const V = await n("select coalesce(max(w.version), 0) + 1 n from work_orders w join jobs j on j.id = w.job_id where j.project_id = 'PROJ-00502'");
@@ -184,6 +189,17 @@ const OLDDB = process.env.OLDDB === "1", ZIPS = "/tmp/zips";
      /3D views/.test(t) && /Done/.test(t) && (has3d ? /Not made/.test(t) && /STEP engine couldn.t be downloaded/.test(t)
        && await n("select count(*) n from item_designs where project_id = 'PROJ-00502' and item = 'X-1' and status = 'failed' and failed_why like '%STEP engine%'") === 1
        : /Not set up yet/.test(t) && /design_viewer\.sql hasn.t run/.test(t)), t.slice(-500));
+
+  // format 3 (3 Nov): Files › Metal, one folder per item, nothing over 45 characters as filed
+  t = await drop("PROJ-00502-v3.zip");
+  ok("Format 3: the plan shows Bend-Tech and Files › Metal with one folder per item", /format 3/.test(t) && /Bend-Tech\/X-1\/V-Arm\.step/.test(t)
+     && /Metal\/X-1\/Base\.pdf/.test(t) && /Metal\/Cut sheet\.pdf/.test(t), t.slice(0, 400));
+  t = await send();
+  ok("…sent: recorded as format 3, each file parked where it's filed (the STEP file unchanged, so not sent to the Bend-Tech again)", /Done/.test(t)
+     && await n("select count(*) n from zip_drops where format = 3") === 1
+     && await n("select count(*) n from parked_files where rel_path in ('Bend-Tech/X-1/V-Arm.step', 'Metal/X-1/Base.pdf', 'Metal/Cut sheet.pdf') and stored_at is not null") === 3
+     && await n("select count(*) n from machine_files where project_id = 'PROJ-00502'") === 3, t.slice(-300));
+  ok("…a format 2 zip's Metal drawings is parked as Metal", await n("select count(*) n from parked_files where zip_path = 'Files/Metal drawings/X-1 base.pdf' and rel_path = 'Metal/X-1 base.pdf'") >= 1);
 
   // a library-only zip
   t = await drop("Database 2026-11-03.zip");

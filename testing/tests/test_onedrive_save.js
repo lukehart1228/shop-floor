@@ -214,17 +214,25 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
   PICK = [bk]; await click(t.w, '[data-savepick="bk"]', 400);
   ok("Choosing the backup folder says the next save copies what it's missing", /Backup folder chosen: Shop Floor Backup/.test(txt(t.w)));
 
+  // filed under the longer names before 3 Nov: the site photo (the very bytes) and an empty defect photo a failed write left
+  od.file("PROJ-00418 Enid's Table", "Production", "Delivery", "TB-03", "TB-03-1 Delivery Picture.jpg").data = new Uint8Array(photoBytes);
+  od.file("PROJ-00418 Enid's Table", "Production", "Photos", "TB-03", "TB-03 Defect 1.jpg").data = new Uint8Array(0);
   // ---------- the first save ----------
   let r = await saveNow(t.w);
+  const oldGone = !od.find("PROJ-00418 Enid's Table/Production/Delivery/TB-03/TB-03-1 Delivery Picture.jpg") && !od.find("PROJ-00418 Enid's Table/Production/Photos/TB-03/TB-03 Defect 1.jpg");
+  ok("The short names (3 Nov): the site photo filed as TB-03-1 Delivery Picture.jpg is renamed 1 Delivery.jpg in place; the empty TB-03 Defect 1.jpg is cleared and Defect 1.jpg saved from Supabase; the panel says so",
+     oldGone && Buffer.from(od.find("PROJ-00418 Enid's Table/Production/Delivery/TB-03/1 Delivery.jpg").data).equals(photoBytes)
+     && Buffer.from(od.find("PROJ-00418 Enid's Table/Production/Photos/TB-03/Defect 1.jpg").data).equals(defectBytes)
+     && /1 file was renamed to the shorter names/.test(txt(t.w)), txt(t.w).match(/Saved .{0,300}/) || "");
   const odJob = od.find("PROJ-00418 Enid's Table/Production"), bkJob = bk.find("PROJ-00418/Production");
   const odFiles = odJob ? odJob.files().sort() : [], bkFiles = bkJob ? bkJob.files().sort() : [];
   ok("First save: PROJ-00418's site photo and signed ticket go in Production › Delivery, its defect photo in Photos, its records in Job Data",
-     odFiles.includes("Delivery/TB-03/TB-03-1 Delivery Picture.jpg") && odFiles.some(f => /^Delivery\/Delivery \d{4}-\d\d-\d\d\/Signed ticket\.pdf$/.test(f))
-     && odFiles.some(f => /^Photos\/TB-03\/TB-03 Defect 1\.jpg$/.test(f)) && odFiles.includes("Job Data/Production record.csv") && odFiles.includes("Job Data/Photos and files.csv"),
+     odFiles.includes("Delivery/TB-03/1 Delivery.jpg") && odFiles.some(f => /^Delivery\/Delivery \d{4}-\d\d-\d\d\/Signed ticket\.pdf$/.test(f))
+     && odFiles.some(f => /^Photos\/TB-03\/Defect 1\.jpg$/.test(f)) && odFiles.includes("Job Data/Production record.csv") && odFiles.includes("Job Data/Photos and files.csv"),
      odFiles.join(", "));
   ok("…the same files in the backup folder, under PROJ-00418/Production", JSON.stringify(bkFiles) === JSON.stringify(odFiles), bkFiles.join(", "));
   ok("…and no old-style folder is made anywhere", !od.find("PROJ-00418 Enid's Table/shop-floor data") && !bk.find("PROJ-00418/shop-floor data"));
-  ok("…the photo is the very file from Supabase, byte for byte", odJob && Buffer.from(odJob.find("Delivery/TB-03/TB-03-1 Delivery Picture.jpg").data).equals(photoBytes));
+  ok("…the photo is the very file from Supabase, byte for byte", odJob && Buffer.from(odJob.find("Delivery/TB-03/1 Delivery.jpg").data).equals(photoBytes));
   const pdf = odJob && odJob.find(odFiles.find(f => /Signed ticket\.pdf$/.test(f)));
   ok("…the signed ticket is a real PDF, signed by Pat Customer", pdf && new TextDecoder().decode(pdf.data.slice(0, 5)) === "%PDF-");
   const prod = txtOf(odJob && odJob.find("Job Data/Production record.csv")) || "";
@@ -253,7 +261,7 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
   ok("…and Windows' Thumbs.db went with the old folder (it didn't stop the move, and wasn't copied)", !j099.files().some(f => /Thumbs\.db/.test(f)));
   ok("…a photo marked entered by mistake since it was saved is recognised under its new name (copied across, not left behind)",
      /entered by mistake/.test(name99(P99VOID)[1]) && txtOf(od.find(["PROJ-00000 - 00099", "PROJ-00099 Smith Lobby", "Production", "Delivery", ...name99(P99VOID)].join("/"))) === txtOf({ data: OLD99 })
-     && !j099.files().some(f => f.endsWith(name99(P99VOID)[1].replace(" (entered by mistake)", ""))), j099.files().join(", "));
+     && !j099.find(["Production", "Delivery", name99(P99VOID)[0], name99(P99VOID)[1].replace(" (entered by mistake)", "")].join("/")), j099.files().join(", "));
   const j501 = od.find("500s/Proj-00501 Hotel");
   ok("PROJ-00501: a file put there by hand keeps its old folder, untouched, and the save says so",
      txtOf(j501.find("shop-floor data/notes from the site visit.txt")) === "bring the long screws"
@@ -273,7 +281,7 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
   await click(t.w, '[data-tab="photos"]', 900);
 
   // ---------- a second save writes nothing; a changed file in OneDrive is never overwritten ----------
-  const photoFile = odJob.find("Delivery/TB-03/TB-03-1 Delivery Picture.jpg"); photoFile.data = new TextEncoder().encode("EDITED BY HAND");
+  const photoFile = odJob.find("Delivery/TB-03/1 Delivery.jpg"); photoFile.data = new TextEncoder().encode("EDITED BY HAND");
   const writes0 = LOG.length;
   r = await saveNow(t.w);
   ok("Second save straight after: nothing new, nothing written (PROJ-00501's old folder is looked at again, and still kept)",
@@ -347,15 +355,15 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
        !await inStorage(DEFECT_PATH) && !await inStorage(TICKET) && /2 files came off Supabase: they're in both OneDrive and the backup folder/.test(txt(t.w)),
        txt(t.w).match(/Saved [^]{0,400}/) || "");
     ok("…but the site photo whose OneDrive copy was changed by hand (a different size) stays on Supabase, and the save says why",
-       await inStorage(PHOTO_PATH) && (r.problems || []).some(x => /PROJ-00418: Delivery\/TB-03\/TB-03-1 Delivery Picture\.jpg in OneDrive isn't the same size as the copy on Supabase, so it stays on Supabase/.test(x)),
+       await inStorage(PHOTO_PATH) && (r.problems || []).some(x => /PROJ-00418: Delivery\/TB-03\/1 Delivery\.jpg in OneDrive isn't the same size as the copy on Supabase, so it stays on Supabase/.test(x)),
        JSON.stringify(r.problems));
     const marks = (await admin.query(`select (select count(*) from photos where job_id = $1 and file_removed_at is not null)::int as p,
                                              (select count(*) from delivery_docs where job_id = $1 and file_removed_at is not null)::int as d,
                                              (select count(*) from photos where job_id = $1)::int as pall`, [J418])).rows[0];
     ok("…the records stay, the two that went marked off Supabase", marks.p === 1 && marks.d === 1 && marks.pall === 2, JSON.stringify(marks));
     ok("…and they're still in OneDrive and the backup folder (the ticket saved just before it went)",
-       !!odJob.find("Delivery/TB-03/TB-03-1 Delivery Picture.jpg") && !!bkJob.find("Photos/TB-03/TB-03 Defect 1.jpg")
-       && odJob.files().some(f => /^Delivery\/Delivery \d{4}-\d\d-\d\d\/Delivery ticket\.pdf$/.test(f)) && bkJob.files().some(f => /Delivery ticket\.pdf$/.test(f)));
+       !!odJob.find("Delivery/TB-03/1 Delivery.jpg") && !!bkJob.find("Photos/TB-03/Defect 1.jpg")
+       && odJob.files().some(f => /^Delivery\/Delivery \d{4}-\d\d-\d\d\/Ticket\.pdf$/.test(f)) && bkJob.files().some(f => /\/Ticket\.pdf$/.test(f)));
     ok("A job still on the floor keeps its files on Supabase (PROJ-00099)", await inStorage(P99));
     const w2 = LOG.length;
     r = await saveNow(t.w);
@@ -365,10 +373,10 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
     t.w.document.querySelector("#phJob").value = "418"; await click(t.w, "[data-phfind]", 1500);
     ok("Looking up PROJ-00418: the photo that went says it's in OneDrive", /Off Supabase · in OneDrive/.test(txt(t.w)) && /1 of this job's photos is off Supabase: it's in the job's OneDrive folder \(Production\) and the backup folder/.test(txt(t.w)),
        (txt(t.w).match(/On defects and issues.{0,300}/) || [""])[0]);
-    odJob.find("Delivery/TB-03").kids.delete("TB-03-1 Delivery Picture.jpg");     // Luke deletes the edited copy
+    odJob.find("Delivery/TB-03").kids.delete("1 Delivery.jpg");     // Luke deletes the edited copy
     r = await saveNow(t.w);
     ok("Deleting the changed copy: the next save puts the original back from Supabase, then takes it off",
-       Buffer.from(odJob.find("Delivery/TB-03/TB-03-1 Delivery Picture.jpg").data).equals(photoBytes) && !await inStorage(PHOTO_PATH)
+       Buffer.from(odJob.find("Delivery/TB-03/1 Delivery.jpg").data).equals(photoBytes) && !await inStorage(PHOTO_PATH)
        && /1 file came off Supabase: it's in both OneDrive and the backup folder/.test(txt(t.w)), txt(t.w).match(/Saved [^]{0,300}/) || "");
   }
 
@@ -380,7 +388,7 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
   const bkNow = bk.find("PROJ-00418/Production").files().sort();
   ok(hasOff ? "Changing the backup folder to a new drive: the next save copies every job's files it can still get there (not the ones off Supabase)"
             : "Changing the backup folder to a new drive: the next save copies every job's files there",
-     (hasOff ? extFiles.length && extFiles.every(f => bkNow.includes(f)) && !extFiles.includes("Delivery/TB-03/TB-03-1 Delivery Picture.jpg") && !extFiles.includes("Photos/TB-03/TB-03 Defect 1.jpg")
+     (hasOff ? extFiles.length && extFiles.every(f => bkNow.includes(f)) && !extFiles.includes("Delivery/TB-03/1 Delivery.jpg") && !extFiles.includes("Photos/TB-03/Defect 1.jpg")
              : JSON.stringify(extFiles) === JSON.stringify(bkNow)) && !!ext.find("PROJ-00325/Production/Job Data/Flags.csv"), extFiles.join(", "));
 
   // ---------- reopening the page: the folders are remembered; it saves by itself ----------
