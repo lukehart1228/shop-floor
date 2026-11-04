@@ -9,6 +9,9 @@ const { makeClient, users, admin, setOffline } = require("./pgsupa");
 const OUT = process.env.OUT || "/home/claude/sf/out";
 const OFFICE_V = (require("fs").readFileSync(`${process.env.OUT || "/home/claude/sf/out"}/office.html`, "utf8").match(/const OFFICE_VERSION = "([^"]+)"/) || [])[1];   // 6 Oct: read from the page, not written in here
 // 26 Oct: Julia's page's version, read from the page too (it was pinned to 2026-10-05.2 until incomplete deliveries changed it)
+// 4 Nov: each page's version read from the page itself (OUT's copy, else the repo's), not written in here
+const pageV = (file) => { const d = process.env.OUT || "/home/claude/sf/out", p = fs_exists(`${d}/${file}`) ? `${d}/${file}` : `/home/claude/sf/repo/${file}`;
+  return (require("fs").readFileSync(p, "utf8").match(/var PAGE_VERSION = "([^"]+)"/) || [])[1]; };
 const DLV_V = (require("fs").readFileSync(fs_exists(`${process.env.OUT || "/home/claude/sf/out"}/delivery.html`) ? `${process.env.OUT || "/home/claude/sf/out"}/delivery.html` : "/home/claude/sf/repo/delivery.html", "utf8").match(/var PAGE_VERSION = "([^"]+)"/) || [])[1];
 function fs_exists(f) { try { return require("fs").existsSync(f); } catch (e) { return false; } }
 const TABLET_V = (require("fs").readFileSync(`${process.env.OUT || "/home/claude/sf/out"}/index.html`, "utf8").match(/const PAGE_VERSION = "([^"]+)"/) || [])[1];   // the same for the tablet page
@@ -185,14 +188,14 @@ async function sendShared(w, note) {
   ok("Setup and the other office screens open as before", /Setup/.test(txt(w, "main h1")));
   w.close();
 
-  // ---- 6. deliveries, inventory, pace, upload ----
-  for (const [page, key, name] of [["delivery.html", "delivery", "Deliveries"], ["inventory.html", "inventory", "Inventory"], ["pace.html", "pace", "Pace"], ["upload.html", "upload", "Work order upload"]]) {
+  // ---- 6. deliveries, inventory, pace (called Data from 4 Nov), upload ----
+  for (const [page, key, name] of [["delivery.html", "delivery", "Deliveries"], ["inventory.html", "inventory", "Inventory"], ["pace.html", "pace", "Data"], ["upload.html", "upload", "Work order upload"]]) {
     t = boot(page, users.luke); w = t.w;
     await until(() => $(w, "header [data-sffb]"), 8000); await wait(600);
     ok(`${name}: the header has a Feedback button`, !!$(w, "header [data-sffb]"));
     r = await sendShared(w, `A note from ${key}`);
     f = (await rows()).pop();
-    ok(`${name}: it says thanks and keeps who, the page and the screen`, /Thanks/.test(r.said) && f.body === `A note from ${key}` && f.page === key && f.person_name === "Luke H" && f.screen && f.screen.startsWith(name) && f.page_version === (key === "delivery" ? DLV_V : "2026-10-05.1"),
+    ok(`${name}: it says thanks and keeps who, the page and the screen`, /Thanks/.test(r.said) && f.body === `A note from ${key}` && f.page === key && f.person_name === "Luke H" && f.screen && f.screen.startsWith(name) && f.page_version === pageV(page),
        JSON.stringify({ said: r.said, where: r.where, page: f.page, v: f.page_version }));
     w.close();
   }

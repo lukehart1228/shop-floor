@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Job status — Shop Floor</title>
+<title>Job status — Production</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
@@ -26,7 +26,7 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid
 .num{font-family:'Barlow Condensed',sans-serif; font-variant-numeric:tabular-nums}
 [hidden]{display:none!important}
 
-/* top bar, as on the tablet: SHOP FLOOR, where you are, a status pill */
+/* top bar, as on the tablet: PRODUCTION (SHOP FLOOR until 4 Nov), where you are, a status pill */
 body::before{content:""; position:fixed; inset:0 0 auto; height:env(safe-area-inset-top,0px); z-index:10; background:var(--midnight)}
 .top{position:sticky; top:env(safe-area-inset-top,0px); z-index:10; background:var(--midnight); color:var(--sawdust); padding:0 24px}
 .top-row{display:flex; align-items:center; gap:12px; min-height:52px; max-width:772px; margin:0 auto}
@@ -136,7 +136,7 @@ table.grid{border-collapse:separate; border-spacing:6px; font-size:15px}
 </head>
 <body>
 <header class="top"><div class="top-row hrow">
-  <span class="brand">SHOP FLOOR</span><span class="place">Job status</span>
+  <span class="brand">PRODUCTION</span><span class="place">Job status</span>
   <span class="right" id="right"></span>
 </div></header>
 <main id="app"></main>
@@ -145,7 +145,7 @@ table.grid{border-collapse:separate; border-spacing:6px; font-size:15px}
 <script src="sf-common-2026-10-05.1.js"></script>
 <script>
 /* Connection settings, the key check, the device report and the Feedback button are in sf-common-2026-10-05.1.js. */
-var PAGE_VERSION = "2026-10-28.1";          // this page's version: bump it with every change (it shows in select * from devices();)
+var PAGE_VERSION = "2026-11-04.1";          // this page's version: bump it with every change (it shows in select * from devices();)
 (function () {
   const app = document.getElementById("app");
   const right = document.getElementById("right");

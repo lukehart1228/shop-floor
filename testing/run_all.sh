@@ -82,9 +82,10 @@ run test_arrow_dept        none  PAGE=$PAGE -- node test_arrow_dept.js   # 4 Nov
 run test_style_same        none  OUT=$P -- node test_style_same.js
 run test_builder_catch     none  OUT=$P -- node test_builder_catch.js   # 2 Nov: real supabase-js requests have no .catch
 run test_lab_reference     none  LAB=$P/lab.html -- node test_lab_reference.js
+run test_app_name          none  OUT=$P -- node test_app_name.js   # 4 Nov: the app is called Production
 # 4 Nov: test_same sets the top bar and tab strip aside and skips Arrow: Arrow left Metal's, Assembly's and Delivery's tabs for its own department
 if [ -f $OUT/index.html ]; then run test_same seed NEWPAGE=$OUT/index.html HEADER=ignore NAV=ignore SKIP_TABS=arrow -- node test_same.js; else want test_same && row test_same skipped "no tablet page in OUT"; fi
-run test_same_office       seed  OUT=$P PHOTOSPACE=ignore ARROWPOS=ignore -- node test_same_office.js   # 31 Oct: the Photos tab changed on purpose; 1 Nov: the Arrow POs panel
+run test_same_office       seed  OUT=$P PHOTOSPACE=ignore ARROWPOS=ignore NAMES=ignore -- node test_same_office.js   # 31 Oct: the Photos tab changed on purpose; 1 Nov: the Arrow POs panel; 4 Nov: the office names
 run test_feedback          seed  OUT=$P -- node test_feedback.js
 run test_feedback_close    seed  OUT=$P -- node test_feedback_close.js
 run test_trip_types        seed  OUT=$P -- node test_trip_types.js
@@ -123,7 +124,7 @@ run test_zip_drop          seed  OUT=$P $PW -- node test_zip_drop.js
 run test_zip_filing_chromium seed OUT=$P $PW -- node test_zip_filing_chromium.js
 run test_arrow_po          seed  PAGE=$PAGE $PW -- node test_arrow_po.js
 run test_arrow_po_remake   seed  OUT=$P $PW -- node test_arrow_po_remake.js   # 4 Nov: Make it again; the office PDF as Luke's template
-want test_lab && row test_lab skipped "needs the three work orders beside it (customer documents, ask Luke)"
+want test_lab && row test_lab skipped "retired: the Prototype lab left the office menu 4 Nov (lab.html stays on GitHub, unlinked)"
 fi
 # 1 Nov: the 3D design viewer, on its own: real STEP files through the real engine take a few minutes
 if in_group browser3; then

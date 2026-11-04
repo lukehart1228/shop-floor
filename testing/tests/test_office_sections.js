@@ -10,6 +10,9 @@ const OUT = process.env.OUT || "/home/claude/sf/out", REPO = "/home/claude/sf/re
 const OFFICE_V = (require("fs").readFileSync(`${process.env.OUT || "/home/claude/sf/out"}/office.html`, "utf8").match(/const OFFICE_VERSION = "([^"]+)"/) || [])[1];   // 6 Oct: read from the page, not written in here
 // 26 Oct: Julia's page's version, read from the page too (pinned to 2026-10-05.2 until incomplete deliveries changed it)
 const DLV_FILE = [`${process.env.OUT || "/home/claude/sf/out"}/delivery.html`, "/home/claude/sf/repo/delivery.html"].find(f => require("fs").existsSync(f));
+// 4 Nov: every page's version read from the page itself, not written in here
+const pageV = (file) => { const d = process.env.OUT || "/home/claude/sf/out", p = require("fs").existsSync(`${d}/${file}`) ? `${d}/${file}` : `/home/claude/sf/repo/${file}`;
+  return (require("fs").readFileSync(p, "utf8").match(/var PAGE_VERSION = "([^"]+)"/) || [])[1]; };
 const DLV_V = (require("fs").readFileSync(DLV_FILE, "utf8").match(/var PAGE_VERSION = "([^"]+)"/) || [])[1];
 let pass = 0, fail = 0;
 const ok = (n, c, x = "") => { c ? pass++ : fail++; console.log(`${c ? "PASS" : "FAIL"}  ${n}${x ? "  — " + x : ""}`); };
@@ -74,8 +77,10 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   let s = await session(browser, users.luke), p = s.p;
   await p.goto(base); await p.waitForSelector("header.top [data-tab]", { timeout: 15000 }).catch(async (e) => { console.log("APP:", (await p.evaluate(() => document.body.innerText)).slice(0, 400)); console.log("ERRS:", s.errs.join(" | ")); throw e; });
   const items = await menu(p);
-  ok("Luke's ☰ menu: the office's tabs, then Deliveries, Upload, Inventory, Pace, Job status, the lab and Drop a job's zip (1 Nov, he's let into the lab) inside the office; Tablet app, Setup, Feedback",
-     JSON.stringify(items) === JSON.stringify(["Operations, Arrow, Photos", "Deliveries", "Upload a work order", "Inventory", "Pace", "Job status", "Prototype lab", "Drop a job's zip", "Tablet app", "Setup", "Feedback", "Sign out"]), JSON.stringify(items));
+  // 4 Nov: Upload and the Prototype lab left the menu; Pace is called Data, Drop a job's zip Project Handoff; Job status is a tab
+  ok("Luke's ☰ menu: Operations, Project Handoff (he's let in), Deliveries, Inventory, Data; Tablet app, Setup, Feedback",
+     JSON.stringify(items) === JSON.stringify(["Operations", "Project Handoff", "Deliveries", "Inventory", "Data", "Tablet app", "Setup", "Feedback", "Sign out"]), JSON.stringify(items));
+  ok("…each item just its name, with no description under it (Luke, 4 Nov)", (await p.$$(".menu small")).length === 0);
   await p.click('.menu [data-section="deliveries"]');
   await p.waitForFunction(() => { const f = document.querySelector("#secs iframe"); return f && f.contentDocument && f.contentDocument.querySelector("#app") && f.contentDocument.querySelector("#app").textContent.length > 20; }, null, { timeout: 15000 });
   let fr = frameOf(p, "delivery.html");
@@ -97,7 +102,7 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   await p.fill("#sf-fb textarea", "Inventory note from the office app"); await p.click("#sf-fb [data-sffbsend]");
   await p.waitForFunction(() => /Thanks/.test(document.getElementById("sf-fb") ? document.getElementById("sf-fb").innerText : ""), null, { timeout: 8000 });
   let f = (await admin.query("select * from feedback order by created_at desc limit 1")).rows[0];
-  ok("Feedback from inside Inventory is kept as Inventory, with its tab and its version", f && f.page === "inventory" && /^Inventory › /.test(f.screen) && f.page_version === "2026-10-05.1" && f.person_name === "Luke H",
+  ok("Feedback from inside Inventory is kept as Inventory, with its tab and its version", f && f.page === "inventory" && /^Inventory › /.test(f.screen) && f.page_version === pageV("inventory.html") && f.person_name === "Luke H",
      JSON.stringify({ where, page: f && f.page, screen: f && f.screen, v: f && f.page_version }));
   await p.waitForTimeout(2700);
   await menu(p); await p.click('.menu [data-section="deliveries"]'); await p.waitForTimeout(300);
@@ -107,15 +112,16 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   ok("A tab (Arrow) leaves the section: the office screen shows, the section hides", /Arrow/.test(await p.$eval("main h1", e => e.textContent)) && !(await visible(p, "#secs")) && !p.url().includes("#"));
   ok("…and the page scrolls normally again", await p.evaluate(() => !document.documentElement.classList.contains("in-section")));
   await p.goto(base + "#pace"); await p.waitForFunction(() => [...document.querySelectorAll("#secs iframe")].some(f => !f.hidden && /pace/.test(f.src)), null, { timeout: 15000 });
-  ok("A link to office.html#pace opens straight into Pace", /Pace/.test(await p.$eval("header.top .place", e => e.textContent)));
+  ok("A link to office.html#pace (bookmarks from before 4 Nov) opens straight into Data", /^Data$/.test((await p.$eval("header.top .place", e => e.textContent)).trim()));
+  ok("…whose own tabs still start with Pace", await frameOf(p, "pace.html").waitForFunction(() => /^Pace/.test(document.getElementById("tabs").textContent.trim()), null, { timeout: 8000 }).then(() => true).catch(() => false));
   await p.waitForTimeout(1500);
   const dev = await p.evaluate(() => JSON.parse(localStorage.getItem("sf_device")));
   const rep = (await admin.query("select page, version from device_versions where device_id = $1 order by page", [dev])).rows.map(r => r.page + " " + r.version);
-  ok("Every page reports its version, as one device", [`delivery ${DLV_V}`, "inventory 2026-10-05.1", `office ${OFFICE_V}`, "pace 2026-10-05.1"].every(x => rep.includes(x)), rep.join(", "));
-  // 1 Nov: Drop a job's zip joins the menu for logins let into the lab; Upload and the lab stay
+  ok("Every page reports its version, as one device", [`delivery ${DLV_V}`, `inventory ${pageV("inventory.html")}`, `office ${OFFICE_V}`, `pace ${pageV("pace.html")}`].every(x => rep.includes(x)), rep.join(", "));
+  // 4 Nov: Project Handoff (was Drop a job's zip) is in the menu for logins let in; Upload and the lab are gone from it
   await menu(p);
   const menuItems = await p.$$eval(".menu [data-section]", bs => bs.map(b => b.dataset.section));
-  ok("The ☰ menu has Drop a job's zip beside Upload and the Prototype lab (both kept, Luke 1 Nov)", menuItems.includes("drop") && menuItems.includes("upload") && menuItems.includes("lab"), menuItems.join(", "));
+  ok("The ☰ menu has Project Handoff, and no Upload or Prototype lab (Luke, 4 Nov)", menuItems.includes("drop") && !menuItems.includes("upload") && !menuItems.includes("lab"), menuItems.join(", "));
   await p.click('.menu [data-section="drop"]');
   await p.waitForFunction(() => [...document.querySelectorAll("#secs iframe")].some(f => !f.hidden && /drop/.test(f.src) && f.contentDocument && f.contentDocument.body && f.contentDocument.body.innerText.length > 20), null, { timeout: 15000 });
   fr = frameOf(p, "drop.html");
@@ -123,6 +129,12 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   // 21 Oct: wait for the hiding, which the page does a moment after its text appears (this line was flaky since 6 Oct)
   const hid = await fr.waitForFunction(() => getComputedStyle(document.querySelector("header")).display === "none", null, { timeout: 10000 }).then(() => true).catch(() => false);
   ok("…its header hidden", hid);
+  ok("…and the page is called Project Handoff, in the office's header and its own", /^Project Handoff$/.test((await p.$eval("header.top .place", e => e.textContent)).trim()) && await fr.evaluate(() => document.querySelector("header h1").textContent === "Project Handoff" && /^Project Handoff/.test(document.title)));
+  for (const k of ["upload", "lab"]) {          // a fresh tab, as a bookmark opens
+    const q = await s.ctx.newPage(); await q.goto(base + "#" + k); await q.waitForSelector("header.top [data-tab]", { timeout: 15000 }); await q.waitForTimeout(800);
+    ok(`An old link to office.html#${k} opens the office's own tabs, not the retired page`, !(await q.$(`#secs iframe[src^='${k}.html']`)) && !(await q.evaluate(() => document.documentElement.classList.contains("in-section"))));
+    await q.close();
+  }
   ok("No errors on any page", s.errs.length === 0, s.errs.join(" | "));
   await menu(p); await p.click('.menu [data-signout]'); await p.waitForTimeout(500);
   ok("Sign out closes every section and shows the sign-in", await p.evaluate(() => document.querySelectorAll("#secs iframe").length === 0 && !!document.querySelector("form.card")));
@@ -156,7 +168,7 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   await s.ctx.close();
 
   // ---- each section opened on its own still works (as before) ----
-  for (const [file, word] of [["delivery.html", "Deliveries"], ["inventory.html", "Inventory"], ["pace.html", "Pace"], ["upload.html", "upload"]]) {
+  for (const [file, word] of [["delivery.html", "Deliveries"], ["inventory.html", "Inventory"], ["pace.html", "Data"], ["upload.html", "upload"]]) {
     s = await session(browser, users.luke); p = s.p;
     await p.goto(base.replace("office.html", file)); await p.waitForTimeout(2500);
     ok(`${file} opened on its own: its header shows, with its Feedback button`, await visible(p, "header") && !!(await p.$("header [data-sffb]")) && new RegExp(word, "i").test(await p.$eval("header", e => e.innerText)) && s.errs.length === 0, s.errs.join(" | "));

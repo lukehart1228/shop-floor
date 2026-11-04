@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#181D2E">
-<title>Drop a job's zip · Shop Floor</title>
+<title>Project Handoff · Production</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
@@ -103,7 +103,7 @@
 <body>
 <header>
   <div class="brand">PURPOSEFUL <span>DESIGN</span></div>
-  <h1>Drop a job's zip</h1>
+  <h1>Project Handoff</h1>
   <a class="toofc" href="office.html#drop">← Office</a>
 </header>
 
@@ -112,7 +112,7 @@
 
   <section id="signIn" class="card" hidden>
     <h2>Sign in</h2>
-    <p class="sub">Dropping zips and sending machine files is only for the logins let into the lab.</p>
+    <p class="sub">Project Handoff (dropping zips and sending machine files) is only for the logins allowed in.</p>
     <form id="signInForm">
       <label class="f" for="email">Email</label>
       <input id="email" type="email" autocomplete="username" required>
@@ -146,7 +146,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
 <script src="sf-common-2026-10-05.1.js"></script>
 <script>
-var PAGE_VERSION = "2026-11-02.3";          // this page's version: bump it with every change (it shows in select * from devices();)
+var PAGE_VERSION = "2026-11-04.1";          // this page's version: bump it with every change (it shows in select * from devices();)
 
 /* ---- core: no screen code in here, so it can be tested on its own ----
    The zip format is 11_SHOP_FLOOR_ZIP.md (format 1; format 2 with Design/; format 3, 3 Nov: Files/Metal, one folder per item
@@ -286,9 +286,9 @@ function itemFolderOf(path, format) {
 /** Checks a whole zip against its contents.json. Returns the plan (what goes where), or throws with the first reason. */
 function checkZip(entries) {
   const cj = entries.find(e => e.path === "contents.json");
-  if (!cj) throw new Error("There's no contents.json at the top of this zip, so it isn't a shop floor zip.");
+  if (!cj) throw new Error("There's no contents.json at the top of this zip, so it isn't a Project Handoff zip.");
   let c; try { c = JSON.parse(new TextDecoder().decode(cj.data)); } catch (e) { throw new Error("contents.json isn't valid JSON."); }
-  if (!c || c.kind !== "shop-floor-zip") throw new Error(`contents.json's kind isn't "shop-floor-zip", so this isn't a shop floor zip.`);
+  if (!c || c.kind !== "shop-floor-zip") throw new Error(`contents.json's kind isn't "shop-floor-zip", so this isn't a Project Handoff zip.`);
   if (![1, 2, 3].includes(c.format)) throw new Error(`contents.json says format ${c.format}; this page reads formats 1 to 3. If it's newer, the page needs updating.`);
   const job = c.job === null ? null : c.job;
   if (job !== null && !/^(PROJ|TEST)-\d{5}$/.test(String(job))) throw new Error("contents.json's job should look like PROJ-00512 (or null for a library-only zip).");
@@ -418,7 +418,7 @@ if (typeof document !== "undefined") (function () {
   const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   sfEmbed("header");
   sfReportDevice(db, "drop", PAGE_VERSION);
-  $("foot").textContent = `Drop page ${PAGE_VERSION}. Zips follow 11_SHOP_FLOOR_ZIP.md, formats 1 to 3.`;
+  $("foot").textContent = `Project Handoff page ${PAGE_VERSION}. Zips follow 11_SHOP_FLOOR_ZIP.md, formats 1 to 3.`;
 
   const notSetUp = (e) => /zip_drop|parked_files|zip_drops|lab_allowed|machine_files|schema cache|does not exist|PGRST202|PGRST205|42883|42P01/i.test(String((e && (e.message || e.code)) || "") + " " + String((e && e.code) || ""));
   function friendly(e) {

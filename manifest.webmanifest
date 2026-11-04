@@ -1,7 +1,7 @@
 {
-  "name": "Shop Floor — Purposeful Design",
-  "short_name": "Shop Floor",
-  "description": "Work orders and piece counts for the shop floor.",
+  "name": "Production — Purposeful Design",
+  "short_name": "Production",
+  "description": "Work orders and piece counts for production.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

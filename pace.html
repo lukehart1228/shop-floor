@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#181D2E">
-<title>Pace · Shop Floor</title>
+<title>Data · Production</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
@@ -125,7 +125,7 @@
 </head>
 <body>
 <header>
-  <div class="hrow"><div class="brand">PURPOSEFUL</div><h1>Pace</h1><div class="me" id="me"></div></div>
+  <div class="hrow"><div class="brand">PURPOSEFUL</div><h1>Data</h1><div class="me" id="me"></div></div>
   <nav class="tabs" id="tabs" hidden></nav>
 </header>
 <div id="app"></div>
@@ -136,7 +136,7 @@
 <script>
 /* The two settings (project address, publishable key), the key check, the connection test, the id maker and the
    Feedback button are in the shared file loaded above, sf-common-2026-10-05.1.js. */
-var PAGE_VERSION = "2026-10-05.1";          // this page's version: bump it with every change (it shows in select * from devices();)
+var PAGE_VERSION = "2026-11-04.1";          // this page's version: bump it with every change (it shows in select * from devices();)
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -149,7 +149,7 @@ function friendlyError(err) {
   if (/jwt expired|refresh token/i.test(m)) return "The sign-in has expired. Sign out and back in.";
   if (isMissing(err)) return "Pace isn't set up in the database yet. Run pace.sql (Walkthrough 16), wait a minute, then reload this page.";
   if (/Only a manager/i.test(m)) return m;
-  if (/row-level security|permission denied|insufficient/i.test(m)) return "This login can't do that. The Pace page is for managers.";
+  if (/row-level security|permission denied|insufficient/i.test(m)) return "This login can't do that. The Data page is for managers.";
   return m || "Something went wrong. Try again, and if it keeps happening, take a screenshot.";
 }
 const DAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -244,7 +244,7 @@ if (typeof document !== "undefined") (function () {
     document.getElementById("so").onclick = async () => { await db.auth.signOut(); location.reload(); };
     if (S.me.role !== "manager" && S.me.role !== "admin") {
       tabsEl.hidden = true;
-      app.innerHTML = `<main><div class="card"><h2>For managers</h2><p class="sub">The Pace page is for the office.</p></div></main>`;
+      app.innerHTML = `<main><div class="card"><h2>For managers</h2><p class="sub">The Data page is for the office.</p></div></main>`;
       return;
     }
     if (!S.loaded) { app.innerHTML = `<main><p class="muted">Loading…</p></main>`; return; }

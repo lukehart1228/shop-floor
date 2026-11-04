@@ -120,18 +120,26 @@ const shot = async (p, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
     ok("A login with no profile is told it can't look up jobs", /can't look up jobs/.test(await text(p)), (await text(p)).slice(0, 100));
     await ctx.close(); }
 
-  // ---- Luke: the office menu has Job status, and it opens inside the office --------------------------------
+  // ---- Luke: Job status is a tab beside Operations (4 Nov), and it opens inside the office ------------------------
   { const { p, errs, ctx } = await session(browser, users.luke, { width: 1366, height: 860 });
-    await p.goto(`${BASE}/office.html`); await p.waitForSelector("[data-menu]", { timeout: 8000 });
+    await p.goto(`${BASE}/office.html`); await p.waitForSelector("nav.tabs .tab", { timeout: 8000 });
+    const tabs = await p.$$eval("nav.tabs .tab", els => els.map(e => ((e.firstChild && e.firstChild.textContent) || e.textContent).trim()));
+    ok("The office's tabs are Operations, Job status, Arrow, OneDrive", JSON.stringify(tabs) === JSON.stringify(["Operations", "Job status", "Arrow", "OneDrive"]), tabs.join(", "));
     await p.click("[data-menu]"); await p.waitForSelector(".menu");
-    // each item's own label (its first text), not innerText: the office re-draws as its data arrives, and an item caught
-    // mid-redraw has no layout, so its label and note ran together and the check failed at random (31 Oct)
+    // each item's own label (its first text), not innerText: the office re-draws as its data arrives (31 Oct)
     const items = await p.$$eval(".menu .mitem, .menu a", els => els.map(e => ((e.firstChild && e.firstChild.textContent) || e.textContent).trim()));
-    ok("Luke's office ☰ menu lists Job status", items.includes("Job status"), items.join(", "));
-    await p.click(".menu >> text=Job status"); await p.waitForTimeout(1500);
+    ok("The ☰ menu doesn't list Job status (its first item, Operations, goes back to the tabs)", !items.includes("Job status") && items[0] === "Operations", items.join(", "));
+    await p.click("[data-menuclose]").catch(() => {}); await p.waitForTimeout(200);
+    await p.click('nav.tabs [data-section="status"]'); await p.waitForTimeout(1500);
     const fr = p.frames().find(f => f.url().includes("status.html"));
     const hdr = fr ? await fr.$eval("header .hrow", el => getComputedStyle(el).display).catch(() => "?") : "no frame";
-    ok("It opens inside the office, with the page's own header hidden", !!fr && hdr === "none", `frame ${!!fr}, header ${hdr}`);
+    ok("The Job status tab opens it inside the office, with the page's own header hidden", !!fr && hdr === "none", `frame ${!!fr}, header ${hdr}`);
+    const cur = await p.$$eval("nav.tabs .tab", els => els.filter(e => e.getAttribute("aria-current") === "true").map(e => e.textContent.trim()));
+    ok("…and only the Job status tab is marked as the one open", JSON.stringify(cur) === JSON.stringify(["Job status"]), cur.join(", "));
+    ok("The address says #status, so a bookmark opens it", (await p.evaluate(() => location.hash)) === "#status");
+    await p.click('nav.tabs [data-tab="tasks"]'); await p.waitForTimeout(800);
+    const back = await p.evaluate(() => ({ inSec: document.documentElement.classList.contains("in-section"), h1: (document.querySelector("main h1") || {}).textContent || "" }));
+    ok("Operations takes it back to the office's own screen", !back.inSec && /Operations/.test(back.h1), JSON.stringify(back));
     ok("No errors in the office", errs.length === 0, errs.join(" | "));
     await ctx.close(); }
 

@@ -71,13 +71,13 @@ const fakeIndexedDB = { open() { const req = {}; setTimeout(() => {
   req.result = db; req.onsuccess && req.onsuccess(); }); return req; } };
 
 let PICK = [];                                    // what the folder picker returns next
-function boot(user) {
+function boot(user, tab = "photos") {
   const raw = fs.readFileSync(`${OUT}/office.html`, "utf8"), html = strip(raw);
   const client = makeClient(user);
   const dom = new JSDOM(html, { runScripts: "outside-only", url: "https://lukehart1228.github.io/shop-floor/office.html", pretendToBeVisual: true });
   const w = dom.window;
   w.localStorage.setItem("sfo_pin", JSON.stringify({ none: true }));
-  w.localStorage.setItem("sfo_tab", JSON.stringify("photos"));
+  w.localStorage.setItem("sfo_tab", JSON.stringify(tab));
   w.indexedDB = fakeIndexedDB;
   w.supabase = { createClient: () => client };
   w.TextEncoder = TextEncoder; w.TextDecoder = TextDecoder;
@@ -407,6 +407,24 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
   ok("Resume saving: permission given, and it saves by itself (marked auto)", r && r.how === "auto" && r.onedrive_ok && r.backup_ok);
   t.w.close();
 
+  // ---------- 4 Nov: reopened on Operations (the tab Luke keeps open): the paused save says so there, with its button ----------
+  od.perm = "prompt";
+  await admin.query("update save_runs set finished_at = finished_at - interval '9 days', started_at = started_at - interval '9 days'");   // overdue too
+  const n1 = (await runs()).length;
+  t = boot(users.luke, "tasks");
+  await until(() => /Saving to OneDrive is paused/.test(txt(t.w)), 10000); await wait(300);
+  ok("Operations, with the browser wanting permission again: “Saving to OneDrive is paused” with Resume saving on it",
+     /Saving to OneDrive is paused/.test(txt(t.w)) && !!$(t.w, '#need-savepaused [data-saveresume]') && /Operations/.test(txt(t.w, "main h1")), (txt(t.w).match(/Saving to OneDrive is paused.{0,200}/) || [""])[0]);
+  ok("Paused and overdue: one card, saying when the last good save was (no second Saving to OneDrive card)",
+     !$(t.w, "#need-saving") && /The last save that reached both OneDrive and the backup folder was 9 days ago/.test(txt(t.w, "#need-savepaused")), txt(t.w, "#need-savepaused"));
+  ok("…and the Operations tab's number counts it", /\d/.test(txt(t.w, 'nav.tabs [data-tab="tasks"] .n')), txt(t.w, 'nav.tabs [data-tab="tasks"]'));
+  await click(t.w, "#need-savepaused [data-saveresume]", 300);
+  await until(async () => (await runs()).length > n1, 15000); await wait(1500);
+  r = (await runs()).slice(-1)[0];
+  ok("Resume saving from Operations: it saves by itself, without opening the OneDrive tab", r && r.how === "auto" && r.onedrive_ok && r.backup_ok && /Operations/.test(txt(t.w, "main h1")));
+  ok("…and the paused card has gone", !/Saving to OneDrive is paused/.test(txt(t.w)));
+  t.w.close();
+
   // ---------- David's computer: no folders; the reminder only when it's due ----------
   IDB.clear();                                     // another computer: its browser remembers no folders
   t = boot(users.david);
@@ -415,6 +433,7 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
   await admin.query("update save_runs set finished_at = finished_at - interval '9 days'");
   await click(t.w, '[data-tab="tasks"]', 1500);
   ok("Nine days without a good save: Needs you says so on David's office too", /The last save that reached both OneDrive and the backup folder was 9 days ago/.test(txt(t.w)), txt(t.w).match(/Saving to OneDrive.{0,200}/) || "");
+  ok("…with Open OneDrive, and no paused card on a computer with no folders chosen (4 Nov)", !!$(t.w, '#need-saving [data-tab="photos"]') && /Open OneDrive/.test(txt(t.w, "#need-saving")) && !/Saving to OneDrive is paused/.test(txt(t.w)));
   t.w.close();
 
   console.log(`\n${pass} PASS, ${fail} FAIL`);

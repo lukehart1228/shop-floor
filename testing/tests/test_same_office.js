@@ -1,6 +1,6 @@
 // 5 Oct: office, delivery, inventory, pace and upload drawn as Luke, live (repo/) vs new (out/): every screen the same apart from
 // the Feedback button, the ☰ Feedback item, the office app's empty section holder and the version label. Seed first.
-// PHOTOSPACE=ignore sets aside what the 31 Oct build changed on the Photos tab (below).  TZ=America/Indiana/Indianapolis node test_same_office.js
+// PHOTOSPACE=ignore sets aside what the 31 Oct build changed on the Photos tab (below); NAMES=ignore the 4 Nov names.  TZ=America/Indiana/Indianapolis node test_same_office.js
 const fs = require("fs"); const { JSDOM } = require("jsdom");
 const { makeClient, users } = require("./pgsupa");
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
@@ -31,6 +31,13 @@ const aside = (h) => {
   if (process.env.PHOTOSPACE === "ignore") h = h.replace(/<section class="panel"><h2>(Photo archive|Space on Supabase)<\/h2>[\s\S]*?<\/section>/g, "")
      .replace(/<p class="meta2" style="margin-top:10px">Each job's photos[\s\S]*?<\/p>/g, "");
   if (process.env.ARROWPOS === "ignore") h = h.replace(/<section class="panel"><h2>Arrow POs<\/h2>[\s\S]*?<\/section>/g, "");
+  // NAMES=ignore (4 Nov, the office's names): sets aside the tab strip (Job status joined it; Photos is called OneDrive),
+  // the tab's heading and first line, the words naming it, Pace's page heading (now Data) and the app's name (Production). Everything else must match.
+  if (process.env.NAMES === "ignore") h = h.replace(/<nav class="tabs">[\s\S]*?<\/nav>/g, "<nav>TABS</nav>")
+     .replace(/<h1>(Photos|OneDrive)<\/h1>\s*<p class="sub">[\s\S]*?<\/p>/g, "<h1>TAB</h1>")
+     .replace(/the (Photos|OneDrive) tab|Open (Photos|OneDrive)|open it on (Photos|the OneDrive tab)/g, "TAB")
+     .replace(/<h1>(Pace|Data)<\/h1>/g, "<h1>PAGE</h1>")
+     .replace(/SHOP FLOOR|PRODUCTION/g, "BRAND").replace(/the shop floor's files|the Production app's files/g, "FILES");   // 4 Nov: the app is called Production
   return h;
 };
 (async () => {

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#181D2E">
-<title>Office · Shop Floor</title>
+<title>Office · Production</title>
 <link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -693,7 +693,7 @@ async function arrowPoPdf(PDFLib, po) {
   cell(M, y, lw, 15, grey, false); centred("Authorized Signature:", M, lw, y - 11, 9, b);
   text(fit(h.issued_by, 195, 9, b), M + lw + 4, y - 11, 9, b);
   page.drawLine({ start: { x: M + lw, y: y - 15 }, end: { x: M + lw + 200, y: y - 15 }, thickness: .8, color: black });
-  doc.setTitle(po.name || "Arrow PO"); doc.setCreator("Purposeful Design shop floor");
+  doc.setTitle(po.name || "Arrow PO"); doc.setCreator("Purposeful Design Production");
   return await doc.save({ useObjectStreams: false });
 }
 /** "Post.step" + 2 → "Post r2.step": a revised job file is filed beside the old one (3 Nov: was the drop date, 11 letters longer) */
@@ -952,7 +952,7 @@ async function buildSignedTicket(PDFLib, d, ticket, signature) {
   const text = (t, x, yy, size, f = font, color = ink) => page.drawText(pdfText(t), { x, y: yy, size, font: f, color });
   text("PURPOSEFUL DESIGN", L, y, 10, bold, orange);
   y -= 26; text(d.part ? (pk ? "Part pickup record" : "Part delivery record") : pk ? "Customer pickup record" : "Delivery record", L, y, 22, bold);
-  y -= 16; text(ticket ? `Added by the shop floor system after the ${pk ? "" : "delivery "}ticket, which is as it was issued.` : `No ${pk ? "" : "delivery "}ticket was attached, so this record stands on its own.`, L, y, 10, font, grey);
+  y -= 16; text(ticket ? `Added by the Production system after the ${pk ? "" : "delivery "}ticket, which is as it was issued.` : `No ${pk ? "" : "delivery "}ticket was attached, so this record stands on its own.`, L, y, 10, font, grey);
   y -= 28;
   const n = pk ? d.tables_photographed : d.site_photographed;
   const rows = pk ? [["Project", `${d.project_id} — ${d.job_name || ""}`],
@@ -1018,7 +1018,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-11-04.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-11-04.2";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -1103,7 +1103,7 @@ if (typeof document !== "undefined") (function () {
     version: () => S.section ? frameVersion(S.section) : OFFICE_VERSION,
     screen: () => S.section ? [sectionOf(S.section).label, frameScreen(S.section)].filter(Boolean).join(" › ")
       : S.jobView ? `Job page${S.job && S.job.job && S.job.job.project_id ? " " + S.job.job.project_id : ""}`
-      : ({ tasks: "Operations", arrow: "Arrow", photos: "Photos", setup: "Setup", feedback: "Feedback" })[S.tab] || S.tab });
+      : ({ tasks: "Operations", arrow: "Arrow", photos: "OneDrive", setup: "Setup", feedback: "Feedback" })[S.tab] || S.tab });
   sfReportDevice(db, "office", OFFICE_VERSION);
 
   // ---------- the office app's sections (5 Oct) ----------
@@ -1112,14 +1112,16 @@ if (typeof document !== "undefined") (function () {
   // what each login may do; the menu just shows each person what's theirs. Julia (schedules deliveries, not a
   // manager) gets Deliveries only.
   const SECTIONS = [
+    // 4 Nov: the ☰ menu lists Project Handoff first, under Operations (Luke); the menu shows labels only, no notes
+    // Project Handoff (4 Nov; was Drop a job's zip): loads the floor, sends machine files, parks the rest for the save.
+    // Upload a work order and the Prototype lab left the menu 4 Nov (Luke); upload.html and lab.html stay on GitHub, unlinked
+    { key: "drop", label: "Project Handoff", file: "drop.html", page: "drop", note: "Loads the floor, sends machine files. Only you see this", lab: true },
     { key: "deliveries", label: "Deliveries", file: "delivery.html", page: "delivery", note: "Schedule, signed tickets", scheduler: true },
-    { key: "upload", label: "Upload a work order", file: "upload.html", page: "upload", note: "The generator's upload file" },
     { key: "inventory", label: "Inventory", file: "inventory.html", page: "inventory", note: "Month-end counts, scrap rate" },
-    { key: "pace", label: "Pace", file: "pace.html", page: "pace", note: "Square feet a week, time in stage" },
-    { key: "status", label: "Job status", file: "status.html", page: "status", note: "Where a job is, in one sentence" },
-    { key: "lab", label: "Prototype lab", file: "lab.html", page: "lab", note: "Trying new generators. Only you see this", lab: true },
-    // the zip drop (1 Nov): loads the floor, sends machine files, parks the rest for the save. Upload and the lab stay beside it for now (Luke, 1 Nov)
-    { key: "drop", label: "Drop a job's zip", file: "drop.html", page: "drop", note: "Loads the floor, sends machine files. Only you see this", lab: true },
+    // Data (4 Nov; was Pace): every tracked number lives here from now on, each kind as a tab inside data's page (pace.html)
+    { key: "pace", label: "Data", file: "pace.html", page: "pace", note: "Pace, time in stage, working days" },
+    // Job status is a tab beside Operations (4 Nov), still opened as a section; tab: true keeps it out of the ☰ list
+    { key: "status", label: "Job status", file: "status.html", page: "status", note: "Where a job is, in one sentence", tab: true },
   ];
   const sectionOf = (k) => SECTIONS.find(x => x.key === k) || null;
   const mySections = () => SECTIONS.filter(x => x.lab ? !!(S.me && S.me.lab)       // the lab: only logins let in with lab_allow() (lab.sql)
@@ -1176,7 +1178,9 @@ if (typeof document !== "undefined") (function () {
   };
   // Setup lives in the ☰ menu now (it's the least-used); it still opens as a screen of its own
   // Operations = what used to be Needs you, with Flags; Routine tasks and Departments live in Setup
-  const TABS = [["tasks", "Operations"], ["arrow", "Arrow"], ["photos", "Photos"]];
+  // 4 Nov: Photos is called OneDrive (its key stays "photos", so a computer that remembers it still opens there);
+  // Job status sits beside Operations but is a section (status.html in the frame), hence data-section
+  const TABS = [["tasks", "Operations"], ["status", "Job status", "section"], ["arrow", "Arrow"], ["photos", "OneDrive"]];
 
   // ---------- data ----------
   const q = async (p) => { const { data, error } = await p; if (error) throw error; return data; };
@@ -1329,7 +1333,7 @@ if (typeof document !== "undefined") (function () {
       routine: overdueRoutine(S.routine).length,
       ordering: needToOrder(S.supplies).reduce((a, g) => a + g.lines.length, 0),
       arrow: (S.arrow || []).filter(a => a.at_vendor && !a.waiting && a.days_out > S.arrowDays).length,
-      photos: S.photoStatus && S.photoStatus.due ? 1 : 0,
+      photos: (S.photoStatus && S.photoStatus.due ? 1 : 0) + (savePaused() ? 1 : 0),
     };
     // everything that needs the office is on one tab, so only that tab carries a number
     c.sync = syncProblem() ? 1 : 0;
@@ -1340,9 +1344,10 @@ if (typeof document !== "undefined") (function () {
     const c = counts();
     return `<header class="top"><div class="top-row">
         <button class="menubtn" data-menu="1" aria-label="Menu" aria-haspopup="true" aria-expanded="${!!S.menu}"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#FFF4D5" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h16M3 11h16M3 16h16"/></svg></button>
-        <span class="brand">SHOP FLOOR</span><span class="place">${S.section ? esc(sectionOf(S.section).label) : "Office"}</span>
-        ${isManager(S.me) ? `<nav class="tabs">${TABS.map(([k, label]) =>
-          `<button class="tab" data-tab="${k}" aria-current="${S.tab === k && !S.jobView && !S.section}">${label}${k === "tasks" && c.tasks ? `<span class="n">${c.tasks}</span>` : ""}</button>`).join("")}</nav>
+        <span class="brand">PRODUCTION</span><span class="place">${S.section ? esc(sectionOf(S.section).label) : "Office"}</span>
+        ${isManager(S.me) ? `<nav class="tabs">${TABS.map(([k, label, kind]) => kind === "section"
+          ? `<button class="tab" data-section="${k}" aria-current="${S.section === k && !S.jobView}">${label}</button>`
+          : `<button class="tab" data-tab="${k}" aria-current="${S.tab === k && !S.jobView && !S.section}">${label}${k === "tasks" && c.tasks ? `<span class="n">${c.tasks}</span>` : ""}</button>`).join("")}</nav>
         <div class="find"><input data-jobfind="1" value="${esc(S.jobFind)}" placeholder="Find a job — PROJ or name" aria-label="Find a job" autocomplete="off" inputmode="search">
           <div class="hits" id="jobhits" hidden>${hitsHtml()}</div></div>` : `<span style="flex:1"></span>`}
         <span class="who"><b>${esc(S.me.name)}</b></span>
@@ -1364,14 +1369,14 @@ if (typeof document !== "undefined") (function () {
     if (!S.menu) return "";
     return `<button class="mshade" data-menuclose="1" aria-label="Close the menu"></button>
       <nav class="menu" aria-label="Menu">
-        <div class="mhead"><b>SHOP FLOOR</b><button class="link" data-menuclose="1">Close</button></div>
+        <div class="mhead"><b>PRODUCTION</b><button class="link" data-menuclose="1">Close</button></div>
         <div class="mlabel">Office</div>
-        ${isManager(S.me) ? `<button class="mitem" data-section="" aria-current="${!S.section && !S.jobView && ["tasks", "arrow", "photos"].includes(S.tab)}">Operations, Arrow, Photos<small>The office's tabs</small></button>` : ""}
-        ${mySections().map(x => `<button class="mitem" data-section="${x.key}" aria-current="${S.section === x.key}">${esc(x.label)}<small>${esc(x.note)}</small></button>`).join("")}
-        ${isManager(S.me) ? `<a href="index.html">Tablet app<small>What the floor sees, as your login</small></a>
+        ${isManager(S.me) ? `<button class="mitem" data-section="" aria-current="${(!S.section || S.section === "status") && !S.jobView && ["tasks", "arrow", "photos"].includes(S.tab)}">Operations</button>` : ""}
+        ${mySections().filter(x => !x.tab).map(x => `<button class="mitem" data-section="${x.key}" aria-current="${S.section === x.key}">${esc(x.label)}</button>`).join("")}
+        ${isManager(S.me) ? `<a href="index.html">Tablet app</a>
         <div class="mline"></div>
-        <button class="mitem" data-tab="setup" aria-current="${S.tab === "setup" && !S.jobView && !S.section}">Setup<small>Routine tasks, departments, lists, Monday, TV link, test jobs</small></button>
-        <button class="mitem" data-tab="feedback" aria-current="${S.tab === "feedback" && !S.jobView && !S.section}">Feedback<small>Notes sent with the Feedback button, newest first</small></button>` : `<div class="mline"></div>`}
+        <button class="mitem" data-tab="setup" aria-current="${S.tab === "setup" && !S.jobView && !S.section}">Setup</button>
+        <button class="mitem" data-tab="feedback" aria-current="${S.tab === "feedback" && !S.jobView && !S.section}">Feedback</button>` : `<div class="mline"></div>`}
         <button class="mitem" data-signout="1">Sign out</button>
         <div class="ver">Version ${esc(OFFICE_VERSION)}</div>
       </nav>`;
@@ -1468,7 +1473,7 @@ if (typeof document !== "undefined") (function () {
         <div class="srow"><span class="k">Arrow${toGo.length + atArrow.length ? `<span class="n">${toGo.length + atArrow.length}</span>` : ""}</span><span class="v">${arrowV}</span><button class="a" data-tab="arrow">Arrow tab</button></div>
         <div class="srow"><span class="k">Defects${J.defects.length ? `<span class="n">${J.defects.length}</span>` : ""}</span><span class="v">${defectsV}</span><span></span></div>
         <div class="srow"><span class="k">Photos${J.photoCount ? `<span class="n">${J.photoCount}</span>` : ""}</span><span class="v">${J.photoCount ? `${J.photoCount} photo${J.photoCount === 1 ? "" : "s"}` : "None yet"}</span>${J.photoCount ? `<button class="a" data-jobphotos="${esc(j.project_id)}">See them</button>` : "<span></span>"}</div>
-        ${tv.length ? `<div class="srow"><span class="k">Floor TV</span><span class="v">${tvV}<span class="m">To hide one picture, open it on Photos and use the button under it.</span></span>${tvA || "<span></span>"}</div>` : ""}
+        ${tv.length ? `<div class="srow"><span class="k">Floor TV</span><span class="v">${tvV}<span class="m">To hide one picture, open it on the OneDrive tab and use the button under it.</span></span>${tvA || "<span></span>"}</div>` : ""}
         <div class="srow"><span class="k">Load-outs</span><span class="v">${loV}</span><span></span></div>
       </section>`;
 
@@ -1851,6 +1856,11 @@ if (typeof document !== "undefined") (function () {
     const keep = (k) => S.openDetails.has(k) ? "open" : "";
     const parts = [];
 
+    // 4 Nov: the save runs every 30 minutes from any tab, but after Chrome restarts it waits for one click; the click lives here too
+    if (savePaused()) parts.push(sec("savepaused", "Saving to OneDrive is paused", 0, `<div class="panel"><p class="sub" style="margin:0 0 10px">Chrome wants permission again before it can save into the folders on this computer: it asks after a restart. Nothing is lost. Press Resume saving and the save carries on, then runs by itself every 30 minutes while this page is open.${S.save.status && S.save.status.good_at
+          ? ` The last save that reached both OneDrive and the backup folder was ${S.save.status.days_since_good ? `${S.save.status.days_since_good} day${S.save.status.days_since_good === 1 ? "" : "s"} ago` : "today"}.` : ""}</p>
+        <div class="btns"><button class="go" data-saveresume="1">Resume saving</button><button class="link" data-tab="photos">Open OneDrive</button></div></div>`));
+
     if (open.length) parts.push(sec("problems", "Issues from the floor", open.length, `<p class="sub">Issues, and defects the floor asked you about. Work stopped comes first.</p>${open.map(issueCard).join("")}`));
 
     if (groups.length) parts.push(sec("ordering", "Supplies to order", nLines, `<div class="panel">
@@ -1881,11 +1891,11 @@ if (typeof document !== "undefined") (function () {
         <button class="plain" data-arret="${esc(a.id)}">Mark returned</button></div>`).join("")}</div>`));
 
     const sv = S.save && S.save.status;
-    if (sv && sv.due && !S.save.missing) parts.push(sec("saving", "Saving to OneDrive", 0, `<div class="panel"><p class="sub" style="margin:0 0 10px">${!sv.ever
-        ? "Saving the shop floor's files to OneDrive and the hard drive hasn't been set up yet. Choose the two folders on the Photos tab, on the computer that stays open in the office."
-        : !sv.good_at ? "No save has reached both OneDrive and the backup folder yet. The Photos tab says what's in the way."
-        : `The last save that reached both OneDrive and the backup folder was ${sv.days_since_good} days ago${sv.good_by ? `, on ${esc(sv.good_by)}'s computer` : ""}. Open the office page there, or check the Photos tab for what's in the way.`}</p>
-        <button class="go" data-tab="photos">Open Photos</button></div>`));
+    if (sv && sv.due && !S.save.missing && !savePaused()) parts.push(sec("saving", "Saving to OneDrive", 0, `<div class="panel"><p class="sub" style="margin:0 0 10px">${!sv.ever
+        ? "Saving the Production app's files to OneDrive and the hard drive hasn't been set up yet. Choose the two folders on the OneDrive tab, on the computer that stays open in the office."
+        : !sv.good_at ? "No save has reached both OneDrive and the backup folder yet. The OneDrive tab says what's in the way."
+        : `The last save that reached both OneDrive and the backup folder was ${sv.days_since_good} days ago${sv.good_by ? `, on ${esc(sv.good_by)}'s computer` : ""}. Open the office page there, or check the OneDrive tab for what's in the way.`}</p>
+        <button class="go" data-tab="photos">Open OneDrive</button></div>`));
 
     if ((S.inv || []).length) parts.push(sec("inventory", "Inventory", S.inv.length, `<div class="panel">${S.inv.map(n => `
         <div class="task"><div class="what">${esc(n.text)}</div><div class="detail"><a href="inventory.html">Open the Inventory page</a></div></div>`).join("")}</div>`));
@@ -2114,7 +2124,7 @@ if (typeof document !== "undefined") (function () {
     return `<section class="panel"><h2>Floor TV</h2><p class="sub" style="margin:0 0 8px">${esc(words)}</p>
       ${jobHidden ? `<button class="plain" data-tvjob="${esc(J.id)}" data-hide="0">Let this job's pictures show again</button>`
                   : withCopy ? `<button class="plain" data-tvjob="${esc(J.id)}" data-hide="1">Hide this job's pictures from the TV</button>` : ""}
-      <p class="meta2" style="margin:8px 0 0">To hide one picture, open it on Photos and use the button under it.</p></section>`;
+      <p class="meta2" style="margin:8px 0 0">To hide one picture, open it on the OneDrive tab and use the button under it.</p></section>`;
   }
   /** Thumbnails; a photo off Supabase says where it is: an archive batch's zip, or OneDrive (off_supabase.sql, 31 Oct). */
   function photoStrip(list, caption = false) {
@@ -2221,8 +2231,8 @@ if (typeof document !== "undefined") (function () {
             <b>${esc(b.id)}</b> <span>${esc(BATCH_STATE[b.state])}</span> <span class="meta2">${b.photos} photos · ${esc(fmtBytes(b.bytes))} · made ${esc(fmtDay(b.made_at))} by ${esc(b.made_by || "")}</span>
             ${b.files_left > 0 ? `<button class="link" data-archagain="${esc(b.id)}">Download again</button>` : ""}</div>`).join("")}</details>` : ""}`;
     }
-    return `<h1>Photos</h1>
-      <p class="sub">Photos taken on the floor: on defects and issues, and Delivery's load-outs. Look a job up to see everything photographed on it, and what left the building when.</p>
+    return `<h1>OneDrive</h1>
+      <p class="sub">Saving everything to OneDrive and the hard drive, and the photos taken on the floor: on defects and issues, and Delivery's load-outs. Look a job up to see everything photographed on it, and what left the building when.</p>
       ${msgBanner()}
       ${savePanel()}
       <section class="panel"><h2>Look up a job</h2>
@@ -2730,7 +2740,7 @@ if (typeof document !== "undefined") (function () {
         for (const [place, label, d] of dirs) {
           const m = await fsMatch(d, name, x.bytes, x.sha256);
           if (m === "other" && !(lib && x.replaces)) {
-            why = lib ? `A different file is already in the library at ${x.rel_path}. If this one should replace it, press Replace the library's copy on Drop a job's zip.`
+            why = lib ? `A different file is already in the library at ${x.rel_path}. If this one should replace it, press Replace the library's copy on Project Handoff.`
                       : `A different file called ${name} is already in ${label} (${x.project_id} › ${SAVE_DIR} › ${SAVE_SUB.files}); it was left alone.`;
             if (res.problems.length < 50) res.problems.push(`${x.project_id || "Library"}: ${why}`);
             continue;
@@ -2818,7 +2828,12 @@ if (typeof document !== "undefined") (function () {
     }
   }
   function saveAgo(ts) { return !ts ? "" : `${fmtWhen(ts)} (${Date.now() - new Date(ts) < 60000 ? "just now" : agoWords(ts) + " ago"})`; }
-  /** The panel on the Photos tab */
+  /** Folders chosen on this computer that the browser wants permission for again (after a restart): the save waits for a click */
+  function savePaused() {
+    const sv = S.save;
+    return !!(sv && sv.supported && !sv.missing && isManager(S.me) && ["od", "bk", "sys"].some(k => sv[k] && sv.perm[k] && sv.perm[k] !== "granted"));
+  }
+  /** The panel on the OneDrive tab (was Photos) */
   function savePanel() {
     const sv = S.save, st = sv.status, r = sv.result;
     if (sv.missing) return `<section class="panel"><h2>Saving to OneDrive and the hard drive</h2>
