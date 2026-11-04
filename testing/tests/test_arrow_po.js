@@ -1,3 +1,4 @@
+// 4 Nov: Arrow is its own department (Willie: Metal | Arrow), and the PO prints as a copy of the NEW form.
 // 1 Nov: Arrow POs on the tablet (arrow_pos.sql). Willie (Metal) ticks two waiting items on the Arrow tab, sends 7 of
 // PROJ-00418's 15 pedestals and all of PROJ-00099's item, and taps Make the PO: one PO for the trip, AR-10(99,418-1),
 // the 7 as a run of their own (8 still waiting), the PO printed in the NEW form's layout with the lines as the upload file
@@ -90,7 +91,12 @@ const appText = (p) => p.evaluate(() => document.querySelector("#app").innerText
   await w.ctx.addInitScript(() => { window.print = () => { window.__printed = (window.__printed || 0) + 1; window.__printHtml = document.getElementById("printArea").innerHTML;
                                                            window.__printClass = document.getElementById("printArea").className; }; });
   await w.p.goto(base); await loaded(w.p);
-  await w.p.click('[data-tab="arrow"]'); await w.p.waitForSelector("#app [data-argone], #app [data-arpick]", { timeout: 15000 });
+  // 4 Nov: Arrow is a department of its own. Willie (Metal) has Metal and Arrow at the top, and Metal has no Arrow tab
+  const deptBtns = await w.p.$$eval("#app [data-dept]", bs => bs.map(b => b.textContent.trim()));
+  ok("Willie's tablet: Metal and Arrow at the top; Metal's own tabs have no Arrow", JSON.stringify(deptBtns) === JSON.stringify(["Metal", "Arrow"])
+     && !(await w.p.$('[data-tab="arrow"]')), JSON.stringify(deptBtns));
+  await w.p.click('[data-dept="arrow"]'); await w.p.waitForSelector("#app [data-argone], #app [data-arpick]", { timeout: 15000 });
+  ok("…Arrow opens straight to the Arrow list, with no other tabs", (await w.p.$$("#app [data-tab]")).length <= 1 && /Waiting to go to Arrow/.test(await appText(w.p)));
 
   if (OLDDB) {
     ok("Older database: Gone to Arrow as before, no ticks, no PO list", !!(await w.p.$("[data-argone]")) && !(await w.p.$("[data-arpick]")) && !/Arrow POs this week/.test(await appText(w.p)));
@@ -132,6 +138,12 @@ const appText = (p) => p.evaluate(() => document.querySelector("#app").innerText
      /7 JESS Pedestal Base, Round Disc, 3\.5" Post Stardust Silver RAL 9006 White Aluminum PROJ-00418/.test(prText)
      && /Item [^ ]+ \(sheet 1\) PROJ-00099/.test(prText) && prText.indexOf("JESS") < prText.indexOf("PROJ-00099")
      && /\*BLAST AND COAT ALL BASES\*/.test(prText) && /Test tax-exempt line/.test(prText) && /Authorized Signature: Luke Hart/.test(prText) && !/\$/.test(prText), prText.slice(400, 900));
+  // 4 Nov: a copy of the NEW form: the address top left, the grey boxes, at least ten line rows, printed portrait with its fills
+  const lay = await w.p.evaluate(() => { const a = document.getElementById("printArea");
+    return { addr: !!a.querySelector(".po .top .addr"), boxes: a.querySelectorAll(".po .bx .k").length, rows: a.querySelectorAll(".po table.ln tr").length,
+             shaded: a.querySelectorAll(".po table.ln td.sh").length, adjust: getComputedStyle(a.querySelector(".po")).printColorAdjust || getComputedStyle(a.querySelector(".po")).webkitPrintColorAdjust }; });
+  ok("…laid out as the NEW form: the address block, five grey label boxes, ten line rows (plus heading and Total), the shaded columns, fills that print",
+     lay.addr && lay.boxes === 5 && lay.rows === 12 && lay.shaded === 20 && lay.adjust === "exact", JSON.stringify(lay));
 
   // the rest, with no signal: kept on the tablet, made once when the signal is back
   await w.p.click(`[data-arpick="${id418}"]`); await w.p.click("[data-armake]"); await w.p.waitForSelector("[data-confirm]");
@@ -143,6 +155,16 @@ const appText = (p) => p.evaluate(() => document.querySelector("#app").innerText
   const pos = await q("select name, file_name from arrow_pos order by po_number");
   ok("…when it's back, it's made exactly once: AR-11(418-2).pdf, and the item itself has gone", pos.length === 2 && pos[1].file_name === "AR-11(418-2).pdf"
      && (await q("select count(*)::int n from outside_jobs o join jobs j on j.id = o.job_id where j.project_id = 'PROJ-00418' and o.waiting"))[0].n === 0, JSON.stringify(pos));
-  ok("No page errors", !w.errs.length, w.errs.join(" | "));
+  // 4 Nov: KP's tablet was left on Assembly / QC's old Arrow tab: it opens the Arrow department, and Assembly / QC still has its own tabs
+  const k = await session(browser, users.kp);
+  await k.ctx.addInitScript(() => { if (!sessionStorage.getItem("seeded")) { localStorage.setItem("sf_dept", JSON.stringify("assembly_qc")); localStorage.setItem("sf_tab", JSON.stringify("arrow")); sessionStorage.setItem("seeded", "1"); } });
+  await k.p.goto(base); await loaded(k.p);
+  await k.p.waitForSelector("#app [data-arpick], #app [data-argone], #app [data-aropen]", { timeout: 15000 }).catch(() => {});
+  const kcur = await k.p.$eval('#app [data-dept][aria-current="true"]', b => b.textContent.trim()).catch(() => "");
+  await k.p.click('[data-dept="assembly_qc"]'); await sleep(800);
+  const ktabs = await k.p.$$eval("#app [data-tab]", bs => bs.map(b => b.dataset.tab));
+  ok("KP's tablet left on Assembly / QC's old Arrow tab opens on Arrow; Assembly / QC keeps its tabs without Arrow", kcur === "Arrow" && ktabs.includes("work") && ktabs.includes("past") && !ktabs.includes("arrow"),
+     `${kcur} | ${ktabs.join(",")}`);
+  ok("No page errors", !w.errs.length && !k.errs.length, [...w.errs, ...k.errs].join(" | "));
   console.log(`\n${pass} passed, ${fail} failed`); await browser.close(); server.close(); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

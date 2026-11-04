@@ -1,5 +1,5 @@
 // Every supervisor's tablet: each screen byte-for-byte the same on the new index.html as on the live one,
-// and the new page reports its version once per start. NAV=ignore sets the tab strip aside (for a build that adds a tab);
+// and the new page reports its version once per start. NAV=ignore sets the tab strip aside (for a build that adds a tab); HEADER=ignore the top bar;
 // PICTURES=ignore sets the drawing pictures aside (for a build that adds or moves them).
 // LOADOUT=ignore sets Shawn's Load-out tab aside (his landing screen and the tab: for a build that changes them, 22 Oct).
 // Run on a seeded database; set NEWPAGE / LIVEPAGE to compare other files.
@@ -53,12 +53,14 @@ async function screens(html, user) {
       // 22 Oct: a drawing picture's frame is compared; whether it has been filled in yet, and the picture's address, are not
       h = h.replace(/<span class="snip(?: none)?" (data-snip="[^"]*" aria-hidden="true")(?: style="[^"]*")?><\/span>/g, '<span class="snip" $1></span>');
       if (process.env.PICTURES === "ignore") h = h.replace(/<span class="snip" data-snip="[^"]*" aria-hidden="true"><\/span>/g, "");
+      // 4 Nov: HEADER=ignore sets the top bar aside (Arrow became a department: Willie, KP, Eric and Shawn get department buttons there)
+      if (process.env.HEADER === "ignore") h = h.replace(/<header[\s\S]*?<\/header>/g, "HEADER");
       return process.env.NAV === "ignore" ? h.replace(/<nav[\s\S]*?<\/nav>/g, "NAV") : h; };
     const only = (o) => o.filter(([n]) => !(process.env.SKIP_TABS || "").split(",").includes(n.replace(/^tab /, ""))
                                        && !(process.env.LOADOUT === "ignore" && who === "Shawn" && (n === "queue" || n === "tab loadout")));
     const ao = only(a.out), bo = only(b.out);
     const diffs = ao.filter(([n, h], i) => !bo[i] || bo[i][0] !== n || norm(h) !== norm(bo[i][1])).map(([n]) => n);
-    if (process.env.SHOWDIFF) for (const n of diffs) { const i = ao.findIndex(x => x[0] === n); const x = norm(ao[i][1]), y = norm((bo[i] || [,''])[1]); let k = 0; while (x[k] === y[k]) k++; console.log(`  DIFF ${who} ${n}\n   live: ${x.slice(k - 120, k + 160)}\n   new:  ${y.slice(k - 120, k + 160)}`); }
+    if (process.env.SHOWDIFF) for (const n of diffs) { const i = ao.findIndex(x => x[0] === n); const x = norm(ao[i][1]), y = norm((bo[i] || [,''])[1]); let k = 0; while (x[k] === y[k]) k++; console.log(`  DIFF ${who} ${n}\n   live: ${x.slice(Math.max(0, k - 120), k + 160)}\n   new:  ${y.slice(Math.max(0, k - 120), k + 160)}`); }
     ok(`${who}: ${ao.length} screens identical to the live page`, diffs.length === 0 && ao.length === bo.length && ao.length > 0, diffs.join(", "));
     ok(`${who}: the new page reports once`, b.reports.length === 1 && b.reports[0][1].p_page === "index" && /^\d{4}-\d\d-\d\d\.\d+$/.test(b.reports[0][1].p_version) && b.dev && b.reports[0][1].p_device === b.dev,
        JSON.stringify(b.reports.map(r => r[1].p_version)));

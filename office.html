@@ -627,45 +627,72 @@ function libraryIndexCsv(rows) {
   return csvText(["path", "kind", "size", "changed"],
     rows.slice().sort((a, b) => a.path.localeCompare(b.path)).map(r => [r.path, LIB_KIND[r.path.split("/").slice(0, 2).join("/")] || "other", r.size, stampShop(r.changed)]));
 }
-/** An Arrow PO as a PDF, laid out like the NEW form (the tablet prints the same as HTML). `po` is an arrow_pos row:
- *  its header and lines exactly as made (arrow_pos.sql, 1 Nov). Letter, landscape. */
+/** An Arrow PO as a PDF: a copy of the NEW form in Luke's Arrow Powder Coat PO Sheet template (4 Nov; the tablet prints the
+ *  same as HTML). `po` is an arrow_pos row: its header and lines exactly as made. Letter, portrait; at least ten line rows,
+ *  the grey label boxes and the shaded Base Description, Arrow Color and Amount columns as on the sheet. */
 async function arrowPoPdf(PDFLib, po) {
   const { PDFDocument, StandardFonts, rgb } = PDFLib, doc = await PDFDocument.create();
   const f = await doc.embedFont(StandardFonts.Helvetica), b = await doc.embedFont(StandardFonts.HelveticaBold);
-  const W = 792, H = 612, M = 36, h = po.header || {}, black = rgb(0, 0, 0);
+  const W = 612, H = 792, M = 27, IW = W - 2 * M, h = po.header || {}, black = rgb(0, 0, 0);
+  const grey = rgb(0.851, 0.851, 0.851), light = rgb(0.949, 0.949, 0.949);
   let page = doc.addPage([W, H]), y = H - M;
   const clean = (t) => String(t == null ? "" : t).replace(/[^\x20-\x7e]/g, (c) => ({ "\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"', "\u2013": "-", "\u2014": "-" })[c] || "");
+  const tw = (t, size, font) => font.widthOfTextAtSize(clean(t), size);
   const text = (t, x, yy, size = 9, font = f) => page.drawText(clean(t), { x, y: yy, size, font, color: black });
-  const wrap = (t, width, size = 9) => { const out = []; let line = "";
-    for (const w of clean(t).split(/\s+/)) { const tryL = line ? line + " " + w : w; if (f.widthOfTextAtSize(tryL, size) > width && line) { out.push(line); line = w; } else line = tryL; }
+  const fit = (t, width, size, font) => { let s = clean(t); while (s && tw(s, size, font) > width) s = s.slice(0, -1); return s; };
+  const centred = (t, x, width, yy, size = 9, font = f) => { const s = fit(t, width - 4, size, font); text(s, x + (width - tw(s, size, font)) / 2, yy, size, font); };
+  const wrap = (t, width, size = 8.5) => { const out = []; let line = "";
+    for (const w of clean(t).split(/\s+/).filter(Boolean)) { const tryL = line ? line + " " + w : w; if (tw(tryL, size, f) > width && line) { out.push(line); line = w; } else line = tryL; }
     if (line) out.push(line); return out.length ? out : [""]; };
+  const cell = (x, yy, w, hgt, fill, border = true) => page.drawRectangle({ x, y: yy - hgt, width: w, height: hgt, ...(fill ? { color: fill } : {}), ...(border ? { borderColor: black, borderWidth: .6 } : {}) });
   const day = (d) => { if (!d) return ""; const [yy, m, dd] = String(d).slice(0, 10).split("-"); return `${Number(m)}/${Number(dd)}/${yy}`; };
-  text("Purchase Order", M, y - 16, 18, b); y -= 34;
-  const addr = String(h.address || "").split(/\n/);
-  addr.forEach((l, i) => text(l, M, y - i * 12));
+
+  centred("Purchase Order", M, IW, y - 20, 20, b); y -= 40;
+  // the address on the left, the PO's own box on the right
+  const half = (IW - 24) / 2, rx = M + half + 24, rh = 15, kw = half * 0.58;
+  String(h.address || "").split(/\n/).slice(0, 6).forEach((l, i) => text(fit(l, half, 9.5, b), M, y - 11 - i * 15, 9.5, b));
   [["PO Number:", po.name], ["Date Issued:", day(h.date_issued)], ["Issued by:", h.issued_by], ["Contact Number:", h.phone], ["Contact e-mail:", h.email]]
-    .forEach(([k, v], i) => { text(k, 470, y - i * 12, 9, b); text(v, 560, y - i * 12); });
-  y -= Math.max(addr.length, 5) * 12 + 10;
-  text("To:", M, y, 9, b); text(h.to, M + 30, y); text("Ship To:", 300, y, 9, b); text(h.ship_to, 345, y); y -= 20;
-  const box = (cols, rows, yy, heads) => { let x = M; const rh = 14;
-    cols.forEach((cw, i) => { rows.forEach((r, j) => { page.drawRectangle({ x, y: yy - (j + 1) * rh, width: cw, height: rh, borderColor: black, borderWidth: .7 });
-      text(r[i], x + 3, yy - (j + 1) * rh + 4, 8.5, j === 0 && heads ? b : f); }); x += cw; }); return yy - rows.length * rh; };
-  y = box([110, 110, 110, 160, 230], [["Date", "Date Required", "Terms", "How Shipped", "PO# / Job Number"], [day(h.date_issued), day(h.date_required), "", h.how_shipped, h.po_jobs]], y, true) - 14;
-  const cols = [52, 50, 220, 90, 140, 70, 49, 49], heads = ["Quantity", "Base ID", "Base Description", "PD Color", "Arrow Color", "Project #", "Unit Price", "Amount"];
-  const row = (cells, bold, thick) => {
-    const lines = cells.map((c, i) => wrap(c, cols[i] - 6, 8.5)), rh = Math.max(...lines.map(l => l.length)) * 10 + 4;
-    if (y - rh < M + 60) { page = doc.addPage([W, H]); y = H - M; }
-    let x = M; cols.forEach((cw, i) => { page.drawRectangle({ x, y: y - rh, width: cw, height: rh, borderColor: black, borderWidth: .7 });
-      lines[i].forEach((l, k) => text(l, x + 3, y - 11 - k * 10, 8.5, bold ? b : f)); x += cw; });
-    if (thick) page.drawLine({ start: { x: M, y }, end: { x: x, y }, thickness: 2, color: black });
-    y -= rh; };
-  row(heads, true);
+    .forEach(([k, v], i) => { const yy = y - i * rh; cell(rx, yy, kw, rh, grey); cell(rx + kw, yy, half - kw, rh, null);
+      text(k, rx + 4, yy - 11, 9, b); centred(v, rx + kw, half - kw, yy - 11, 9, b); });
+  y -= 5 * rh + 18;
+  // To: and Ship To:
+  [[M, "To:", h.to], [rx, "Ship To:", h.ship_to]].forEach(([x, k, v]) => {
+    cell(x, y, half, rh, null); text(k, x + 4, y - 11, 9, b); cell(x, y - rh, half, rh, grey); text(fit(v, half - 8, 9, b), x + 4, y - rh - 11, 9, b); });
+  y -= 2 * rh + 16;
+  // Date, Date Required, Terms, How Shipped, PO# / Job Number
+  const dw = [11.4, 27.7, 16.3, 26.3, 18.3].map(p => IW * p / 100);
+  const dv = [day(h.date_issued), day(h.date_required), "", h.how_shipped, h.po_jobs];
+  let x = M;
+  ["Date", "Date Required", "Terms", "How Shipped", "PO# / Job Number"].forEach((k, i) => {
+    cell(x, y, dw[i], rh, grey); centred(k, x, dw[i], y - 11, 9, b);
+    cell(x, y - rh, dw[i], 24, null); centred(dv[i], x, dw[i], y - rh - 15, 8.5); x += dw[i]; });
+  y -= rh + 24 + 18;
+  // the lines: the form's columns, the three shaded ones, no grid (as on the sheet); a rule between colours
+  const cw = [11.4, 10.3, 17.4, 16.3, 14.3, 12, 9.2, 9.1].map(p => IW * p / 100);
+  const shade = [null, null, light, null, light, null, null, grey];
+  const heads = ["Quantity", "Base ID", "Base Description", "PD Color", "Arrow Color", "Project #", "Unit Price", "Amount"];
+  const headRow = () => { let xx = M; heads.forEach((k, i) => { centred(k, xx, cw[i], y - 11, 8.5, b); xx += cw[i]; }); y -= 16; };
+  const row = (cells, opts = {}) => {
+    const lines = cells.map((c, i) => wrap(c, cw[i] - 6)), rht = opts.total ? 16 : Math.max(36, Math.max(...lines.map(l => l.length)) * 10 + 6);
+    if (y - rht < M + 70) { page = doc.addPage([W, H]); y = H - M; headRow(); }
+    let xx = M;
+    cw.forEach((w, i) => { if (shade[i] && (!opts.total || i === 7)) cell(xx, y, w, rht, shade[i], false);
+      lines[i].forEach((l, k) => i === 0 ? centred(l, xx, w, y - 11 - k * 10, 8.5, opts.total ? b : f) : text(l, xx + 3, y - 11 - k * 10, 8.5, f)); xx += w; });
+    if (opts.rule) page.drawLine({ start: { x: M, y }, end: { x: M + IW, y }, thickness: 1.2, color: black });
+    y -= rht; };
+  headRow();
   let prev = null;
-  for (const l of po.lines || []) { row([l.qty == null ? "" : String(l.qty), l.base, l.description, l.pd_color, l.arrow_color, l.project, "", ""], false, prev !== null && l.pd_color !== prev); prev = l.pd_color; }
-  row(["Total", "", "", "", "", "", "", ""], true);
-  y -= 16; text("*BLAST AND COAT ALL BASES*", M, y, 9.5, b);
-  if (h.tax_line) { y -= 14; text(h.tax_line, M, y); }
-  y -= 18; text(`Authorized Signature: ${h.issued_by || ""}`, M, y, 9.5);
+  const ls = po.lines || [];
+  for (const l of ls) { row([l.qty == null ? "" : String(l.qty), l.base, l.description, l.pd_color, l.arrow_color, l.project, "", ""], { rule: prev !== null && l.pd_color !== prev }); prev = l.pd_color; }
+  for (let i = ls.length; i < 10; i++) row(["", "", "", "", "", "", "", ""]);
+  row(["Total", "", "", "", "", "", "", ""], { total: true });
+  if (y < M + 70) { page = doc.addPage([W, H]); y = H - M; }
+  y -= 18; centred("*BLAST AND COAT ALL BASES*", M, IW, y, 9.5, b);
+  if (h.tax_line) { y -= 22; text(fit(h.tax_line, IW, 9, f), M, y, 9); }
+  y -= 8; const lw = 137;
+  cell(M, y, lw, 15, grey, false); centred("Authorized Signature:", M, lw, y - 11, 9, b);
+  text(fit(h.issued_by, 195, 9, b), M + lw + 4, y - 11, 9, b);
+  page.drawLine({ start: { x: M + lw, y: y - 15 }, end: { x: M + lw + 200, y: y - 15 }, thickness: .8, color: black });
   doc.setTitle(po.name || "Arrow PO"); doc.setCreator("Purposeful Design shop floor");
   return await doc.save({ useObjectStreams: false });
 }
@@ -991,7 +1018,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-11-02.2";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-11-04.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -1240,7 +1267,7 @@ if (typeof document !== "undefined") (function () {
         if (set) { const s = set.find(x => x.key === "arrow_alert_days"); if (s) S.arrowDays = Number(s.value); }
         // Arrow POs (arrow_pos.sql, 1 Nov): the details and the list; none before it
         const [ps, pl] = await Promise.all([db.rpc("arrow_po_settings_get").then(r => r, e => ({ error: e })),
-          db.from("arrow_pos").select("id, name, file_name, gone_on, jobs, header, lines, made_at, made_by_name, is_test, onedrive_at, backup_at").order("made_at", { ascending: false }).limit(60).then(r => r, e => ({ error: e }))]);
+          db.from("arrow_pos").select("*").order("made_at", { ascending: false }).limit(60).then(r => r, e => ({ error: e }))]);
         S.po = ps.error || pl.error ? null : { settings: ps.data || {}, list: pl.data || [] };
         return;
       }
@@ -1721,14 +1748,17 @@ if (typeof document !== "undefined") (function () {
           <label>Contact number<input class="in" id="poPhone" value="${esc(st.phone || "")}"></label>
           <label>Contact e-mail<input class="in" id="poEmail" value="${esc(st.email || "")}"></label>
           <label>Next PO number (AR-…)<input class="in" id="poNext" type="number" min="1" value="${esc(st.next_number || "")}"></label>
-          <label style="grid-column:1/-1">The company's name and address, one line each<textarea class="in" id="poAddr" rows="4" style="width:100%">${esc(st.address || "")}</textarea></label>
-          <label style="grid-column:1/-1">The line under the lines (the tax-exempt sentence)<input class="in" id="poTax" value="${esc(st.tax_line || "")}" style="width:100%"></label>
+          <label style="grid-column:1/-1">Purposeful Design's name and address, one line each (top left of the PO; not Arrow's)<textarea class="in" id="poAddr" rows="4" style="width:100%">${esc(st.address || "")}</textarea></label>
+          <label style="grid-column:1/-1">The tax-exempt sentence (printed above the signature)<input class="in" id="poTax" value="${esc(st.tax_line || "")}" style="width:100%"></label>
         </div>
         <div class="btns" style="margin-top:8px"><button class="go" data-posave="1">Save the PO details</button>
           <span class="meta2">${st.last_number ? `The last PO was AR-${esc(st.last_number)}.` : "No PO made yet."}</span></div></details>
       ${list.length ? `<div style="margin-top:10px">${list.map(p => `<div class="line"><span class="body"><b>${p.is_test ? `<span class="tag">TEST</span> ` : ""}${esc(p.name)}</b>
-          <span class="meta2">· ${esc((p.jobs || []).join(", "))} · ${esc(fmtDay(p.gone_on))}${p.made_by_name ? ` · by ${esc(p.made_by_name)}` : ""}${p.onedrive_at && p.backup_at ? " · saved in the Arrow folder" : p.is_test ? "" : " · saved at the next save"}</span></span>
-          <button class="plain" data-popdf="${esc(p.id)}">PDF</button></div>`).join("")}</div>` : `<p class="sub" style="margin-top:8px">No POs yet. The floor makes them on the tablets' Arrow tab.</p>`}
+          ${p.revision > 1 ? ` <span class="tag">r${esc(p.revision)}</span>` : ""}
+          <span class="meta2">· ${esc((p.jobs || []).join(", "))} · ${esc(fmtDay(p.gone_on))}${p.made_by_name ? ` · by ${esc(p.made_by_name)}` : ""}${p.remade_by_name ? ` · made again by ${esc(p.remade_by_name)}` : ""}${p.onedrive_at && p.backup_at ? " · saved in the Arrow folder" : p.is_test ? "" : " · saved at the next save"}${(() => {
+            const bare = (p.lines || []).filter(l => !String(l.pd_color || "").trim()).length;
+            return bare ? ` · ${bare} line${bare === 1 ? "" : "s"} without colours` : ""; })()}</span></span>
+          <button class="plain" data-popdf="${esc(p.id)}">PDF</button>${"revision" in p ? `<button class="plain" data-poremake="${esc(p.id)}">Make it again</button>` : ""}</div>`).join("")}</div>` : `<p class="sub" style="margin-top:8px">No POs yet. The floor makes them on the tablets' Arrow tab.</p>`}
     </section>`;
   }
   function arrowScreen() {
@@ -3003,6 +3033,9 @@ if (typeof document !== "undefined") (function () {
     on("[data-posave]", () => { const v = (id) => (app.querySelector(id) || {}).value || "";
       act("set_arrow_po_settings", { p: { issued_by: v("#poBy"), phone: v("#poPhone"), email: v("#poEmail"), address: v("#poAddr"), tax_line: v("#poTax"),
         ...(v("#poNext") && Number(v("#poNext")) !== Number((S.po.settings || {}).next_number) ? { next_number: Number(v("#poNext")) } : {}) } }); });
+    on("[data-poremake]", (b) => { const po = ((S.po || {}).list || []).find(p => p.id === b.dataset.poremake); if (!po) return;
+      if (confirm(`Make ${po.name} again? It keeps its number, items and dates, takes the colours from the jobs' Arrow lines now and the PO details as they are now, and the next save files it as a new PDF (r${(po.revision || 1) + 1}) beside the first one. The first one is kept.`))
+        act("arrow_po_remake", { p_po: po.id }); });
     on("[data-popdf]", async (b) => { const po = ((S.po || {}).list || []).find(p => p.id === b.dataset.popdf); if (!po) return;
       try { saveBlob(new Blob([await arrowPoPdf(await pdfLib(), po)], { type: "application/pdf" }), po.file_name); }
       catch (e) { S.msg = { ok: false, text: friendlyError(e) }; render(); } });

@@ -227,10 +227,10 @@ function judge(name, l, pathOfPage) {
   ok("Mike: no errors on the page", m.errs.length === 0, m.errs.join(" | "));
   await m.ctx.close();
 
-  // ---- 2. Willie, Metal: the Arrow tab ----
+  // ---- 2. Willie, Metal: the Arrow list (its own department since 4 Nov) ----
   const w = await session(browser, users.willie);
   await w.p.goto(base); await loaded(w.p);
-  await w.p.click('[data-tab="arrow"]'); await w.p.waitForSelector("#app .arpic", { timeout: 10000 }).catch(() => {});
+  await w.p.click('[data-dept="arrow"]'); await w.p.waitForSelector("#app .arpic", { timeout: 10000 }).catch(() => {});
   ok("Willie: the pictures fill in on their own", await settled(w.p));
   const info = await w.p.evaluate(() => [...document.querySelectorAll("#app .li")].map(c => ({ text: c.innerText.replace(/\s+/g, " ").trim(),
     pics: c.querySelectorAll(".arpic").length, gone: !!c.querySelector("[data-argone],[data-arpick]"), wo: c.querySelector(".arwo") ? c.querySelector(".arwo").innerText.trim() : null,
@@ -278,36 +278,35 @@ function judge(name, l, pathOfPage) {
   ok("Willie: no errors on the page", w.errs.length === 0, w.errs.join(" | "));
   await w.ctx.close();
 
-  // ---- 2b. Eric, Assembly / QC beside Full Custom: the same Arrow tab, and switching department leaves the viewer ----
+  // ---- 2b. Eric, Assembly / QC beside Full Custom: the same Arrow list, and switching department leaves the viewer ----
   const e = await session(browser, users.eric);
   await e.p.goto(base); await loaded(e.p);
-  await e.p.click('.top [data-dept="assembly_qc"]').catch(() => {});
-  await e.p.waitForSelector('[data-tab="arrow"]', { timeout: 8000 }).catch(() => {});
-  await e.p.click('[data-tab="arrow"]'); await e.p.waitForSelector("#app .arpic", { timeout: 10000 }).catch(() => {});
-  ok("Eric, Assembly / QC: the same pictures on his Arrow tab", await settled(e.p) && (await e.p.$$("#app .arpic")).length === 3);
+  await e.p.waitForSelector('.top [data-dept="arrow"]', { timeout: 8000 }).catch(() => {});
+  await e.p.click('.top [data-dept="arrow"]'); await e.p.waitForSelector("#app .arpic", { timeout: 10000 }).catch(() => {});
+  ok("Eric (Full Custom + Assembly / QC): the same pictures on his Arrow", await settled(e.p) && (await e.p.$$("#app .arpic")).length === 3);
   await e.p.click("#app .arwo >> nth=0"); await e.p.waitForSelector("#arpage", { timeout: 5000 }).catch(() => {});
   ok("Eric: the viewer opens", !!(await e.p.$("#arpage")));
   ok("Eric: no errors on the page", e.errs.length === 0, e.errs.join(" | "));
   await e.ctx.close();
 
-  // ---- 2c. Luke, a manager: from Metal's Arrow viewer straight to Assembly / QC (both have an Arrow tab) ----
+  // ---- 2c. Luke, a manager: from the Arrow viewer straight to Metal (4 Nov: Arrow is its own department) ----
   const k = await session(browser, users.luke);
   await k.p.goto(base); await loaded(k.p);
   const pick = async (d) => { await k.p.click("[data-deptmenu]").catch(() => {}); await k.p.click(`.deptmenu [data-dept="${d}"]`).catch(() => {}); await k.p.waitForTimeout(600); };
-  await pick("metal");
-  await k.p.click('[data-tab="arrow"]').catch(() => {}); await k.p.waitForSelector("#app .arwo", { timeout: 10000 }).catch(() => {});
+  await pick("arrow");
+  await k.p.waitForSelector("#app .arwo", { timeout: 10000 }).catch(() => {});
   await k.p.click("#app .arwo >> nth=0").catch(() => {}); await k.p.waitForSelector("#arpage", { timeout: 5000 }).catch(() => {});
-  ok("Luke: the viewer opens from Metal's Arrow tab", !!(await k.p.$("#arpage")));
-  await pick("assembly_qc");
+  ok("Luke: the viewer opens from Arrow", !!(await k.p.$("#arpage")));
+  await pick("metal"); await pick("arrow");
   await k.p.waitForSelector("#app .subtabs", { timeout: 5000 }).catch(() => {});
-  ok("Luke: switching department, still on Arrow, opens on the list, not the old viewer", !(await k.p.$("#arpage")) && !!(await k.p.$("#app .subtabs")) && !!(await k.p.$("#app .arpic, #app .li")));
+  ok("Luke: away to Metal and back to Arrow, it opens on the list, not the old viewer", !(await k.p.$("#arpage")) && !!(await k.p.$("#app .subtabs")) && !!(await k.p.$("#app .arpic, #app .li")));
   ok("Luke: no errors on the page", k.errs.length === 0, k.errs.join(" | "));
   await k.ctx.close();
 
   // ---- 3. Shawn's phone: the same Arrow items, the same pictures, nothing wider than the screen ----
   const s = await session(browser, users.shawn, { width: 412, height: 915 });
   await s.p.goto(base); await loaded(s.p);
-  await s.p.click('[data-tab="arrow"]'); await s.p.waitForSelector("#app .arpic", { timeout: 10000 }).catch(() => {});
+  await s.p.click('[data-dept="arrow"]'); await s.p.waitForSelector("#app .arpic", { timeout: 10000 }).catch(() => {});
   ok("Shawn: the pictures fill in on his phone too", await settled(s.p) && (await s.p.$$("#app .arpic")).length === 3);
   ok("Shawn: nothing wider than the phone", await s.p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), String(await s.p.evaluate(() => document.documentElement.scrollWidth)));
   judge("Shawn, a picture", await look(s.p, { arrow: 5 }), "PROJ-00418/v1/sheet-5.png");

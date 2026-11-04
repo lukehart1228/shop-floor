@@ -293,6 +293,10 @@ async function toLoadout(w) { if ($(w, "[data-loback]")) await click(w, "[data-l
     await click(w, `[data-tab="${tab}"]`, 500);
     ok(`…and on ${tab[0].toUpperCase() + tab.slice(1)}`, /LOADING/.test(tx($(w, ".tripbar"))));
   }
+  if ($(w, '[data-dept="arrow"]')) {          // 4 Nov: Arrow is its own department; Shawn keeps the bar there, and tapping it goes back to Delivery
+    await click(w, '[data-dept="arrow"]', 800);
+    ok("…and on the Arrow department (Arrow left Delivery's tabs on 4 Nov)", /LOADING/.test(tx($(w, ".tripbar"))) && !$(w, '[data-tab="loadout"]'));
+  }
   await click(w, ".tripbar", 800);
   await until(() => /2 · At the site/.test(txt(w)), 5000);
   ok("Tapping it from another tab opens that trip on Load-out", tx($(w, "#app h1")) === "PROJ-00418" && $(w, '[data-tab="loadout"]').getAttribute("aria-current") === "true");
