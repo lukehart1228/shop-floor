@@ -12,7 +12,7 @@ set -e
 SF=/home/claude/sf
 mkdir -p $SF/base $SF/t $SF/out
 
-echo "== 1. Postgres 16, pg_cron, the http extension"
+echo "== 1. Postgres 16, pg_cron, the http extension, safeupdate"
 if [ ! -x /usr/lib/postgresql/16/bin/initdb ] || [ ! -f /usr/share/postgresql/16/extension/pg_cron.control ]; then
   rm -f /etc/apt/sources.list.d/nodesource*            # its 403 makes apt-get update fail
   apt-get update -qq                                  # separate command: a failed update installs nothing
@@ -21,6 +21,13 @@ fi
 if [ ! -f /usr/share/postgresql/16/extension/http.control ]; then
   cd /tmp && rm -rf pgsql-http && git clone -q --depth 1 https://github.com/pramsey/pgsql-http.git && cd pgsql-http && make -s && make -s install
 fi
+# safeupdate: Supabase's API refuses an UPDATE or DELETE with no WHERE, even inside a function
+# ("UPDATE requires a WHERE clause"). Switched on below for authenticator only, as Supabase does,
+# so every test that signs in like the API meets it (4 Nov: the PO details save stopped on it).
+if [ ! -f /usr/lib/postgresql/16/lib/safeupdate.so ]; then
+  cd /tmp && rm -rf pg-safeupdate-master && curl -sfL https://codeload.github.com/eradman/pg-safeupdate/tar.gz/refs/heads/master | tar xz \
+    && cd pg-safeupdate-master && make -s PG_CONFIG=/usr/lib/postgresql/16/bin/pg_config >/dev/null 2>&1 && make -s install PG_CONFIG=/usr/lib/postgresql/16/bin/pg_config >/dev/null 2>&1
+fi
 if [ ! -d /tmp/pg/data ]; then
   mkdir -p /tmp/pg && chown postgres:postgres /tmp/pg
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D /tmp/pg/data -A trust" >/dev/null
@@ -28,6 +35,9 @@ if [ ! -d /tmp/pg/data ]; then
 fi
 pg_isready -q -h /tmp/pg -p 5433 || su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pg/data -o '-k /tmp/pg -p 5433' -l /tmp/pg/log start" >/dev/null
 sleep 1
+if [ -f /usr/lib/postgresql/16/lib/safeupdate.so ]; then
+  psql -h /tmp/pg -p 5433 -U postgres -d postgres -qc "do \$\$ begin create role authenticator login noinherit; exception when duplicate_object then null; end \$\$;" -c "alter role authenticator set session_preload_libraries = 'safeupdate';"
+else echo "!! safeupdate didn't build: tests won't catch an update with no where, as Supabase's API does"; fi
 
 echo "== 2. The live repo (codeload works when api.github.com is rate-limited)"
 if [ -z "$KEEP_REPO" ]; then
@@ -36,7 +46,7 @@ if [ -z "$KEEP_REPO" ]; then
   cd /tmp && unzip -q -o sf-repo.zip && mv /tmp/shop-floor-main $SF/repo
 fi
 cp $SF/repo/testing/helpers/*.sql $SF/repo/testing/helpers/*.sh $SF/repo/testing/helpers/*.py $SF/base/
-cp $SF/repo/testing/helpers/pgsupa.js $SF/repo/testing/tests/*.js $SF/t/
+cp $SF/repo/testing/helpers/pgsupa.js $SF/repo/testing/tests/*.js $SF/repo/testing/tests/*.py $SF/t/
 cp $SF/repo/testing/tests/*.sh $SF/base/
 chmod +x $SF/base/*.sh
 

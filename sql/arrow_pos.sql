@@ -7,6 +7,10 @@
 -- The last result is the PASS/FAIL table: every row should say PASS.
 -- Run it BEFORE the new pages go on GitHub. The pages there now keep
 -- working with it: v_outside_jobs only gains columns at its end.
+-- 4 Nov: its three updates of the one settings row now say where id.
+--   Supabase's API refuses an update with no where (safeupdate), so
+--   Save the PO details and Make the PO stopped with "UPDATE requires
+--   a WHERE clause". Re-paste this file; check step 11 guards it.
 --
 -- WHAT IT DOES (design: the Arrow POs tab, 30–31 Oct)
 -- 1. sheet_arrow_lines: each sheet's Arrow lines (qty, base, description,
@@ -187,7 +191,8 @@ begin
     email       = case when p ? 'email'     then nullif(btrim(p ->> 'email'), '')     else email end,
     address     = case when p ? 'address'   then nullif(btrim(p ->> 'address'), '')   else address end,
     tax_line    = case when p ? 'tax_line'  then nullif(btrim(p ->> 'tax_line'), '')  else tax_line end,
-    updated_at = now(), updated_by = auth.uid();
+    updated_at = now(), updated_by = auth.uid()
+   where id;                                  -- its one row: Supabase's API refuses an update with no where (4 Nov)
   return jsonb_build_object('ok', true);
 exception when check_violation then raise exception 'One of the details is too long.';
 end $$;
@@ -339,8 +344,8 @@ begin
   end loop;
 
   -- the number
-  if v_test then v_num := st.next_test; update arrow_po_settings set next_test = next_test + 1; v_name := 'AR-T' || v_num;
-  else v_num := st.next_number; update arrow_po_settings set next_number = next_number + 1; v_name := 'AR-' || v_num; end if;
+  if v_test then v_num := st.next_test; update arrow_po_settings set next_test = next_test + 1 where id; v_name := 'AR-T' || v_num;
+  else v_num := st.next_number; update arrow_po_settings set next_number = next_number + 1 where id; v_name := 'AR-' || v_num; end if;
   insert into arrow_pos (id, client_id, po_number, is_test, name, file_name, gone_on, jobs, header, lines, made_by, made_by_name)
   values (v_po, p_client_id, v_num, v_test, v_name, v_name || '.pdf', v_on, '{}', '{}', '[]', auth.uid(), my_name());
 
@@ -501,7 +506,7 @@ begin
     insert into work_orders (job_id, is_current) values (j1, true) returning id into w1;
     insert into work_orders (job_id, is_current) values (j2, true) returning id into w2;
     insert into sheets (work_order_id, sheet_number, qty, item_code) values (w1, 1, 15, 'PD-01'), (w2, 1, 2, 'TB-01'), (w2, 2, 1, 'TB-02');
-    update arrow_po_settings set issued_by = null, next_number = 9000;
+    update arrow_po_settings set issued_by = null, next_number = 9000 where id;
 
     -- ---- 3. the lines: only a manager saves them, once per work order -----------
     perform set_config('request.jwt.claims', as_met, true);
@@ -656,6 +661,20 @@ begin
   exception when sqlstate 'P0099' then null;
   end;
   perform set_config('request.jwt.claims', '', true);
+
+  -- ---- 11. every update and delete names its rows (4 Nov) ---------------------
+  -- Supabase's API runs with safeupdate on: an UPDATE or DELETE with no WHERE is refused
+  -- ("UPDATE requires a WHERE clause"), even inside a function. The SQL Editor doesn't
+  -- have it, so steps 1-10 can't see it. This reads every function's text instead.
+  select string_agg(distinct fn, ', ') into msg from (
+    select p.oid::regprocedure::text fn, m[1] stmt
+      from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace,
+           regexp_matches(regexp_replace(p.prosrc, '--[^\n]*', '', 'g'),
+             '(\mupdate\s+[\w.]+(\s+(as\s+)?\w+)?\s+set\s[^;]*;|\mdelete\s+from\s+[\w.]+[^;]*;)', 'gi') m
+     where ns.nspname = 'public' and p.prolang in (select oid from pg_language where lanname in ('plpgsql', 'sql'))) x
+   where stmt !~* '\mwhere\M';
+  res := res || check_row(11, 'Every function''s update and delete says which rows (Supabase''s API refuses one that doesn''t)',
+                          msg is null, 'These would stop with "UPDATE requires a WHERE clause" from a page: ' || msg);
   return query select (x->>'step')::int, x->>'name', x->>'result', x->>'msg' from jsonb_array_elements(res) x;
 end $$;
 revoke all on function check_arrow_pos() from public, anon, authenticated;

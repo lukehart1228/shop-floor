@@ -8,7 +8,7 @@
 curl -sfL -o /tmp/setup.sh https://raw.githubusercontent.com/lukehart1228/shop-floor/main/testing/setup.sh && bash /tmp/setup.sh
 ```
 
-Installs Postgres 16 with `pg_cron` and the `http` extension, downloads the live repo to `/home/claude/sf/repo`, copies the helpers, and builds the `sync_base` database from every file in `sql/` in the run order written in `sql/README.md`, each run twice as one transaction. Nothing is listed by hand: the build stops if a file in `sql/` has no row in that run order, if a self-registering file has no line in `install_log.sql`'s master list, or if `whats_installed()` isn't all PASS afterwards. It ends with every check's score (`checks.sh` finds the checks in the database itself); all should be full except the three that need the real Monday. A few minutes the first time; after a sandbox reset run it again (it skips what's there). `KEEP_REPO=1` keeps a repo copy you've changed.
+Installs Postgres 16 with `pg_cron`, the `http` extension and `safeupdate` (switched on for `authenticator`, as on Supabase: §4), downloads the live repo to `/home/claude/sf/repo`, copies the helpers, and builds the `sync_base` database from every file in `sql/` in the run order written in `sql/README.md`, each run twice as one transaction. Nothing is listed by hand: the build stops if a file in `sql/` has no row in that run order, if a self-registering file has no line in `install_log.sql`'s master list, or if `whats_installed()` isn't all PASS afterwards. It ends with every check's score (`checks.sh` finds the checks in the database itself); all should be full except the three that need the real Monday. A few minutes the first time; after a sandbox reset run it again (it skips what's there). `KEEP_REPO=1` keeps a repo copy you've changed.
 
 Afterwards: `/home/claude/sf/repo` is what's live, byte for byte · `/home/claude/sf/out` is where new and changed files go, laid out like the repo (`out/sql/…`, `out/testing/tests/…`, pages at the top) · `/home/claude/sf/base` has the helpers (`load.sh`, `fresh.sh`, `checks.sh`, `overlaps.py`, the seeds, stubs and the `.sh` tests) · `/home/claude/sf/t` has `pgsupa.js` (the fake Supabase client that talks to the real test database as a real login) and the browser tests.
 
@@ -98,6 +98,8 @@ Supabase's API connects as `authenticator`, then switches role and sets the JWT 
 | Eric (Full Custom + Assembly / QC) | `aaaa…` |
 
 Secret key: `set role service_role`. No login: `set role anon`.
+
+**safeupdate (4 Nov).** Supabase loads the `safeupdate` library for `authenticator`, so anything a page calls refuses an `UPDATE` or `DELETE` with no `WHERE`, even inside a SECURITY DEFINER function: *UPDATE requires a WHERE clause*. The SQL Editor (postgres) doesn't, so a file's own check never sees it. `setup.sh` builds it from GitHub and sets `session_preload_libraries = 'safeupdate'` on `authenticator`, so `pgsupa.js` and `as()` meet it like the real API. A one-row settings table still says `where id` (`arrow_po_settings`; the PO details save and Make the PO stopped on it, 1–4 Nov). `check_arrow_pos()` step 11 scans every function's text for one and names it.
 
 ## 5. Rules every new SQL file follows
 
