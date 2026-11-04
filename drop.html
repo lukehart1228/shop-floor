@@ -77,6 +77,13 @@
   table.math tr.no td{color:var(--ink2)}
   .flagline{color:var(--warn)}
   ul.taught{list-style:none; padding:0; margin:8px 0 0}
+  /* 4 Nov: the long lists fold away, closed to start (Luke); the line says how many and what needs you */
+  details.fold{border-top:1px solid var(--line); margin-top:10px}
+  details.fold>summary{list-style:none; cursor:pointer; display:flex; gap:10px; align-items:center; flex-wrap:wrap; min-height:44px; padding:6px 0; font-weight:600}
+  details.fold>summary::-webkit-details-marker{display:none}
+  details.fold>summary::before{content:""; width:0; height:0; border-left:7px solid currentColor; border-top:5px solid transparent; border-bottom:5px solid transparent; transition:transform .15s}
+  details.fold[open]>summary::before{transform:rotate(90deg)}
+  details.fold>summary .small{font-weight:400}
   ul.taught li{display:flex; gap:10px; align-items:baseline; padding:8px 0; border-bottom:1px solid var(--line); flex-wrap:wrap}
   ul.taught li:last-child{border-bottom:none}
   ul.taught .what{flex:1; min-width:220px}
@@ -146,7 +153,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
 <script src="sf-common-2026-10-05.1.js"></script>
 <script>
-var PAGE_VERSION = "2026-11-04.1";          // this page's version: bump it with every change (it shows in select * from devices();)
+var PAGE_VERSION = "2026-11-04.2";          // this page's version: bump it with every change (it shows in select * from devices();)
 
 /* ---- core: no screen code in here, so it can be tested on its own ----
    The zip format is 11_SHOP_FLOOR_ZIP.md (format 1; format 2 with Design/; format 3, 3 Nov: Files/Metal, one folder per item
@@ -707,13 +714,13 @@ if (typeof document !== "undefined") (function () {
       .is("superseded_at", null).order("registered_at", { ascending: false }).limit(30);
     if (r.error) { d3rows = []; $("d3list").innerHTML = `<p class="small">${esc(d3NotSetUp(r.error) ? "Not set up in the database yet: design_viewer.sql hasn’t run." : friendly(r.error))}</p>`; return; }
     d3rows = r.data || [];
-    $("d3list").innerHTML = d3rows.length ? `<ul class="taught">${d3rows.map(d => `<li><span class="what"><b>${esc(d.project_id)}</b> · ${esc(d.item)}<br>
+    $("d3list").innerHTML = d3rows.length ? fold("designs", plural(d3rows.length, "3D view", "3D views"), "newest first", (() => { const b = d3rows.filter(d => d.status === "failed").length; return b ? `${b} not made` : ""; })(), `<ul class="taught">${d3rows.map(d => `<li><span class="what"><b>${esc(d.project_id)}</b> · ${esc(d.item)}<br>
         <span class="small">${esc(d.step_name)} · ${kb(d.step_bytes)}${d.status === "ready" ? ` · ${esc(sizeText(d.size_in))} in · ${d.parts} part${d.parts === 1 ? "" : "s"} · ${esc(d.up.toUpperCase())} up` : ""} · ${esc(fwhen(d.registered_at))}</span>
         ${d.status === "failed" && d.failed_why ? `<br><span class="small flagline">${esc(d.failed_why)}</span>` : ""}</span>
         <span class="tag ${d.status === "ready" ? "st-made" : d.status === "failed" ? "st-flag" : "st-stuck"}">${d.status === "ready" ? "Ready" : d.status === "failed" ? "Not made" : "Waiting to be made"}</span>
-        ${d.status === "ready" ? `<button class="link" data-d3look="${esc(d.id)}">Look</button>` : `<button class="link" data-d3make="${esc(d.id)}">Make it again</button>`}</li>`).join("")}</ul>`
+        ${d.status === "ready" ? `<button class="link" data-d3look="${esc(d.id)}">Look</button>` : `<button class="link" data-d3make="${esc(d.id)}">Make it again</button>`}</li>`).join("")}</ul>`)
       : `<p class="small">None yet. A zip with a Design folder (11_SHOP_FLOOR_ZIP.md v2) brings them.</p>`;
-    wireLooks($("d3list"));
+    wireLooks($("d3list")); wireFolds($("d3list"));
   }
   const lookSay = (t) => { const el = $("d3say"); if (el) el.textContent = t; };
   async function look(id) {
@@ -766,6 +773,16 @@ if (typeof document !== "undefined") (function () {
     };
   }
 
+  // ---------- the long lists fold away (4 Nov, Luke): closed to start; one you open stays open while the page is open ----------
+  const openFolds = new Set();
+  function fold(key, label, note, flag, inner) {
+    return `<details class="fold" data-fold="${key}"${openFolds.has(key) ? " open" : ""}><summary><span>${esc(label)}</span>${note ? `<span class="small">${esc(note)}</span>` : ""}${flag ? `<span class="tag st-flag">${esc(flag)}</span>` : ""}</summary>${inner}</details>`;
+  }
+  function wireFolds(box) {
+    box.querySelectorAll("details.fold").forEach(d => d.addEventListener("toggle", () => { if (d.open) openFolds.add(d.dataset.fold); else openFolds.delete(d.dataset.fold); }));
+  }
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
   // ---------- what's waiting for the save, and the zips dropped ----------
   async function loadWaiting() {
     const [p, d] = await Promise.all([
@@ -786,13 +803,14 @@ if (typeof document !== "undefined") (function () {
       : ["Waiting for the save on your PC", "st-stuck"];
     $("waiting").innerHTML = `<h3>Waiting for the save</h3>
       <p class="small">Files from dropped zips stay on Supabase until the office’s save on your PC has put them in OneDrive and the backup folder. Then they come off; the record stays.</p>
-      ${(p.data || []).length ? `<ul class="taught">${p.data.map(f => { const [t, c] = st(f); return `<li><span class="what"><b>${esc(f.project_id || "Library")}</b> · ${esc(f.rel_path)}<br>
+      ${(p.data || []).length ? fold("waiting", plural(p.data.length, "file waiting", "files waiting"), "", (() => { const h = p.data.filter(f => f.held).length; return h ? plural(h, "held: needs you", "held: need you") : ""; })(), `<ul class="taught">${p.data.map(f => { const [t, c] = st(f); return `<li><span class="what"><b>${esc(f.project_id || "Library")}</b> · ${esc(f.rel_path)}<br>
         <span class="small">${esc(f.what)} · ${kb(f.size_bytes)}${f.filed_name && f.filed_name !== f.rel_path.split("/").pop() ? ` · filed as ${esc(f.filed_name)}` : ""}</span></span>
-        <span class="tag ${c}">${esc(t)}</span>${f.place === "library" && f.held && !f.replace_ok_at ? `<button class="link" data-replace="${esc(f.id)}">Replace the library’s copy</button>` : ""}</li>`; }).join("")}</ul>`
+        <span class="tag ${c}">${esc(t)}</span>${f.place === "library" && f.held && !f.replace_ok_at ? `<button class="link" data-replace="${esc(f.id)}">Replace the library’s copy</button>` : ""}</li>`; }).join("")}</ul>`)
         : `<p class="small">Nothing waiting.</p>`}
-      ${(d.data || []).length ? `<h3 style="margin-top:16px">Zips dropped</h3><ul class="taught">${d.data.map(z => { const s = z.summary || {}; return `<li><span class="what"><b>${esc(z.zip_name)}</b><br>
+      ${(d.data || []).length ? `<h3 style="margin-top:16px">Zips dropped</h3>` + fold("zips", plural(d.data.length, "zip", "zips"), "newest first", (() => { const b = d.data.filter(z => !z.finished_at || ((z.summary || {}).problems || []).length).length; return b ? plural(b, "didn’t finish or had problems", "didn’t finish or had problems") : ""; })(), `<ul class="taught">${d.data.map(z => { const s = z.summary || {}; return `<li><span class="what"><b>${esc(z.zip_name)}</b><br>
         <span class="small">${esc(fwhen(z.dropped_at))} · format ${z.format}${s.parked !== undefined ? ` · ${s.parked} parked${s.unchanged ? `, ${s.unchanged} unchanged` : ""}` : ""}${s.floor ? (s.floor.ok ? (s.floor.skipped ? " · floor already had it" : ` · floor: version ${esc(s.floor.version)}`) : " · floor not loaded") : ""}${(s.machines || []).length ? ` · ${s.machines.length} machine file${s.machines.length === 1 ? "" : "s"}` : ""}</span></span>
-        <span class="tag ${!z.finished_at ? "st-flag" : (s.problems || []).length ? "st-flag" : "st-made"}">${!z.finished_at ? "Didn’t finish" : (s.problems || []).length ? `${s.problems.length} problem${s.problems.length === 1 ? "" : "s"}` : "Done"}</span></li>`; }).join("")}</ul>` : ""}`;
+        <span class="tag ${!z.finished_at ? "st-flag" : (s.problems || []).length ? "st-flag" : "st-made"}">${!z.finished_at ? "Didn’t finish" : (s.problems || []).length ? `${s.problems.length} problem${s.problems.length === 1 ? "" : "s"}` : "Done"}</span></li>`; }).join("")}</ul>`) : ""}`;
+    wireFolds($("waiting"));
     document.querySelectorAll("[data-replace]").forEach(b => b.onclick = async () => {
       if (!confirm("Replace the file in the library with this one? OneDrive keeps the old one in its version history.")) return;
       const r = await db.rpc("parked_replace_ok", { p_id: b.dataset.replace });
@@ -833,9 +851,10 @@ if (typeof document !== "undefined") (function () {
         <div style="grid-column:1/-1"><label for="fFiles">Files</label><input type="file" id="fFiles" multiple accept=".step,.stp,.dxf,.mprx,.mpr"> <span class="small">Several files at once: each file’s own name is its part.</span></div>
       </div>
       <div class="ctl" style="margin-top:12px"><button class="go" id="fSend">Send to the machine</button><span id="fMsg" class="small"></span></div>
-      ${fileRows.length ? `<ul class="taught">${fileRows.map(f => { const [t, c] = fileStatus(f); return `<li><span class="what"><b>${esc(f.file_name)}</b><br>
+      ${fileRows.length ? fold("sent", plural(fileRows.length, "file sent", "files sent"), "newest first", (() => { const b = fileRows.filter(f => !f.stored_at && !f.replaced_by && !f.picked_up_at).length; return b ? plural(b, "didn’t finish uploading", "didn’t finish uploading") : ""; })(), `<ul class="taught">${fileRows.map(f => { const [t, c] = fileStatus(f); return `<li><span class="what"><b>${esc(f.file_name)}</b><br>
         <span class="small">${esc(MACH[f.machine])} · revision ${f.rev} · sent ${esc(fday(f.uploaded_at))}${f.note ? " · " + esc(f.note) : ""}${f.picked_up_at && !f.cleared_at ? " · still in storage" : ""}</span></span>
-        <span class="tag ${c}">${esc(t)}</span>${f.picked_up_at && !f.cleared_at ? `<button class="link" data-clear="${esc(f.id)}">Clear it</button>` : ""}</li>`; }).join("")}</ul>` : `<p class="small">Nothing sent yet.</p>`}`;
+        <span class="tag ${c}">${esc(t)}</span>${f.picked_up_at && !f.cleared_at ? `<button class="link" data-clear="${esc(f.id)}">Clear it</button>` : ""}</li>`; }).join("")}</ul>`) : `<p class="small">Nothing sent yet.</p>`}`;
+    wireFolds($("files"));
     if (prevMachine) $("fMachine").value = prevMachine;
     const syncPart = () => { const a = $("fAssembly").checked; $("fPart").disabled = a; if (a) $("fPart").value = "Assembly"; };
     $("fAssembly").onchange = syncPart; if (wasAssembly) syncPart();

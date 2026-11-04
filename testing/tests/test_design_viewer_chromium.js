@@ -200,6 +200,11 @@ async function tapAt(p, pt, dx = 0, dy = 0) { const s = await p.evaluate((pt) =>
      && objs.every(o => rows.some(r => r.view_path === o.name && r.view_bytes === o.size)) && objs.every(o => /^PROJ-00418\/[0-9a-f]{64}\.fine\.view\.json\.gz$/.test(o.name)), JSON.stringify(objs));
   console.log(`      (in this sandbox: Send took ${(sendMs / 1000).toFixed(1)} s with the engine's first download; the cube converted in ${r3.convert_ms} ms, the assembly in ${r4.convert_ms} ms; view files ${objs.map(o => Math.round(o.size / 1024) + " KB").join(" and ")})`);
   ok("The drop's record lists the 3D views", (await q("select summary->'designs' as d from zip_drops order by dropped_at desc limit 1"))[0].d.length === 3);
+  // 4 Nov: the list folds away, closed to start; its line says how many and how many weren't made (Luke)
+  await lp.waitForFunction(() => /3 3D views/.test(document.querySelector("#d3list details.fold summary")?.textContent || ""), null, { timeout: 10000 });
+  ok("The 3D views list starts folded, its line saying 3 3D views and 1 not made", await lp.$eval("#d3list details.fold", d => !d.open && /3 3D views/.test(d.querySelector("summary").textContent) && /1 not made/.test(d.querySelector("summary").textContent))
+     && !(await lp.isVisible("#d3list [data-d3look]")));
+  await lp.click("#d3list details.fold > summary");
   await lp.waitForFunction(() => /TB-04/.test(document.getElementById("d3list").innerText), null, { timeout: 10000 });
   t = await lp.textContent("#d3list");
   ok("The 3D views card lists them: two Ready with their size, one Not made with its reason and Make it again", (t.match(/Ready/g) || []).length === 2 && /Not made/.test(t)
@@ -616,6 +621,9 @@ async function tapAt(p, pt, dx = 0, dy = 0) { const s = await p.evaluate((pt) =>
 
   // ---------- 8. Make it again (Luke), from the parked STEP ----------
   await lp.reload(); await lp.waitForSelector("#dropArea:not([hidden])", { timeout: 15000 });
+  await lp.waitForSelector("#d3list details.fold > summary", { timeout: 15000 });
+  ok("After a reload the 3D views list is folded again (open only while the page stays open)", await lp.$eval("#d3list details.fold", d => !d.open));
+  await lp.click("#d3list details.fold > summary");
   await lp.waitForFunction(() => /TB-01/.test(document.getElementById("d3list").innerText), null, { timeout: 15000 });
   await lp.click(`#d3list [data-d3make="${r1.id}"]`);
   await lp.waitForFunction(() => /Made:|couldn/.test(document.getElementById("d3look").innerText), null, { timeout: 120000 });

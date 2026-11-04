@@ -161,7 +161,15 @@ const OLDDB = process.env.OLDDB === "1", ZIPS = "/tmp/zips";
   await p.waitForFunction(() => /Waiting for the save on your PC/.test(document.querySelector("#waiting").textContent));
   const w = await p.textContent("#waiting");
   ok("The waiting list shows each file waiting for the save, and the zip as Done", (w.match(/Waiting for the save on your PC/g) || []).length === 7 && /PROJ-00502\.zip/.test(w) && /Done/.test(w));
+  // 4 Nov: the long lists fold away, closed to start (Luke)
+  ok("The waiting files and the zips dropped start folded, each line saying how many", await p.$eval("#waiting", el => {
+       const w = el.querySelector('details.fold[data-fold="waiting"]'), z = el.querySelector('details.fold[data-fold="zips"]');
+       return !!w && !!z && !w.open && !z.open && /7 files waiting/.test(w.querySelector("summary").textContent) && /^1 zip(?!s)/.test(z.querySelector("summary").textContent); }),
+     await p.$eval("#waiting", el => [...el.querySelectorAll("summary")].map(x => x.textContent).join(" | ")));
+  await p.click('#waiting details.fold[data-fold="waiting"] > summary');
+  ok("…a tap opens the list", await p.isVisible('#waiting details.fold[data-fold="waiting"] ul.taught'));
   ok("Machine files lists the two new files", /PROJ-00502_X-1_V-Arm_r1\.step/.test(await p.textContent("#files")));
+  ok("…folded to start, its line saying 2 files sent", await p.$eval('#files details.fold[data-fold="sent"]', d => !d.open && /2 files sent/.test(d.querySelector("summary").textContent)));
 
   // the revised zip: one changed program
   t = await drop("PROJ-00502-rev.zip");
