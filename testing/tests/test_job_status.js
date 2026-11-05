@@ -2,6 +2,8 @@
 // Mike (a supervisor) finds a job by number and reads its sentence, departments, done-by dates and sheet grid;
 // Sally (a look-up login, made here) gets the same job with no done-by dates; a login with no profile is turned
 // away; a #PROJ link opens the job; Luke's office menu has Job status and opens it inside the office.
+// 4 Nov: each job's Items list and an item's page (its work order page, open issue, Arrow, ‹ ›, #PROJ….n), for Mike;
+// Sally gets the page but no issue, done-by or 3D; Luke gets the 3D panel where the database gives him a design.
 // OLDDB=1 (no job_status.sql): the page says the database part isn't there yet. Screenshots with SHOTS=.
 //   bash /home/claude/sf/base/fresh.sh ; psql … -f out/sql/job_status.sql
 //   PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers TZ=America/Indiana/Indianapolis node test_job_status.js
@@ -25,7 +27,9 @@ const FAKE = (user) => `window.supabase = { createClient: () => {
   return { auth: { getSession: async () => ({ data: { session: localStorage.getItem("fake_signed_out") ? null : session } }),
                    signOut: async () => { localStorage.setItem("fake_signed_out", "1"); return {}; }, onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
                    signInWithPassword: async () => ({ data: null, error: { message: "Invalid login credentials" } }) },
-    from: builder, rpc: (fn, args) => call({ kind: "rpc", fn, args }) };
+    from: builder, rpc: (fn, args) => call({ kind: "rpc", fn, args }),
+    storage: { from: (b) => ({ createSignedUrl: async (pth) => { window.__signed = (window.__signed || []).concat([b + "/" + pth]);
+      return { data: { signedUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" }, error: null }; } }) } };
 } };`;
 const server = http.createServer((req, res) => {
   let p = req.url.split("?")[0].replace(/^\/shop-floor/, ""); if (p === "/" || p === "") p = "/status.html";
@@ -36,11 +40,12 @@ const server = http.createServer((req, res) => {
   res.writeHead(200, { "Content-Type": file.endsWith(".js") ? "application/javascript" : file.endsWith(".css") ? "text/css" : file.endsWith(".html") ? "text/html" : "application/octet-stream" });
   res.end(body);
 });
-async function session(browser, user, vp = { width: 1100, height: 900 }) {
+async function session(browser, user, vp = { width: 1100, height: 900 }, over = null) {
   const client = makeClient(user);
   const ctx = await browser.newContext({ viewport: vp, serviceWorkers: "block" });
   await ctx.addInitScript(() => { if (!localStorage.getItem("sfo_pin")) localStorage.setItem("sfo_pin", JSON.stringify({ none: true })); });
   await ctx.exposeBinding("__sb", async (_, m) => {
+    if (over) { const o = over(m); if (o) return o; }
     if (m.kind === "rpc") return JSON.parse(JSON.stringify(await client.rpc(m.fn, m.args || {})));
     let b = client.from(m.t); for (const [k, a] of m.calls) b = b[k](...a);
     return JSON.parse(JSON.stringify(await b));
@@ -65,11 +70,25 @@ const shot = async (p, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
   await admin.query(`insert into profiles (id, full_name, role, departments) values ($1, 'Sally (sales)', 'supervisor', '{}') on conflict (id) do nothing`, [SALLY.id]);
   if (!OLD) await admin.query(`select set_look_up($1)`, [SALLY.email]);
   const browser = await chromium.launch();
+  // 4 Nov: the job's sheets get page images, sheet 1 an open issue, sheet 2 an Arrow item
+  await admin.query(`update sheets s set png_path = $2 || '/page-' || s.sheet_number || '.png', item_code = coalesce(s.item_code, 'IT-' || s.sheet_number)
+                       from work_orders w where w.id = s.work_order_id and w.is_current and w.job_id = $1`, [job.id, job.project_id]);
+  const sh = (await admin.query(`select s.sheet_number n, s.item_code code from sheets s join work_orders w on w.id = s.work_order_id and w.is_current
+                                  where w.job_id = $1 order by s.sheet_number`, [job.id])).rows;
+  if (!OLD) {
+    await admin.query(`insert into problems (job_id, sheet_number, department, body, work_stopped, status, is_test)
+                       values ($1, $2, 'sanding', 'Edge chipped on two tops', true, 'open', false)`, [job.id, sh[0].n]);
+    await admin.query(`insert into outside_jobs (job_id, sheet_numbers, description, vendor, service, department, sent_on, gone_at, is_test)
+                       values ($1, $2, 'bases', 'Arrow', 'powdercoat', 'metal', current_date - 5, now() - interval '5 days', false)`, [job.id, [sh[1].n]]);
+  }
 
-  if (OLD) {
+  if (OLD) {     // 4 Nov: the old database is today's live one, without job_items.sql (no item fields yet)
     const { p, errs, ctx } = await session(browser, users.mike);
-    await p.goto(`${BASE}/status.html`); await p.fill("#q", num); await p.waitForTimeout(1200);
-    ok("On a database without job_status.sql the page says that part isn't set up yet", /isn't set up in the database yet/.test(await text(p)), (await text(p)).slice(0, 120));
+    await p.goto(`${BASE}/status.html#${job.project_id}`); await p.waitForSelector(".irow", { timeout: 6000 }).catch(() => {});
+    ok("On today's database the job and its Items list still show", (await p.$$(".drow")).length > 0 && (await p.$$(".irow")).length === sh.length);
+    await p.click('[data-item="0"]').catch(() => {}); await p.waitForSelector("#item .say", { timeout: 4000 }).catch(() => {});
+    const it = await p.$eval("#item", el => el.innerText).catch(() => "");
+    ok("An item's page opens, saying its work order page waits for job_items.sql (not that it was never uploaded)", /once the database has job_items.sql \(4 Nov\)/.test(it), it.replace(/\s+/g, " ").slice(0, 160));
     ok("…and nothing breaks", errs.length === 0, errs.join(" | "));
     await ctx.close(); await browser.close(); server.close(); await admin.end();
     console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);
@@ -91,8 +110,6 @@ const shot = async (p, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
     ok("One row per department the job goes through", rows.length === dbn, `${rows.length} rows, ${dbn} departments`);
     ok("Mike sees done-by dates on the departments still working", rows.some(r => /Done by [A-Z][a-z]{2} \d+/.test(r)), rows.join(" / ").slice(0, 200));
     ok("The facts strip shows Phase, Delivery and Trip", /PHASE[\s\S]*DELIVERY[\s\S]*TRIP/i.test(await p.$eval(".facts", el => el.innerText).catch(() => "")));
-    await p.click("details.later summary"); const cells = await p.$$eval(".grid td", els => els.length);
-    ok("Sheet by sheet unfolds to the grid", cells > 0, `${cells} cells`);
     ok("The address now carries the job (#PROJ…), so the link can be shared", (await p.evaluate(() => location.hash)) === "#" + job.project_id);
     const banned = await p.$eval("#app", el => /species|thickness|glue|finish spec|floor note/i.test(el.innerText));
     ok("No work order content on the page (sheet number and item code only)", !banned);
@@ -104,6 +121,45 @@ const shot = async (p, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
     ok("No errors in the page", errs.length === 0, errs.join(" | "));
     await ctx.close(); }
 
+
+  // ---- Mike: the Items list and an item's page (4 Nov) -----------------------------------------------------
+  { const { p, errs, ctx } = await session(browser, users.mike);
+    await p.goto(`${BASE}/status.html#${job.project_id}`); await p.waitForSelector(".irow", { timeout: 6000 }).catch(() => {});
+    const rows = await p.$$eval(".irow", els => els.map(e => e.innerText.replace(/\s+/g, " ")));
+    ok("The job lists its items, one row per sheet, each with a square per department", rows.length === sh.length && (await p.$$(".irow .dot")).length > 0, rows.join(" / ").slice(0, 200));
+    await p.click('[data-item="0"]'); await p.waitForSelector("#item .say", { timeout: 5000 }).catch(() => {});
+    const say = await p.$eval("#item .say p", el => el.innerText).catch(() => "");
+    ok(`Tapping sheet ${sh[0].n} opens its own page and sentence`, new RegExp(`Sheet ${sh[0].n}`).test(await p.$eval("#item h1", el => el.innerText).catch(() => "")) && !!say, say);
+    await p.waitForSelector("#item .page img", { timeout: 5000 }).catch(() => {});
+    const signed = await p.evaluate(() => window.__signed || []);
+    ok("Its work order page shows, from the work-orders bucket", (await p.$$("#item .page img")).length === 1 && signed.includes(`work-orders/${job.project_id}/page-${sh[0].n}.png`), signed.join(", "));
+    const txt = await p.$eval("#item", el => el.innerText).catch(() => "");
+    ok("Mike sees the sheet's open issue, in the sentence and on its own line", /has an open issue \(work stopped\)/.test(say) && /Open issue[\s\S]*Edge chipped/.test(txt), txt.replace(/\s+/g, " ").slice(0, 220));
+    ok("…and done-by dates on its departments still working", /Done by [A-Z][a-z]{2} \d+/.test(txt));
+    await p.click("[data-big]"); ok("Tapping the page makes it bigger", (await p.$$("#item .page.big")).length === 1);
+    await p.click('.nav [data-item="1"]'); await p.waitForTimeout(300);
+    const t2 = await p.$eval("#item", el => el.innerText).catch(() => "");
+    ok(`› goes to sheet ${sh[1].n}, which has an Arrow item out`, new RegExp(`Sheet ${sh[1].n}`).test(t2) && /Arrow\s*At Arrow since/.test(t2) && /at Arrow/.test(await p.$eval("#item .say p", el => el.innerText).catch(() => "")), t2.replace(/\s+/g, " ").slice(0, 220));
+    ok("The address carries the item (#PROJ….n), so the link can be shared", (await p.evaluate(() => location.hash)) === `#${job.project_id}.${sh[1].n}`);
+    await shot(p, "status-mike-item");
+    await p.click("[data-tojob]"); await p.waitForSelector(".irow", { timeout: 3000 }).catch(() => {});
+    ok("← PROJ goes back to the job", (await p.$$(".irow")).length === sh.length);
+    ok("No errors in the page", errs.length === 0, errs.join(" | "));
+    await ctx.close(); }
+
+  // ---- Luke: a 3D design where the database gives him one -----------------------------------------------------
+  { const over = (m) => m.kind === "from" && m.t === "item_designs"
+      ? { data: [{ id: "d3-check", project_id: job.project_id, item: sh[0].code, status: "ready", up: "z", detail: "normal", view_path: "x", parts: 3, step_name: "check.step" }], error: null } : null;
+    const { p, errs, ctx } = await session(browser, users.luke, { width: 1100, height: 900 }, over);
+    await p.goto(`${BASE}/status.html#${job.project_id}.${sh[0].n}`); await p.waitForSelector("#item [data-d3]", { timeout: 6000 }).catch(() => {});
+    ok("Where the database gives a 3D design for the item, its page has Open the 3D design", (await p.$$("#item [data-d3]")).length === 1);
+    await p.click("#item [data-d3]").catch(() => {}); await p.waitForSelector(".d3ovl", { timeout: 3000 }).catch(() => {});
+    ok("It opens the 3D panel, as on the office job page", (await p.$$(".d3ovl")).length === 1);
+    await p.click("[data-d3close]").catch(() => {}); await p.waitForTimeout(200);
+    ok("Close shuts it, back on the item", (await p.$$(".d3ovl")).length === 0 && (await p.$$("#item .say")).length === 1);
+    ok("No errors in the page", errs.filter(e => !/viewer|three|3D|Failed to fetch|net::/i.test(e)).length === 0, errs.join(" | "));
+    await ctx.close(); }
+
   // ---- Sally (look-up): same job, no done-by dates; the #link opens straight onto it ------------------------
   { const { p, errs, ctx } = await session(browser, SALLY, { width: 390, height: 844 });
     await p.goto(`${BASE}/status.html#${job.project_id}`); await p.waitForSelector(".say", { timeout: 5000 }).catch(() => {});
@@ -111,6 +167,12 @@ const shot = async (p, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
     ok("A #PROJ link opens the job directly", (await p.$(".say")) && all.includes(job.project_id), all.slice(0, 80));
     ok("Sally (look-up login) sees the same departments with no done-by dates", (await p.$$(".drow")).length > 0 && !/Done by|past its done-by|days past/.test(all), all.replace(/\s+/g, " ").slice(0, 200));
     await shot(p, "status-sally-phone");
+    await p.goto(`${BASE}/status.html?again=1#${job.project_id}.${sh[0].n}`); await p.waitForSelector("#item .say", { timeout: 6000 }).catch(() => {});
+    await p.waitForSelector("#item .page img", { timeout: 5000 }).catch(() => {});
+    const it = await p.$eval("#item", el => el.innerText).catch(() => "");
+    ok("A #PROJ….n link opens the item, and Sally sees its work order page", (await p.$$("#item .page img")).length === 1, it.replace(/\s+/g, " ").slice(0, 100));
+    ok("…but not its open issue, done-by dates or a 3D design", !/open issue|Done by|3D design/i.test(it), it.replace(/\s+/g, " ").slice(0, 220));
+    await shot(p, "status-sally-item-phone");
     ok("No errors in the page", errs.length === 0, errs.join(" | "));
     await ctx.close(); }
 

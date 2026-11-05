@@ -1,6 +1,6 @@
 #!/bin/bash
 # test_job_status_db.sh — job_status.sql (28 Oct): a look-up login, signed in the way Supabase does it,
-# can read job status and nothing else, and every function a signed-in login may call refuses it.
+# can read job status and nothing else (4 Nov: each item's page image too, never its issue or a 3D design), and every function a signed-in login may call refuses it.
 # Each call is undone straight after (a raised 'undo'), so the sweep changes nothing. A reply of
 # {"ok": false} counts as refused: the Delivery phone's functions answer that way ("hasn't reached the
 # database yet") when the caller can't see the trip, so the phone keeps the entry queued.
@@ -30,6 +30,21 @@ r=$(as $LOOK /tmp/q.sql | grep -v '=0$' | tr '\n' ' '); [ -z "$r" ] && pass "Sal
 r=$(as $MIKE /tmp/q.sql | grep -E '^(problems|flags|loadouts|photos)=' | tr '\n' ' '); pass "for comparison Mike reads: $r"
 echo "select count(*) from profiles;" > /tmp/q.sql
 r=$(as $LOOK /tmp/q.sql | tail -1); [ "$r" = "1" ] && pass "Sally sees only her own profile" || fail "Sally sees $r profiles"
+
+# ---- 4 Nov: item detail. Sally gets each item's page image (Luke's call), never its issue or a 3D design ------------
+JOB=$($P -c "select j.id from jobs j join work_orders w on w.job_id = j.id and w.is_current where not j.is_test order by j.project_id limit 1")
+PID=$($P -c "select project_id from jobs where id = '$JOB'")
+$P -c "update sheets s set png_path = '$PID/page-' || s.sheet_number || '.png' from work_orders w where w.id = s.work_order_id and w.is_current and w.job_id = '$JOB'" >/dev/null
+$P -c "insert into problems (job_id, sheet_number, department, body, status, is_test) values ('$JOB', 1, 'sanding', 'check', 'open', false)" >/dev/null
+$P -c "insert into storage.objects (bucket_id, name) values ('work-orders', '$PID/page-1.png') on conflict do nothing" >/dev/null 2>&1
+echo "select coalesce(job_lookup('$PID')#>>'{jobs,0,sheets,0,page}', 'none') || '|' || coalesce(job_lookup('$PID')#>>'{jobs,0,sheets,0,issue,open}', 'none');" > /tmp/q.sql
+r=$(as $LOOK /tmp/q.sql | tail -1); [ "$r" = "$PID/page-1.png|none" ] && pass "Sally's lookup gives each item its page image and no issue ($r)" || fail "Sally's item: $r"
+r=$(as $MIKE /tmp/q.sql | tail -1); [ "$r" = "$PID/page-1.png|1" ] && pass "Mike's gives the page and the open issue ($r)" || fail "Mike's item: $r"
+echo "select count(*) from storage.objects where bucket_id = 'work-orders' and name = '$PID/page-1.png';" > /tmp/q.sql
+r=$(as $LOOK /tmp/q.sql | tail -1); [ "$r" = "1" ] && pass "Sally can open the work order page file itself (the work-orders bucket)" || fail "Sally reads $r page files"
+echo "select design_viewer()::text || '|' || (select count(*) from item_designs);" > /tmp/q.sql
+r=$(as $LOOK /tmp/q.sql | tail -1); [ "${r%%|*}" = "false" ] && pass "design_viewer() says no to Sally, so she never gets a 3D design ($r)" || fail "Sally and designs: $r"
+r=$(as $LUKE /tmp/q.sql | tail -1); [ "${r%%|*}" = "true" ] && pass "…and yes to Luke ($r)" || fail "Luke and designs: $r"
 
 # ---- the sweep: every function a signed-in login may run ----------------------------------------------
 $P -F'|' -c "
