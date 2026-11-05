@@ -1,4 +1,4 @@
-// 4 Nov: Export counts on the office Inventory page (inventory.html 2026-11-04.2). One month's counts as a CSV, every
+// 4 Nov: Export counts on the office Inventory page (inventory.html 2026-11-04.2); 5 Nov: lumber one row per bundle (2026-11-05.2). One month's counts as a CSV, every
 // list as counted. Part 1, no database: the file's logic from the page itself (which lists go in, steel's note, lumber's
 // "count not finished", the file name, the cells). Part 2, real Chromium through the real test database as each login:
 // counts sent the real way (Willie, Eric, KP, Luke), the download's name and every line that matters, the 31 Aug starting
@@ -21,7 +21,7 @@ const X = mod.exports;
 ok("the page has the export (exportRows, exportCsv, exportName)", typeof X.exportRows === "function" && typeof X.exportCsv === "function" && typeof X.exportName === "function");
 if (typeof X.exportRows !== "function") { console.log(`\n${pass} PASS, ${fail} FAIL`); process.exit(1); }
 const ver = (html.match(/var PAGE_VERSION = "([^"]+)"/) || [])[1];
-ok("inventory.html's version was bumped", ver && ver > "2026-11-04.1", ver);
+ok("inventory.html's version was bumped", ver && ver > "2026-11-04.2", ver);
 
 for (const [v, want] of [["-2 legs", "'-2 legs"], ["=SUM(A1)", "'=SUM(A1)"], ["Bolts, 1/4", "\"Bolts, 1/4\""], [-3, "-3"], [12.5, "12.5"], [null, ""], ["Say \"hi\"", "\"Say \"\"hi\"\"\""]])
   ok(`a cell: ${JSON.stringify(v)} → ${JSON.stringify(want)}`, X.csvCell(v) === want, JSON.stringify(X.csvCell(v)));
@@ -38,6 +38,8 @@ const items = [
   { id: "m2", list_key: "metal", section: "Hardware", name: "Leveler feet", unit: "each", std_length_ft: null, sort_order: 1 },
   { id: "p1", list_key: "plywood", section: "Birch", name: "3/4 Birch ply", unit: "sheets", std_length_ft: null, sort_order: 1 },
   { id: "o1", list_key: "other", section: "", name: "=Glue", unit: "each", std_length_ft: null, sort_order: 1 },
+  { id: "w1", list_key: "lumber", section: "", name: "Walnut 8/4", species: "Walnut", stock: "8/4", unit: "bd ft", std_length_ft: null },
+  { id: "k1", list_key: "lumber", section: "", name: "Maple 6/4", species: "Maple", stock: "6/4", unit: "bd ft", std_length_ft: null },
 ];
 const M = "2026-10-31";
 const d = {
@@ -49,27 +51,36 @@ const d = {
           { id: 2, list_key: "plywood", month_end: M, sent_by_name: "Eric", sent_at: "2026-10-31T18:00:00Z", withdrawn_at: "2026-10-31T18:30:00Z" },
           { id: 3, list_key: "other", month_end: M, sent_by_name: "KP", sent_at: "2026-10-31T15:00:00Z", withdrawn_at: "2026-10-31T15:10:00Z" },
           { id: 4, list_key: "other", month_end: M, sent_by_name: "Luke H", sent_at: "2026-10-31T16:00:00Z" }],
-  lumber: [{ month_end: M, name: "Walnut 8/4", species: "Walnut", board_feet: 412.04 }, { month_end: M, name: "Maple 6/4", species: "Maple", board_feet: 1840.26 },
-           { month_end: "2026-09-30", name: "Cherry 5/4", species: "Cherry", board_feet: 9 }],
+  lumberLines: [
+    { month_end: M, item_id: "k1", length_in: 120, width_in: 42, bundles: [10.25, 9] },      // 120 × 42 × 10.25 × 1.5 ÷ 144 = 538.13; × 9 = 472.5
+    { month_end: M, item_id: "k1", length_in: 96, width_in: 42, bundles: [] },               // a length added, nothing counted
+    { month_end: M, item_id: "w1", length_in: 96, width_in: 42, bundles: [4] },              // 96 × 42 × 4 × 2 ÷ 144 = 224
+    { month_end: "2026-09-30", item_id: "w1", length_in: 96, width_in: 42, bundles: [99] },   // another month
+  ],
 };
 const rows = X.exportRows(d), names = rows.map(r => r[3]);
-ok("lists in list order: Lumber, then Metal, then Other", rows.map(r => r[1]).join() === "Lumber,Lumber,Metal,Metal,Other", rows.map(r => r[1]).join());
-ok("lumber: board feet by species and thickness, to one decimal, that month only", JSON.stringify(rows[0]) === JSON.stringify(["2026-10", "Lumber", "Maple", "Maple 6/4", 1840.3, "bd ft", "", "Luke H", "2026-10-31 4:00 PM"]), JSON.stringify(rows[0]));
+ok("lists in list order: Lumber, then Metal, then Other", rows.map(r => r[1]).join() === "Lumber,Lumber,Lumber,Metal,Metal,Other", rows.map(r => r[1]).join());
+ok("the header has the four bundle columns on the end", X.EXPORT_HEAD.slice(-4).join() === "Length (in),Width (in),Bundle,Rows");
+ok("lumber: one row per bundle, its board feet to two decimals, its length, width, number and rows", JSON.stringify(rows[0]) === JSON.stringify(["2026-10", "Lumber", "Maple", "Maple 6/4", 538.13, "bd ft", "", "Luke H", "2026-10-31 4:00 PM", 120, 42, 1, 10.25]), JSON.stringify(rows[0]));
+ok("…the second bundle of the same length", JSON.stringify(rows[1].slice(3)) === JSON.stringify(["Maple 6/4", 472.5, "bd ft", "", "Luke H", "2026-10-31 4:00 PM", 120, 42, 2, 9]), JSON.stringify(rows[1]));
+ok("…species and thickness in name order, lengths in order; a length with no bundles and another month's lines left out", rows.filter(r => r[1] === "Lumber").map(r => r[3] + " " + r[9]).join() === "Maple 6/4 120,Maple 6/4 120,Walnut 8/4 96");
+ok("…a sum of Count still gives the species and thickness's total", Math.abs(rows.filter(r => r[3] === "Maple 6/4").reduce((a, r) => a + r[4], 0) - 1010.63) < 0.01);
+ok("other lists leave the four bundle columns blank", rows.filter(r => r[1] !== "Lumber").every(r => r.length === 13 && r.slice(9).every(c => c === "")));
 ok("items in their list's order (Leveler feet before 1x1)", names.indexOf("Leveler feet") < names.indexOf("1x1 16ga"));
-ok("steel: feet, with sticks + loose feet as counted in the note", JSON.stringify(rows.find(r => r[3] === "1x1 16ga")) === JSON.stringify(["2026-10", "Metal", "Square tube", "1x1 16ga", 292, "ft", "12 sticks + 4 ft", "Willie", "2026-10-31 1:40 PM"]));
+ok("steel: feet, with sticks + loose feet as counted in the note", JSON.stringify(rows.find(r => r[3] === "1x1 16ga").slice(0, 9)) === JSON.stringify(["2026-10", "Metal", "Square tube", "1x1 16ga", 292, "ft", "12 sticks + 4 ft", "Willie", "2026-10-31 1:40 PM"]));
 ok("a blank sent as 0 shows as 0", rows.find(r => r[3] === "Leveler feet")[4] === 0);
 ok("a count taken back and not sent again is left out (Plywood)", !rows.some(r => r[1] === "Plywood"));
 ok("a list not counted is left out (Finish)", !rows.some(r => r[1] === "Finish"));
-ok("taken back and sent again: the latest send's name and time", JSON.stringify(rows.find(r => r[1] === "Other").slice(7)) === JSON.stringify(["Luke H", "2026-10-31 12:00 PM"]));
+ok("taken back and sent again: the latest send's name and time", JSON.stringify(rows.find(r => r[1] === "Other").slice(7, 9)) === JSON.stringify(["Luke H", "2026-10-31 12:00 PM"]));
 const csv = X.exportCsv(rows);
-ok("the file: a byte-order mark, the header, Windows line ends", csv.startsWith("\ufeffMonth,List,Group,Item,Count,Unit,Note,Sent by,Sent\r\n") && csv.endsWith("\r\n") && !/[^\r]\n/.test(csv));
+ok("the file: a byte-order mark, the header, Windows line ends", csv.startsWith("\ufeffMonth,List,Group,Item,Count,Unit,Note,Sent by,Sent,Length (in),Width (in),Bundle,Rows\r\n") && csv.endsWith("\r\n") && !/[^\r]\n/.test(csv));
 ok("a name starting with = opens as text in Excel", csv.includes(",'=Glue,"));
 const open = X.exportRows({ ...d, month: { month_end: M, kind: "count", status: "open" } });
 ok("an open month's lumber not marked done says count not finished, no sender", open[0][6] === "count not finished" && open[0][7] === "" && open[0][8] === "");
 const start = X.exportRows({ ...d, month: { month_end: M, kind: "starting", status: "closed" }, sends: [],
-  lumberLines: [{ month_end: M, item_id: "x", updated_by_name: "From the 31 Aug 2026 workbook", updated_at: "2026-09-25T10:00:00Z" }] });
+  lumberLines: [{ month_end: M, item_id: "k1", length_in: 120, width_in: 42, bundles: [5], updated_by_name: "From the 31 Aug 2026 workbook", updated_at: "2026-09-25T10:00:00Z" }] });
 ok("the starting count: every list in with no sends, named by where it came from", start.some(r => r[1] === "Plywood" && r[7] === "Eric") && start[0][7] === "From the 31 Aug 2026 workbook" && start[0][6] === "");
-ok("a month with nothing in it gives no rows", X.exportRows({ month: { month_end: "2026-12-31", kind: "count", status: "open" }, lists, items, counts: [], sends: [], lumber: [] }).length === 0);
+ok("a month with nothing in it gives no rows", X.exportRows({ month: { month_end: "2026-12-31", kind: "count", status: "open" }, lists, items, counts: [], sends: [], lumberLines: [] }).length === 0);
 
 // ---------------- part 2: Chromium, the real database ----------------
 (async () => {
@@ -135,8 +146,9 @@ ok("a month with nothing in it gives no rows", X.exportRows({ month: { month_end
     await rpcAs("eric", "send_inventory_count", { p_list: "plywood", p_counts: [{ item_id: ply[0].id, qty: 7 }] });
     await rpcAs("luke", "reopen_inventory_count", { p_list: "plywood" });             // taken back, not sent again
     const lum = await q("select id, name from inv_items where list_key = 'lumber' and not retired order by name limit 1");
-    await rpcAs("luke", "set_lumber_line", { p_item: lum[0].id, p_length: 96, p_bundles: [10], p_width: 42 });
-    const lumBf = Math.round(96 * 42 * 10 * (await q("select inv_stock_in(stock) as s from inv_items where id = $1", [lum[0].id]))[0].s / 144 * 10) / 10;
+    await rpcAs("luke", "set_lumber_line", { p_item: lum[0].id, p_length: 96, p_bundles: [10, 7.75], p_width: 42 });
+    const stockS = (await q("select inv_stock_in(stock) as s from inv_items where id = $1", [lum[0].id]))[0].s;
+    const lumBf = Math.round(96 * 42 * 10 * stockS / 144 * 100) / 100, lumBf2 = Math.round(96 * 42 * 7.75 * stockS / 144 * 100) / 100;
 
     const browser = await chromium.launch();
     // ---- Luke on the Inventory page ----
@@ -153,14 +165,16 @@ ok("a month with nothing in it gives no rows", X.exportRows({ month: { month_end
     let [dl] = await Promise.all([p.waitForEvent("download", { timeout: 15000 }), p.click("[data-export]")]);
     ok("the download's name says the month isn't closed", dl.suggestedFilename() === `inventory-counts-${ym}-not-closed.csv`, dl.suggestedFilename());
     let text = await read(dl), t = parse(text);
-    ok("the file starts with a byte-order mark and the header", text.startsWith("\ufeffMonth,List,Group,Item,Count,Unit,Note,Sent by,Sent\r\n"));
+    ok("the file starts with a byte-order mark and the header", text.startsWith("\ufeffMonth,List,Group,Item,Count,Unit,Note,Sent by,Sent,Length (in),Width (in),Bundle,Rows\r\n"));
     const st = t.find(r => r[3] === steel.name);
     ok("Willie's steel: feet, with 12 sticks + 4 ft in the note, sent by Willie", st && Number(st[4]) === 12 * Number(steel.std_length_ft) + 4 && st[5] === "ft" && st[6] === "12 sticks + 4 ft" && /Willie/.test(st[7]) && /^\d{4}-\d\d-\d\d \d{1,2}:\d\d (AM|PM)$/.test(st[8]), JSON.stringify(st));
     ok("Willie's blanks are 0, one row per item on the list", t.filter(r => r[1] === "Metal").length === metal.length && t.filter(r => r[1] === "Metal" && r[4] === "0").length === metal.length - 2);
     ok("Plywood, taken back and not sent again, isn't in the file", !t.some(r => r[1] === "Plywood"));
     ok("lists not sent aren't in the file (Finish, Other)", !t.some(r => r[1] === "Finish" || r[1] === "Other"));
-    const lr = t.find(r => r[1] === "Lumber" && r[3] === lum[0].name);
-    ok("lumber typed on the page, in board feet, marked count not finished", lr && Number(lr[4]) === lumBf && lr[5] === "bd ft" && lr[6] === "count not finished", JSON.stringify(lr) + " want " + lumBf);
+    const lr = t.filter(r => r[1] === "Lumber" && r[3] === lum[0].name);
+    ok("lumber typed on the page: one row per bundle, board feet, length, width, bundle, rows (¾ as .75), marked count not finished",
+       lr.length === 2 && Number(lr[0][4]) === lumBf && lr[0].slice(9).join() === "96,42,1,10" && Number(lr[1][4]) === lumBf2 && lr[1].slice(9).join() === "96,42,2,7.75"
+       && lr.every(r => r[5] === "bd ft" && r[6] === "count not finished"), JSON.stringify(lr) + ` want ${lumBf}, ${lumBf2}`);
     ok("no prices or values anywhere in the file", !/\$|price|value|1201|1204/i.test(text));
     ok("the page says what it exported", /Exported inventory-counts-.*-not-closed\.csv — \d+ rows\./.test(await p.textContent("main")));
 
@@ -170,11 +184,17 @@ ok("a month with nothing in it gives no rows", X.exportRows({ month: { month_end
     ok("31 Aug: inventory-counts-2026-08-starting.csv", dl.suggestedFilename() === "inventory-counts-2026-08-starting.csv", dl.suggestedFilename());
     t = parse(await read(dl));
     const sum = (k) => t.filter(r => r[1] === k).reduce((a, r) => a + Number(r[4]), 0);
-    const [{ n: startRows }] = await q("select (select count(*) from inv_counts where month_end = '2026-08-31') + (select count(*) from v_inv_lumber_close where month_end = '2026-08-31') as n");
-    ok("31 Aug: one row per item counted (every list, no sends needed)", t.length - 1 === Number(startRows), `${t.length - 1} vs ${startRows}`);
+    const [{ n: startRows }] = await q("select (select count(*) from inv_counts where month_end = '2026-08-31') + (select coalesce(sum(cardinality(bundles)), 0) from inv_lumber_lines where month_end = '2026-08-31') as n");
+    ok("31 Aug: one row per item counted, and per bundle for lumber (every list, no sends needed)", t.length - 1 === Number(startRows), `${t.length - 1} vs ${startRows}`);
+    const perItem = {}; for (const r of t.filter(r => r[1] === "Lumber")) perItem[r[3]] = (perItem[r[3]] || 0) + Number(r[4]);
+    const closeRows = await q("select name, board_feet::float as bf from v_inv_lumber_close where month_end = '2026-08-31'");
+    ok("31 Aug: each species and thickness's bundles add up to the database's own total (within rounding)", closeRows.every(c => Math.abs((perItem[c.name] || 0) - c.bf) < 0.05) && Object.keys(perItem).length === closeRows.length,
+       closeRows.filter(c => Math.abs((perItem[c.name] || 0) - c.bf) >= 0.05).map(c => `${c.name} ${perItem[c.name]} vs ${c.bf}`).join("; "));
+    ok("31 Aug: the workbook's lumber is one bundle per length", t.filter(r => r[1] === "Lumber").every(r => r[11] === "1" && Number(r[9]) > 0 && Number(r[12]) > 0));
     ok("31 Aug: lumber adds up to the spec's 36,440 bd ft", Math.round(sum("Lumber")) === 36440, sum("Lumber"));
     ok("31 Aug: plywood adds up to the spec's 207 sheets", sum("Plywood") === 207, sum("Plywood"));
     ok("31 Aug: named by where it came from", t.slice(1).every(r => /workbook/i.test(r[7])), JSON.stringify(t[1]));
+    ok("31 Aug: every line has all 13 columns", t.every(r => r.length === 13));
     ok("31 Aug: the month column", t.slice(1).every(r => r[0] === "2026-08"));
 
     // a month with nothing in it

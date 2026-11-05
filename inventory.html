@@ -155,7 +155,7 @@
 <script>
 /* The two settings (project address, publishable key), the key check, the connection test, the id maker and the
    Feedback button are in the shared file loaded above, sf-common-2026-10-05.1.js. */
-var PAGE_VERSION = "2026-11-04.2";          // this page's version: bump it with every change (it shows in select * from devices();)
+var PAGE_VERSION = "2026-11-05.2";          // this page's version: bump it with every change (it shows in select * from devices();)
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -238,7 +238,7 @@ function csvCell(v) {
   if (typeof v !== "number" && /^[=+\-@\t\r]/.test(t)) t = "'" + t;
   return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
 }
-const EXPORT_HEAD = ["Month", "List", "Group", "Item", "Count", "Unit", "Note", "Sent by", "Sent"];
+const EXPORT_HEAD = ["Month", "List", "Group", "Item", "Count", "Unit", "Note", "Sent by", "Sent", "Length (in)", "Width (in)", "Bundle", "Rows"];
 /** A database time as shop time: "2026-10-31 3:12 PM" */
 function shopTime(ts) {
   if (!ts) return "";
@@ -246,11 +246,13 @@ function shopTime(ts) {
     hour: "numeric", minute: "2-digit", hour12: true }).formatToParts(new Date(ts))) p[x.type] = x.value;
   return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute} ${String(p.dayPeriod).toUpperCase()}`;
 }
-const round1 = (n) => Math.round((Number(n) || 0) * 10) / 10;
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 /** The rows of one month's export: every list as counted, in list order. A department's list is in only when it was
  *  sent (one taken back with "Change the count" and not sent again is left out); the 31 Aug starting count is all in.
- *  Lumber is board feet by species and thickness. Blanks were stored as 0 when sent, so they show as 0.
- *  d = { month: inv_months row, lists, items, counts, sends, lumber: v_inv_lumber_close rows, lumberLines } */
+ *  Lumber (5 Nov): one row per bundle, its board feet in Count and its length, width, bundle number and rows in the
+ *  last four columns, so a sum of Count still gives each species and thickness's total. The 31 Aug workbook had rows
+ *  per length only, so that month shows one bundle per length. Blanks were stored as 0 when sent, so they show as 0.
+ *  d = { month: inv_months row, lists, items, counts, sends, lumberLines: inv_lumber_lines rows } */
 function exportRows(d) {
   const m = d.month || {}, me = m.month_end, ym = String(me || "").slice(0, 7), starting = m.kind === "starting";
   const items = new Map((d.items || []).map(i => [i.id, i]));
@@ -258,12 +260,19 @@ function exportRows(d) {
   const rows = [];
   for (const l of [...(d.lists || [])].sort((a, b) => a.sort_order - b.sort_order)) {
     if (l.key === "lumber") {
-      const lum = (d.lumber || []).filter(r => r.month_end === me).sort((a, b) => String(a.name).localeCompare(String(b.name)));
-      if (!lum.length) continue;
-      const last = (d.lumberLines || []).filter(x => x.month_end === me && x.updated_by_name).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))[0];
+      const lines = (d.lumberLines || []).filter(x => x.month_end === me && items.has(x.item_id) && items.get(x.item_id).list_key === "lumber")
+        .sort((a, b) => String(items.get(a.item_id).name).localeCompare(String(items.get(b.item_id).name)) || Number(a.length_in) - Number(b.length_in));
+      const last = lines.filter(x => x.updated_by_name).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))[0];
       const by = m.lumber_done_by || (starting && last ? last.updated_by_name : "");
       const note = !m.lumber_done_at && !starting && m.status !== "closed" ? "count not finished" : "";
-      for (const r of lum) rows.push([ym, l.name, r.species || "", r.name, round1(r.board_feet), "bd ft", note, by, shopTime(m.lumber_done_at)]);
+      for (const x of lines) {
+        const it = items.get(x.item_id), len = Number(x.length_in), wid = Number(x.width_in) || ROW_W;
+        (x.bundles || []).forEach((b, i) => {
+          if (b === null || b === undefined || b === "") return;          // a bundle box left empty isn't a bundle
+          rows.push([ym, l.name, it.species || "", it.name, round2(lineBf(len, wid, Number(b), it.stock)), "bd ft", note, by, shopTime(m.lumber_done_at),
+                     len, wid, i + 1, Number(b)]);
+        });
+      }
       continue;
     }
     const send = (d.sends || []).filter(x => x.list_key === l.key && x.month_end === me && !x.withdrawn_at)
@@ -276,7 +285,7 @@ function exportRows(d) {
       const note = steel && c.sticks !== null && c.sticks !== undefined
         ? `${c.sticks} stick${Number(c.sticks) === 1 ? "" : "s"} + ${Number(c.loose_ft) || 0} ft` : "";
       rows.push([ym, l.name, it.section || "", it.name, Number(c.qty), steel ? "ft" : it.unit, note,
-                 send ? send.sent_by_name : c.counted_by_name, send ? shopTime(send.sent_at) : ""]);
+                 send ? send.sent_by_name : c.counted_by_name, send ? shopTime(send.sent_at) : "", "", "", "", ""]);
     }
   }
   return rows;
@@ -497,7 +506,7 @@ if (typeof document !== "undefined") (function () {
         <select class="pick" id="xm">${ms.map(me => `<option value="${esc(me)}" ${me === S.exportMonth ? "selected" : ""}>${esc(label(me))}</option>`).join("")}</select>
         <button class="btn ghost" data-export ${S.exporting ? "disabled" : ""}>${S.exporting ? "Exporting…" : "Export counts"}</button></div>
         ${S.exportMsg ? `<div class="banner ${S.exportMsg.ok ? "ok" : ""}" role="status" style="margin:4px 0 10px">${esc(S.exportMsg.text)}</div>` : ""}
-        <p class="note" style="margin:0">A spreadsheet file (CSV) with every list's counts for that month, as sent: one row per item. Lumber is board feet by species and thickness. No prices. It goes to your Downloads folder.</p></div>`;
+        <p class="note" style="margin:0">A spreadsheet file (CSV) with every list's counts for that month, as sent: one row per item, and lumber one row per bundle (its board feet, length, width and rows). No prices. It goes to your Downloads folder.</p></div>`;
   }
   async function all(make) {                                 // every row, a thousand at a time (the API's limit)
     const out = [];
@@ -511,15 +520,14 @@ if (typeof document !== "undefined") (function () {
   async function exportCounts(me) {
     S.exporting = true; S.exportMsg = null; render();
     try {
-      const [lists, counts, sends, lumber, lumberLines] = await Promise.all([
+      const [lists, counts, sends, lumberLines] = await Promise.all([
         all(() => db.from("inv_lists").select("*").order("sort_order")),
         all(() => db.from("inv_counts").select("month_end,item_id,qty,sticks,loose_ft,counted_by_name,counted_at").eq("month_end", me).order("item_id")),
         all(() => db.from("inv_sends").select("*").eq("month_end", me).order("id")),
-        all(() => db.from("v_inv_lumber_close").select("*").eq("month_end", me).order("item_id")),
-        all(() => db.from("inv_lumber_lines").select("month_end,item_id,updated_by_name,updated_at").eq("month_end", me).order("id")),
+        all(() => db.from("inv_lumber_lines").select("month_end,item_id,length_in,width_in,bundles,updated_by_name,updated_at").eq("month_end", me).order("id")),
       ]);
       const m = monthRowOf(me);
-      const rows = exportRows({ month: m, lists, items: S.items, counts, sends, lumber, lumberLines });
+      const rows = exportRows({ month: m, lists, items: S.items, counts, sends, lumberLines });
       if (!rows.length) { S.exportMsg = { ok: false, text: `Nothing has been counted for ${monthName(me)} yet, so there's nothing to export.` }; return; }
       const blob = new Blob([exportCsv(rows)], { type: "text/csv;charset=utf-8" });
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = exportName(m);
