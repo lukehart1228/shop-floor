@@ -31,6 +31,8 @@ const aside = (h) => {
   if (process.env.PHOTOSPACE === "ignore") h = h.replace(/<section class="panel"><h2>(Photo archive|Space on Supabase)<\/h2>[\s\S]*?<\/section>/g, "")
      .replace(/<p class="meta2" style="margin-top:10px">Each job's photos[\s\S]*?<\/p>/g, "");
   if (process.env.ARROWPOS === "ignore") h = h.replace(/<section class="panel"><h2>Arrow POs<\/h2>[\s\S]*?<\/section>/g, "");
+  // EXPORT=ignore (4 Nov, inventory.html 2026-11-04.2): sets aside the Export counts section added to Inventory's This month on purpose
+  if (process.env.EXPORT === "ignore") h = h.replace(/<h3>Export counts<\/h3>\s*<div class="card">[\s\S]*?<\/p>\s*<\/div>/g, "");
   // NAMES=ignore (4 Nov, the office's names): sets aside the tab strip (Job status joined it; Photos is called OneDrive),
   // the tab's heading and first line, the words naming it, Pace's page heading (now Data) and the app's name (Production). Everything else must match.
   if (process.env.NAMES === "ignore") h = h.replace(/<nav class="tabs">[\s\S]*?<\/nav>/g, "<nav>TABS</nav>")

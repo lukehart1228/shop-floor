@@ -155,7 +155,7 @@
 <script>
 /* The two settings (project address, publishable key), the key check, the connection test, the id maker and the
    Feedback button are in the shared file loaded above, sf-common-2026-10-05.1.js. */
-var PAGE_VERSION = "2026-11-04.1";          // this page's version: bump it with every change (it shows in select * from devices();)
+var PAGE_VERSION = "2026-11-04.2";          // this page's version: bump it with every change (it shows in select * from devices();)
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -230,10 +230,70 @@ function deptPayload(items, draft) {
 const deptFeet = (it, d) => (Number((d || {}).sticks) || 0) * Number(it.std_length_ft || 0) + (Number((d || {}).loose) || 0);
 const deptHas = (it, d) => it.std_length_ft ? ((d || {}).sticks ?? "") !== "" || ((d || {}).loose ?? "") !== "" : ((d || {}).n ?? "") !== "";
 
+/* ---- the export (4 Nov): one month's counts as a spreadsheet file ---- */
+/** One spreadsheet cell, as the office writes them: text starting with = + - @ (or a tab or return) gets a leading '
+ *  so Excel shows it as typed instead of running it (review finding R-12). Numbers are left alone. */
+function csvCell(v) {
+  let t = v === null || v === undefined ? "" : String(v);
+  if (typeof v !== "number" && /^[=+\-@\t\r]/.test(t)) t = "'" + t;
+  return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+}
+const EXPORT_HEAD = ["Month", "List", "Group", "Item", "Count", "Unit", "Note", "Sent by", "Sent"];
+/** A database time as shop time: "2026-10-31 3:12 PM" */
+function shopTime(ts) {
+  if (!ts) return "";
+  const p = {}; for (const x of new Intl.DateTimeFormat("en-US", { timeZone: "America/Indiana/Indianapolis", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "numeric", minute: "2-digit", hour12: true }).formatToParts(new Date(ts))) p[x.type] = x.value;
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute} ${String(p.dayPeriod).toUpperCase()}`;
+}
+const round1 = (n) => Math.round((Number(n) || 0) * 10) / 10;
+/** The rows of one month's export: every list as counted, in list order. A department's list is in only when it was
+ *  sent (one taken back with "Change the count" and not sent again is left out); the 31 Aug starting count is all in.
+ *  Lumber is board feet by species and thickness. Blanks were stored as 0 when sent, so they show as 0.
+ *  d = { month: inv_months row, lists, items, counts, sends, lumber: v_inv_lumber_close rows, lumberLines } */
+function exportRows(d) {
+  const m = d.month || {}, me = m.month_end, ym = String(me || "").slice(0, 7), starting = m.kind === "starting";
+  const items = new Map((d.items || []).map(i => [i.id, i]));
+  const byItem = (a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0) || String(a.name).localeCompare(String(b.name));
+  const rows = [];
+  for (const l of [...(d.lists || [])].sort((a, b) => a.sort_order - b.sort_order)) {
+    if (l.key === "lumber") {
+      const lum = (d.lumber || []).filter(r => r.month_end === me).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+      if (!lum.length) continue;
+      const last = (d.lumberLines || []).filter(x => x.month_end === me && x.updated_by_name).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))[0];
+      const by = m.lumber_done_by || (starting && last ? last.updated_by_name : "");
+      const note = !m.lumber_done_at && !starting && m.status !== "closed" ? "count not finished" : "";
+      for (const r of lum) rows.push([ym, l.name, r.species || "", r.name, round1(r.board_feet), "bd ft", note, by, shopTime(m.lumber_done_at)]);
+      continue;
+    }
+    const send = (d.sends || []).filter(x => x.list_key === l.key && x.month_end === me && !x.withdrawn_at)
+      .sort((a, b) => String(b.sent_at).localeCompare(String(a.sent_at)) || b.id - a.id)[0];
+    if (!send && !starting) continue;
+    const cs = (d.counts || []).filter(c => c.month_end === me && (items.get(c.item_id) || {}).list_key === l.key)
+      .sort((a, b) => byItem(items.get(a.item_id), items.get(b.item_id)));
+    for (const c of cs) {
+      const it = items.get(c.item_id), steel = it.std_length_ft !== null && it.std_length_ft !== undefined;
+      const note = steel && c.sticks !== null && c.sticks !== undefined
+        ? `${c.sticks} stick${Number(c.sticks) === 1 ? "" : "s"} + ${Number(c.loose_ft) || 0} ft` : "";
+      rows.push([ym, l.name, it.section || "", it.name, Number(c.qty), steel ? "ft" : it.unit, note,
+                 send ? send.sent_by_name : c.counted_by_name, send ? shopTime(send.sent_at) : ""]);
+    }
+  }
+  return rows;
+}
+/** The whole file: a byte-order mark (so Excel reads ¼ and – right), then Windows line ends, as the office's files */
+const exportCsv = (rows) => "\ufeff" + [EXPORT_HEAD, ...rows].map(r => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
+/** inventory-counts-2026-10.csv · -not-closed for an open month · -starting for the 31 Aug count */
+function exportName(m) {
+  const ym = String(m.month_end).slice(0, 7);
+  return `inventory-counts-${ym}${m.kind === "starting" ? "-starting" : m.status === "closed" ? "" : "-not-closed"}.csv`;
+}
+
 /* ---- end core ---- */
 
 if (typeof module !== "undefined") module.exports = {
   friendlyError, stockIn, lineBf, rowsOf, fracText, setWhole, toggleQuarter, ftin, prevMonthEnd, lumberLines, currentMatches, norm, monthName,
+  csvCell, shopTime, exportRows, exportCsv, exportName, EXPORT_HEAD,
 };
 
 
@@ -262,6 +322,7 @@ if (typeof document !== "undefined") (function () {
     open: store.get("open", {}), pickMonth: null, drill: null, setupList: "lumber", editItem: null,
     pending: store.get("pending_lines", {}), saving: false,
     counts: [], deptList: store.get("deptlist", "plywood"), deptDrafts: store.get("deptdrafts", {}),
+    exportMonth: null, exporting: false, exportMsg: null,
   };
 
   // ---------- data ----------
@@ -413,7 +474,62 @@ if (typeof document !== "undefined") (function () {
         <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           ${closed() ? `<span class="muted">Closed.</span>` : `<button class="btn or" data-close ${canClose ? "" : "disabled"}>Close ${esc(monthShort(m))}</button>
           <span class="note">Closing saves the counts, the sheets and today's prices for good. It can't be done before ${esc(dayShort(m))}.</span>`}
-        </div></div>`;
+        </div></div>
+      ${viewExport()}`;
+  }
+
+  // ---- export a month's counts as a spreadsheet file (CSV) ----
+  function exportMonths() {
+    const ms = S.months.map(r => r.month_end);
+    if (S.month && !ms.includes(S.month)) ms.push(S.month);
+    return [...new Set(ms)].sort().reverse();
+  }
+  const monthRowOf = (me) => S.months.find(r => r.month_end === me) || { month_end: me, kind: "count", status: "open" };
+  function viewExport() {
+    const ms = exportMonths(); if (!ms.length) return "";
+    if (!ms.includes(S.exportMonth)) {                      // this month once anything is in, else the last closed month
+      const anyIn = S.status.some(s => s.done) || S.curLines.length > 0;
+      S.exportMonth = anyIn || ms.length === 1 ? ms[0] : (ms.find(me => monthRowOf(me).status === "closed") || ms[0]);
+    }
+    const label = (me) => { const r = monthRowOf(me); return monthName(me) + (r.kind === "starting" ? " (starting count)" : r.status === "closed" ? "" : " (not closed)"); };
+    return `<h3>Export counts</h3>
+      <div class="card"><div class="monthpick" style="margin:0 0 8px"><label class="muted small" for="xm">Month</label>
+        <select class="pick" id="xm">${ms.map(me => `<option value="${esc(me)}" ${me === S.exportMonth ? "selected" : ""}>${esc(label(me))}</option>`).join("")}</select>
+        <button class="btn ghost" data-export ${S.exporting ? "disabled" : ""}>${S.exporting ? "Exporting…" : "Export counts"}</button></div>
+        ${S.exportMsg ? `<div class="banner ${S.exportMsg.ok ? "ok" : ""}" role="status" style="margin:4px 0 10px">${esc(S.exportMsg.text)}</div>` : ""}
+        <p class="note" style="margin:0">A spreadsheet file (CSV) with every list's counts for that month, as sent: one row per item. Lumber is board feet by species and thickness. No prices. It goes to your Downloads folder.</p></div>`;
+  }
+  async function all(make) {                                 // every row, a thousand at a time (the API's limit)
+    const out = [];
+    for (let from = 0; ; from += 1000) {
+      const r = await make().range(from, from + 999);
+      if (r.error) throw r.error;
+      out.push(...(r.data || []));
+      if (!r.data || r.data.length < 1000) return out;
+    }
+  }
+  async function exportCounts(me) {
+    S.exporting = true; S.exportMsg = null; render();
+    try {
+      const [lists, counts, sends, lumber, lumberLines] = await Promise.all([
+        all(() => db.from("inv_lists").select("*").order("sort_order")),
+        all(() => db.from("inv_counts").select("month_end,item_id,qty,sticks,loose_ft,counted_by_name,counted_at").eq("month_end", me).order("item_id")),
+        all(() => db.from("inv_sends").select("*").eq("month_end", me).order("id")),
+        all(() => db.from("v_inv_lumber_close").select("*").eq("month_end", me).order("item_id")),
+        all(() => db.from("inv_lumber_lines").select("month_end,item_id,updated_by_name,updated_at").eq("month_end", me).order("id")),
+      ]);
+      const m = monthRowOf(me);
+      const rows = exportRows({ month: m, lists, items: S.items, counts, sends, lumber, lumberLines });
+      if (!rows.length) { S.exportMsg = { ok: false, text: `Nothing has been counted for ${monthName(me)} yet, so there's nothing to export.` }; return; }
+      const blob = new Blob([exportCsv(rows)], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = exportName(m);
+      document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      const waiting = me === S.month ? Object.keys(S.pending).length : 0;
+      S.exportMsg = { ok: true, text: `Exported ${a.download} — ${rows.length} row${rows.length === 1 ? "" : "s"}.${
+        waiting ? ` ${waiting} lumber line${waiting === 1 ? " is" : "s are"} still waiting to save and aren't in it.` : ""}` };
+    } catch (e) {
+      S.exportMsg = { ok: false, text: isNetworkError(e) ? "Can't reach the database right now, so nothing was exported. Try again when the connection is back." : friendlyError(e) };
+    } finally { S.exporting = false; render(); }
   }
 
   // ---- a department's list, as its tablet shows it; the office can count and send it on their behalf ----
@@ -700,6 +816,8 @@ if (typeof document !== "undefined") (function () {
     });
     on("[data-addkey]", () => { const id = document.getElementById("newkey").value; if (!id) return; S.open["add_" + id] = true; S.open[id] = true;
       if (!(S.lines.get(id) || []).length) S.lines.set(id, [{ item_id: id, length_in: 114, width_in: ROW_W, bundles: [null] }]); render(); });
+    on("#xm", (el) => { S.exportMonth = el.value; S.exportMsg = null; render(); }, "change");
+    on("[data-export]", () => { const el = document.getElementById("xm"); exportCounts(el ? el.value : S.exportMonth); });
     on("[data-golist]", (el) => { S.deptList = el.dataset.golist; store.set("deptlist", S.deptList); S.tab = "dept"; store.set("tab", "dept"); render(); scrollTo(0, 0); });
     on("[data-dlist]", (el) => { S.deptList = el.dataset.dlist; store.set("deptlist", S.deptList); S.msg = null; render(); });
     on("[data-dinv]", (el) => {
