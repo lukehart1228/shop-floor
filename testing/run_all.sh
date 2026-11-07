@@ -125,6 +125,7 @@ run test_zip_drop          seed  OUT=$P $PW -- node test_zip_drop.js
 run test_zip_filing_chromium seed OUT=$P $PW -- node test_zip_filing_chromium.js
 run test_arrow_po          seed  PAGE=$PAGE $PW -- node test_arrow_po.js
 run test_arrow_po_remake   seed  OUT=$P $PW -- node test_arrow_po_remake.js   # 4 Nov: Make it again; the office PDF as Luke's template
+run test_purchasing        seed  OUT=$P $PW -- node test_purchasing.js   # 7 Nov: Purchasing, its own page (To buy, POs in two series, the Purchases file, Prices)
 want test_lab && row test_lab skipped "retired: the Prototype lab left the office menu 4 Nov (lab.html stays on GitHub, unlinked)"
 fi
 # 1 Nov: the 3D design viewer, on its own: real STEP files through the real engine take a few minutes

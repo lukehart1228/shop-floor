@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#181D2E">
+<title>Purchasing · Production</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+
+  :root{
+    --midnight:#181D2E; --orange:#ED5E0F; --bright:#F0A721; --teal:#00B4B2;
+    --teal-ink:#00807E; --teal-bg:#DDF2F1; --sawdust:#FFF4D5; --gray:#C2BAA0;
+    --paper:#EFEDE6; --line:#E4DFCF; --ink2:#6B7082; --warn:#8A4B00;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--paper); color:var(--midnight);
+    font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:17px; line-height:1.45}
+  button,input,select,textarea{font:inherit; color:inherit}
+  button{cursor:pointer}
+  button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--bright); outline-offset:2px}
+  [hidden]{display:none!important}
+  .num{font-family:'Barlow Condensed',sans-serif; font-variant-numeric:tabular-nums}
+  header{background:var(--midnight); color:var(--sawdust); padding:0 16px; position:sticky; top:0; z-index:10}
+  .hrow{display:flex; align-items:center; gap:14px; min-height:52px; flex-wrap:wrap}
+  .brand{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.14em; color:var(--orange); white-space:nowrap}
+  header h1{margin:0; font-size:19px; font-weight:600}
+  .me{margin-left:auto; color:var(--gray); font-size:15px; white-space:nowrap}
+  .me a,.me button{color:var(--sawdust); background:none; border:none; padding:0; text-decoration:underline; font-weight:500}
+  nav.tabs{display:flex; gap:2px; overflow-x:auto; scrollbar-width:none}
+  nav.tabs button{background:none; border:none; color:#9AA0B4; padding:0 12px; min-height:48px; font-weight:600; white-space:nowrap;
+                  border-bottom:4px solid transparent; border-radius:0}
+  nav.tabs button[aria-current="true"]{color:var(--sawdust); border-bottom-color:var(--orange)}
+  main{max-width:1180px; margin:0 auto; padding:16px 14px 90px}
+  h2{font-size:25px; margin:4px 2px 2px}
+  h3{font-size:17px; color:var(--ink2); margin:24px 2px 10px}
+  .sub{color:var(--ink2); margin:0 2px 16px}
+  .card{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:12px}
+  .btn{background:var(--midnight); color:var(--sawdust); border:none; border-radius:10px; padding:10px 18px; font-weight:700; min-height:46px}
+  .btn.ghost{background:#fff; color:var(--midnight); border:1px solid var(--gray)}
+  .btn.or{background:var(--orange); color:#fff}
+  .btn:disabled{opacity:.4; cursor:default}
+  .link{background:none; border:none; color:var(--orange); font-weight:700; padding:6px 2px}
+  .muted{color:var(--ink2)} .small{font-size:14px}
+  .banner{border-radius:10px; padding:12px 16px; margin-bottom:14px; font-weight:600; background:var(--sawdust); color:var(--warn); border-left:5px solid var(--bright)}
+  .banner.ok{background:var(--teal-bg); color:var(--teal-ink); border-left-color:var(--teal)}
+  .banner small{display:block; font-weight:500}
+  .alarm{background:var(--midnight); color:var(--sawdust); border-radius:12px; padding:20px}
+  .alarm h2{color:var(--bright)}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px}
+  .stat{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px}
+  .stat .o{color:var(--ink2); font-size:14px; font-weight:600}
+  .stat .t{font-weight:700; font-size:26px; line-height:1.2}
+  .stat .s{color:var(--ink2); font-size:14px; margin-top:4px}
+  .stat.big{background:var(--midnight); color:var(--sawdust); border-color:var(--midnight)}
+  .stat.big .o,.stat.big .s{color:var(--gray)}
+  .tw{overflow-x:auto; background:#fff; border:1px solid var(--line); border-radius:12px}
+  table{border-collapse:collapse; width:100%; min-width:640px}
+  th,td{padding:9px 11px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap}
+  th{font-size:14px; color:var(--ink2); font-weight:700; background:#fff}
+  th:first-child,td:first-child,.l{text-align:left}
+  td.wrap{white-space:normal; min-width:220px}
+  tr.subtot td{font-weight:700; background:var(--paper)}
+  tr.off td{color:var(--ink2); text-decoration:line-through}
+  tr.click{cursor:pointer}
+  tr.click:hover td{background:var(--paper)}
+  tr.open td{background:var(--sawdust)}
+  .tag{display:inline-block; font-size:12px; font-weight:700; padding:2px 7px; border-radius:5px; border:1.5px solid var(--ink2); color:var(--ink2); white-space:nowrap}
+  .tag.done{border-color:var(--teal); background:var(--teal); color:#fff}
+  .tag.flag{border-color:var(--bright); background:var(--bright); color:var(--midnight)}
+  .form{display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:10px; align-items:end}
+  .form label{display:flex; flex-direction:column; gap:4px; font-size:14px; color:var(--ink2); font-weight:600}
+  .form input,.form select,.form textarea,td input,td select{min-height:42px; border:1px solid var(--gray); border-radius:8px; padding:6px 9px; background:#fff; font-size:16px}
+  .form textarea{min-height:84px}
+  td input,td select{width:100%}
+  td input.n{text-align:right; font-family:'Barlow Condensed',sans-serif}
+  .note{font-size:14px; color:var(--ink2)}
+  .seg{display:flex; border:2px solid var(--midnight); border-radius:10px; overflow:hidden; width:max-content; margin:4px 2px 14px}
+  .seg button{background:#fff; border:none; padding:8px 18px; min-height:44px; font-weight:700}
+  .seg button[aria-current="true"]{background:var(--midnight); color:var(--sawdust)}
+  .titlerow{display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; margin-bottom:10px}
+  .titlerow .grow{flex:1 1 300px}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .detail{padding:14px 16px; background:var(--paper)}
+  .detail .tw{margin:10px 0}
+  table.edit td{padding:6px 6px; vertical-align:middle}
+  table.edit td:first-child{width:34px; color:var(--ink2)}
+  .x{background:none; border:none; color:var(--ink2); font-size:22px; padding:0 8px; min-height:40px}
+  @media (max-width:700px){ .brand{display:none} h2{font-size:22px} .stat .t{font-size:22px} }
+  .drop{display:block; cursor:pointer; border:2px dashed var(--gray); border-radius:12px; background:#fff; padding:22px; text-align:center; margin-bottom:6px}
+  .drop.over{border-color:var(--orange); background:var(--sawdust)}
+  .chk{width:22px; height:22px; accent-color:var(--midnight)}
+  td.chkc{width:44px; text-align:center}
+  .dept{font-weight:700; margin:18px 2px 6px}
+  .pill{display:inline-block; font-size:13px; font-weight:600; padding:1px 8px; border-radius:20px; background:var(--paper); color:var(--ink2)}
+  .up{color:var(--warn); font-weight:700}
+  .down{color:var(--teal-ink); font-weight:700}
+  details.fold>summary{cursor:pointer; font-weight:700; color:var(--ink2); margin:18px 2px 8px; min-height:32px}
+</style>
+</head>
+<body>
+<header>
+  <div class="hrow"><div class="brand">PURPOSEFUL</div><h1>Purchasing</h1><div class="me" id="me"></div></div>
+  <nav class="tabs" id="tabs" hidden></nav>
+</header>
+<div id="app"></div>
+<!-- the Supabase library, checked: the browser refuses it if even one byte differs from the published file -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+<script src="sf-common-2026-10-05.1.js"></script>
+<script>
+/* The two settings (project address, publishable key), the key check, the connection test, the id maker and the
+   Feedback button are in the shared file loaded above, sf-common-2026-10-05.1.js.
+   Purchasing (7 Nov; design: the spec's Purchasing tab, "First release: standalone", and the Lumber buying & POs tab):
+   To buy (the tablets' supply requests, as on Operations), POs in Luke's PD - PO template filed as PDFs in PD - POs
+   (PO 00001 on, and Lumber PO 24 on), Prices against each item's baseline with an export for the yearly check against
+   the bills, Savings to chase, Lumber (the tracker), the Purchases file with Match these, and Setup. Managers only.
+   purchasing.sql. What's entered is the truth: PO lines, and buys with no PO from the Purchases file. */
+var PAGE_VERSION = "2026-11-07.1";          // this page's version: bump it with every change (it shows in select * from devices();)
+/* ---- core: no screen code in here, so it can be tested on its own ---- */
+const SCRAP_ALLOWANCE = 1.7;                 // the workbook's allowance: 1.7 bd ft bought for each bd ft in a top
+function isMissing(err) { return /could not find the function|schema cache|does not exist/i.test(String((err && err.message) || err || "")); }
+function friendlyError(err) {
+  const m = String((err && (err.message || err.error_description || err.error)) || err || "");
+  if (isNetworkError(err)) return "Can't reach the database right now. Check the connection and try again.";
+  if (/jwt expired|refresh token/i.test(m)) return "The sign-in has expired. Sign out and back in.";
+  if (isMissing(err)) return "Purchasing isn't set up in the database yet. Run purchasing.sql, wait a minute, then reload this page.";
+  if (/row-level security|permission denied|insufficient/i.test(m) && !/^Only a manager/.test(m)) return "This login can't do that. Purchasing is for managers.";
+  return m || "Something went wrong. Try again, and if it keeps happening, take a screenshot.";
+}
+const n0 = (x) => Math.round(Number(x) || 0).toLocaleString("en-US");
+/** $1,234 (no cents) or $1,234.56 */
+function usd(x, cents) {
+  const v = Number(x) || 0, s = Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: cents ? 2 : 0 });
+  return (v < 0 ? "−$" : "$") + s;
+}
+/** a price per board foot: $3.125, $3.50, $3.00 (two or three places, as typed) */
+function price(x) { if (x === null || x === undefined || x === "") return ""; const v = Number(x); const s = v.toFixed(3); return "$" + (s.endsWith("0") ? v.toFixed(2) : s); }
+const pct = (x) => x === null || x === undefined || !isFinite(x) ? "—" : `${(x * 100).toFixed(1)}%`;
+/** "2026-11-04" → "11/4/2026" (as Luke's POs print it) */
+function mdy(d) { if (!d) return ""; const [y, m, dd] = String(d).slice(0, 10).split("-").map(Number); return `${m}/${dd}/${y}`; }
+const yearOf = (d) => Number(String(d || "").slice(0, 4));
+/** the benchmark a 7/4 item takes from 8/4 at the same square feet (the database works it out the same way) */
+function compareBenchmark(avg, quarters, asQuarters) { return Math.round(avg * asQuarters / quarters * 10000) / 10000; }
+/** one line's tracker figures: bf counts (received, else ordered), its cost and saving */
+function lineMoney(l) {
+  const tracked = !!l.lumber, bf = tracked ? Number(l.bf) || 0 : 0, priced = l.unit_price !== null && l.unit_price !== undefined;
+  const bench = l.benchmark === null || l.benchmark === undefined ? null : Number(l.benchmark);
+  return { tracked, bf, priced, cost: priced ? bf * Number(l.unit_price) : null, bench,
+           saving: priced && bench !== null ? bf * (bench - Number(l.unit_price)) : null, received: l.received_bf !== null && l.received_bf !== undefined };
+}
+/** a PO's own sums: tracked bd ft, in so far, its total (as printed), its saving, and where it stands */
+function poSummary(po) {
+  const ls = po.lines || [];
+  let bf = 0, inBf = 0, saving = 0, tracked = 0, open = 0, ordered = 0;
+  for (const l of ls) { const m = lineMoney(l); if (!m.tracked) continue; tracked++; bf += m.bf; ordered += Number(l.qty); if (m.saving !== null) saving += m.saving;
+    if (m.received) inBf += Number(l.received_bf);
+    // still coming: nothing in yet, or slips short of the order (a workbook figure is what came, short or not)
+    if (!m.received || (l.history_in_bf === null || l.history_in_bf === undefined) && Number(l.received_bf) < Number(l.qty)) open++; }
+  const total = (po.printed && po.printed.length ? po.printed : ls).reduce((a, l) => a + (l.unit_price === null || l.unit_price === undefined ? 0 : Number(l.qty) * Number(l.unit_price)), 0);
+  const state = po.cancelled_at ? "cancelled" : !tracked ? "untracked" : inBf === 0 && !ls.some(l => l.received_bf !== null && l.received_bf !== undefined) ? "on order"
+              : open ? "part in" : "in";
+  return { bf, ordered, inBf, saving, total, state, tracked };
+}
+/** the months with scrap figures in a year: the workbook's, then Inventory's own (which win for the same month) */
+function scrapMonths(data, year) {
+  const by = new Map();
+  for (const m of data.scrap_history || []) if (yearOf(m.month_end) === year) by.set(m.month_end, { ...m, from: "workbook" });
+  for (const m of data.scrap_inventory || []) if (yearOf(m.month_end) === year && Number(m.zero_bf) > 0) by.set(m.month_end, { ...m, from: "Inventory" });
+  return [...by.values()].sort((a, b) => String(a.month_end).localeCompare(String(b.month_end))).map(m => {
+    const zero = Number(m.zero_bf), used = Number(m.used_bf), allow = zero * SCRAP_ALLOWANCE;
+    return { month_end: m.month_end, from: m.from, zero, used, ratio: used / zero, allow, saved: allow - used };
+  });
+}
+/** the workbook's Results tab for one year, from the POs and the scrap months */
+function lumberResults(data, year) {
+  const lines = [];
+  for (const po of data.pos || []) if (!po.cancelled_at && yearOf(po.ordered_on) === year) for (const l of po.lines || []) if (l.lumber) lines.push(l);
+  let bf = 0, pricedBf = 0, spent = 0, saving = 0, benchCost = 0, benchSpent = 0, onOrder = 0, noPrice = 0, noBench = 0, measured = 0, measuredOf = 0;
+  for (const l of lines) {
+    const m = lineMoney(l); bf += m.bf;
+    if (!m.received) onOrder += m.bf;
+    if (!m.priced) { noPrice++; continue; }
+    pricedBf += m.bf; spent += m.cost;
+    if (m.bench === null) { noBench++; continue; }
+    saving += m.saving; benchCost += m.bf * m.bench; benchSpent += m.cost;
+    if (l.measured_bf && m.received) { measured += Number(l.measured_bf); measuredOf += Number(l.received_bf); }
+  }
+  const avg = pricedBf ? spent / pricedBf : 0;
+  const months = scrapMonths(data, year);
+  const zero = months.reduce((a, m) => a + m.zero, 0), used = months.reduce((a, m) => a + m.used, 0), savedBf = months.reduce((a, m) => a + m.saved, 0);
+  const ratio = zero ? used / zero : null;
+  const costCut = benchCost ? 1 - benchSpent / benchCost : null, scrapCut = ratio === null ? null : 1 - ratio / SCRAP_ALLOWANCE;
+  return { year, lines: lines.length, bf, spent, avg, saving, onOrder, noPrice, noBench, months, ratio, savedBf, scrapDollars: savedBf * avg,
+           total: saving + savedBf * avg, costCut, scrapCut, totalCut: costCut === null ? null : costCut + (scrapCut || 0),
+           lostOnPurchase: measuredOf ? 1 - measured / measuredOf : null };
+}
+/** each supplier's share of board feet and dollars: this year from the POs, the year before from what was typed in */
+function supplierMix(data, year) {
+  const now = new Map(), before = new Map();
+  for (const po of data.pos || []) if (!po.cancelled_at && yearOf(po.ordered_on) === year)
+    for (const l of po.lines || []) { const m = lineMoney(l); if (!m.tracked) continue;
+      const r = now.get(po.vendor_id) || { bf: 0, dollars: 0 }; r.bf += m.bf; r.dollars += m.cost || 0; now.set(po.vendor_id, r); }
+  for (const t of data.year_totals || []) if (Number(t.year) === year - 1) before.set(t.vendor_id, { bf: Number(t.bf), dollars: Number(t.dollars) });
+  const sum = (m, k) => [...m.values()].reduce((a, r) => a + r[k], 0);
+  const tn = { bf: sum(now, "bf"), dollars: sum(now, "dollars") }, tb = { bf: sum(before, "bf"), dollars: sum(before, "dollars") };
+  const ids = [...new Set([...now.keys(), ...before.keys()])];
+  const rows = ids.map(id => { const v = (data.suppliers || []).find(x => x.id === id) || {}; const a = before.get(id) || { bf: 0, dollars: 0 }, b = now.get(id) || { bf: 0, dollars: 0 };
+    return { id, name: v.name || "?", before: a, now: b, bfShareBefore: tb.bf ? a.bf / tb.bf : null, bfShareNow: tn.bf ? b.bf / tn.bf : null,
+             dShareBefore: tb.dollars ? a.dollars / tb.dollars : null, dShareNow: tn.dollars ? b.dollars / tn.dollars : null }; })
+    .sort((a, b) => b.now.bf - a.now.bf || b.before.bf - a.before.bf);
+  return { rows, totalNow: tn, totalBefore: tb, hasBefore: before.size > 0 };
+}
+/** the editor's lines, checked as the database will: [{qty, unit, description, job_number, unit_price, item_id, supply_request_id}] or a problem */
+function checkLines(rows, items) {
+  const isLumber = (id) => !!id && ((items || []).find(i => i.id === id) || {}).category_key === "lumber";
+  const out = [];
+  for (const [i, r] of rows.entries()) {
+    const blank = !String(r.qty ?? "").trim() && !String(r.description ?? "").trim() && !String(r.unit_price ?? "").trim();
+    if (blank && !r.id) continue;
+    const qty = Number(String(r.qty ?? "").replace(/,/g, "")), up = String(r.unit_price ?? "").replace(/[$,\s]/g, "");
+    if (!(qty > 0)) return { problem: `Line ${i + 1}: type the quantity.` };
+    if (!String(r.description || "").trim()) return { problem: `Line ${i + 1}: type the description.` };
+    if (up !== "" && !(Number(up) >= 0)) return { problem: `Line ${i + 1}: the unit price isn't a number.` };
+    if (isLumber(r.item_id) && String(r.unit || "").trim()) return { problem: `Line ${i + 1}: a lumber line is in board feet, so leave its unit blank.` };
+    out.push({ ...(r.id ? { id: r.id } : {}), qty, unit: String(r.unit || "").trim(), description: String(r.description).trim(),
+               job_number: String(r.job_number || "").trim(), unit_price: up === "" ? null : Number(up), item_id: r.item_id || null,
+               supply_request_id: r.supply_request_id || null });
+  }
+  if (!out.length) return { problem: "Add at least one line." };
+  if (out.length > 22) return { problem: "A PO has room for 22 lines. Split it into two POs." };
+  return { lines: out };
+}
+
+/* ---- the PO as a PDF: a copy of the PD - PO sheet in Luke's PD PO Template.xlsx ----
+   Laid out from the sheet itself: its column widths and row heights, printed at the sheet's own 49% on letter
+   portrait with its margins (0.7" sides, 0.75" top): rows at the sheet's 49%, columns spread to the page's width as
+   Excel and LibreOffice print it (Fit to 1 page wide). Checked against the sheet itself printed by LibreOffice. The orange fills (Excel's Orange, Accent 2, 60% lighter), the
+   medium outer box and title box, the thin grids, the double rule under the lines and above Total Due, the logo
+   where the sheet has it, the labels and alignments as on the sheet; Calibri becomes Helvetica. */
+const PO_COLS = [12.375, 4.03515625, 22.05859375, 47.484375, 18.96484375, 22.05859375, 41.02734375, 5.6484375, 9.14453125];   // A to I
+const PO_ROWS = { 1: 15.75, 2: 14.45, 3: 14.45, 4: 14.45, 5: 15.95, 27: 17.1, 57: 14.45 };
+for (const r of [6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20]) PO_ROWS[r] = 20.1;
+for (let r = 28; r <= 56; r++) PO_ROWS[r] = 24.95;
+const PO_FILL = [248 / 255, 203 / 255, 173 / 255];
+/** Excel's column width (characters of Calibri 11) in points */
+const colPt = (w) => Math.trunc(((256 * w + Math.trunc(128 / 7)) / 256) * 7) * 0.75;
+function poGrid() {
+  const xs = [0]; for (const w of PO_COLS) xs.push(xs[xs.length - 1] + colPt(w));
+  const ys = [0, 0]; for (let r = 1; r <= 58; r++) ys[r + 1] = ys[r] + (PO_ROWS[r] || 15);
+  return { xs, ys };                                    // xs[c] = left edge of column c (0 = A); ys[r] = top of row r (1-based)
+}
+/** the number a PO prints: 24 for Lumber PO 24, 00001 for PO 00001 */
+const poNumberText = (po) => po.series === "po" ? String(po.po_number || "").padStart(5, "0") : String(po.po_number || "");
+async function poPdf(PDFLib, po, logoBytes) {
+  const { PDFDocument, StandardFonts, rgb } = PDFLib, doc = await PDFDocument.create();
+  const f = await doc.embedFont(StandardFonts.Helvetica), b = await doc.embedFont(StandardFonts.HelveticaBold);
+  const { xs, ys } = poGrid(), C = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5, G: 6, H: 7, I: 8 };
+  const page = doc.addPage([612, 792]), SX = (612 - 2 * 0.7 * 72) / xs[9], S = 0.49, X0 = 0.7 * 72, Y0 = 792 - 0.75 * 72, black = rgb(0, 0, 0), fill = rgb(...PO_FILL);
+  const X = (col) => X0 + xs[C[col]] * SX, Xr = (col) => X0 + xs[C[col] + 1] * SX, Y = (row) => Y0 - ys[row] * S, Yb = (row) => Y0 - ys[row + 1] * S;
+  const h = po.header || {}, v = h.vendor || {}, sh = h.ship_to || {};
+  const clean = (t) => String(t == null ? "" : t).replace(/[^\x20-\x7e]/g, (c) => ({ "\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"', "\u2013": "-", "\u2014": "-", "\u00a0": " " })[c] || "");
+  const SZ = 11 * S, PAD = 2.2 * S * 2;
+  /** text in a box: left, centre or right, shrunk (never below 70%) then cut to fit */
+  const put = (t, x1, x2, yTop, yBot, o = {}) => {
+    let s = clean(t), size = (o.size || 11) * S; const font = o.bold ? b : f, width = x2 - x1 - 2 * PAD;
+    while (s && font.widthOfTextAtSize(s, size) > width && size > (o.size || 11) * S * 0.7) size -= 0.1;
+    while (s && font.widthOfTextAtSize(s, size) > width) s = s.slice(0, -1);
+    const w = font.widthOfTextAtSize(s, size), x = o.align === "center" ? x1 + (x2 - x1 - w) / 2 : o.align === "right" ? x2 - PAD - w : x1 + PAD;
+    const y = o.valign === "center" ? (yTop + yBot) / 2 - size * 0.35 : yBot + 1.6 * S * 2;   // Excel puts text at the bottom of a cell unless told otherwise
+    if (s) page.drawText(s, { x, y, size, font, color: black });
+  };
+  const line = (x1, y1, x2, y2, w) => page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: w, color: black });
+  const THIN = 0.75 * S, MED = 1.5 * S;
+  const box = (c1, r1, c2, r2, w = THIN, sides = "lrtb") => { const x1 = X(c1), x2 = Xr(c2), y1 = Y(r1), y2 = Yb(r2);
+    if (sides.includes("l")) line(x1, y1, x1, y2, w); if (sides.includes("r")) line(x2, y1, x2, y2, w);
+    if (sides.includes("t")) line(x1, y1, x2, y1, w); if (sides.includes("b")) line(x1, y2, x2, y2, w); };
+  const shade = (c1, r1, c2, r2) => page.drawRectangle({ x: X(c1), y: Yb(r2), width: Xr(c2) - X(c1), height: Y(r1) - Yb(r2), color: fill });
+  const dbl = (c1, c2, row) => { const y = Yb(row), x1 = X(c1), x2 = Xr(c2); line(x1, y + 0.6 * S, x2, y + 0.6 * S, THIN * 0.8); line(x1, y - 0.9 * S, x2, y - 0.9 * S, THIN * 0.8); };
+  /** accounting format: $ at the left, the amount at the right, "-" for nothing */
+  const acct = (val, c, r, bold) => { const x1 = X(c), x2 = Xr(c);
+    put("$", x1, x2, Y(r), Yb(r), { bold });
+    const s = val === null || val === undefined || Number(val) === 0 ? "-   " : Number(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " ";
+    put(s, x1, x2, Y(r), Yb(r), { align: "right", bold }); };
+
+  // fills first, then lines and words on top
+  shade("C", 13, "D", 13); shade("F", 13, "G", 13); shade("C", 22, "G", 22); shade("C", 27, "G", 27); shade("F", 50, "F", 54);
+  // the outer box (B2:H57) and the title box (F3:G4)
+  box("B", 2, "H", 57, MED);
+  box("F", 3, "G", 4, MED);
+  put("Purchase Order", X("F"), Xr("G"), Y(3), Yb(4), { size: 22, bold: true, align: "center", valign: "center" });
+  // the logo, where the sheet anchors it (column B + 0.2", row 4 + 0.04"); its own size at the sheet's scale
+  if (logoBytes) {
+    try { const img = await doc.embedPng(logoBytes);
+      const w = 4913134 / 914400 * 72 * SX, hh = 1615545 / 914400 * 72 * SX, x = X("B") + 182741 / 914400 * 72 * SX, top = Y(4) - 35454 / 914400 * 72 * S;
+      page.drawImage(img, { x, y: top - hh, width: w, height: hh }); } catch (e) { /* a broken logo file: the PO without it */ }
+  }
+  // PO Number, Date Issued, Issued By, Contact #, Contact E-Mail
+  [["PO Number:", poNumberText(po)], ["Date Issued:", mdy(h.date_issued)], ["Issued By:", h.issued_by], ["Contact #:", h.phone], ["Contact E-Mail:", h.email]]
+    .forEach(([k, val], i) => { const r = 6 + i; box("F", r, "F", r); box("G", r, "G", r);
+      put(k, X("F"), Xr("F"), Y(r), Yb(r), { bold: true, align: "right" }); put(val, X("G"), Xr("G"), Y(r), Yb(r), { align: "center" }); });
+  // Vendor and Ship to
+  box("C", 13, "D", 13); put("Vendor:", X("C"), Xr("D"), Y(13), Yb(13), { bold: true, align: "center", valign: "center" });
+  box("F", 13, "G", 13); put("Ship to: ", X("F"), Xr("G"), Y(13), Yb(13), { bold: true, align: "center", valign: "center" });
+  const labels = ["Name:", "Company:", "Street Address: ", "City/State/Zip:", "Phone:", "E-Mail:"];
+  const vend = [v.name, v.company, v.street, v.city, v.phone, v.email], ship = ["", sh.company, sh.street, sh.city, "", ""];
+  labels.forEach((k, i) => { const r = 14 + i;
+    box("C", r, "C", r); box("D", r, "D", r); box("F", r, "F", r);
+    put(k, X("C"), Xr("C"), Y(r), Yb(r), { bold: true }); put(vend[i], X("D"), Xr("D"), Y(r), Yb(r), { align: "center" });
+    put(k, X("F"), Xr("F"), Y(r), Yb(r), { bold: true }); put(ship[i], X("G"), Xr("G"), Y(r), Yb(r), { bold: true, align: "center" }); });
+  box("G", 14, "G", 19, THIN);                                           // the ship-to values sit in one box, as on the sheet
+  // Date · Date Required · Terms · Method · PO # / Job #
+  const dcols = ["C", "D", "E", "F", "G"], dval = [mdy(h.date), mdy(h.date_required), h.terms, h.method, h.po_job];
+  ["Date", "Date Required", "Terms", "Method", "PO # / Job #"].forEach((k, i) => { const c = dcols[i];
+    box(c, 22, c, 22); put(k, X(c), Xr(c), Y(22), Yb(22), { bold: true, align: "center" });
+    box(c, 23, c, 24); put(dval[i], X(c), Xr(c), Y(23), Yb(24), { align: "center", valign: "center" }); });
+  // the lines: 22 rows (28 to 49), a double rule under the last
+  ["Quantity", "Description", "Job Number", "Unit Price", "Amount"].forEach((k, i) => { const c = dcols[i];
+    box(c, 27, c, 27); put(k, X(c), Xr(c), Y(27), Yb(27), { bold: true, align: "center" }); });
+  const ls = (po.printed || []).slice(0, 22);
+  let subtotal = 0;
+  for (let i = 0; i < 22; i++) {
+    const r = 28 + i, l = ls[i];
+    for (const c of dcols) box(c, r, c, r);
+    if (!l) { acct(null, "G", r); continue; }
+    const qty = `${Number(l.qty).toLocaleString("en-US", { maximumFractionDigits: 3 }).replace(/,/g, "")}${l.unit ? " " + l.unit : ""}`;
+    put(qty, X("C"), Xr("C"), Y(r), Yb(r), { align: "center" });
+    put(l.description, X("D"), Xr("D"), Y(r), Yb(r));
+    put(l.job_number, X("E"), Xr("E"), Y(r), Yb(r), { align: "center" });
+    if (l.unit_price !== null && l.unit_price !== undefined) {
+      const p = Number(l.unit_price), ps = (Math.round(p * 100 + 1e-7) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });   // the sheet's format, rounding half up as Excel shows it: 3.935 → 3.94, 3.015 → 3.02
+      put("$", X("F"), Xr("F"), Y(r), Yb(r)); put(ps + " ", X("F"), Xr("F"), Y(r), Yb(r), { align: "right" });
+      const amt = Math.round(Number(l.qty) * p * 100) / 100; subtotal += amt; acct(amt, "G", r);
+    } else acct(null, "G", r);
+  }
+  dbl("C", "G", 49);
+  // Subtotal, Discount, Shipping, Tax, Total Due
+  [["Subtotal", subtotal, true], ["Discount", 0], ["Shipping", 0], ["Tax", 0], ["Total Due", subtotal]].forEach(([k, val, bold], i) => { const r = 50 + i;
+    box("F", r, "F", r, THIN, i === 0 ? "lrb" : i === 4 ? "lrb" : "lrtb"); box("G", r, "G", r, THIN, i === 0 ? "lrb" : i === 4 ? "lrb" : "lrtb");
+    put(k, X("F"), Xr("F"), Y(r), Yb(r), { bold: true, align: "right" }); acct(val, "G", r, !!bold); });
+  dbl("F", "G", 53);
+  put("Authorized Signature: ________________________", X("C"), Xr("D"), Y(52), Yb(53), { bold: true, align: "center", valign: "center" });
+  put(h.tax_line, X("C"), Xr("D"), Y(55), Yb(55), { bold: true, align: "center" });
+  doc.setTitle(po.name || "PO"); doc.setCreator("Purposeful Design Production");
+  return await doc.save({ useObjectStreams: false });
+}
+
+/* ---- Purchasing (7 Nov): what's entered is the truth ----
+   Every line counted: the POs' lines (a lumber line its board feet as received, else ordered; any other line its
+   quantity) and the Purchases file's buys that aren't for a PO. A file line for a PO is on record, not counted again. */
+/** "PO 12" → "PO 00012"; "lumber po 9" → "Lumber PO 9" */
+function poName(t) {
+  const s = String(t || "").trim(); let m;
+  if ((m = /^lumber\s*po\s*#?\s*(\d+)$/i.exec(s))) return `Lumber PO ${Number(m[1])}`;
+  if ((m = /^po\s*#?\s*(\d{1,5})$/i.exec(s))) return `PO ${m[1].padStart(5, "0")}`;
+  return s;
+}
+/** the PO a note starts with ("Lumber PO 15 (ordered 3,500)" → "Lumber PO 15"); not one it only mentions */
+function poFromNote(note) {
+  const m = /^\s*(lumber\s+po\s+\d+|po\s+\d{5})\b/i.exec(String(note || ""));
+  return m ? poName(m[1]) : "";
+}
+const isNum = (v) => v !== null && v !== undefined && v !== "" && isFinite(Number(v));
+/** every counted line, oldest first: {date, year, source, ref, supplier, supplier_id, item_id, category, description, qty, unit, price, amount, in_baseline} */
+function entries(data) {
+  const items = new Map((data.items || []).map(i => [i.id, i])), out = [];
+  for (const po of data.pos || []) {
+    if (po.cancelled_at) continue;
+    for (const l of po.lines || []) {
+      if (!isNum(l.unit_price)) continue;                                   // no price yet: nothing to count
+      const it = items.get(l.item_id) || null, qty = l.lumber ? Number(l.bf) || 0 : Number(l.qty), p = Number(l.unit_price);
+      out.push({ date: String(po.ordered_on).slice(0, 10), year: yearOf(po.ordered_on), source: "PO", ref: po.name, supplier: po.vendor, supplier_id: po.vendor_id,
+                 item_id: l.item_id || null, category: it ? it.category_key : null, description: l.description, qty,
+                 unit: l.lumber ? "bd ft" : (l.unit || (it ? it.unit : "")), price: p, amount: Math.round(qty * p * 100) / 100, in_baseline: true, line_id: l.id });
+    }
+  }
+  for (const b of data.buys || []) {
+    if (b.ignored || b.po) continue;
+    const it = items.get(b.item_id) || null, qty = isNum(b.qty) ? Number(b.qty) : null, amount = Number(b.amount);
+    out.push({ date: String(b.on).slice(0, 10), year: yearOf(b.on), source: "Purchases file", ref: b.doc || "", supplier: b.supplier, supplier_id: b.supplier_id,
+               item_id: b.item_id || null, category: it ? it.category_key : (b.category || null), description: b.description, qty,
+               unit: b.unit || (it ? it.unit : ""), price: qty ? amount / qty : null, amount, in_baseline: b.in_baseline !== false, buy_id: b.id, note: b.note || "" });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+/** the price a buy in `year` is measured against, and where it comes from:
+ *  a typed baseline for the year before (a compare-as item: the other item's, at the same square feet), else the year
+ *  before's average paid, else the first price paid this year. null: nothing to measure against. */
+function baselineFor(data, ents, itemId, year) {
+  const items = data.items || [], it = items.find(i => i.id === itemId);
+  if (!it) return null;
+  const typed = (id) => { const b = (data.baselines || []).find(x => x.item_id === id && Number(x.year) === year - 1); return b ? Number(b.price) : null; };
+  const avg = (id, y) => { let q = 0, a = 0; for (const e of ents) if (e.item_id === id && e.year === y && e.in_baseline && e.qty > 0) { q += e.qty; a += e.amount; } return q > 0 ? a / q : null; };
+  const c = it.compare_as ? items.find(i => i.id === it.compare_as) : null;
+  const scale = c && c.quarters && it.quarters ? c.quarters / it.quarters : 1;
+  let v = typed(it.id); if (v !== null) return { price: v, how: `${year - 1} baseline` };
+  if (c && (v = typed(c.id)) !== null) return { price: Math.round(v * scale * 10000) / 10000, how: `${year - 1} baseline of ${c.name}` };
+  if ((v = avg(it.id, year - 1)) !== null) return { price: v, how: `${year - 1} average paid` };
+  if (c && (v = avg(c.id, year - 1)) !== null) return { price: v * scale, how: `${year - 1} average paid for ${c.name}` };
+  const first = ents.find(e => e.item_id === it.id && e.year === year && e.qty > 0);
+  return first ? { price: first.price, how: `first price paid in ${year}` } : null;
+}
+/** Prices for a year: one row per item bought, the categories, and what isn't filed under an item */
+function pricesFor(data, year) {
+  const ents = entries(data), inYear = ents.filter(e => e.year === year), items = new Map((data.items || []).map(i => [i.id, i]));
+  const rows = new Map(); let spend = 0, noItemSpend = 0, noItemLines = 0;
+  for (const e of inYear) {
+    spend += e.amount;
+    if (!e.item_id) { noItemSpend += e.amount; noItemLines++; continue; }
+    const r = rows.get(e.item_id) || { item: items.get(e.item_id), qty: 0, qtySpend: 0, spend: 0, lines: 0, suppliers: new Map(), last: null };
+    r.spend += e.amount; r.lines++;
+    if (e.qty > 0) { r.qty += e.qty; r.qtySpend += e.amount; r.last = e; }
+    r.suppliers.set(e.supplier, (r.suppliers.get(e.supplier) || 0) + e.amount);
+    rows.set(e.item_id, r);
+  }
+  const out = [...rows.values()].map(r => {
+    const avg = r.qty ? r.qtySpend / r.qty : null, base = baselineFor(data, ents, r.item.id, year);
+    const against = avg !== null && base ? (base.price - avg) * r.qty : null;           // above 0: saved; below: paid more
+    const top = [...r.suppliers.entries()].sort((a, b) => b[1] - a[1])[0];
+    return { item: r.item, qty: r.qty, spend: r.spend, avg, base, against, change: avg !== null && base ? avg / base.price - 1 : null,
+             lines: r.lines, suppliers: r.suppliers.size, top: top ? top[0] : "", last: r.last };
+  }).sort((a, b) => b.spend - a.spend);
+  const cats = new Map();
+  for (const r of out) { const k = r.item.category_key, c = cats.get(k) || { key: k, spend: 0, items: 0, against: 0, sup: new Map() };
+    c.spend += r.spend; c.items++; c.against += r.against || 0; cats.set(k, c); }
+  for (const e of inYear) if (e.item_id) { const c = cats.get(e.category); if (c) c.sup.set(e.supplier, (c.sup.get(e.supplier) || 0) + e.amount); }
+  const catRows = [...cats.values()].map(c => ({ ...c, top: ([...c.sup.entries()].sort((a, b) => b[1] - a[1])[0] || [""])[0],
+    name: ((data.categories || []).find(x => x.key === c.key) || {}).name || c.key })).sort((a, b) => b.spend - a.spend);
+  const toMatch = (data.buys || []).filter(b => !b.item_id && !b.ignored && !b.po).length;
+  return { rows: out, cats: catRows, spend, noItemSpend, noItemLines, toMatch,
+           saved: out.reduce((a, r) => a + (r.against || 0), 0), up: out.filter(r => r.change !== null && r.change > 0.005).length };
+}
+/** Savings to chase over the last 365 days: the same item from suppliers at different prices, prices creeping
+ *  up on their baseline, and big spend with only one supplier */
+function chaseFor(data) {
+  const ents = entries(data), today = String(data.today).slice(0, 10), from = new Date(today + "T12:00:00Z"); from.setUTCDate(from.getUTCDate() - 365);
+  const since = from.toISOString().slice(0, 10), recent = ents.filter(e => e.item_id && e.date >= since && e.date <= today);
+  const items = new Map((data.items || []).map(i => [i.id, i])), byItem = new Map();
+  for (const e of recent) { const a = byItem.get(e.item_id) || []; a.push(e); byItem.set(e.item_id, a); }
+  const spread = [], creep = [], single = [];
+  for (const [id, es] of byItem) {
+    const it = items.get(id), bySup = new Map();
+    for (const e of es) if (e.qty > 0) { const s = bySup.get(e.supplier) || { q: 0, a: 0 }; s.q += e.qty; s.a += e.amount; bySup.set(e.supplier, s); }
+    const sups = [...bySup.entries()].map(([name, s]) => ({ name, qty: s.q, avg: s.a / s.q })).sort((a, b) => a.avg - b.avg);
+    if (sups.length >= 2 && sups[sups.length - 1].avg > sups[0].avg * 1.02) {
+      const best = sups[0], potential = sups.slice(1).reduce((t, s) => t + s.qty * (s.avg - best.avg), 0);
+      spread.push({ item: it, suppliers: sups, best, potential });
+    }
+    const last = [...es].reverse().find(e => e.qty > 0);
+    if (last) { const base = baselineFor(data, ents, id, last.year);
+      if (base && base.how.indexOf("first price") !== 0 && last.price > base.price * 1.05) creep.push({ item: it, last, base, change: last.price / base.price - 1 }); }
+    const spend = es.reduce((t, e) => t + e.amount, 0), names = new Set(es.map(e => e.supplier));
+    if (names.size === 1 && spend >= 2500) single.push({ item: it, supplier: [...names][0], spend });
+  }
+  return { since, spread: spread.sort((a, b) => b.potential - a.potential), creep: creep.sort((a, b) => b.change - a.change),
+           single: single.sort((a, b) => b.spend - a.spend) };
+}
+/** the most recent price paid for an item, from any supplier: {price, unit, date, supplier, ref} or null */
+function lastPaid(data, itemId, ents) {
+  const e = [...(ents || entries(data))].reverse().find(x => x.item_id === itemId && x.qty > 0);
+  return e ? { price: e.price, unit: e.unit, date: e.date, supplier: e.supplier, ref: e.ref } : null;
+}
+/** One spreadsheet cell, as the office writes them: text starting with = + - @ (or a tab or return) gets a leading '
+ *  so Excel shows it as typed instead of running it (review finding R-12). Numbers are left alone. */
+function csvCell(v) {
+  let t = v === null || v === undefined ? "" : String(v);
+  if (typeof v !== "number" && /^[=+\-@\t\r]/.test(t)) t = "'" + t;
+  return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+}
+const EXPORT_HEAD = ["Date", "From", "PO or bill #", "Supplier", "Category", "Item", "Description", "Quantity", "Unit", "Unit price", "Amount", "Note"];
+/** the yearly check against the bills: every line counted in a year */
+function exportRows(data, year) {
+  const items = new Map((data.items || []).map(i => [i.id, i])), cats = new Map((data.categories || []).map(c => [c.key, c.name]));
+  return entries(data).filter(e => e.year === year).map(e => [e.date, e.source, e.ref, e.supplier, cats.get(e.category) || "", (items.get(e.item_id) || {}).name || "",
+    e.description, e.qty === null ? "" : Math.round(e.qty * 1000) / 1000, e.unit, e.price === null ? "" : Math.round(e.price * 10000) / 10000, Math.round(e.amount * 100) / 100, e.note || ""]);
+}
+const exportCsv = (rows) => "\ufeff" + [EXPORT_HEAD, ...rows].map(r => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
+/** the item list for the Purchases project, so it learns the shop's names */
+function itemsCsv(data) {
+  const cats = new Map((data.categories || []).map(c => [c.key, c.name]));
+  const rows = (data.items || []).filter(i => !i.retired).map(i => [i.name, cats.get(i.category_key) || i.category_key, i.unit]);
+  return "\ufeff" + [["Item", "Category", "Unit"], ...rows].map(r => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
+}
+/** the Match these list: unmatched buys grouped by supplier and description */
+function matchGroups(data) {
+  const g = new Map();
+  for (const b of data.buys || []) {
+    if (b.item_id || b.ignored || b.po) continue;
+    const k = String(b.supplier).trim().toLowerCase() + "|" + String(b.description).trim().toLowerCase().replace(/\s+/g, " ");
+    const x = g.get(k) || { key: k, supplier: b.supplier, description: b.description, category: b.category, ids: [], total: 0, last: "" };
+    x.ids.push(b.id); x.total += Number(b.amount) || 0; if (String(b.on) > x.last) x.last = String(b.on).slice(0, 10); g.set(k, x);
+  }
+  return [...g.values()].sort((a, b) => b.total - a.total);
+}
+
+/** "8/4 QS RO" and "8/4 QS Red Oak" name the same thing: the same thickness, and every word on each side accounted for by
+ *  the other, a word by a word it starts or by the initials of a run of words ("ro" = Red Oak). An extra word on either
+ *  side ("thermally modified") means a different thing. */
+function looksLike(a, b) {
+  const t = (x) => String(x).toLowerCase().replace(/[^a-z0-9/ ]+/g, " ").split(/\s+/).filter(w => w && !["lumber", "wood", "hardwood"].includes(w)), isQ = (w) => /^\d+\/4$/.test(w);
+  const A = t(a), B = t(b), qa = A.find(isQ) || "", qb = B.find(isQ) || "";
+  if (qa !== qb) return false;
+  const ra = A.filter(w => !isQ(w)), rb = B.filter(w => !isQ(w));
+  if (!ra.length || !rb.length) return ra.length === rb.length;
+  const covers = (short, long) => {                       // every short word accounts for one or more long words; every long word used
+    const used = long.map(() => false);
+    for (const w of short) {
+      let i = long.findIndex((x, k) => !used[k] && (x.startsWith(w) || w.startsWith(x)));
+      if (i >= 0) { used[i] = true; continue; }
+      let found = false;
+      for (let s = 0; s + w.length <= long.length && !found; s++)
+        if (w.length > 1 && long.slice(s, s + w.length).every((x, k) => !used[s + k] && x[0] === w[k])) { for (let k = 0; k < w.length; k++) used[s + k] = true; found = true; }
+      if (!found) return false;
+    }
+    return used.every(Boolean);
+  };
+  return ra.length <= rb.length ? covers(ra, rb) : covers(rb, ra);
+}
+/** the item names a Purchases file uses that aren't an item or another name for one yet: what Match these can make in one go */
+function fileItemNames(data) {
+  const items = (data.items || []), known = new Set(items.flatMap(i => [i.name, ...(i.aliases || [])]).map(x => x.trim().toLowerCase()));
+  const by = new Map();
+  for (const b of data.buys || []) {
+    const name = String(b.item_text || "").trim(); if (!name || b.item_id || b.ignored || b.po || known.has(name.toLowerCase())) continue;
+    const k = name.toLowerCase(), x = by.get(k) || { name, ids: [], cats: new Map(), units: new Map(), total: 0 };
+    x.ids.push(b.id); x.total += Number(b.amount) || 0;
+    if (b.category) x.cats.set(b.category, (x.cats.get(b.category) || 0) + 1);
+    if (b.unit) x.units.set(b.unit, (x.units.get(b.unit) || 0) + 1);
+    by.set(k, x);
+  }
+  const top = (m) => ([...m.entries()].sort((a, b) => b[1] - a[1])[0] || [""])[0];
+  return [...by.values()].map(x => {
+    const category = top(x.cats), m = /^(\d+)\/4\b/.exec(x.name), quarters = m ? Number(m[1]) : null;
+    const same = items.find(i => !i.retired && i.category_key === category && looksLike(i.name, x.name)) || null;
+    return { name: x.name, ids: x.ids, total: x.total, category, unit: category === "lumber" ? "bd ft" : top(x.units), quarters, same };
+  }).sort((a, b) => (a.category || "").localeCompare(b.category || "") || a.name.localeCompare(b.name));
+}
+/* ---- reading the Purchases file: the Lines tab's shape (a .xlsx, or a .csv saved from it) ---- */
+const FILE_COLS = {
+  date: ["date"], supplier: ["supplier", "vendor"], doc: ["bill / receipt #", "bill/receipt #", "bill or receipt #", "bill #", "receipt #", "order #", "document #", "doc"],
+  line: ["line", "line #"], how: ["how", "paid by"], description: ["description on the bill", "description"], category: ["category"], item: ["item"],
+  qty: ["qty", "quantity"], unit: ["unit"], amount: ["amount", "total"], in_baseline: ["in the baseline", "in baseline", "baseline"], note: ["note", "notes"],
+  po: ["po", "po #", "po number", "for po"],
+};
+/** a date cell: an Excel day number, 2026-01-06, or 1/6/2026 → "2026-01-06" (or null) */
+function cellDate(v) {
+  if (v === null || v === undefined || v === "") return null;
+  if (typeof v === "number" || /^\d+(\.\d+)?$/.test(String(v).trim())) {
+    const n = Number(v); if (n < 20000 || n > 80000) return null;
+    return new Date(Math.round((n - 25569) * 86400000)).toISOString().slice(0, 10);
+  }
+  const s = String(v).trim(); let m;
+  if ((m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s))) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  if ((m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(s))) return `${m[3].length === 2 ? "20" + m[3] : m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
+  return null;
+}
+const cellNum = (v) => { if (v === null || v === undefined || String(v).trim() === "") return null; const t = String(v).replace(/[$,\s]/g, "").replace(/^\((.*)\)$/, "-$1"); return isFinite(Number(t)) ? Number(t) : NaN; };
+/** rows (each {r: row number, cells: [...]}) → {lines, problems}. The header row is the first with Date, Supplier, Description and Amount. */
+function sheetToLines(rows) {
+  const norm = (s) => String(s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  let hi = -1, col = {};
+  for (let i = 0; i < Math.min(rows.length, 15) && hi < 0; i++) {
+    const cells = rows[i].cells.map(norm), found = {};
+    for (const [k, names] of Object.entries(FILE_COLS)) { const j = cells.findIndex(c => names.includes(c)); if (j >= 0) found[k] = j; }
+    if (["date", "supplier", "description", "amount"].every(k => k in found)) { hi = i; col = found; }
+  }
+  if (hi < 0) return { lines: [], problems: ["The file has no header row with Date, Supplier, Description and Amount (the Lines tab's columns)."] };
+  const lines = [], problems = [];
+  for (const row of rows.slice(hi + 1)) {
+    const get = (k) => (k in col ? row.cells[col[k]] : undefined);
+    if (row.cells.every(c => c === null || c === undefined || String(c).trim() === "")) continue;
+    const date = cellDate(get("date")), amount = cellNum(get("amount")), qty = cellNum(get("qty"));
+    if (!date) { problems.push(`Row ${row.r}: the date isn't readable.`); continue; }
+    if (amount === null || isNaN(amount)) { problems.push(`Row ${row.r}: the amount isn't a number.`); continue; }
+    if (isNaN(qty)) { problems.push(`Row ${row.r}: the quantity isn't a number.`); continue; }
+    const txt = (k) => { const v = get(k); return v === null || v === undefined ? "" : String(v).trim(); };
+    if (!txt("supplier")) { problems.push(`Row ${row.r}: the supplier is blank.`); continue; }
+    if (!txt("description")) { problems.push(`Row ${row.r}: the description is blank.`); continue; }
+    const note = txt("note"), po = txt("po") ? poName(txt("po")) : poFromNote(note);
+    lines.push({ row: row.r, date, supplier: txt("supplier"), doc: txt("doc"), line: txt("line"), how: txt("how"), description: txt("description"),
+                 category: txt("category"), item: txt("item"), qty: qty === null || qty === 0 ? null : qty, unit: txt("unit"), amount,
+                 in_baseline: /^(no|n|false)$/i.test(txt("in_baseline")) ? "No" : "Yes", note, po });
+  }
+  return { lines, problems };
+}
+/** a .csv's text → rows */
+function readCsv(text) {
+  const rows = []; let row = [], cell = "", q = false, r = 1;
+  const t = String(text).replace(/^\ufeff/, "");
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (q) { if (ch === '"') { if (t[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; continue; }
+    if (ch === '"') q = true;
+    else if (ch === ",") { row.push(cell); cell = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && t[i + 1] === "\n") i++; row.push(cell); rows.push({ r: r++, cells: row }); row = []; cell = ""; }
+    else cell += ch;
+  }
+  if (cell !== "" || row.length) { row.push(cell); rows.push({ r, cells: row }); }
+  return rows;
+}
+/** a .xlsx's bytes → {names, sheets: {name: rows}}, read without a library: the zip's files, the shared strings and each
+ *  sheet's cells (values only; numbers stay numbers). inflateRaw(bytes) → Promise<bytes> (the browser's DecompressionStream). */
+async function readXlsx(buf, inflateRaw) {
+  const u8 = new Uint8Array(buf), dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  let eocd = -1; for (let i = u8.length - 22; i >= Math.max(0, u8.length - 66000); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error("This isn't an .xlsx file Excel saved (or it's damaged).");
+  const n = dv.getUint16(eocd + 10, true); let p = dv.getUint32(eocd + 16, true); const files = new Map(), dec = new TextDecoder();
+  for (let k = 0; k < n; k++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error("This .xlsx file is damaged.");
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true);
+    const off = dv.getUint32(p + 42, true), name = dec.decode(u8.subarray(p + 46, p + 46 + nl));
+    files.set(name, { method, csize, off }); p += 46 + nl + el + cl;
+  }
+  const read = async (name) => {
+    const f = files.get(name); if (!f) return null;
+    const start = f.off + 30 + dv.getUint16(f.off + 26, true) + dv.getUint16(f.off + 28, true), raw = u8.subarray(start, start + f.csize);
+    return dec.decode(f.method === 0 ? raw : await inflateRaw(raw));
+  };
+  const ent = (s) => s.replace(/&(lt|gt|amp|quot|apos|#\d+|#x[0-9a-f]+);/gi, (m, e) => ({ lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" })[e.toLowerCase()]
+    ?? String.fromCodePoint(e[1].toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)));
+  const texts = (x) => [...x.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>|<t(?:\s[^>]*)?\/>/g)].map(m => ent(m[1] || "")).join("");
+  const shared = [...((await read("xl/sharedStrings.xml")) || "").matchAll(/<si>([\s\S]*?)<\/si>/g)].map(m => texts(m[1]));
+  const wb = (await read("xl/workbook.xml")) || "", rels = (await read("xl/_rels/workbook.xml.rels")) || "";
+  const target = new Map([...rels.matchAll(/<Relationship\b[^>]*>/g)].map(m => [/\bId="([^"]+)"/.exec(m[0])[1], /\bTarget="([^"]+)"/.exec(m[0])[1]]));
+  const names = [], sheets = {};
+  for (const m of wb.matchAll(/<sheet\b[^>]*>/g)) {
+    const name = ent(/\bname="([^"]*)"/.exec(m[0])[1]), rid = /\br:id="([^"]+)"/.exec(m[0]), t = rid && target.get(rid[1]);
+    if (!t) continue;
+    const path = t.startsWith("/") ? t.slice(1) : "xl/" + t.replace(/^\.\//, ""), xml = await read(path);
+    if (xml === null) continue;
+    const rows = [];
+    for (const rm of xml.matchAll(/<row\b([^>]*)>([\s\S]*?)<\/row>/g)) {
+      const r = Number((/\br="(\d+)"/.exec(rm[1]) || [])[1]) || rows.length + 1, cells = [];
+      for (const cm of rm[2].matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+        const ref = (/\br="([A-Z]+)\d+"/.exec(cm[1]) || [])[1], type = (/\bt="(\w+)"/.exec(cm[1]) || [])[1], inner = cm[2] || "";
+        if (!ref) continue;
+        let ci = 0; for (const ch of ref) ci = ci * 26 + ch.charCodeAt(0) - 64; ci--;
+        const v = (/<v>([\s\S]*?)<\/v>/.exec(inner) || [])[1];
+        let val = null;
+        if (type === "s") val = shared[Number(v)] ?? "";
+        else if (type === "inlineStr") val = texts(inner);
+        else if (type === "str" || type === "e" || type === "d") val = v === undefined ? "" : ent(v);   // "d": an ISO date, read as text
+        else if (type === "b") val = v === "1" ? "TRUE" : "FALSE";
+        else if (v !== undefined) val = Number(v);
+        cells[ci] = val;
+      }
+      rows.push({ r, cells: Array.from(cells, c => c === undefined ? null : c) });
+    }
+    names.push(name); sheets[name] = rows;
+  }
+  if (!names.length) throw new Error("No sheets could be read from this .xlsx file.");
+  return { names, sheets };
+}
+/** the sheet to read: one called Lines, else the first */
+const pickSheet = (x) => x.sheets[x.names.find(n => n.trim().toLowerCase() === "lines") || x.names[0]];
+async function sha256Hex(buf) {
+  const h = await crypto.subtle.digest("SHA-256", buf);
+  return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+/* ---- end core ---- */
+if (typeof module !== "undefined") module.exports = {
+  friendlyError, usd, price, mdy, compareBenchmark, lineMoney, poSummary, scrapMonths, lumberResults, supplierMix, checkLines,
+  poPdf, poNumberText, poGrid, colPt, SCRAP_ALLOWANCE,
+  poName, poFromNote, entries, baselineFor, pricesFor, chaseFor, lastPaid, csvCell, exportRows, exportCsv, EXPORT_HEAD, itemsCsv, matchGroups,
+  cellDate, cellNum, sheetToLines, readCsv, readXlsx, pickSheet, looksLike, fileItemNames,
+};
+/* ---- the screen ---- */
+if (typeof document !== "undefined") (function () {
+  const app = document.getElementById("app"), tabsEl = document.getElementById("tabs"), meEl = document.getElementById("me");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("sfpu_" + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem("sfpu_" + k, JSON.stringify(v)); } catch (e) {} },
+  };
+  const problem = keyProblem(SUPABASE_URL, SUPABASE_KEY);
+  if (problem) {
+    app.innerHTML = `<main><div class="alarm"><h2>${problem.secret ? "Stop — wrong key in this file" : "This page isn't set up yet"}</h2><p>${esc(problem.text)}</p></div></main>`;
+    return;
+  }
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  sfEmbed("header .hrow");
+  if (!SF_EMBEDDED) sfFeedbackSetup({ db, page: "purchasing", version: PAGE_VERSION, mount: "header .hrow" });
+  sfReportDevice(db, "purchasing", PAGE_VERSION);
+  const TABS = [["buy", "To buy"], ["pos", "POs"], ["prices", "Prices"], ["chase", "Savings to chase"], ["lumber", "Lumber"], ["file", "Purchases file"], ["setup", "Setup"]];
+  const PDF_LIB_URL = "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
+  const PDF_LIB_SRI = "sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI";
+  const firstTab = (location.hash || "").replace("#", "");
+  const S = {
+    me: null, tab: TABS.some(t => t[0] === firstTab) ? firstTab : store.get("tab", "buy"), year: null, data: null, loaded: false, missing: false, msg: null, busy: false,
+    open: null, edit: null, setupEdit: null, folder: null, perm: null, filing: false,
+    reqs: [], depts: [], ticked: new Set(), notOrdering: null, adding: false,
+    openItem: null, file: null, matchNew: null, slips: [], slipLines: null,
+  };
+  /** a tab: drawn at once, then again with what's new (supply requests come in from the tablets all day) */
+  const go = async (tab) => { S.tab = tab; store.set("tab", tab); try { history.replaceState(null, "", "#" + tab); } catch (e) {}
+    S.msg = null; S.setupEdit = null; S.open = null; S.openItem = null; render(); window.scrollTo(0, 0);
+    if (S.loaded && !S.missing) { await load(); render(); } };
+
+  // ---------- the PD - POs folder on this computer (remembered in this browser) ----------
+  const kv = {
+    open() { if (!window.indexedDB) return Promise.resolve(null);
+      return this.p || (this.p = new Promise((res) => { const r = indexedDB.open("sf-purchasing", 1);
+        r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => res(r.result); r.onerror = () => res(null); })); },
+    async get(k) { const d = await this.open(); if (!d) return undefined;
+      return new Promise((res) => { const t = d.transaction("kv").objectStore("kv").get(k); t.onsuccess = () => res(t.result); t.onerror = () => res(undefined); }); },
+    async set(k, v) { const d = await this.open(); if (!d) return;
+      return new Promise((res, rej) => { const tx = d.transaction("kv", "readwrite"); tx.objectStore("kv").put(v, k); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); },
+  };
+  const canPickFolder = () => typeof window.showDirectoryPicker === "function";
+  async function loadFolder() {
+    S.folder = (await kv.get("pd-pos")) || null;
+    S.perm = S.folder ? await S.folder.queryPermission({ mode: "readwrite" }).catch(() => "prompt") : null;
+  }
+  async function pickFolder() {
+    let h;
+    try { h = await window.showDirectoryPicker({ id: "sf-pd-pos", mode: "readwrite" }); }
+    catch (e) { if (e && e.name === "AbortError") return; S.msg = { ok: false, text: friendlyError(e) }; return render(); }
+    await kv.set("pd-pos", h); S.folder = h; S.perm = "granted";
+    S.msg = { ok: true, text: `PD - POs folder chosen: ${h.name}. POs made here are filed in it as PDFs.` };
+    render(); fileWaiting();
+  }
+  async function resumeFolder() {
+    try { S.perm = await S.folder.requestPermission({ mode: "readwrite" }); } catch (e) { S.perm = "prompt"; }
+    render(); if (S.perm === "granted") fileWaiting();
+  }
+  async function pdfLib() {
+    if (window.PDFLib) return window.PDFLib;
+    await new Promise((res, rej) => { const s = document.createElement("script"); s.integrity = PDF_LIB_SRI; s.crossOrigin = "anonymous"; s.src = PDF_LIB_URL; s.onload = res;
+      s.onerror = () => rej(new Error("The PDF helper couldn't load. Check the connection and try again.")); document.head.appendChild(s); });
+    return window.PDFLib;
+  }
+  let logo = null;
+  async function logoBytes() {
+    if (logo) return logo;
+    try { const r = await fetch("po-logo.png", { cache: "no-cache" }); if (r.ok) logo = new Uint8Array(await r.arrayBuffer()); } catch (e) { /* the PO prints without it */ }
+    return logo;
+  }
+  async function pdfFor(po) { return poPdf(await pdfLib(), po, await logoBytes()); }
+  function saveBlob(bytes, name, type) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([bytes], { type: type || "application/pdf" })); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  }
+  const waiting = () => (S.data ? S.data.pos : []).filter(p => p.file_name && !p.filed_at && !p.cancelled_at);
+  /** Each PO made here, as a PDF in PD - POs, once. A file of that name already there is left as it is. */
+  async function fileWaiting() {
+    if (S.filing || !S.folder || S.perm !== "granted") return;
+    const list = waiting(); if (!list.length) return;
+    S.filing = true; const done = [], kept = [], failed = [];
+    for (const po of list) {
+      try {
+        let size = -1;
+        try { size = (await (await S.folder.getFileHandle(po.file_name)).getFile()).size; } catch (e) { if (!(e && (e.name === "NotFoundError" || e.name === "TypeMismatchError"))) throw e; }
+        if (size > 0) kept.push(po.file_name);
+        else {
+          const bytes = await pdfFor(po), fh = await S.folder.getFileHandle(po.file_name, { create: true });
+          const w = await fh.createWritable(); await w.write(bytes); await w.close();
+          size = (await fh.getFile()).size; if (size !== bytes.byteLength) throw new Error(`${po.file_name} didn't save in full`);
+        }
+        const r = await Promise.resolve(db.rpc("purchase_po_filed", { p_id: po.id, p_revision: po.revision, p_bytes: size })).catch(e => ({ error: e }));
+        if (r.error) throw r.error;
+        done.push(po.file_name);
+      } catch (e) { failed.push(`${po.file_name}: ${friendlyError(e)}`); }
+    }
+    S.filing = false;
+    if (done.length || failed.length) {
+      S.msg = failed.length ? { ok: false, text: `Couldn't file ${failed.join("; ")}` }
+        : { ok: true, text: `Filed in PD - POs: ${done.join(", ")}.${kept.length ? ` (${kept.join(", ")} ${kept.length === 1 ? "was" : "were"} there already, so left as ${kept.length === 1 ? "it was" : "they were"}.)` : ""}` };
+      await load(); render();
+    }
+  }
+
+  // ---------- data ----------
+  async function load() {
+    try {
+      const [r, q, d] = await Promise.all([db.rpc("purchasing_data"),
+        Promise.resolve(db.from("v_supply_requests").select("*").eq("is_open", true).order("requested_at")).catch(e => ({ error: e })),
+        Promise.resolve(db.from("departments").select("key,name,sort_order").order("sort_order")).catch(e => ({ error: e }))]);
+      if (r.error) throw r.error;
+      S.data = r.data; S.missing = false;
+      S.reqs = q && !q.error ? q.data || [] : []; S.depts = d && !d.error ? d.data || [] : [];
+      for (const id of [...S.ticked]) if (!S.reqs.some(x => x.id === id && x.state === "requested")) S.ticked.delete(id);
+      const years = yearsAvailable();
+      if (!S.year || !years.includes(S.year)) S.year = years[0];
+    } catch (e) {
+      S.missing = isMissing(e);
+      if (!S.missing) S.msg = { ok: false, text: friendlyError(e) };
+    }
+    S.loaded = true;
+  }
+  function yearsAvailable() {
+    const ys = new Set([yearOf(S.data.today)]);
+    for (const p of S.data.pos || []) ys.add(yearOf(p.ordered_on));
+    for (const b of S.data.buys || []) ys.add(yearOf(b.on));
+    return [...ys].filter(Boolean).sort((a, b) => b - a);
+  }
+  const supplierById = (id) => (S.data.suppliers || []).find(v => v.id === id) || {};
+  const itemById = (id) => (S.data.items || []).find(i => i.id === id) || null;
+  const catName = (k) => ((S.data.categories || []).find(c => c.key === k) || {}).name || k || "";
+  async function call(fn, args, okText) {
+    S.busy = true; render();
+    const r = await Promise.resolve(db.rpc(fn, args)).catch(e => ({ error: e }));
+    S.busy = false;
+    if (r.error) { S.msg = { ok: false, text: friendlyError(r.error) }; render(); return null; }
+    if (okText) S.msg = { ok: true, text: typeof okText === "function" ? okText(r.data) : okText };
+    await load(); render();
+    return r.data || {};
+  }
+
+  // ---------- screens ----------
+  function render() {
+    if (!S.me) return;
+    meEl.innerHTML = `<a href="office.html">← Office</a> · ${esc(S.me.name)} · <button id="so">Sign out</button>`;
+    document.getElementById("so").onclick = async () => { await db.auth.signOut(); location.reload(); };
+    if (S.me.role !== "manager" && S.me.role !== "admin") {
+      tabsEl.hidden = true;
+      app.innerHTML = `<main><div class="card"><h2>For managers</h2><p class="sub">Purchasing is for the office.</p></div></main>`;
+      return;
+    }
+    tabsEl.hidden = false;
+    tabsEl.innerHTML = TABS.map(([k, t]) => `<button data-tab="${k}" aria-current="${k === S.tab && !S.edit}">${t}${k === "file" && S.data ? matchCount() : ""}</button>`).join("");
+    if (!S.loaded) { app.innerHTML = `<main><p class="muted">Loading…</p></main>`; return wire(); }
+    if (S.missing) {
+      app.innerHTML = `<main><div class="banner">Purchasing isn't set up in the database yet<small>Run purchasing.sql in the Supabase SQL Editor (Walkthrough 54), then purchasing_history.sql from your computer, wait a minute and reload this page.</small></div></main>`;
+      return wire();
+    }
+    const head = S.msg ? `<div class="banner ${S.msg.ok ? "ok" : ""}" role="status">${esc(S.msg.text)}</div>` : "";
+    const body = S.edit ? viewEdit() : ({ buy: viewBuy, pos: viewPos, prices: viewPrices, chase: viewChase, lumber: viewLumber, file: viewFile, setup: viewSetup }[S.tab] || viewBuy)();
+    app.innerHTML = `<main>${head}${body}</main>`;
+    wire();
+  }
+  const matchCount = () => { const n = matchGroups(S.data).reduce((a, g) => a + g.ids.length, 0); return n ? ` <span class="pill">${n}</span>` : ""; };
+  function yearPicker() {
+    const ys = yearsAvailable();
+    return ys.length < 2 ? "" : `<label class="muted small">Year <select data-year style="min-height:40px;border:1px solid var(--gray);border-radius:8px;padding:4px 8px">${ys.map(y => `<option ${y === S.year ? "selected" : ""}>${y}</option>`).join("")}</select></label>`;
+  }
+  const when = (ts) => ts ? new Date(ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+
+  // ---------- To buy: the tablets' supply requests, as on Operations ----------
+  function poForRequest(id) {
+    for (const po of S.data.pos || []) if (!po.cancelled_at) for (const l of po.lines || []) if (l.supply_request_id === id) return po;
+    return null;
+  }
+  function viewBuy() {
+    const open = S.reqs, groups = new Map();
+    for (const r of open) { const g = groups.get(r.department) || { name: r.department_name, rows: [] }; g.rows.push(r); groups.set(r.department, g); }
+    const n = S.ticked.size;
+    const rows = [...groups.values()].map(g => `<div class="dept">${esc(g.name)}</div><div class="tw"><table><tbody>${g.rows.map(r => {
+      const po = r.state === "ordered" ? poForRequest(r.id) : null;
+      return `<tr><td class="chkc">${r.state === "requested" ? `<input type="checkbox" class="chk" data-tick="${esc(r.id)}" ${S.ticked.has(r.id) ? "checked" : ""} aria-label="Tick ${esc(r.item)}">` : ""}</td>
+        <td class="l wrap"><b>${esc(r.qty)} × ${esc(r.item)}</b>${r.note ? `<div class="note">${esc(r.note)}</div>` : ""}</td>
+        <td class="l small muted">${esc(r.requested_by_name || "")} · ${esc(when(r.requested_at))}</td>
+        <td class="l">${r.state === "ordered" ? `<span class="tag done">Ordered${po ? ` on ${esc(po.name)}` : ""}</span>` : `<span class="tag">Waiting</span>`}</td>
+        <td>${S.notOrdering === r.id ? `<span class="row"><input data-noreason style="min-height:40px;border:1px solid var(--gray);border-radius:8px;padding:4px 8px" placeholder="Why (the department sees it)" aria-label="Why not ordering">
+            <button class="btn ghost" data-nosave="${esc(r.id)}">Save</button><button class="link" data-nocancel>Cancel</button></span>`
+          : `<button class="link" data-noorder="${esc(r.id)}">Not ordering…</button>`}</td></tr>`; }).join("")}</tbody></table></div>`).join("");
+    const deptOpts = S.depts.map(d => `<option value="${esc(d.key)}">${esc(d.name)}</option>`).join("");
+    return `<div class="titlerow"><div class="grow"><h2>To buy</h2><p class="sub" style="margin-bottom:0">What the departments asked for on their tablets' Supplies tab, plus anything added here. Operations shows the same list: ticking it ordered here shows there too.</p></div></div>
+      <div class="row" style="margin:6px 2px 4px">
+        <button class="btn or" data-reqpo ${n ? "" : "disabled"}>Put ${n ? n + " ticked" : "ticked"} on a PO</button>
+        <button class="btn ghost" data-reqorder ${n ? "" : "disabled"}>Mark ${n ? n + " ticked" : "ticked"} as ordered</button></div>
+      ${open.length ? rows : `<p class="muted" style="margin:16px 2px">Nothing waiting to be bought.</p>`}
+      <h3>Add something to buy</h3>
+      ${S.adding ? `<div class="card"><div class="form">
+          <label>For<select id="adDept">${deptOpts}</select></label><label>What<input id="adItem" placeholder="Titebond III, 1 gallon"></label>
+          <label>Quantity<input id="adQty" class="n" inputmode="numeric" value="1"></label><label>Note<input id="adNote"></label>
+          <button class="btn" data-addsave ${S.busy ? "disabled" : ""}>Add it</button><button class="link" data-addcancel>Cancel</button></div></div>`
+        : `<button class="btn ghost" data-addreq>Add something to buy</button>`}`;
+  }
+
+  // ---------- POs ----------
+  function stateTag(po, sum) {
+    if (sum.state === "cancelled") return `<span class="tag">Cancelled</span>`;
+    if (sum.state === "untracked") return "";
+    if (sum.state === "in") return `<span class="tag done">In</span>`;
+    if (sum.state === "part in") return `<span class="tag">${n0(sum.inBf)} of ${n0(sum.ordered)} in</span>`;
+    return `<span class="tag">On order</span>`;
+  }
+  function fileTag(po) {
+    if (!po.file_name) return `<span class="muted small">From the workbook</span>`;
+    if (po.cancelled_at) return "";
+    return po.filed_at ? `<span class="tag done">Filed</span>` : `<span class="tag flag">Not filed</span>`;
+  }
+  function filingBanner() {
+    const wait = waiting();
+    return !wait.length ? "" : !canPickFolder()
+      ? `<div class="banner">${wait.length} PO${wait.length === 1 ? " isn't" : "s aren't"} in PD - POs yet<small>This browser can't save into a folder. Download ${wait.length === 1 ? "it" : "each"} with PDF below and put ${wait.length === 1 ? "it" : "them"} in Production Utilization › PD - POs, or use Chrome or Edge on the office PC.</small></div>`
+      : !S.folder ? `<div class="banner">${wait.length} PO${wait.length === 1 ? " isn't" : "s aren't"} in PD - POs yet<small>Choose the folder once on this computer and they're filed there from then on.</small><div style="margin-top:8px"><button class="btn" data-pickfolder>Choose the PD - POs folder</button></div></div>`
+      : S.perm !== "granted" ? `<div class="banner">${wait.length} PO${wait.length === 1 ? " is" : "s are"} waiting to be filed in PD - POs<small>The browser wants permission for the folder again.</small><div style="margin-top:8px"><button class="btn" data-resume>Resume filing</button></div></div>`
+      : `<div class="banner">${wait.length} PO${wait.length === 1 ? " is" : "s are"} waiting to be filed in ${esc(S.folder.name)}<div style="margin-top:8px"><button class="btn" data-filenow ${S.filing ? "disabled" : ""}>File ${wait.length === 1 ? "it" : "them"} now</button></div></div>`;
+  }
+  const nextName = (series) => series === "lumber" ? `Lumber PO ${S.data.next_lumber}` : `PO ${String(S.data.next_po).padStart(5, "0")}`;
+  function viewPos() {
+    const pos = (S.data.pos || []).filter(p => yearOf(p.ordered_on) === S.year);
+    const rows = pos.map(po => {
+      const sum = poSummary(po), open = S.open === po.id, n = (po.lines || []).length;
+      return `<tr class="click ${open ? "open" : ""} ${po.cancelled_at ? "off" : ""}" data-openpo="${esc(po.id)}"><td><b>${esc(po.name)}</b>${po.revision > 1 && po.file_name ? ` <span class="tag">r${po.revision}</span>` : ""}</td>
+        <td class="l">${esc(po.vendor)}</td><td>${esc(mdy(po.ordered_on))}</td><td class="l">${sum.tracked ? `${n0(sum.bf)} bd ft` : `${n} line${n === 1 ? "" : "s"}`}</td><td class="num">${usd(sum.total)}</td>
+        <td class="l">${stateTag(po, sum)}</td><td class="l">${fileTag(po)}</td></tr>
+        ${open ? `<tr><td colspan="7" style="padding:0">${poDetail(po)}</td></tr>` : ""}`;
+    }).join("");
+    const ready = S.data.issuer.ready;
+    return `<div class="titlerow"><div class="grow"><h2>POs ${S.year}</h2><p class="sub" style="margin-bottom:0">Every PO the shop makes, in your PD - PO template, filed in PD - POs. Next: ${esc(nextName("po"))} and ${esc(nextName("lumber"))}. Tap a PO for its lines.</p></div>${yearPicker()}</div>
+      <div class="row" style="margin:0 2px 12px"><button class="btn or" data-newpo="po" ${ready ? "" : "disabled"}>Make a PO</button><button class="btn ghost" data-newpo="lumber" ${ready ? "" : "disabled"}>Make a lumber PO</button></div>
+      ${ready ? "" : `<div class="banner">Fill in the PO details first<small>Setup › PO details: who issues it, phone, e-mail, address and the tax-exempt line (the Arrow POs use the same).</small></div>`}
+      ${filingBanner()}
+      ${pos.length ? `<div class="tw"><table><thead><tr><th>PO</th><th class="l">Supplier</th><th>Issued</th><th class="l">What</th><th>Total</th><th class="l">In</th><th class="l">PDF</th></tr></thead><tbody>${rows}</tbody></table></div>`
+        : `<p class="muted">No POs in ${S.year} yet.</p>`}
+      <p class="note" style="margin:10px 2px">Buys off a website, by card or at a store have no PO: they come in through the Purchases file and count in Prices.</p>`;
+  }
+  function poDetail(po) {
+    const anyLumber = (po.lines || []).some(l => l.lumber), reqs = new Map(S.reqs.map(r => [r.id, r]));
+    const lines = (po.lines || []).map(l => {
+      const m = lineMoney(l), it = l.item_id ? itemById(l.item_id) : null, rq = l.supply_request_id ? reqs.get(l.supply_request_id) : null;
+      return `<tr><td>${l.position}</td><td class="num">${esc(Number(l.qty).toLocaleString("en-US", { maximumFractionDigits: 3 }))}${l.unit ? " " + esc(l.unit) : ""}</td>
+        <td class="l wrap">${esc(l.description)}${l.supply_request_id ? ` <span class="pill">${rq ? esc(rq.department_name) + " asked" : "supply request"}</span>` : ""}</td><td class="l">${esc(l.job_number)}</td>
+        <td class="num">${esc(price(l.unit_price))}</td><td class="l">${it ? esc(it.name) : `<span class="muted">no item</span>`}</td>
+        ${anyLumber ? `<td class="num">${!m.tracked ? "" : m.bench === null ? "—" : esc(price(m.bench))}</td>
+        <td class="num">${!m.tracked ? "" : m.received ? `${n0(l.received_bf)}${l.slips ? ` <span class="muted small">(${l.slips} slip${l.slips === 1 ? "" : "s"})</span>` : ""}` : `<span class="muted">on order</span>`}</td>
+        <td class="num">${m.saving === null ? "" : usd(m.saving)}</td>
+        <td>${!m.tracked || po.cancelled_at ? "" : `<input class="n" style="width:110px" data-measured="${esc(l.id)}" inputmode="decimal" value="${l.measured_bf === null || l.measured_bf === undefined ? "" : esc(l.measured_bf)}" placeholder="—" aria-label="Measured after SLR, line ${l.position}">`}</td>` : ""}</tr>`;
+    }).join("");
+    const earlier = (po.earlier || []).filter(e => e.file_name).map(e => `${esc(e.file_name)} (${esc(String(e.at || "").slice(0, 10))}, ${esc(e.by || "")})`).join("; ");
+    const bills = (S.data.buys || []).filter(b => b.po_id === po.id);
+    return `<div class="detail">
+      <div class="note">${po.from_history ? "From the workbook (no PDF). " : `Made by ${esc(po.made_by_name || "")}${po.changed_by_name ? `, changed by ${esc(po.changed_by_name)}` : ""}. `}${po.cancelled_at ? `Cancelled by ${esc(po.cancelled_by_name)}${po.cancel_reason ? `: ${esc(po.cancel_reason)}` : ""}.` : ""}
+        ${po.filed_at ? `Filed in PD - POs as ${esc(po.file_name)}.` : ""}</div>
+      <div class="tw"><table><thead><tr><th>#</th><th>Qty</th><th class="l">Description</th><th class="l">Job</th><th>Price</th><th class="l">Item</th>
+        ${anyLumber ? `<th>Measured against</th><th>In (bd ft)</th><th>Saved</th><th>Measured after SLR</th>` : ""}</tr></thead><tbody>${lines}</tbody></table></div>
+      ${earlier ? `<p class="note">Earlier versions, kept: ${earlier}</p>` : ""}
+      ${bills.length ? `<p class="note">On record against this PO from the Purchases file (not counted again): ${bills.map(b => `${esc(b.doc || b.supplier)} ${esc(mdy(b.on))}, ${usd(b.amount, true)}`).join("; ")}.</p>` : ""}
+      <div class="row">
+        ${po.cancelled_at ? `<button class="btn ghost" data-uncancel="${esc(po.id)}">Put it back</button>` : `<button class="btn ghost" data-changepo="${esc(po.id)}">Change the PO</button>`}
+        ${po.file_name ? `<button class="btn ghost" data-pdf="${esc(po.id)}">PDF</button>` : ""}
+        ${!po.cancelled_at ? `<button class="link" data-cancelpo="${esc(po.id)}">Cancel the PO</button>` : ""}
+        ${anyLumber ? `<span class="note">Received board feet come from Inventory's lumber slips, picked on the Lumber tab.</span>` : ""}</div></div>`;
+  }
+
+  // ---------- the PO editor ----------
+  const blankLine = () => ({ qty: "", unit: "", description: "", job_number: "", unit_price: "", item_id: "", supply_request_id: "" });
+  function startEdit(po, series, fromRequests) {
+    if (!po) {
+      const lines = (fromRequests || []).map(r => ({ ...blankLine(), qty: String(r.qty), description: r.item, supply_request_id: r.id }));
+      while (lines.length < 3) lines.push(blankLine());
+      S.edit = { series, vendor_id: "", ordered_on: S.data.today, date: "", date_required: "", terms: "", method: "", po_job: "", lines };
+    } else {
+      const h = po.header || {};
+      S.edit = { id: po.id, name: po.name, series: po.series, history: po.from_history, vendor_id: po.vendor_id, ordered_on: po.ordered_on, date: h.date || "", date_required: h.date_required || "",
+                 terms: h.terms || "", method: h.method || "", po_job: h.po_job || "",
+                 lines: (po.lines || []).map(l => ({ id: l.id, qty: String(l.qty), unit: l.unit || "", description: l.description, job_number: l.job_number || "",
+                                                     unit_price: l.unit_price === null || l.unit_price === undefined ? "" : String(Number(l.unit_price)), item_id: l.item_id || "",
+                                                     supply_request_id: l.supply_request_id || "" })) };
+    }
+    S.edit.client_id = newId(); S.msg = null; render(); window.scrollTo(0, 0);
+  }
+  function readEdit() {
+    const E = S.edit; if (!E) return;
+    const val = (sel) => { const el = app.querySelector(sel); return el ? el.value : undefined; };
+    for (const k of ["vendor_id", "ordered_on", "date", "date_required", "terms", "method", "po_job"]) { const x = val(`[data-e="${k}"]`); if (x !== undefined) E[k] = x; }
+    E.lines.forEach((l, i) => { for (const k of ["qty", "unit", "description", "job_number", "unit_price", "item_id"]) { const x = val(`[data-l="${i}|${k}"]`); if (x !== undefined) l[k] = x; } });
+  }
+  function lastPaidText(itemId, ents) {
+    const lp = itemId ? lastPaid(S.data, itemId, ents) : null;
+    return lp ? `Last paid ${price(lp.price)}${lp.unit ? " a " + esc(lp.unit) : ""} · ${esc(lp.supplier)} · ${esc(mdy(lp.date))}` : "";
+  }
+  function viewEdit() {
+    const E = S.edit, lumber = E.series === "lumber", ents = entries(S.data);
+    const vendors = (S.data.suppliers || []).filter(v => !v.retired || v.id === E.vendor_id);
+    const items = (S.data.items || []).filter(i => (!i.retired || E.lines.some(l => l.item_id === i.id)));
+    const cats = (S.data.categories || []).filter(c => items.some(i => i.category_key === c.key));
+    const itemOpts = (sel) => `<option value="">No item</option>${cats.map(c => `<optgroup label="${esc(c.name)}">${items.filter(i => i.category_key === c.key)
+      .map(it => `<option value="${esc(it.id)}" ${it.id === sel ? "selected" : ""}>${esc(it.name)}</option>`).join("")}</optgroup>`).join("")}`;
+    const reqs = new Map(S.reqs.map(r => [r.id, r]));
+    const descs = [...new Set((S.data.pos || []).filter(p => p.series === E.series).flatMap(p => (p.lines || []).map(l => l.description)))].slice(0, 300);
+    let total = 0;
+    const rows = E.lines.map((l, i) => {
+      const q = Number(String(l.qty).replace(/,/g, "")), up = Number(String(l.unit_price).replace(/[$,]/g, ""));
+      const amt = String(l.unit_price).trim() !== "" && q > 0 && up >= 0 ? Math.round(q * up * 100) / 100 : null; if (amt) total += amt;
+      const rq = l.supply_request_id ? reqs.get(l.supply_request_id) : null;
+      return `<tr><td>${i + 1}</td>
+        <td style="width:110px"><input class="n" data-l="${i}|qty" inputmode="decimal" value="${esc(l.qty)}" aria-label="Quantity, line ${i + 1}"></td>
+        <td style="width:90px"><input data-l="${i}|unit" value="${esc(l.unit)}" placeholder="${lumber ? "bd ft" : "each"}" aria-label="Unit, line ${i + 1}"></td>
+        <td><input data-l="${i}|description" list="descs" value="${esc(l.description)}" aria-label="Description, line ${i + 1}">
+          <div class="note" id="lp-${i}">${l.supply_request_id ? `<span class="pill">${rq ? esc(rq.department_name) + " asked for it" : "a supply request"}</span> ` : ""}${lastPaidText(l.item_id, ents)}</div></td>
+        <td style="width:100px"><input data-l="${i}|job_number" value="${esc(l.job_number)}" aria-label="Job number, line ${i + 1}"></td>
+        <td style="width:110px"><input class="n" data-l="${i}|unit_price" inputmode="decimal" value="${esc(l.unit_price)}" aria-label="Unit price, line ${i + 1}"></td>
+        <td style="width:190px"><select data-l="${i}|item_id" aria-label="Item, line ${i + 1}">${itemOpts(l.item_id)}</select></td>
+        <td class="num" style="width:110px" id="amt-${i}">${amt === null ? "" : usd(amt, true)}</td>
+        <td style="width:40px"><button class="x" data-rmline="${i}" aria-label="Take off line ${i + 1}">×</button></td></tr>`;
+    }).join("");
+    const field = (k, label, type = "text") => `<label>${label}<input type="${type}" data-e="${k}" value="${esc(E[k] || "")}"></label>`;
+    return `<h2>${E.id ? `Change ${esc(E.name)}` : `Make ${esc(nextName(E.series))}`}</h2>
+      <p class="sub">${E.history ? "From the workbook: a change corrects the record, and no PDF is made." : E.id ? "A change keeps the number and makes a new version (r2, r3…), filed in PD - POs beside the first. The first version is kept." : "Printed in your PD - PO template and filed in PD - POs as a PDF. The number is given when you make it."}</p>
+      <div class="card"><div class="form">
+        <label>Supplier<select data-e="vendor_id"><option value="">Choose…</option>${vendors.map(v => `<option value="${esc(v.id)}" ${v.id === E.vendor_id ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></label>
+        ${field("ordered_on", "Date issued", "date")}${field("date", "Date", "date")}${field("date_required", "Date required", "date")}
+        ${field("terms", "Terms")}${field("method", "Method")}${field("po_job", "PO # / Job #")}
+      </div>${!vendors.length ? `<p class="note">No suppliers yet: add one in Setup › Suppliers.</p>` : ""}</div>
+      <div class="tw"><table class="edit"><thead><tr><th>#</th><th>Quantity</th><th class="l">Unit</th><th class="l">Description</th><th class="l">Job Number</th><th>Unit Price</th><th class="l">Item</th><th>Amount</th><th></th></tr></thead>
+        <tbody>${rows}<tr class="subtot"><td colspan="7">Total</td><td class="num" id="amt-total">${usd(total, true)}</td><td></td></tr></tbody></table></div>
+      <datalist id="descs">${descs.map(d => `<option value="${esc(d)}">`).join("")}</datalist>
+      <p class="note" style="margin:8px 2px">Item: what the line counts as in Prices. ${lumber ? "Lumber lines are in board feet, so leave Unit blank; plywood and anything else: its own item, with its unit (Sheets)." : "Last paid: the most recent price for that item from any supplier, so a creep shows before you sign."}</p>
+      <div class="row" style="margin-top:12px">
+        <button class="btn ghost" data-addline ${E.lines.length >= 22 ? "disabled" : ""}>Add a line</button>
+        ${E.history ? "" : `<button class="btn ghost" data-preview>Preview the PDF</button>`}
+        <button class="btn or" data-savepo ${S.busy ? "disabled" : ""}>${E.id ? "Save the change" : "Make the PO"}</button>
+        <button class="link" data-canceledit>Cancel</button></div>`;
+  }
+  function editAmounts() {
+    let total = 0; const ents = entries(S.data);
+    S.edit.lines.forEach((l, i) => {
+      const q = Number(String(l.qty).replace(/,/g, "")), up = Number(String(l.unit_price).replace(/[$,]/g, ""));
+      const amt = String(l.unit_price).trim() !== "" && q > 0 && up >= 0 ? Math.round(q * up * 100) / 100 : null; if (amt) total += amt;
+      const c = document.getElementById("amt-" + i); if (c) c.textContent = amt === null ? "" : usd(amt, true);
+      const lp = document.getElementById("lp-" + i);
+      if (lp && !l.supply_request_id) lp.innerHTML = lastPaidText(l.item_id, ents);
+    });
+    const t = document.getElementById("amt-total"); if (t) t.textContent = usd(total, true);
+  }
+  /** what the PO would print, for the preview: the same shape purchase_po_save() makes */
+  function draftPo(lines) {
+    const E = S.edit, v = supplierById(E.vendor_id), is = S.data.issuer || {}, addr = String(is.address || "").split(/\s*\n\s*/);
+    const num = E.id ? Number(String(E.name).replace(/\D+/g, "")) : E.series === "lumber" ? S.data.next_lumber : S.data.next_po;
+    return { name: E.id ? E.name : nextName(E.series), series: E.series, po_number: num,
+      header: { vendor: { name: v.contact, company: v.company || v.name, street: v.street, city: v.city, phone: v.phone, email: v.email },
+                issued_by: is.issued_by, phone: is.phone, email: is.email, tax_line: is.tax_line, ship_to: { company: addr[0], street: addr[1], city: addr[2] },
+                date_issued: E.ordered_on, date: E.date, date_required: E.date_required, terms: E.terms, method: E.method, po_job: E.po_job },
+      printed: lines.map(l => ({ ...l, amount: l.unit_price === null ? null : Math.round(l.qty * l.unit_price * 100) / 100 })) };
+  }
+  async function savePo() {
+    readEdit();
+    const E = S.edit, chk = checkLines(E.lines, S.data.items);
+    if (!E.vendor_id) { S.msg = { ok: false, text: "Choose the supplier." }; return render(); }
+    if (chk.problem) { S.msg = { ok: false, text: chk.problem }; return render(); }
+    const p = { series: E.series, vendor_id: E.vendor_id, ordered_on: E.ordered_on, date: E.date, date_required: E.date_required, terms: E.terms, method: E.method, po_job: E.po_job, lines: chk.lines };
+    if (E.id) p.id = E.id;
+    S.busy = true; render();
+    const r = await Promise.resolve(db.rpc("purchase_po_save", { p_client_id: E.id ? null : E.client_id, p })).catch(e => ({ error: e }));
+    S.busy = false;
+    if (r.error) { S.msg = { ok: false, text: friendlyError(r.error) }; return render(); }
+    const d = r.data || {};
+    S.edit = null; S.tab = "pos"; store.set("tab", "pos"); S.open = d.id; S.ticked = new Set();
+    const reqText = d.requests_ordered ? ` ${d.requests_ordered} supply request${d.requests_ordered === 1 ? " is" : "s are"} marked ordered.` : "";
+    S.msg = { ok: true, text: (d.unchanged ? `Nothing changed on ${d.name}.` : E.id ? `${d.name} changed${d.file_name ? `: it's ${d.file_name} now` : ""}.` : `${d.name} made.`) + reqText };
+    await load();
+    const made = (S.data.pos || []).find(x => x.id === d.id);
+    if (made) S.year = yearOf(made.ordered_on);
+    render();
+    if (made && made.file_name && !made.filed_at) {
+      if (S.folder && S.perm === "granted") await fileWaiting();
+      else { S.msg = { ok: true, text: `${S.msg.text} It isn't in PD - POs yet: ${!canPickFolder() ? "download it with PDF and put it there." : !S.folder ? "choose the folder below and it's filed." : "Resume filing below."}` }; render(); }
+    }
+  }
+
+  // ---------- Prices ----------
+  const stat = (o, t, s, big) => `<div class="stat ${big ? "big" : ""}"><div class="o">${o}</div><div class="t num">${t}</div>${s ? `<div class="s">${s}</div>` : ""}</div>`;
+  const signed = (x) => x === null ? "—" : x >= 0 ? usd(x) : "−" + usd(-x);
+  function viewPrices() {
+    const P = pricesFor(S.data, S.year), ents = entries(S.data);
+    const cats = P.cats.map(c => `<tr><td>${esc(c.name)}</td><td class="num">${usd(c.spend)}</td><td class="num">${c.items}</td>
+        <td class="num ${c.against < 0 ? "up" : c.against > 0 ? "down" : ""}">${c.against >= 0 ? usd(c.against) + " saved" : usd(-c.against) + " more"}</td><td class="l">${esc(c.top)}</td></tr>`).join("");
+    const rows = P.rows.map(r => {
+      const open = S.openItem === r.item.id, chg = r.change === null ? "—" : `${r.change > 0 ? "+" : ""}${(r.change * 100).toFixed(1)}%`;
+      const paid = open ? ents.filter(e => e.item_id === r.item.id && e.year === S.year).reverse().map(e => `<tr><td>${esc(mdy(e.date))}</td><td class="l">${esc(e.supplier)}</td>
+          <td class="l">${esc(e.ref)}</td><td class="num">${e.qty === null ? "" : n0(e.qty)} ${esc(e.unit)}</td><td class="num">${e.price === null ? "" : price(e.price)}</td><td class="num">${usd(e.amount, true)}</td></tr>`).join("") : "";
+      return `<tr class="click ${open ? "open" : ""}" data-openitem="${esc(r.item.id)}"><td><b>${esc(r.item.name)}</b></td><td class="l">${esc(catName(r.item.category_key))}</td>
+        <td class="num">${n0(r.qty)} ${esc(r.item.unit)}</td><td class="num">${usd(r.spend)}</td><td class="num">${r.avg === null ? "—" : price(r.avg)}</td>
+        <td class="num" title="${esc(r.base ? r.base.how : "")}">${r.base ? price(r.base.price) : "—"}</td><td class="num ${r.change > 0.005 ? "up" : r.change < -0.005 ? "down" : ""}">${chg}</td>
+        <td class="num">${signed(r.against)}</td><td class="l">${esc(r.top)}${r.suppliers > 1 ? ` <span class="muted small">+${r.suppliers - 1}</span>` : ""}</td></tr>
+        ${open ? `<tr><td colspan="9" style="padding:0"><div class="detail"><div class="note">Measured against: ${esc(r.base ? r.base.how : "nothing yet")}.</div>
+          <div class="tw"><table><thead><tr><th>Date</th><th class="l">Supplier</th><th class="l">PO or bill</th><th>Quantity</th><th>Price</th><th>Amount</th></tr></thead><tbody>${paid}</tbody></table></div></div></td></tr>` : ""}`;
+    }).join("");
+    const y = S.year;
+    return `<div class="titlerow"><div class="grow"><h2>Prices ${y}</h2><p class="sub" style="margin-bottom:0">Every production buy entered, on a PO or not, against the price the year before: a typed baseline (lumber's ${y - 1} averages), else ${y - 1}'s average paid, else the first price paid in ${y}.</p></div>${yearPicker()}
+        <button class="btn ghost" data-export>Export ${y} for the yearly check</button></div>
+      <div class="grid">
+        ${stat("Spent on production", usd(P.spend), P.noItemLines ? `${usd(P.noItemSpend)} of it on ${P.noItemLines} line${P.noItemLines === 1 ? "" : "s"} with no item` : "every line filed under an item", true)}
+        ${stat("Against the baseline", P.saved >= 0 ? `${usd(P.saved)} saved` : `${usd(-P.saved)} more`, "all categories, items with a baseline")}
+        ${stat("Items gone up", String(P.up), "paying more than their baseline")}
+        ${stat("Not matched yet", String(P.toMatch), P.toMatch ? `<button class="link" data-tabgo="file" style="padding:0">Match them on the Purchases file tab</button>` : "nothing waiting")}
+      </div>
+      <h3>By category</h3>
+      ${cats ? `<div class="tw"><table><thead><tr><th>Category</th><th>Spent</th><th>Items</th><th>Against baseline</th><th class="l">Top supplier</th></tr></thead><tbody>${cats}</tbody></table></div>` : `<p class="muted">Nothing bought in ${y} yet.</p>`}
+      <h3>Items (tap one for every price paid)</h3>
+      ${rows ? `<div class="tw"><table><thead><tr><th>Item</th><th class="l">Category</th><th>Bought</th><th>Spent</th><th>Average</th><th>Baseline</th><th>Change</th><th>Saved</th><th class="l">Supplier</th></tr></thead><tbody>${rows}</tbody></table></div>` : ""}
+      <p class="note" style="margin:10px 2px">The export is every line counted in ${y}: date, from a PO or the Purchases file, the PO or bill number, supplier, category, item, quantity, unit, price and amount, to check against the bills once a year.</p>`;
+  }
+
+  // ---------- Savings to chase ----------
+  function viewChase() {
+    const C = chaseFor(S.data);
+    const spread = C.spread.slice(0, 15).map(s => `<tr><td><b>${esc(s.item.name)}</b></td><td class="l wrap">${s.suppliers.map(x => `${esc(x.name)} ${price(x.avg)}`).join(" · ")}</td>
+        <td class="l">${esc(s.best.name)}</td><td class="num">${usd(s.potential)}</td></tr>`).join("");
+    const creep = C.creep.slice(0, 15).map(c => `<tr><td><b>${esc(c.item.name)}</b></td><td class="num">${price(c.base.price)}</td><td class="num">${price(c.last.price)}</td>
+        <td class="num up">+${(c.change * 100).toFixed(1)}%</td><td class="l">${esc(c.last.supplier)} · ${esc(mdy(c.last.date))}</td></tr>`).join("");
+    const single = C.single.slice(0, 15).map(s => `<tr><td><b>${esc(s.item.name)}</b></td><td class="l">${esc(s.supplier)}</td><td class="num">${usd(s.spend)}</td></tr>`).join("");
+    return `<h2>Savings to chase</h2><p class="sub">From everything bought since ${esc(mdy(C.since))}.</p>
+      <h3>The same item from two suppliers at different prices</h3>
+      ${spread ? `<div class="tw"><table><thead><tr><th>Item</th><th class="l">Average paid by supplier</th><th class="l">Cheapest</th><th>If all at the cheapest</th></tr></thead><tbody>${spread}</tbody></table></div>` : `<p class="muted">None: no item bought from two suppliers at prices more than 2% apart.</p>`}
+      <h3>Prices creeping up</h3>
+      ${creep ? `<div class="tw"><table><thead><tr><th>Item</th><th>Baseline</th><th>Last paid</th><th>Up</th><th class="l">Last bought</th></tr></thead><tbody>${creep}</tbody></table></div>` : `<p class="muted">None: no last price more than 5% over its baseline.</p>`}
+      <h3>Big spend from one supplier only</h3>
+      ${single ? `<div class="tw"><table><thead><tr><th>Item</th><th class="l">Supplier</th><th>Spent</th></tr></thead><tbody>${single}</tbody></table></div>
+        <p class="note" style="margin:8px 2px">$2,500 or more in the last year, all from one supplier: worth a quote from another.</p>` : `<p class="muted">None over $2,500.</p>`}`;
+  }
+
+  // ---------- Lumber: the tracker's results, and slips on PO lines ----------
+  async function loadSlips() {
+    const [l, r] = await Promise.all([Promise.resolve(db.rpc("purchase_slip_lines")).catch(e => ({ error: e })),
+      Promise.resolve(db.from("inv_receipts").select("id,received_on,month_end,supplier,item_id,board_feet,mistake_at").eq("kind", "lumber")
+        .is("mistake_at", null).order("received_on", { ascending: false }).limit(80)).catch(e => ({ error: e }))]);
+    if (l.error || r.error) { S.msg = { ok: false, text: friendlyError(l.error || r.error) }; S.slipLines = { lines: [], links: [] }; S.slips = []; return; }
+    S.slipLines = l.data || { lines: [], links: [] }; S.slips = r.data || [];
+  }
+  function viewLumber() {
+    const R = lumberResults(S.data, S.year), mix = supplierMix(S.data, S.year), last = S.year - 1;
+    const notes = [];
+    if (R.onOrder) notes.push(`${n0(R.onOrder)} bd ft of it is still on order: counted as ordered until its delivery slips are picked below.`);
+    if (R.noPrice) notes.push(`${R.noPrice} line${R.noPrice === 1 ? " has" : "s have"} no price yet, so ${R.noPrice === 1 ? "it isn't" : "they aren't"} in the dollars.`);
+    if (R.noBench) notes.push(`${R.noBench} line${R.noBench === 1 ? "'s item has" : "s' items have"} no ${last} baseline, so no saving is worked out for ${R.noBench === 1 ? "it" : "them"} (Setup › Baselines).`);
+    const months = R.months.map(m => `<tr><td>${esc(new Date(m.month_end + "T12:00").toLocaleString("en-US", { month: "long" }))}</td><td class="num">${n0(m.zero)}</td><td class="num">${n0(m.used)}</td>
+        <td class="num">${m.ratio.toFixed(2)}</td><td class="num">${n0(m.allow)}</td><td class="num">${n0(m.saved)}</td><td class="l muted small">${esc(m.from)}</td></tr>`).join("");
+    const mixRows = mix.rows.map(r => `<tr><td>${esc(r.name)}</td>${mix.hasBefore ? `<td class="num">${pct(r.bfShareBefore)}</td>` : ""}<td class="num">${pct(r.bfShareNow)}</td>
+        ${mix.hasBefore ? `<td class="num">${pct(r.dShareBefore)}</td>` : ""}<td class="num">${pct(r.dShareNow)}</td>
+        ${mix.hasBefore ? `<td class="num">${n0(r.before.bf)}</td>` : ""}<td class="num">${n0(r.now.bf)}</td>${mix.hasBefore ? `<td class="num">${usd(r.before.dollars)}</td>` : ""}<td class="num">${usd(r.now.dollars)}</td></tr>`).join("");
+    return `<div class="titlerow"><div class="grow"><h2>Lumber ${S.year}</h2><p class="sub" style="margin-bottom:0">What was bought on lumber POs against ${last}'s baselines, and lumber saved against the 1.7 scrap allowance. Every lumber PO counts from the day it's made.</p></div>${yearPicker()}</div>
+      <div class="grid">
+        ${stat("Board feet bought", n0(R.bf), `${R.lines} PO line${R.lines === 1 ? "" : "s"}`)}
+        ${stat("Spent on lumber", usd(R.spent), `${price(R.avg)} a board foot on average`)}
+        ${stat("Saved on price", usd(R.saving), `against ${last} baselines · ${pct(R.costCut)} less`)}
+        ${stat("Saved on scrap", usd(R.scrapDollars), R.months.length ? `${n0(R.savedBf)} bd ft under the 1.7 allowance · ${pct(R.scrapCut)}` : "no months with scrap figures yet")}
+        ${stat("Estimated total saved", usd(R.total), `${pct(R.totalCut)} in all`, true)}
+        ${stat("Lost on purchase", pct(R.lostOnPurchase), R.lostOnPurchase === null ? "nothing measured after SLR yet" : R.lostOnPurchase < 0 ? "measured after SLR: more than was billed" : "measured after SLR: less than was billed")}
+      </div>
+      ${notes.map(t => `<p class="note" style="margin:8px 2px 0">${esc(t)}</p>`).join("")}
+      <h3>Scrap against the 1.7 allowance</h3>
+      ${R.months.length ? `<div class="tw"><table><thead><tr><th>Month</th><th>0-scrap bd ft</th><th>Used</th><th>Used ÷ 0-scrap</th><th>1.7 allowance</th><th>Saved</th><th class="l">From</th></tr></thead>
+        <tbody>${months}<tr class="subtot"><td>${S.year}</td><td class="num">${n0(R.months.reduce((a, m) => a + m.zero, 0))}</td><td class="num">${n0(R.months.reduce((a, m) => a + m.used, 0))}</td>
+          <td class="num">${R.ratio === null ? "—" : R.ratio.toFixed(2)}</td><td class="num">${n0(R.months.reduce((a, m) => a + m.allow, 0))}</td><td class="num">${n0(R.savedBf)}</td><td></td></tr></tbody></table></div>
+        <p class="note" style="margin:8px 2px 0">Inventory's months appear here once they're closed on the Inventory page. Saved board feet × this year's average price = saved on scrap.</p>`
+      : `<p class="muted">No months yet: the workbook's April–June figures load with purchasing_history.sql, and Inventory's months appear once closed.</p>`}
+      <h3>Suppliers</h3>
+      ${mix.rows.length ? `<div class="tw"><table><thead>
+          <tr><th></th><th colspan="${mix.hasBefore ? 2 : 1}">Share of board feet</th><th colspan="${mix.hasBefore ? 2 : 1}">Share of dollars</th><th colspan="${mix.hasBefore ? 2 : 1}">Board feet</th><th colspan="${mix.hasBefore ? 2 : 1}">Dollars</th></tr>
+          <tr><th>Supplier</th>${[0, 1, 2, 3].map(() => `${mix.hasBefore ? `<th>${last}</th>` : ""}<th>${S.year}</th>`).join("")}</tr></thead>
+        <tbody>${mixRows}</tbody></table></div>
+        <p class="note" style="margin:8px 2px 0">${mix.hasBefore ? `${last} is as typed in Setup › Earlier lumber years; ${S.year} adds itself up from the POs.` : `Type ${last}'s figures in Setup › Earlier lumber years to compare.`}</p>`
+      : `<p class="muted">No lumber POs in ${S.year} yet.</p>`}
+      <h3>Delivery slips and PO lines</h3>
+      ${slipsSection()}`;
+  }
+  function slipsSection() {
+    if (!S.slipLines) return `<button class="btn ghost" data-loadslips>Show Inventory's lumber slips</button>
+      <p class="note" style="margin:8px 2px">A lumber PO line counts what was ordered until its slips are picked here; then what they brought in.</p>`;
+    const links = new Map((S.slipLines.links || []).map(x => [x.receipt_id, x.line_id])), lines = S.slipLines.lines || [];
+    const invName = (id) => ((S.data.inv_items || []).find(i => i.id === id) || {}).name || "";
+    const rows = S.slips.map(r => {
+      const cur = links.get(r.id), opts = lines.filter(l => l.open || l.id === cur).sort((a, b) => (b.inv_item_id === r.item_id) - (a.inv_item_id === r.item_id));
+      return `<tr><td>${esc(mdy(r.received_on))}</td><td class="l">${esc(r.supplier || "")}</td><td class="l">${esc(invName(r.item_id))}</td><td class="num">${n0(r.board_feet)}</td>
+        <td><select data-slip="${esc(r.id)}" aria-label="PO line this slip fills"><option value="">No PO line</option>${opts.map(l => `<option value="${esc(l.id)}" ${l.id === cur ? "selected" : ""}>${esc(l.po)} line ${l.position}: ${esc(l.item)} (${n0(l.in_bf)} of ${n0(l.qty)} in)</option>`).join("")}</select></td></tr>`;
+    }).join("");
+    return rows ? `<div class="tw"><table><thead><tr><th>Received</th><th class="l">Supplier</th><th class="l">Inventory item</th><th>Bd ft</th><th class="l">Fills</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="note" style="margin:8px 2px">The last 80 lumber slips from Inventory's Deliveries in. Lines for the same Inventory item are listed first. A slip in a closed month stays as it is.</p>`
+      : `<p class="muted">No lumber slips on the Inventory page yet.</p>`;
+  }
+
+  // ---------- the Purchases file, and Match these ----------
+  const inflateRaw = async (bytes) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer());
+  async function readFile(f) {
+    S.file = { name: f.name, reading: true }; render();
+    try {
+      const buf = await f.arrayBuffer();
+      if (buf.byteLength > 15 * 1024 * 1024) throw new Error("That file is over 15 MB. The Purchases file is a few hundred lines; check it's the right one.");
+      let rows;
+      if (/\.csv$/i.test(f.name)) rows = readCsv(new TextDecoder().decode(buf));
+      else if (/\.xlsx$/i.test(f.name)) { if (typeof DecompressionStream !== "function") throw new Error("This browser can't open .xlsx files. Use Chrome or Edge, or save the Lines tab as a .csv."); rows = pickSheet(await readXlsx(buf, inflateRaw)); }
+      else throw new Error("Drop the Purchases file as .xlsx or .csv.");
+      const r = sheetToLines(rows);
+      S.file = { name: f.name, sha256: await sha256Hex(buf), client_id: newId(), lines: r.lines, problems: r.problems };
+    } catch (e) { S.file = { name: f.name, error: friendlyError(e) }; }
+    render();
+  }
+  async function sendFile() {
+    const F = S.file; if (!F || !F.lines || F.problems.length) return;
+    S.busy = true; render();
+    const r = await Promise.resolve(db.rpc("purchases_drop", { p_client_id: F.client_id, p_file: { name: F.name, sha256: F.sha256 }, p_lines: F.lines })).catch(e => ({ error: e }));
+    S.busy = false;
+    if (r.error) { S.msg = { ok: false, text: friendlyError(r.error) }; return render(); }
+    S.file = null; S.msg = { ok: true, text: `${F.name}: ${r.data.summary}` }; await load(); render();
+  }
+  function viewFile() {
+    const F = S.file, groups = matchGroups(S.data), items = (S.data.items || []).filter(i => !i.retired), cats = S.data.categories || [], newNames = fileItemNames(S.data);
+    const itemOpts = `<option value="">Choose the item…</option>${cats.filter(c => items.some(i => i.category_key === c.key)).map(c => `<optgroup label="${esc(c.name)}">${items.filter(i => i.category_key === c.key)
+      .map(it => `<option value="${esc(it.id)}">${esc(it.name)}</option>`).join("")}</optgroup>`).join("")}`;
+    let drop;
+    if (!F) drop = `<label class="drop" id="dropzone"><b>Drop the Purchases file here</b><br><span class="muted">or tap to choose it: .xlsx (its Lines tab) or .csv</span>
+        <input type="file" id="fileIn" accept=".xlsx,.csv" hidden></label>`;
+    else if (F.reading) drop = `<div class="card">Reading ${esc(F.name)}…</div>`;
+    else if (F.error) drop = `<div class="banner">${esc(F.name)} couldn't be read<small>${esc(F.error)}</small><div style="margin-top:8px"><button class="btn ghost" data-fileclear>Choose another file</button></div></div>`;
+    else {
+      const forPo = F.lines.filter(l => l.po).length, tot = F.lines.reduce((a, l) => a + l.amount, 0);
+      drop = F.problems.length
+        ? `<div class="banner">${esc(F.name)}: ${F.problems.length} row${F.problems.length === 1 ? "" : "s"} can't be read, so nothing was added<small>${F.problems.slice(0, 8).map(esc).join("<br>")}${F.problems.length > 8 ? `<br>…and ${F.problems.length - 8} more` : ""}</small>
+           <div style="margin-top:8px"><button class="btn ghost" data-fileclear>Choose another file</button></div></div>`
+        : `<div class="card"><p style="margin-top:0"><b>${esc(F.name)}</b>: ${F.lines.length} line${F.lines.length === 1 ? "" : "s"}, ${usd(tot, true)}, from ${esc(mdy(F.lines.reduce((a, l) => l.date < a ? l.date : a, F.lines[0].date)))} to ${esc(mdy(F.lines.reduce((a, l) => l.date > a ? l.date : a, F.lines[0].date)))}.
+            ${forPo ? `${forPo} of them say which PO they're for: kept against it, not counted again.` : ""} Lines already in are skipped.</p>
+            <div class="row"><button class="btn or" data-filesend ${S.busy ? "disabled" : ""}>Add these lines</button><button class="link" data-fileclear>Cancel</button></div></div>`;
+    }
+    const mrows = groups.slice(0, 60).map((g, gi) => {
+      const mk = S.matchNew === g.key;
+      return `<tr><td class="l wrap"><b>${esc(g.description)}</b><div class="note">${esc(g.supplier)} · ${g.ids.length} line${g.ids.length === 1 ? "" : "s"} · last ${esc(mdy(g.last))}${g.category ? ` · ${esc(catName(g.category))}` : ""}</div></td>
+        <td class="num">${usd(g.total, true)}</td>
+        <td style="min-width:240px">${mk ? `<div class="form" style="grid-template-columns:1fr"><label>New item<input data-nm="name" value="${esc(((S.data.buys || []).find(b => b.id === g.ids[0]) || {}).item_text || "")}"></label>
+              <label>Category<select data-nm="category_key">${cats.filter(c => !c.retired).map(c => `<option value="${esc(c.key)}" ${c.key === (g.category || "") ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>
+              <label>Unit (lumber: bd ft)<input data-nm="unit" placeholder="sheet, each, gallon…"></label><label>Lumber: quarters<input data-nm="quarters" class="n" inputmode="numeric" placeholder="6 for 6/4"></label>
+              <div class="row"><button class="btn" data-newitem="${gi}">Make it and match</button><button class="link" data-newitemcancel>Cancel</button></div></div>`
+          : `<select data-matchsel="${gi}" aria-label="Item for ${esc(g.description)}">${itemOpts}</select>`}</td>
+        <td>${mk ? "" : `<div class="row"><button class="btn ghost" data-match="${gi}">Match</button><button class="link" data-newitemopen="${esc(g.key)}">New item</button>
+          <button class="link" data-forpo="${gi}">For a PO</button><button class="link" data-leaveout="${gi}">Leave out</button></div>`}</td></tr>`;
+    }).join("");
+    const files = (S.data.files || []).slice(0, 12).map(f => `<tr><td class="l">${esc(f.file_name)}</td><td>${esc(when(f.dropped_at))}</td><td class="l">${esc(f.dropped_by_name || "")}</td><td class="num">${f.lines_new}</td><td class="num">${f.lines_skipped}</td></tr>`).join("");
+    const left = (S.data.buys || []).filter(b => b.ignored);
+    return `<h2>Purchases file</h2><p class="sub">Buys with no PO (card, Amazon, a store run, a supplier's invoice), from the Purchases project, in the Lines tab's shape. A line that's for a PO is kept against it and not counted again.</p>
+      ${drop}
+      ${newNames.length ? `<h3>The file names ${newNames.length} item${newNames.length === 1 ? "" : "s"} that ${newNames.length === 1 ? "isn't" : "aren't"} here yet</h3>
+        <div class="tw"><table><thead><tr><th class="l">As the file names it</th><th class="l">Category</th><th class="l">Unit</th><th>Spent</th><th class="l">Do</th></tr></thead><tbody>${newNames.map((n, i) => `<tr>
+          <td class="l"><b>${esc(n.name)}</b><div class="note">${n.ids.length} line${n.ids.length === 1 ? "" : "s"}</div></td>
+          <td class="l">${n.category ? esc(catName(n.category)) : `<select data-fncat="${i}" aria-label="Category for ${esc(n.name)}">${cats.filter(c => !c.retired).map(c => `<option value="${esc(c.key)}">${esc(c.name)}</option>`).join("")}</select>`}</td>
+          <td class="l">${n.category === "lumber" ? (n.quarters ? `bd ft · ${n.quarters}/4` : `<input data-fnq="${i}" class="n" style="width:90px" placeholder="quarters" aria-label="Quarters for ${esc(n.name)}">`)
+             : `<input data-fnunit="${i}" style="width:110px" value="${esc(n.unit || "")}" placeholder="sheet, each…" aria-label="Unit for ${esc(n.name)}">`}</td>
+          <td class="num">${usd(n.total)}</td>
+          <td><select data-fndo="${i}" aria-label="What to do with ${esc(n.name)}"><option value="new" ${!n.same && n.category ? "selected" : ""}>Make it a new item</option><option value="" ${!n.same && !n.category ? "selected" : ""}>Leave it for now</option>
+            ${items.filter(it => !n.category || it.category_key === n.category).map(it => `<option value="${esc(it.id)}" ${n.same && n.same.id === it.id ? "selected" : ""}>Same as ${esc(it.name)}</option>`).join("")}</select></td></tr>`).join("")}</tbody></table></div>
+        <div class="row" style="margin:8px 2px 4px"><button class="btn" data-fnapply ${S.busy ? "disabled" : ""}>Do these</button>
+          <span class="note">A new item takes the file's name, category and unit. "Same as" keeps the file's name as one of that item's other names. Either way the lines are filed now, and every future file's lines naming it file themselves.</span></div>` : ""}
+      <h3>Match these${groups.length ? ` <span class="pill">${groups.reduce((a, g) => a + g.ids.length, 0)} lines</span>` : ""}</h3>
+      ${mrows ? `<div class="tw"><table><thead><tr><th class="l">Bought</th><th>Spent</th><th class="l">Item</th><th></th></tr></thead><tbody>${mrows}</tbody></table></div>
+        <p class="note" style="margin:8px 2px">Matching remembers: the next file's line from the same supplier with the same words, or naming the same item, files itself. ${groups.length > 60 ? `Showing the 60 biggest of ${groups.length}.` : ""}</p>`
+        : `<p class="muted">Nothing waiting: every line is filed under an item.</p>`}
+      <div class="row" style="margin:12px 2px"><button class="btn ghost" data-itemscsv>Download the item list</button><span class="note">For the Purchases project, so it uses the shop's names for things.</span></div>
+      ${files ? `<h3>Files added</h3><div class="tw"><table><thead><tr><th class="l">File</th><th>Added</th><th class="l">By</th><th>New lines</th><th>Already in</th></tr></thead><tbody>${files}</tbody></table></div>` : ""}
+      ${left.length ? `<details class="fold"><summary>Left out (${left.length})</summary><div class="tw"><table><tbody>${left.map(b => `<tr><td class="l wrap">${esc(b.description)}<div class="note">${esc(b.supplier)} · ${esc(mdy(b.on))} · ${esc(b.ignore_reason || "")}</div></td>
+          <td class="num">${usd(b.amount, true)}</td><td><button class="link" data-putback="${esc(b.id)}">Put it back</button></td></tr>`).join("")}</tbody></table></div></details>` : ""}`;
+  }
+
+  // ---------- Setup ----------
+  function viewSetup() {
+    const is = S.data.issuer || {}, D = S.data, ed = S.setupEdit || {};
+    const sup = (D.suppliers || []).map(v => ed.supplier === v.id ? supplierForm(v) : `<tr class="${v.retired ? "off" : ""}"><td><b>${esc(v.name)}</b>${(v.aliases || []).length ? `<div class="note">also ${esc(v.aliases.join(", "))}</div>` : ""}</td><td class="l">${esc(v.company || "")}</td><td class="l">${esc(v.contact || "")}</td>
+        <td class="l wrap">${esc([v.street, v.city, v.phone, v.email].filter(Boolean).join(" · "))}</td><td><button class="link" data-editsupplier="${esc(v.id)}">Change</button></td></tr>`).join("");
+    const cats = (D.categories || []).filter(c => !c.retired || ed.cat === c.key);
+    const itemRows = (c) => (D.items || []).filter(i => i.category_key === c.key).map(i => ed.item === i.id ? itemForm(i) : `<tr class="${i.retired ? "off" : ""}"><td><b>${esc(i.name)}</b>${(i.aliases || []).length ? `<div class="note">also ${esc(i.aliases.join(", "))}</div>` : ""}</td>
+        <td class="l">${esc(i.unit)}${i.quarters ? ` · ${i.quarters}/4` : ""}</td><td class="l">${i.compare_as ? `as ${esc((itemById(i.compare_as) || {}).name || "?")}` : ""}${i.inv_name ? `<div class="note">Inventory: ${esc(i.inv_name)}</div>` : ""}</td>
+        <td class="num">${i.benchmark === null || i.benchmark === undefined ? "" : esc(price(i.benchmark))}</td><td><button class="link" data-edititem="${esc(i.id)}">Change</button></td></tr>`).join("");
+    const items = cats.map(c => `<tr class="subtot"><td colspan="5">${esc(c.name)}${c.retired ? " (retired)" : ""} <button class="link" data-editcat="${esc(c.key)}">Rename</button></td></tr>
+        ${ed.cat === c.key ? catForm(c) : ""}${itemRows(c)}${ed.item === "new:" + c.key ? itemForm({ category_key: c.key }) : ""}
+        <tr><td colspan="5"><button class="link" data-edititem="new:${esc(c.key)}">Add a${/^[aeiou]/i.test(c.name) ? "n" : ""} ${esc(c.name.toLowerCase())} item</button></td></tr>`).join("");
+    const bl = (D.baselines || []).slice().sort((a, b) => b.year - a.year || String((itemById(a.item_id) || {}).name).localeCompare(String((itemById(b.item_id) || {}).name)))
+      .map(b => `<tr><td class="l">${esc((itemById(b.item_id) || {}).name || "?")}</td><td>${b.year}</td><td class="num">${esc(price(b.price))}</td><td class="l small muted">${esc(b.note || "")}</td>
+        <td><button class="link" data-rmbase="${esc(b.item_id)}|${b.year}">Take it away</button></td></tr>`).join("");
+    const last = yearOf(D.today) - 1, lumberSup = (D.suppliers || []).filter(v => !v.retired);
+    const yt = lumberSup.map(v => { const t = (D.year_totals || []).find(x => x.vendor_id === v.id && Number(x.year) === last) || {};
+      return `<tr><td>${esc(v.name)}</td><td><input class="n" data-ytbf="${esc(v.id)}" inputmode="decimal" value="${t.bf === undefined ? "" : esc(t.bf)}" aria-label="${last} board feet, ${esc(v.name)}"></td>
+        <td><input class="n" data-ytd="${esc(v.id)}" inputmode="decimal" value="${t.dollars === undefined ? "" : esc(t.dollars)}" aria-label="${last} dollars, ${esc(v.name)}"></td></tr>`; }).join("");
+    const folder = !canPickFolder() ? `<p class="muted">This browser can't save into a folder: use Chrome or Edge on the office PC, or download each PO with PDF.</p>`
+      : S.folder ? `<p>Filing in <b>${esc(S.folder.name)}</b>${S.perm === "granted" ? "" : ` <span class="tag flag">needs permission again</span> <button class="btn ghost" data-resume>Resume filing</button>`}. <button class="link" data-pickfolder>Choose another folder</button></p>`
+      : `<p class="muted">Not chosen on this computer yet.</p><button class="btn" data-pickfolder>Choose the PD - POs folder</button>`;
+    const itemSel = `<select id="blItem"><option value="">Item…</option>${(D.items || []).filter(i => !i.retired && !i.compare_as).map(i => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join("")}</select>`;
+    return `<h2>Setup</h2>
+      <h3>PO details <span class="muted small">(the Arrow POs print the same)</span></h3>
+      <div class="card"><div class="form">
+        <label>Issued by<input id="isBy" value="${esc(is.issued_by || "")}"></label><label>Contact #<input id="isPhone" value="${esc(is.phone || "")}"></label>
+        <label>Contact e-mail<input id="isEmail" value="${esc(is.email || "")}"></label>
+        <label style="grid-column:1/-1">Purposeful Design's name and address, one line each: company, street, city/state/zip (the PO's Ship to)<textarea id="isAddr">${esc(is.address || "")}</textarea></label>
+        <label style="grid-column:1/-1">The tax-exempt sentence (printed under the signature)<input id="isTax" value="${esc(is.tax_line || "")}"></label>
+        <button class="btn" data-saveissuer>Save the PO details</button></div></div>
+      <h3>PO numbers</h3>
+      <div class="card"><div class="form">
+        <label>Next PO<input id="nextPo" class="n" inputmode="numeric" value="${esc(D.next_po)}"></label><button class="btn ghost" data-savenext="po">Save</button>
+        <label>Next lumber PO<input id="nextLumber" class="n" inputmode="numeric" value="${esc(D.next_lumber)}"></label><button class="btn ghost" data-savenext="lumber">Save</button></div>
+        <p class="note">${D.last_po ? `The last PO is PO ${esc(String(D.last_po).padStart(5, "0"))}. ` : ""}${D.last_lumber ? `The last lumber PO is Lumber PO ${esc(D.last_lumber)}. ` : ""}The next has to be higher; a number is never used twice. Arrow POs keep their own on the Arrow tab.</p></div>
+      <h3>The PD - POs folder on this computer</h3>
+      <div class="card">${folder}<p class="note">Production › Production Utilization › PD - POs. Each PO made here is filed there as a PDF (PO 00001.pdf, Lumber PO 24.pdf; a change is … r2.pdf beside it). A file already there is never overwritten.</p></div>
+      <h3>Suppliers</h3>
+      <div class="tw"><table><thead><tr><th>Name</th><th class="l">Company (on the PO)</th><th class="l">Contact</th><th class="l">Address, phone, e-mail</th><th></th></tr></thead>
+        <tbody>${sup}${ed.supplier === "new" ? supplierForm({}) : ""}</tbody></table></div>
+      ${ed.supplier ? "" : `<button class="btn ghost" style="margin-top:8px" data-editsupplier="new">Add a supplier</button>`}
+      <h3>Items, by category</h3>
+      <div class="tw"><table><thead><tr><th>Item</th><th class="l">Unit</th><th class="l">Compared as</th><th>Measured against now</th><th></th></tr></thead><tbody>${items}${ed.cat === "new" ? catForm({}) : ""}</tbody></table></div>
+      ${ed.cat ? "" : `<button class="btn ghost" style="margin-top:8px" data-editcat="new">Add a category</button>`}
+      <p class="note">Other names: what a Purchases file or a supplier's bill calls it, so those lines file themselves. A lumber item compared as another (7/4 Ash as 8/4 Ash) takes that item's price at the same square feet: 8/4's × 8/7.</p>
+      <h3>Baselines</h3>
+      <p class="sub">An item's price for a year, typed. A buy is measured against the year before's; without one, against the year before's average paid, or the first price paid this year.</p>
+      ${bl ? `<div class="tw"><table><thead><tr><th class="l">Item</th><th>Year</th><th>Price</th><th class="l">Note</th><th></th></tr></thead><tbody>${bl}</tbody></table></div>` : ""}
+      <div class="card" style="margin-top:8px"><div class="form"><label>Item${itemSel}</label><label>Year<input id="blYear" class="n" inputmode="numeric" value="${last}"></label>
+        <label>Price per unit<input id="blPrice" class="n" inputmode="decimal"></label><label>Note<input id="blNote" placeholder="2025 average"></label><button class="btn ghost" data-savebase>Save the baseline</button></div></div>
+      <h3>Earlier lumber years: ${last}</h3>
+      ${yt ? `<div class="tw"><table><thead><tr><th>Supplier</th><th>Board feet</th><th>Dollars</th></tr></thead><tbody>${yt}</tbody></table></div>
+        <button class="btn ghost" style="margin-top:8px" data-saveyears>Save ${last}</button>` : `<p class="muted">Add a supplier first.</p>`}`;
+  }
+  function supplierForm(v) {
+    const i = (k, label) => `<label>${label}<input data-v="${k}" value="${esc(v[k] || "")}"></label>`;
+    return `<tr><td colspan="5"><div class="form" style="padding:6px 0">${i("name", "Name")}${i("company", "Company on the PO")}${i("contact", "Contact name")}
+      ${i("street", "Street address")}${i("city", "City/State/Zip")}${i("phone", "Phone")}${i("email", "E-mail")}
+      <label style="grid-column:1/-1">Other names on bills, one per line (Amazon.com, AMZN Mktp US)<textarea data-v="aliases">${esc((v.aliases || []).join("\n"))}</textarea></label>
+      ${v.id ? `<label><span>&nbsp;</span><span style="display:flex;gap:6px;align-items:center;min-height:42px"><input type="checkbox" data-v="retired" ${v.retired ? "checked" : ""}> No longer used</span></label>` : ""}
+      <button class="btn" data-savesupplier="${esc(v.id || "")}">Save</button><button class="link" data-closesetup>Cancel</button></div></td></tr>`;
+  }
+  function catForm(c) {
+    return `<tr><td colspan="5"><div class="form" style="padding:6px 0"><label>Category name<input data-c="name" value="${esc(c.name || "")}"></label>
+      ${c.key && c.key !== "lumber" ? `<label><span>&nbsp;</span><span style="display:flex;gap:6px;align-items:center;min-height:42px"><input type="checkbox" data-c="retired" ${c.retired ? "checked" : ""}> No longer used</span></label>` : ""}
+      <button class="btn" data-savecat="${esc(c.key || "")}">Save</button><button class="link" data-closesetup>Cancel</button></div></td></tr>`;
+  }
+  function itemForm(it) {
+    const lumber = it.category_key === "lumber", others = (S.data.items || []).filter(x => x.id !== it.id && !x.compare_as && x.category_key === "lumber");
+    return `<tr><td colspan="5"><div class="form" style="padding:6px 0">
+      <label>Item<input data-i="name" value="${esc(it.name || "")}" placeholder="${lumber ? "6/4 Maple" : "3/4 Maple Plywood"}"></label>
+      <label>Category<select data-i="category_key">${(S.data.categories || []).filter(c => !c.retired || c.key === it.category_key).map(c => `<option value="${esc(c.key)}" ${c.key === it.category_key ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>
+      ${lumber ? `<label>Thickness in quarters<input data-i="quarters" class="n" inputmode="numeric" value="${esc(it.quarters || "")}" placeholder="6"></label>
+        <label>Compare as<select data-i="compare_as"><option value="">— its own baseline —</option>${others.map(o => `<option value="${esc(o.id)}" ${o.id === it.compare_as ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select></label>
+        <label>Inventory item<select data-i="inv_item_id"><option value="">None</option>${(S.data.inv_items || []).map(o => `<option value="${esc(o.id)}" ${o.id === it.inv_item_id ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select></label>`
+        : `<label>Unit<input data-i="unit" value="${esc(it.unit || "")}" placeholder="sheet, each, gallon, box, ft"></label>`}
+      <label style="grid-column:1/-1">Other names on bills, one per line<textarea data-i="aliases">${esc((it.aliases || []).join("\n"))}</textarea></label>
+      ${it.id ? `<label><span>&nbsp;</span><span style="display:flex;gap:6px;align-items:center;min-height:42px"><input type="checkbox" data-i="retired" ${it.retired ? "checked" : ""}> No longer used</span></label>` : ""}
+      <button class="btn" data-saveitem="${esc(it.id || "")}">Save</button><button class="link" data-closesetup>Cancel</button></div></td></tr>`;
+  }
+
+  // ---------- wiring ----------
+  const val = (sel) => { const el = app.querySelector(sel); return el ? el.value : ""; };
+  const lines = (t) => String(t || "").split(/\n/).map(x => x.trim()).filter(Boolean);
+  function wire() {
+    tabsEl.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { if (S.edit && !confirm("Leave the PO without saving it?")) return; S.edit = null; go(b.dataset.tab); });
+    const on = (sel, fn) => app.querySelectorAll(sel).forEach(el => el.onclick = (e) => fn(el, e));
+    on("[data-tabgo]", (b) => go(b.dataset.tabgo));
+    app.querySelectorAll("[data-year]").forEach(s => s.onchange = () => { S.year = Number(s.value); S.open = null; S.openItem = null; render(); });
+    // To buy
+    app.querySelectorAll("[data-tick]").forEach(c => c.onchange = () => { if (c.checked) S.ticked.add(c.dataset.tick); else S.ticked.delete(c.dataset.tick); render(); });
+    on("[data-reqorder]", () => call("order_supplies", { p_requests: [...S.ticked] }, (d) => { S.ticked = new Set(); return d.summary || "Marked ordered."; }));
+    on("[data-reqpo]", () => startEdit(null, "po", S.reqs.filter(r => S.ticked.has(r.id))));
+    on("[data-noorder]", (b) => { S.notOrdering = b.dataset.noorder; render(); const i = app.querySelector("[data-noreason]"); if (i) i.focus(); });
+    on("[data-nocancel]", () => { S.notOrdering = null; render(); });
+    on("[data-nosave]", (b) => { const reason = val("[data-noreason]"); call("not_ordering_supply", { p_request: b.dataset.nosave, p_reason: reason }, (d) => { S.notOrdering = null; S.ticked.delete(b.dataset.nosave); return d.summary; }); });
+    on("[data-addreq]", () => { S.adding = true; render(); });
+    on("[data-addcancel]", () => { S.adding = false; render(); });
+    on("[data-addsave]", async () => { const d = await call("request_supply", { p_department: val("#adDept"), p_item: val("#adItem"), p_qty: Number(val("#adQty")), p_note: val("#adNote") || null, p_client_id: newId() },
+      (x) => x.summary || "Added."); if (d) { S.adding = false; render(); } });
+    // POs
+    on("[data-openpo]", (r, e) => { if (e.target.closest("button,input,select,a")) return; S.open = S.open === r.dataset.openpo ? null : r.dataset.openpo; render(); });
+    on("[data-newpo]", (b) => startEdit(null, b.dataset.newpo));
+    on("[data-changepo]", (b) => startEdit(S.data.pos.find(p => p.id === b.dataset.changepo)));
+    on("[data-pdf]", async (b) => { const po = S.data.pos.find(p => p.id === b.dataset.pdf);
+      try { saveBlob(await pdfFor(po), po.file_name); } catch (e) { S.msg = { ok: false, text: friendlyError(e) }; render(); } });
+    on("[data-cancelpo]", async (b) => { const po = S.data.pos.find(p => p.id === b.dataset.cancelpo);
+      const why = window.prompt(`Cancel ${po.name}? It stays on record and stops counting; any supply request on it goes back to be ordered. Why (optional)?`, "");
+      if (why === null) return;
+      await call("purchase_po_cancel", { p_id: po.id, p_cancel: true, p_reason: why }, `${po.name} cancelled. It stays on record.`); });
+    on("[data-uncancel]", async (b) => { const po = S.data.pos.find(p => p.id === b.dataset.uncancel);
+      await call("purchase_po_cancel", { p_id: po.id, p_cancel: false, p_reason: null }, `${po.name} is back.`); });
+    app.querySelectorAll("[data-measured]").forEach(inp => inp.onchange = async () => { const v = inp.value.replace(/,/g, "").trim();
+      await call("purchase_measured_save", { p_line: inp.dataset.measured, p_bf: v === "" ? null : Number(v) }, v === "" ? "Measurement cleared." : `Saved: ${n0(v)} bd ft measured after SLR.`); });
+    on("[data-pickfolder]", () => pickFolder());
+    on("[data-resume]", () => resumeFolder());
+    on("[data-filenow]", () => fileWaiting().then(render));
+    if (S.edit) {
+      app.querySelectorAll("[data-e],[data-l]").forEach(el => el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => { readEdit(); editAmounts(); }));
+      on("[data-addline]", () => { readEdit(); S.edit.lines.push(blankLine()); render(); });
+      on("[data-rmline]", (b) => { readEdit(); S.edit.lines.splice(Number(b.dataset.rmline), 1); if (!S.edit.lines.length) S.edit.lines.push(blankLine()); render(); });
+      on("[data-canceledit]", () => { S.edit = null; S.msg = null; render(); });
+      on("[data-savepo]", () => savePo());
+      on("[data-preview]", async () => { readEdit(); const chk = checkLines(S.edit.lines, S.data.items);
+        if (chk.problem) { S.msg = { ok: false, text: chk.problem }; return render(); }
+        try { const po = draftPo(chk.lines); saveBlob(await pdfFor(po), `${po.name} (preview).pdf`); } catch (e) { S.msg = { ok: false, text: friendlyError(e) }; render(); } });
+    }
+    // Prices
+    on("[data-openitem]", (r) => { S.openItem = S.openItem === r.dataset.openitem ? null : r.dataset.openitem; render(); });
+    on("[data-export]", () => { const rows = exportRows(S.data, S.year);
+      saveBlob(new TextEncoder().encode(exportCsv(rows)), `Purchasing ${S.year} - every line (${S.data.today}).csv`, "text/csv;charset=utf-8");
+      S.msg = { ok: true, text: `Downloaded ${rows.length} line${rows.length === 1 ? "" : "s"} for ${S.year}.` }; render(); });
+    // Lumber slips
+    on("[data-loadslips]", async () => { await loadSlips(); render(); });
+    app.querySelectorAll("[data-slip]").forEach(s => s.onchange = async () => {
+      const r = await Promise.resolve(db.rpc("purchase_slip_link", { p_receipt: s.dataset.slip, p_line: s.value || null })).catch(e => ({ error: e }));
+      S.msg = r.error ? { ok: false, text: friendlyError(r.error) } : { ok: true, text: r.data.summary };
+      await load(); await loadSlips(); render(); });
+    // the Purchases file
+    const fileIn = app.querySelector("#fileIn"), zone = app.querySelector("#dropzone");
+    if (fileIn) fileIn.onchange = () => { if (fileIn.files[0]) readFile(fileIn.files[0]); };
+    if (zone) {
+      zone.ondragover = (e) => { e.preventDefault(); zone.classList.add("over"); };
+      zone.ondragleave = () => zone.classList.remove("over");
+      zone.ondrop = (e) => { e.preventDefault(); zone.classList.remove("over"); const f = e.dataTransfer.files[0]; if (f) readFile(f); };
+    }
+    on("[data-fileclear]", () => { S.file = null; render(); });
+    on("[data-filesend]", () => sendFile());
+    const groups = () => matchGroups(S.data);
+    on("[data-match]", (b) => { const g = groups()[Number(b.dataset.match)], item = val(`[data-matchsel="${b.dataset.match}"]`);
+      if (!item) { S.msg = { ok: false, text: "Choose the item first, or make a new one." }; return render(); }
+      call("purchase_buys_match", { p_ids: g.ids, p_item: item, p_remember: true }, (d) => d.summary); });
+    on("[data-newitemopen]", (b) => { S.matchNew = b.dataset.newitemopen; render(); });
+    on("[data-newitemcancel]", () => { S.matchNew = null; render(); });
+    on("[data-newitem]", async (b) => { const g = groups()[Number(b.dataset.newitem)], p = {};
+      app.querySelectorAll("[data-nm]").forEach(el => p[el.dataset.nm] = el.value);
+      const made = await call("purchase_item_save", { p }, null); if (!made) return;
+      S.matchNew = null; await call("purchase_buys_match", { p_ids: g.ids, p_item: made.id, p_remember: true }, (d) => `${p.name} made. ${d.summary}`); });
+    on("[data-forpo]", (b) => { const g = groups()[Number(b.dataset.forpo)];
+      const po = window.prompt("Which PO is it for? Type it as it's named, like Lumber PO 17 or PO 00001.", ""); if (!po) return;
+      (async () => { for (const id of g.ids) { const r = await Promise.resolve(db.rpc("purchase_buy_po", { p_id: id, p_po: poName(po) })).catch(e => ({ error: e }));
+          if (r.error) { S.msg = { ok: false, text: friendlyError(r.error) }; return render(); } }
+        S.msg = { ok: true, text: `Kept against ${poName(po)}: not counted again.` }; await load(); render(); })(); });
+    on("[data-leaveout]", (b) => { const g = groups()[Number(b.dataset.leaveout)];
+      const why = window.prompt("Why is it left out? (For example: not a production buy.)", ""); if (!why) return;
+      (async () => { for (const id of g.ids) { const r = await Promise.resolve(db.rpc("purchase_buy_ignore", { p_id: id, p_ignore: true, p_reason: why })).catch(e => ({ error: e }));
+          if (r.error) { S.msg = { ok: false, text: friendlyError(r.error) }; return render(); } }
+        S.msg = { ok: true, text: `Left out (${g.ids.length} line${g.ids.length === 1 ? "" : "s"}). It stays on record under Left out.` }; await load(); render(); })(); });
+    on("[data-putback]", (b) => call("purchase_buy_ignore", { p_id: b.dataset.putback, p_ignore: false, p_reason: null }, "Put back: it's waiting in Match these again."));
+    on("[data-fnapply]", async () => {
+      const names = fileItemNames(S.data), done = [], left = [];
+      S.busy = true; render();
+      for (const [i, n] of names.entries()) {
+        const what = app.querySelector(`[data-fndo="${i}"]`) ? app.querySelector(`[data-fndo="${i}"]`).value : "";
+        if (!what) { left.push(n.name); continue; }
+        let item = what;
+        if (what === "new") {
+          const cat = n.category || val(`[data-fncat="${i}"]`), p = { name: n.name, category_key: cat };
+          if (cat === "lumber") p.quarters = n.quarters || Number(val(`[data-fnq="${i}"]`)); else p.unit = val(`[data-fnunit="${i}"]`) || n.unit;
+          const r = await Promise.resolve(db.rpc("purchase_item_save", { p })).catch(e => ({ error: e }));
+          if (r.error) { S.busy = false; S.msg = { ok: false, text: `${n.name}: ${friendlyError(r.error)}` }; await load(); return render(); }
+          item = r.data.id;
+        }
+        const r = await Promise.resolve(db.rpc("purchase_buys_match", { p_ids: n.ids, p_item: item, p_remember: true })).catch(e => ({ error: e }));
+        if (r.error) { S.busy = false; S.msg = { ok: false, text: `${n.name}: ${friendlyError(r.error)}` }; await load(); return render(); }
+        done.push(n.name);
+      }
+      S.busy = false;
+      S.msg = { ok: true, text: `${done.length} item name${done.length === 1 ? "" : "s"} done; their lines are filed.${left.length ? ` Left for now: ${left.join(", ")}.` : ""}` };
+      await load(); render();
+    });
+    on("[data-itemscsv]", () => saveBlob(new TextEncoder().encode(itemsCsv(S.data)), `Purchasing items (${S.data.today}).csv`, "text/csv;charset=utf-8"));
+    // Setup
+    on("[data-saveissuer]", () => call("set_arrow_po_settings", { p: { issued_by: val("#isBy"), phone: val("#isPhone"), email: val("#isEmail"),
+      address: val("#isAddr"), tax_line: val("#isTax") } }, "PO details saved. The POs and Arrow POs print them from now on."));
+    on("[data-savenext]", (b) => { const series = b.dataset.savenext, n = Number(val(series === "po" ? "#nextPo" : "#nextLumber"));
+      call("purchase_next_number_save", { p_series: series, p_next: n }, () => `The next ${series === "po" ? "PO is PO " + String(n).padStart(5, "0") : "lumber PO is Lumber PO " + n}.`); });
+    on("[data-editsupplier]", (b) => { S.setupEdit = { supplier: b.dataset.editsupplier }; render(); });
+    on("[data-edititem]", (b) => { S.setupEdit = { item: b.dataset.edititem }; render(); });
+    on("[data-editcat]", (b) => { S.setupEdit = { cat: b.dataset.editcat }; render(); });
+    on("[data-closesetup]", () => { S.setupEdit = null; render(); });
+    on("[data-savesupplier]", async (b) => { const p = {};
+      app.querySelectorAll("[data-v]").forEach(el => p[el.dataset.v] = el.type === "checkbox" ? el.checked : el.dataset.v === "aliases" ? lines(el.value) : el.value);
+      if (b.dataset.savesupplier) p.id = b.dataset.savesupplier;
+      if (await call("purchase_supplier_save", { p }, `Supplier saved: ${p.name}.`)) { S.setupEdit = null; render(); } });
+    on("[data-savecat]", async (b) => { const p = {}; app.querySelectorAll("[data-c]").forEach(el => p[el.dataset.c] = el.type === "checkbox" ? el.checked : el.value);
+      if (b.dataset.savecat) p.key = b.dataset.savecat;
+      if (await call("purchase_category_save", { p }, `Category saved: ${p.name}.`)) { S.setupEdit = null; render(); } });
+    on("[data-saveitem]", async (b) => { const p = {};
+      app.querySelectorAll("[data-i]").forEach(el => p[el.dataset.i] = el.type === "checkbox" ? el.checked : el.dataset.i === "aliases" ? lines(el.value) : el.value);
+      if (b.dataset.saveitem) p.id = b.dataset.saveitem;
+      if (await call("purchase_item_save", { p }, (d) => `Item saved: ${p.name}${d.benchmark ? `, measured against ${price(d.benchmark)}` : ""}.`)) { S.setupEdit = null; render(); } });
+    app.querySelectorAll('[data-i="category_key"]').forEach(s => s.onchange = () => {   // lumber and other items ask different things
+      const it = (S.setupEdit.item || "").startsWith("new:") ? {} : { ...(itemById(S.setupEdit.item) || {}) };
+      app.querySelectorAll("[data-i]").forEach(el => { if (el.type !== "checkbox") it[el.dataset.i] = el.dataset.i === "aliases" ? lines(el.value) : el.value; });
+      it.category_key = s.value; const row = s.closest("tr"); row.outerHTML = itemForm(it); wire(); });
+    on("[data-savebase]", () => { const item = val("#blItem"); if (!item) { S.msg = { ok: false, text: "Choose the item." }; return render(); }
+      call("purchase_baseline_save", { p_item: item, p_year: Number(val("#blYear")), p_price: Number(String(val("#blPrice")).replace(/[$,]/g, "")), p_note: val("#blNote") || null }, "Baseline saved."); });
+    on("[data-rmbase]", (b) => { const [item, year] = b.dataset.rmbase.split("|");
+      if (confirm("Take this baseline away? Buys are then measured against the year before's average paid.")) call("purchase_baseline_save", { p_item: item, p_year: Number(year), p_price: null, p_note: null }, "Baseline taken away."); });
+    on("[data-saveyears]", async () => {
+      const last = yearOf(S.data.today) - 1;
+      for (const v of S.data.suppliers) {
+        const bf = val(`[data-ytbf="${v.id}"]`), d = val(`[data-ytd="${v.id}"]`);
+        if (String(bf).trim() === "" && String(d).trim() === "") continue;
+        const r = await Promise.resolve(db.rpc("lumber_year_total_save", { p_year: last, p_vendor: v.id, p_bf: Number(String(bf).replace(/,/g, "")) || 0,
+          p_dollars: Number(String(d).replace(/[$,]/g, "")) || 0 })).catch(e => ({ error: e }));
+        if (r.error) { S.msg = { ok: false, text: friendlyError(r.error) }; return render(); }
+      }
+      S.msg = { ok: true, text: `${last} saved.` }; await load(); render();
+    });
+  }
+
+  // ---------- start ----------
+  async function start(user) {
+    const { data } = await db.from("profiles").select("*").eq("id", user.id).maybeSingle();
+    S.me = { id: user.id, email: user.email, name: (data && data.full_name) || user.email, role: data && data.role };
+    render();
+    if (S.me.role === "manager" || S.me.role === "admin") { await loadFolder().catch(() => {}); await load(); render(); fileWaiting(); }
+  }
+  (async () => {
+    const { data } = await db.auth.getSession();
+    if (data && data.session) return start(data.session.user);
+    app.innerHTML = `<main><div class="card" style="max-width:460px;margin:30px auto"><h2>Sign in</h2><p class="sub">Use a manager's login.</p>
+      <form id="f"><div class="form" style="grid-template-columns:1fr"><label>Email<input id="e" type="email" autocomplete="username" required></label>
+        <label>Password<input id="p" type="password" autocomplete="current-password" required></label><button class="btn or" type="submit">Sign in</button></div></form>
+      <div id="err" class="banner" style="margin-top:14px" hidden></div></div></main>`;
+    document.getElementById("f").onsubmit = async (e) => {
+      e.preventDefault();
+      const r = await db.auth.signInWithPassword({ email: document.getElementById("e").value.trim(), password: document.getElementById("p").value });
+      if (r.error) { const el = document.getElementById("err"); el.hidden = false; el.textContent = friendlyError(r.error); return; }
+      start(r.data.user);
+    };
+  })();
+})();
+</script>
+</body>
+</html>
