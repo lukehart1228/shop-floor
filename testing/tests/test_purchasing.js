@@ -1,4 +1,4 @@
-// 7 Nov: Purchasing (purchasing.sql, purchasing.html), the standalone first release. In real Chromium through the real
+// 7 Nov: Purchasing (purchasing.sql, lumber_scrap_skips.sql, purchasing.html), the standalone first release. In real Chromium through the real
 // database as Luke: Setup (PO details, a supplier with another name, a hardware item, 8/4 and 7/4 Ash with a 2025 baseline);
 // To buy shows a tablet's supply request, two ticked go onto a PO and are marked ordered (Operations sees the same); PO 00001
 // and Lumber PO 24 numbered apart; the PD - POs folder chosen and both filed as PDFs (PO 00001's number printed as 00001);
@@ -228,9 +228,31 @@ wb.save(sys.argv[1])`;
   ok("Savings to chase draws its three lists", /two suppliers/.test(t) && /creeping/.test(t) && /one supplier only/.test(t), t.slice(0, 200));
   await tab(p, "lumber"); t = await txt(p);
   ok("Lumber: 2,000 bd ft bought on lumber POs this year", /Board feet bought 2,000/.test(t), t.slice(0, 300));
+  // ---- a month whose counts weren't done, left out of the scrap results (lumber_scrap_skips.sql) ----
+  await q(`insert into lumber_scrap_history (month_end, zero_bf, used_bf) values ('${year}-04-30', 3106, 4434), ('${year}-09-30', 7446, 31185)`);
+  await tab(p, "lumber"); t = await txt(p);
+  ok("Lumber: a bad month swamps the scrap results (September 4.19, saved on scrap below zero)", /September/.test(t) && /4\.19/.test(t) && /Saved on scrap −?-?\$|Saved on scrap \$/.test(t), t.slice(0, 600));
+  p.once("dialog", d => d.accept("The counts weren't done"));
+  await p.click(`[data-skipmonth="${year}-09-30"]`); await sleep(1500);
+  t = await txt(p);
+  const skip = (await q("select left_out, reason, changed_by_name from lumber_scrap_skips where month_end = $1", [`${year}-09-30`]))[0];
+  ok("Leave out: September is off the scrap table, listed as left out with its reason; the month is kept in the database",
+     !/4\.19/.test(t) && /Left out: September \d{4} \(The counts weren't done/.test(t) && skip && skip.left_out
+     && (await q("select count(*)::int n from lumber_scrap_history where month_end = $1", [`${year}-09-30`]))[0].n === 1, t.slice(0, 900));
+  ok("…and the scrap results are April's alone now (846 bd ft saved)", /846 bd ft under the 1\.7 allowance/.test(t), t.slice(0, 600));
+  await p.click(`[data-putbackmonth="${year}-09-30"]`); await sleep(1500);
+  t = await txt(p);
+  ok("Put back: September counts again; its row is kept, marked", /4\.19/.test(t) && !/Left out:/.test(t)
+     && (await q("select left_out from lumber_scrap_skips where month_end = $1", [`${year}-09-30`]))[0].left_out === false, t.slice(0, 600));
   await p.click("[data-loadslips]"); await sleep(800);
   ok("Lumber: Inventory's slips can be shown to pick their PO lines", /No lumber slips on the Inventory page yet|Fills/.test(await txt(p)));
   ok("No page errors for Luke", !s.errs.length, s.errs.join(" | "));
+  // the page on a database with purchasing.sql but not lumber_scrap_skips.sql yet: no Leave out, no errors
+  await q("drop function lumber_scrap_skips_list()");
+  const s2 = await session(browser, users.luke);            // a fresh session: headless Chromium falls over reloading with the stand-in folder kept
+  await s2.p.goto(base + "purchasing.html#lumber"); await s2.p.waitForSelector("[data-tab]"); await sleep(1200);
+  ok("Without lumber_scrap_skips.sql: the scrap table shows, with no Leave out link, and no page errors",
+     /September/.test(await txt(s2.p)) && !(await s2.p.$("[data-skipmonth]")) && !s2.errs.length, s2.errs.join(" | "));
 
   // ---- Mike ----
   const m = await session(browser, users.mike);

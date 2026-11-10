@@ -117,7 +117,7 @@
    (PO 00001 on, and Lumber PO 24 on), Prices against each item's baseline with an export for the yearly check against
    the bills, Savings to chase, Lumber (the tracker), the Purchases file with Match these, and Setup. Managers only.
    purchasing.sql. What's entered is the truth: PO lines, and buys with no PO from the Purchases file. */
-var PAGE_VERSION = "2026-11-07.1";          // this page's version: bump it with every change (it shows in select * from devices();)
+var PAGE_VERSION = "2026-11-07.2";          // this page's version: bump it with every change (it shows in select * from devices();)
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
 const SCRAP_ALLOWANCE = 1.7;                 // the workbook's allowance: 1.7 bd ft bought for each bd ft in a top
 function isMissing(err) { return /could not find the function|schema cache|does not exist/i.test(String((err && err.message) || err || "")); }
@@ -689,7 +689,7 @@ if (typeof document !== "undefined") (function () {
   const S = {
     me: null, tab: TABS.some(t => t[0] === firstTab) ? firstTab : store.get("tab", "buy"), year: null, data: null, loaded: false, missing: false, msg: null, busy: false,
     open: null, edit: null, setupEdit: null, folder: null, perm: null, filing: false,
-    reqs: [], depts: [], ticked: new Set(), notOrdering: null, adding: false,
+    reqs: [], depts: [], ticked: new Set(), notOrdering: null, adding: false, skips: [], skipsReady: false,
     openItem: null, file: null, matchNew: null, slips: [], slipLines: null,
   };
   /** a tab: drawn at once, then again with what's new (supply requests come in from the tablets all day) */
@@ -775,12 +775,15 @@ if (typeof document !== "undefined") (function () {
   // ---------- data ----------
   async function load() {
     try {
-      const [r, q, d] = await Promise.all([db.rpc("purchasing_data"),
+      const [r, q, d, k] = await Promise.all([db.rpc("purchasing_data"),
         Promise.resolve(db.from("v_supply_requests").select("*").eq("is_open", true).order("requested_at")).catch(e => ({ error: e })),
-        Promise.resolve(db.from("departments").select("key,name,sort_order").order("sort_order")).catch(e => ({ error: e }))]);
+        Promise.resolve(db.from("departments").select("key,name,sort_order").order("sort_order")).catch(e => ({ error: e })),
+        Promise.resolve(db.rpc("lumber_scrap_skips_list")).catch(e => ({ error: e }))]);
       if (r.error) throw r.error;
       S.data = r.data; S.missing = false;
       S.reqs = q && !q.error ? q.data || [] : []; S.depts = d && !d.error ? d.data || [] : [];
+      // months left out of the scrap results (lumber_scrap_skips.sql; without it nothing is left out and there's no Leave out link)
+      S.skipsReady = !!(k && !k.error); S.skips = S.skipsReady ? k.data || [] : [];
       for (const id of [...S.ticked]) if (!S.reqs.some(x => x.id === id && x.state === "requested")) S.ticked.delete(id);
       const years = yearsAvailable();
       if (!S.year || !years.includes(S.year)) S.year = years[0];
@@ -1115,13 +1118,19 @@ if (typeof document !== "undefined") (function () {
     S.slipLines = l.data || { lines: [], links: [] }; S.slips = r.data || [];
   }
   function viewLumber() {
-    const R = lumberResults(S.data, S.year), mix = supplierMix(S.data, S.year), last = S.year - 1;
+    const out = new Set(S.skips.map(x => String(x.month_end).slice(0, 10)));
+    const D = { ...S.data, scrap_history: (S.data.scrap_history || []).filter(m => !out.has(String(m.month_end).slice(0, 10))),
+                scrap_inventory: (S.data.scrap_inventory || []).filter(m => !out.has(String(m.month_end).slice(0, 10))) };
+    const R = lumberResults(D, S.year), mix = supplierMix(S.data, S.year), last = S.year - 1;
+    const leftOut = S.skips.filter(x => yearOf(x.month_end) === S.year);
+    const monthName = (d) => new Date(String(d).slice(0, 10) + "T12:00").toLocaleString("en-US", { month: "long", year: "numeric" });
     const notes = [];
     if (R.onOrder) notes.push(`${n0(R.onOrder)} bd ft of it is still on order: counted as ordered until its delivery slips are picked below.`);
     if (R.noPrice) notes.push(`${R.noPrice} line${R.noPrice === 1 ? " has" : "s have"} no price yet, so ${R.noPrice === 1 ? "it isn't" : "they aren't"} in the dollars.`);
     if (R.noBench) notes.push(`${R.noBench} line${R.noBench === 1 ? "'s item has" : "s' items have"} no ${last} baseline, so no saving is worked out for ${R.noBench === 1 ? "it" : "them"} (Setup › Baselines).`);
     const months = R.months.map(m => `<tr><td>${esc(new Date(m.month_end + "T12:00").toLocaleString("en-US", { month: "long" }))}</td><td class="num">${n0(m.zero)}</td><td class="num">${n0(m.used)}</td>
-        <td class="num">${m.ratio.toFixed(2)}</td><td class="num">${n0(m.allow)}</td><td class="num">${n0(m.saved)}</td><td class="l muted small">${esc(m.from)}</td></tr>`).join("");
+        <td class="num">${m.ratio.toFixed(2)}</td><td class="num">${n0(m.allow)}</td><td class="num">${n0(m.saved)}</td><td class="l muted small">${esc(m.from)}</td>
+        <td>${S.skipsReady ? `<button class="link" data-skipmonth="${esc(m.month_end)}">Leave out</button>` : ""}</td></tr>`).join("");
     const mixRows = mix.rows.map(r => `<tr><td>${esc(r.name)}</td>${mix.hasBefore ? `<td class="num">${pct(r.bfShareBefore)}</td>` : ""}<td class="num">${pct(r.bfShareNow)}</td>
         ${mix.hasBefore ? `<td class="num">${pct(r.dShareBefore)}</td>` : ""}<td class="num">${pct(r.dShareNow)}</td>
         ${mix.hasBefore ? `<td class="num">${n0(r.before.bf)}</td>` : ""}<td class="num">${n0(r.now.bf)}</td>${mix.hasBefore ? `<td class="num">${usd(r.before.dollars)}</td>` : ""}<td class="num">${usd(r.now.dollars)}</td></tr>`).join("");
@@ -1136,11 +1145,12 @@ if (typeof document !== "undefined") (function () {
       </div>
       ${notes.map(t => `<p class="note" style="margin:8px 2px 0">${esc(t)}</p>`).join("")}
       <h3>Scrap against the 1.7 allowance</h3>
-      ${R.months.length ? `<div class="tw"><table><thead><tr><th>Month</th><th>0-scrap bd ft</th><th>Used</th><th>Used ÷ 0-scrap</th><th>1.7 allowance</th><th>Saved</th><th class="l">From</th></tr></thead>
+      ${R.months.length ? `<div class="tw"><table><thead><tr><th>Month</th><th>0-scrap bd ft</th><th>Used</th><th>Used ÷ 0-scrap</th><th>1.7 allowance</th><th>Saved</th><th class="l">From</th><th></th></tr></thead>
         <tbody>${months}<tr class="subtot"><td>${S.year}</td><td class="num">${n0(R.months.reduce((a, m) => a + m.zero, 0))}</td><td class="num">${n0(R.months.reduce((a, m) => a + m.used, 0))}</td>
-          <td class="num">${R.ratio === null ? "—" : R.ratio.toFixed(2)}</td><td class="num">${n0(R.months.reduce((a, m) => a + m.allow, 0))}</td><td class="num">${n0(R.savedBf)}</td><td></td></tr></tbody></table></div>
-        <p class="note" style="margin:8px 2px 0">Inventory's months appear here once they're closed on the Inventory page. Saved board feet × this year's average price = saved on scrap.</p>`
+          <td class="num">${R.ratio === null ? "—" : R.ratio.toFixed(2)}</td><td class="num">${n0(R.months.reduce((a, m) => a + m.allow, 0))}</td><td class="num">${n0(R.savedBf)}</td><td></td><td></td></tr></tbody></table></div>
+        <p class="note" style="margin:8px 2px 0">Inventory's months appear here once they're closed on the Inventory page. Saved board feet × this year's average price = saved on scrap.${S.skipsReady ? " A month whose counts weren't done can be left out; it stays as it is on the Inventory page." : ""}</p>`
       : `<p class="muted">No months yet: the workbook's April–June figures load with purchasing_history.sql, and Inventory's months appear once closed.</p>`}
+      ${leftOut.length ? `<p class="note" style="margin:8px 2px 0">Left out: ${leftOut.map(x => `<b>${esc(monthName(x.month_end))}</b> (${esc(x.reason)}${x.by ? `, ${esc(x.by)}` : ""}) <button class="link" data-putbackmonth="${esc(x.month_end)}">Put back</button>`).join("; ")}</p>` : ""}
       <h3>Suppliers</h3>
       ${mix.rows.length ? `<div class="tw"><table><thead>
           <tr><th></th><th colspan="${mix.hasBefore ? 2 : 1}">Share of board feet</th><th colspan="${mix.hasBefore ? 2 : 1}">Share of dollars</th><th colspan="${mix.hasBefore ? 2 : 1}">Board feet</th><th colspan="${mix.hasBefore ? 2 : 1}">Dollars</th></tr>
@@ -1378,6 +1388,14 @@ if (typeof document !== "undefined") (function () {
     on("[data-export]", () => { const rows = exportRows(S.data, S.year);
       saveBlob(new TextEncoder().encode(exportCsv(rows)), `Purchasing ${S.year} - every line (${S.data.today}).csv`, "text/csv;charset=utf-8");
       S.msg = { ok: true, text: `Downloaded ${rows.length} line${rows.length === 1 ? "" : "s"} for ${S.year}.` }; render(); });
+    // months left out of the scrap results
+    on("[data-skipmonth]", (b) => {
+      const m = b.dataset.skipmonth, name = new Date(m.slice(0, 10) + "T12:00").toLocaleString("en-US", { month: "long", year: "numeric" });
+      const why = window.prompt(`Leave ${name} out of the scrap results? It stays as it is on the Inventory page. Why (for example: the counts weren't done)?`, "");
+      if (!why) return;
+      call("lumber_scrap_skip_save", { p_month: m.slice(0, 10), p_out: true, p_reason: why }, (d) => d.summary);
+    });
+    on("[data-putbackmonth]", (b) => call("lumber_scrap_skip_save", { p_month: b.dataset.putbackmonth.slice(0, 10), p_out: false, p_reason: null }, (d) => d.summary));
     // Lumber slips
     on("[data-loadslips]", async () => { await loadSlips(); render(); });
     app.querySelectorAll("[data-slip]").forEach(s => s.onchange = async () => {
