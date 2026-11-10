@@ -73,13 +73,31 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   await admin.query("update profiles set schedules_deliveries = true where id = (select id from auth.users where email = 'julia@example.com')");
   const julia = { id: (await admin.query("select id from auth.users where email = 'julia@example.com'")).rows[0].id, email: "julia@example.com" };
 
+  // 10 Nov: a tablet's supply request, waiting: Operations points at Purchasing for it
+  await admin.query("insert into supply_requests (department, item, qty, requested_by_name) values ('cnc', 'Rubber pod pads', 6, 'Sam D')");
+
   // ---- Luke ----
   let s = await session(browser, users.luke), p = s.p;
   await p.goto(base); await p.waitForSelector("header.top [data-tab]", { timeout: 15000 }).catch(async (e) => { console.log("APP:", (await p.evaluate(() => document.body.innerText)).slice(0, 400)); console.log("ERRS:", s.errs.join(" | ")); throw e; });
+  // 10 Nov (Luke): buying left Operations. One line stays while requests wait, and opens Purchasing; no list to tick here
+  await p.waitForFunction(() => /supply request/.test(document.getElementById("app").innerText), null, { timeout: 15000 }).catch(() => {});
+  const ops = await p.$eval("#app", e => e.innerText.replace(/\s+/g, " "));
+  ok("Operations: 1 supply request is waiting, from CNC, with Open Purchasing; no list to tick, no Ordered or Closed supply lists",
+     /1 supply request is waiting from CNC/.test(ops) && /Open Purchasing/.test(ops) && !(await p.$("[data-otick]")) && !(await p.$("[data-order]")) && !/Rubber pod pads/.test(ops)
+     && !/Ordered, not received/.test(ops) && !/Supply requests closed/.test(ops), ops.slice(0, 500));
+  await p.click('#app [data-section="purchasing"]');
+  await p.waitForFunction(() => [...document.querySelectorAll("#secs iframe")].some(f => !f.hidden && /purchasing/.test(f.src) && f.contentDocument && f.contentDocument.getElementById("app") && /Needs buying/.test(f.contentDocument.getElementById("app").textContent)), null, { timeout: 15000 });
+  let pf = frameOf(p, "purchasing.html");
+  ok("Open Purchasing: it opens inside the office, on Buy, with the request there to act on",
+     /Purchasing/.test(await p.$eval("header.top .place", e => e.textContent)) && p.url().endsWith("#purchasing")
+     && /6 × Rubber pod pads/.test(await pf.evaluate(() => document.getElementById("app").innerText)) && !!(await pf.$("[data-tick]")));
+  ok("Purchasing inside the office: its title row hides, its tabs stay (Buy, Savings, Prices, Setup)", await pf.evaluate(() => getComputedStyle(document.querySelector("header .hrow")).display === "none"
+     && [...document.querySelectorAll("#tabs [data-tab]")].map(b => b.textContent.trim()).join("|") === "Buy|Savings|Prices|Setup"));
+  await p.click("[data-menu]"); await p.waitForSelector(".menu"); await p.click('.menu [data-section=""]'); await p.waitForTimeout(400);
   const items = await menu(p);
-  // 4 Nov: Upload and the Prototype lab left the menu; Pace is called Data, Drop a job's zip Project Handoff; Job status is a tab
-  ok("Luke's ☰ menu: Operations, Project Handoff (he's let in), Deliveries, Inventory, Data; Tablet app, Setup, Feedback",
-     JSON.stringify(items) === JSON.stringify(["Operations", "Project Handoff", "Deliveries", "Inventory", "Data", "Tablet app", "Setup", "Feedback", "Sign out"]), JSON.stringify(items));
+  // 4 Nov: Upload and the Prototype lab left the menu; Pace is called Data, Drop a job's zip Project Handoff; Job status is a tab. 10 Nov: Purchasing
+  ok("Luke's ☰ menu: Operations, Project Handoff (he's let in), Deliveries, Purchasing, Inventory, Data; Tablet app, Setup, Feedback",
+     JSON.stringify(items) === JSON.stringify(["Operations", "Project Handoff", "Deliveries", "Purchasing", "Inventory", "Data", "Tablet app", "Setup", "Feedback", "Sign out"]), JSON.stringify(items));
   ok("…each item just its name, with no description under it (Luke, 4 Nov)", (await p.$$(".menu small")).length === 0);
   await p.click('.menu [data-section="deliveries"]');
   await p.waitForFunction(() => { const f = document.querySelector("#secs iframe"); return f && f.contentDocument && f.contentDocument.querySelector("#app") && f.contentDocument.querySelector("#app").textContent.length > 20; }, null, { timeout: 15000 });
@@ -168,7 +186,7 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   await s.ctx.close();
 
   // ---- each section opened on its own still works (as before) ----
-  for (const [file, word] of [["delivery.html", "Deliveries"], ["inventory.html", "Inventory"], ["pace.html", "Data"], ["upload.html", "upload"]]) {
+  for (const [file, word] of [["delivery.html", "Deliveries"], ["inventory.html", "Inventory"], ["pace.html", "Data"], ["upload.html", "upload"], ["purchasing.html", "Purchasing"]]) {
     s = await session(browser, users.luke); p = s.p;
     await p.goto(base.replace("office.html", file)); await p.waitForTimeout(2500);
     ok(`${file} opened on its own: its header shows, with its Feedback button`, await visible(p, "header") && !!(await p.$("header [data-sffb]")) && new RegExp(word, "i").test(await p.$eval("header", e => e.innerText)) && s.errs.length === 0, s.errs.join(" | "));

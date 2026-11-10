@@ -40,6 +40,11 @@ const aside = (h) => {
      .replace(/the (Photos|OneDrive) tab|Open (Photos|OneDrive)|open it on (Photos|the OneDrive tab)/g, "TAB")
      .replace(/<h1>(Pace|Data)<\/h1>/g, "<h1>PAGE</h1>")
      .replace(/SHOP FLOOR|PRODUCTION/g, "BRAND").replace(/the shop floor's files|the Production app's files/g, "FILES");   // 4 Nov: the app is called Production
+  // BUYING=ignore (10 Nov, office.html 2026-11-10.1): buying left Operations for Purchasing › Buy. Sets aside Operations' Supplies to
+  // order part (a list to tick before; one line pointing at Purchasing now) and the two supply lists folded under it (Ordered, not
+  // received; closed), which that build took away on purpose. Everything else on the office must match.
+  if (process.env.BUYING === "ignore") h = h.replace(/<section class="need" id="need-ordering"[\s\S]*?<\/section>/g, "")
+     .replace(/<details class="more" data-keep="(ordered|closed)"[^>]*>[\s\S]*?<\/details>/g, "");
   return h;
 };
 (async () => {

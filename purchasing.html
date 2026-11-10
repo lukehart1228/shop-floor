@@ -89,6 +89,78 @@
   table.edit td:first-child{width:34px; color:var(--ink2)}
   .x{background:none; border:none; color:var(--ink2); font-size:22px; padding:0 8px; min-height:40px}
   @media (max-width:700px){ .brand{display:none} h2{font-size:22px} .stat .t{font-size:22px} }
+  /* 10 Nov: the simpler page */
+  nav.tabs .setupbtn{margin-left:auto; font-size:15px}
+  .list{background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden}
+  .r{display:flex; align-items:center; gap:12px; padding:11px 14px; border-top:1px solid var(--line); flex-wrap:wrap}
+  .r:first-child{border-top:0}
+  .r .rc{width:26px; flex:none; display:flex}
+  .r .grow{flex:1 1 220px; min-width:0}
+  .r small{display:block; color:var(--ink2); font-size:14px}
+  .in{min-height:42px; border:1px solid var(--gray); border-radius:8px; padding:6px 9px; background:#fff; flex:1 1 220px}
+  .row.end{justify-content:flex-end}
+  .yearrow{display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap}
+  .say{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:clamp(30px,5.2vw,46px); line-height:1.08; margin:6px 2px 2px; flex:1 1 300px; text-wrap:balance}
+  .yearrow + .sub{margin-top:4px}
+  .hero{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 12px 10px; margin:10px 0 4px}
+  .hero svg{display:block; width:100%; touch-action:pan-y}
+  .c-area{fill:var(--teal); opacity:.2}
+  .c-line{fill:none; stroke:var(--teal-ink); stroke-width:3; stroke-linejoin:round; stroke-linecap:round}
+  .c-grid{stroke:var(--line); stroke-width:1}
+  .c-axis{stroke:var(--gray); stroke-width:1.5}
+  .c-txt{fill:var(--ink2); font:500 13px 'Barlow',sans-serif}
+  .c-end{fill:var(--midnight); font:700 16px 'Barlow',sans-serif}
+  .c-dot{fill:var(--teal-ink)}
+  .c-guide{stroke:var(--ink2); stroke-width:1; stroke-dasharray:3 4}
+  .c-hit{fill:transparent; cursor:pointer}
+  .readout{font-size:16px; margin:8px 4px 2px; min-height:24px}
+  .two{display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; margin-top:18px}
+  .two h2, main > h2{font-size:22px}
+  @media (max-width:760px){ .two{grid-template-columns:1fr} }
+  .panel{background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 16px 10px; margin-top:8px}
+  .b{display:grid; grid-template-columns:minmax(96px,30%) 1fr minmax(64px,auto); gap:10px; align-items:center; padding:7px 0; border:0; border-top:1px solid var(--line); width:100%; background:none; text-align:left; border-radius:0}
+  .b:first-child{border-top:0}
+  button.b:hover{background:var(--paper)}
+  .b .nm{font-weight:600; overflow-wrap:anywhere}
+  .b .v{text-align:right; font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap}
+  .b .v.lo{font-weight:500; color:var(--ink2)}
+  .link.sm{font-size:14px; font-weight:600; padding:0 0 0 6px}
+  .trk{position:relative; height:18px; display:block}
+  .trk i{position:absolute; top:0; bottom:0; border-radius:3px; background:var(--teal)}
+  .trk i.more{background:var(--orange)}
+  .trk .zero{position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--gray)}
+  .trk .mark{position:absolute; top:-4px; bottom:-4px; width:2px; background:var(--midnight)}
+  .trk.out{border:1px dashed var(--gray); border-radius:3px}
+  .key{font-size:14px; color:var(--ink2); margin:8px 0 0}
+  .sw{display:inline-block; width:12px; height:12px; border-radius:2px; background:var(--teal); vertical-align:-1px; margin-right:4px}
+  .sw.more{background:var(--orange)}
+  .look{background:#fff; border:1px solid var(--line); border-left:8px solid var(--orange); border-radius:12px; padding:4px 16px; margin:0 0 6px}
+  .look p{margin:10px 0; max-width:76ch}
+  .chips{display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 10px}
+  .chip{border:1px solid var(--gray); background:#fff; border-radius:20px; padding:6px 14px; font-weight:600; min-height:40px}
+  .chip[aria-pressed="true"]{background:var(--midnight); border-color:var(--midnight); color:var(--sawdust)}
+  table.five{min-width:520px}
+  .banner.ask{color:var(--midnight)}
+  .banner.filed{font-weight:500}
+  .banner.filed b{font-weight:700}
+  .scrim{position:fixed; inset:0; background:rgba(24,29,46,.55); z-index:30; display:flex; align-items:flex-start; justify-content:center; padding:70px 14px 20px; overflow:auto}
+  .sheet{background:#fff; border-radius:14px; max-width:600px; width:100%; padding:18px 18px 16px}
+  .sheet h3{margin:0 0 4px; font-size:21px; color:var(--midnight)}
+  .sheet select{width:100%; min-height:44px; border:1px solid var(--gray); border-radius:8px; padding:6px 10px; background:#fff}
+  .sheet .r select{width:auto; flex:0 1 190px}
+  .r.gone{opacity:.6}
+  .logsheet{max-width:720px}
+  .logsheet input, .logsheet select{width:100%; min-height:42px; border:1px solid var(--gray); border-radius:8px; padding:6px 9px; background:#fff}
+  .lab{display:block; font-size:13px; font-weight:600; color:var(--ink2); margin-bottom:2px}
+  .lgtop{display:grid; grid-template-columns:1fr 160px 1fr; gap:8px; margin:0 0 8px}
+  .lgrow{display:grid; grid-template-columns:minmax(0,1fr) 72px 100px 84px 30px; gap:8px; align-items:end; margin:6px 0 0}
+  .lgamt{text-align:right; font-weight:600; padding-bottom:10px}
+  .lgx{border:0; background:none; color:var(--ink2); font-size:22px; padding:0 0 6px; min-height:40px}
+  .lgnew{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:6px 0 0 0; padding:8px 10px; background:var(--paper); border-radius:8px}
+  .lgnew[hidden], .lgnew [hidden]{display:none}
+  .lgnew select{width:auto; flex:0 1 170px} .lgnew input{width:auto; flex:1 1 180px}
+  .lgasked{font-size:13px; color:var(--ink2); margin:3px 2px 0}
+  @media (max-width:600px){ .lgtop{grid-template-columns:1fr} .lgrow{grid-template-columns:1fr 1fr 30px} .lgrow .lgamt{display:none} .lgrow .lgi{grid-column:1 / -1} .lgrow .lab{white-space:nowrap} }
   .drop{display:block; cursor:pointer; border:2px dashed var(--gray); border-radius:12px; background:#fff; padding:22px; text-align:center; margin-bottom:6px}
   .drop.over{border-color:var(--orange); background:var(--sawdust)}
   .chk{width:22px; height:22px; accent-color:var(--midnight)}
@@ -112,12 +184,18 @@
 <script>
 /* The two settings (project address, publishable key), the key check, the connection test, the id maker and the
    Feedback button are in the shared file loaded above, sf-common-2026-10-05.1.js.
-   Purchasing (7 Nov; design: the spec's Purchasing tab, "First release: standalone", and the Lumber buying & POs tab):
-   To buy (the tablets' supply requests, as on Operations), POs in Luke's PD - PO template filed as PDFs in PD - POs
-   (PO 00001 on, and Lumber PO 24 on), Prices against each item's baseline with an export for the yearly check against
-   the bills, Savings to chase, Lumber (the tracker), the Purchases file with Match these, and Setup. Managers only.
-   purchasing.sql. What's entered is the truth: PO lines, and buys with no PO from the Purchases file. */
-var PAGE_VERSION = "2026-11-07.2";          // this page's version: bump it with every change (it shows in select * from devices();)
+   Purchasing (7 Nov; simpler 10 Nov. Design: the spec's Purchasing tab, "A simpler page"). Three tabs, by what the office
+   comes to do, and Setup as a button:
+     Buy      what the departments asked for on their tablets (it left Operations 10 Nov), then the POs: PO 00001 on and
+              Lumber PO 24 on, in Luke's PD - PO template, filed as PDFs in PD - POs. A lumber PO's slips are picked on it.
+     Savings  the year as pictures: saved so far month by month, where it came from, lumber scrap against the 1.7
+              allowance, the biggest movers.
+     Prices   worth a look (a few plain findings), what was paid item by item, the Purchases file, the yearly export.
+   Log a purchase (purchasing_log.sql): every buy with no PO is logged on Buy when it's ordered (Luke, 10 Nov: this is how
+   the data comes in from now on). A Purchases file is for loading past buys: it asks nothing, its new item names become
+   items as it's added, and the page says so afterwards. Managers only.
+   What's entered is the truth: PO lines, and buys with no PO from the Purchases file. */
+var PAGE_VERSION = "2026-11-10.1";          // this page's version: bump it with every change (it shows in select * from devices();)
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
 const SCRAP_ALLOWANCE = 1.7;                 // the workbook's allowance: 1.7 bd ft bought for each bd ft in a top
 function isMissing(err) { return /could not find the function|schema cache|does not exist/i.test(String((err && err.message) || err || "")); }
@@ -364,7 +442,7 @@ function poFromNote(note) {
 const isNum = (v) => v !== null && v !== undefined && v !== "" && isFinite(Number(v));
 /** every counted line, oldest first: {date, year, source, ref, supplier, supplier_id, item_id, category, description, qty, unit, price, amount, in_baseline} */
 function entries(data) {
-  const items = new Map((data.items || []).map(i => [i.id, i])), out = [];
+  const items = new Map((data.items || []).map(i => [i.id, i])), sups = new Map((data.suppliers || []).map(v => [v.id, v.name])), out = [];
   for (const po of data.pos || []) {
     if (po.cancelled_at) continue;
     for (const l of po.lines || []) {
@@ -378,9 +456,20 @@ function entries(data) {
   for (const b of data.buys || []) {
     if (b.ignored || b.po) continue;
     const it = items.get(b.item_id) || null, qty = isNum(b.qty) ? Number(b.qty) : null, amount = Number(b.amount);
-    out.push({ date: String(b.on).slice(0, 10), year: yearOf(b.on), source: "Purchases file", ref: b.doc || "", supplier: b.supplier, supplier_id: b.supplier_id,
+    // a supplier the shop knows goes by its own name, whichever of its names the file used: "TSC" and "Test Supply Co" are one supplier
+    out.push({ date: String(b.on).slice(0, 10), year: yearOf(b.on), source: "Purchases file", ref: b.doc || "", supplier: sups.get(b.supplier_id) || b.supplier, supplier_id: b.supplier_id,
                item_id: b.item_id || null, category: it ? it.category_key : (b.category || null), description: b.description, qty,
                unit: b.unit || (it ? it.unit : ""), price: qty ? amount / qty : null, amount, in_baseline: b.in_baseline !== false, buy_id: b.id, note: b.note || "" });
+  }
+  // purchases logged on Buy (purchasing_log.sql, 10 Nov): how buys with no PO come in from now on. One marked a mistake isn't counted.
+  for (const g of data.logs || []) {
+    if (g.cancelled) continue;
+    for (const l of g.lines || []) {
+      const it = items.get(l.item_id) || null, qty = Number(l.qty), p = Number(l.unit_price);
+      out.push({ date: String(g.on).slice(0, 10), year: yearOf(g.on), source: "Logged", ref: g.doc || "", supplier: sups.get(g.supplier_id) || g.supplier, supplier_id: g.supplier_id,
+                 item_id: l.item_id, category: it ? it.category_key : null, description: l.item || (it ? it.name : ""), qty,
+                 unit: l.unit || (it ? it.unit : ""), price: p, amount: Number(l.amount), in_baseline: true, log_id: g.id, note: "" });
+    }
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -536,6 +625,69 @@ function fileItemNames(data) {
     return { name: x.name, ids: x.ids, total: x.total, category, unit: category === "lumber" ? "bd ft" : top(x.units), quarters, same };
   }).sort((a, b) => (a.category || "").localeCompare(b.category || "") || a.name.localeCompare(b.name));
 }
+/** the item a typed name means: by its name or one of its other names, in use only. null: a new item. */
+function itemByName(data, name) {
+  const t = String(name || "").trim().toLowerCase(); if (!t) return null;
+  return (data.items || []).find(i => !i.retired && [i.name, ...(i.aliases || [])].some(x => String(x).trim().toLowerCase() === t)) || null;
+}
+/** a request's words as a line to log: the item it plainly is (its own words, or a look-alike in any category), else a new one */
+function requestLine(data, r) {
+  const it = itemByName(data, r.item) || (data.items || []).filter(i => !i.retired && looksLike(i.name, r.item)).sort((a, b) => a.name.length - b.name.length)[0] || null;
+  return { name: it ? it.name : String(r.item || "").trim(), qty: String(r.qty || 1), price: "", req: r.id, asked: r.department_name || "" };
+}
+
+/* ---- the simpler page (10 Nov): Savings as pictures, Worth a look as sentences, a file that asks nothing ---- */
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** a year's savings month by month: [{m, saved, paid, cum}] from January to the last month to show (this month in the
+ *  current year, December in an earlier one). A line saves (its baseline − its price) × its quantity; the baseline is
+ *  baselineFor(), so the months add up to exactly what Prices shows for the year. */
+function monthlySavings(data, year) {
+  const ents = entries(data), base = new Map(), today = String(data.today).slice(0, 10);
+  const last = yearOf(today) === year ? Number(today.slice(5, 7)) - 1 : 11;
+  const months = Array.from({ length: last + 1 }, (_, m) => ({ m, saved: 0, paid: 0, cum: 0 }));
+  for (const e of ents) {
+    if (e.year !== year) continue;
+    const m = Number(e.date.slice(5, 7)) - 1; if (!months[m]) continue;
+    months[m].paid += e.amount;
+    if (!e.item_id || !(e.qty > 0) || e.price === null) continue;
+    if (!base.has(e.item_id)) base.set(e.item_id, baselineFor(data, ents, e.item_id, year));
+    const b = base.get(e.item_id); if (b) months[m].saved += (b.price - e.price) * e.qty;
+  }
+  let run = 0; for (const x of months) { run += x.saved; x.cum = run; }
+  return { months, total: run, paid: months.reduce((a, x) => a + x.paid, 0) };
+}
+/** Worth a look: Savings to chase as a few plain findings, at most two of each kind, biggest first:
+ *  {kind: "up" | "prices" | "one", item, ...} */
+function worthALook(data) {
+  const C = chaseFor(data), out = [];
+  for (const c of C.creep.slice(0, 2)) out.push({ kind: "up", item: c.item, change: c.change, last: c.last, base: c.base });
+  for (const s of C.spread.slice(0, 2)) out.push({ kind: "prices", item: s.item, suppliers: s.suppliers, potential: s.potential });
+  for (const s of C.single.slice(0, 2)) out.push({ kind: "one", item: s.item, supplier: s.supplier, spend: s.spend });
+  return { since: C.since, list: out, more: Math.max(0, C.creep.length - 2) + Math.max(0, C.spread.length - 2) + Math.max(0, C.single.length - 2) };
+}
+/** the item names a file's lines use that aren't items yet, as purchases_add() takes them: each with the file's category
+ *  and unit, a lumber name's thickness ("6/4 …" → 6), and same_as when exactly one item in that category is plainly the
+ *  same thing under another name */
+function fileNames(lines, data) {
+  const items = data.items || [], cats = data.categories || [];
+  const known = new Set(items.flatMap(i => [i.name, ...(i.aliases || [])]).map(x => String(x).trim().toLowerCase()));
+  const catKey = (c) => { const t = String(c || "").trim().toLowerCase(); const hit = cats.find(x => !x.retired && (x.key.toLowerCase() === t || String(x.name).toLowerCase() === t)); return hit ? hit.key : ""; };
+  const by = new Map();
+  for (const l of lines || []) {
+    const name = String(l.item || "").trim(); if (!name || name.length > 80 || known.has(name.toLowerCase())) continue;
+    const x = by.get(name.toLowerCase()) || { name, cats: new Map(), units: new Map() };
+    if (l.category) x.cats.set(l.category, (x.cats.get(l.category) || 0) + 1);
+    if (l.unit) x.units.set(l.unit, (x.units.get(l.unit) || 0) + 1);
+    by.set(name.toLowerCase(), x);
+  }
+  const top = (m) => ([...m.entries()].sort((a, b) => b[1] - a[1])[0] || [""])[0];
+  return [...by.values()].map(x => {
+    const category = top(x.cats), key = catKey(category), q = /^(\d{1,2})\/4\b/.exec(x.name);
+    const alike = key ? items.filter(i => !i.retired && i.category_key === key && looksLike(i.name, x.name)) : [];
+    return { name: x.name, category, unit: key === "lumber" ? "bd ft" : top(x.units), quarters: q ? Number(q[1]) : null, same_as: alike.length === 1 ? alike[0].id : null };
+  });
+}
+
 /* ---- reading the Purchases file: the Lines tab's shape (a .xlsx, or a .csv saved from it) ---- */
 const FILE_COLS = {
   date: ["date"], supplier: ["supplier", "vendor"], doc: ["bill / receipt #", "bill/receipt #", "bill or receipt #", "bill #", "receipt #", "order #", "document #", "doc"],
@@ -664,6 +816,7 @@ if (typeof module !== "undefined") module.exports = {
   poPdf, poNumberText, poGrid, colPt, SCRAP_ALLOWANCE,
   poName, poFromNote, entries, baselineFor, pricesFor, chaseFor, lastPaid, csvCell, exportRows, exportCsv, EXPORT_HEAD, itemsCsv, matchGroups,
   cellDate, cellNum, sheetToLines, readCsv, readXlsx, pickSheet, looksLike, fileItemNames,
+  MONTH_NAMES, monthlySavings, worthALook, fileNames, itemByName, requestLine,
 };
 /* ---- the screen ---- */
 if (typeof document !== "undefined") (function () {
@@ -682,19 +835,24 @@ if (typeof document !== "undefined") (function () {
   sfEmbed("header .hrow");
   if (!SF_EMBEDDED) sfFeedbackSetup({ db, page: "purchasing", version: PAGE_VERSION, mount: "header .hrow" });
   sfReportDevice(db, "purchasing", PAGE_VERSION);
-  const TABS = [["buy", "To buy"], ["pos", "POs"], ["prices", "Prices"], ["chase", "Savings to chase"], ["lumber", "Lumber"], ["file", "Purchases file"], ["setup", "Setup"]];
+  // 10 Nov (Luke: seven tabs were too many): Buy, Savings, Prices, and Setup as a button. The old tabs' bookmarks land on the new one that holds them.
+  const TABS = [["buy", "Buy"], ["savings", "Savings"], ["prices", "Prices"]];
+  const OLD_TAB = { pos: "buy", chase: "prices", file: "prices", lumber: "savings" };
+  const tabOf = (t) => { const k = OLD_TAB[t] || t; return TABS.some(x => x[0] === k) || k === "setup" ? k : null; };
   const PDF_LIB_URL = "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
   const PDF_LIB_SRI = "sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI";
   const firstTab = (location.hash || "").replace("#", "");
   const S = {
-    me: null, tab: TABS.some(t => t[0] === firstTab) ? firstTab : store.get("tab", "buy"), year: null, data: null, loaded: false, missing: false, msg: null, busy: false,
+    me: null, tab: tabOf(firstTab) || tabOf(store.get("tab", "buy")) || "buy", year: null, data: null, loaded: false, missing: false, msg: null, busy: false,
     open: null, edit: null, setupEdit: null, folder: null, perm: null, filing: false,
     reqs: [], depts: [], ticked: new Set(), notOrdering: null, adding: false, skips: [], skipsReady: false,
     openItem: null, file: null, matchNew: null, slips: [], slipLines: null,
+    closedReqs: [], fileItems: [], filesReady: false, month: null, cat: "all", sheet: null, slipPo: null, keep: new Set(),
+    logsReady: false, log: null,
   };
   /** a tab: drawn at once, then again with what's new (supply requests come in from the tablets all day) */
   const go = async (tab) => { S.tab = tab; store.set("tab", tab); try { history.replaceState(null, "", "#" + tab); } catch (e) {}
-    S.msg = null; S.setupEdit = null; S.open = null; S.openItem = null; render(); window.scrollTo(0, 0);
+    S.msg = null; S.setupEdit = null; S.open = null; S.openItem = null; S.sheet = null; S.month = null; render(); window.scrollTo(0, 0);
     if (S.loaded && !S.missing) { await load(); render(); } };
 
   // ---------- the PD - POs folder on this computer (remembered in this browser) ----------
@@ -775,15 +933,24 @@ if (typeof document !== "undefined") (function () {
   // ---------- data ----------
   async function load() {
     try {
-      const [r, q, d, k] = await Promise.all([db.rpc("purchasing_data"),
+      const since = new Date(Date.now() - 60 * 86400000).toISOString();
+      const [r, q, d, k, c, f, g] = await Promise.all([db.rpc("purchasing_data"),
         Promise.resolve(db.from("v_supply_requests").select("*").eq("is_open", true).order("requested_at")).catch(e => ({ error: e })),
         Promise.resolve(db.from("departments").select("key,name,sort_order").order("sort_order")).catch(e => ({ error: e })),
-        Promise.resolve(db.rpc("lumber_scrap_skips_list")).catch(e => ({ error: e }))]);
+        Promise.resolve(db.rpc("lumber_scrap_skips_list")).catch(e => ({ error: e })),
+        Promise.resolve(db.from("v_supply_requests").select("*").eq("is_open", false).gte("updated_at", since).order("updated_at", { ascending: false })).catch(e => ({ error: e })),
+        Promise.resolve(db.rpc("purchase_file_items_list")).catch(e => ({ error: e })),
+        Promise.resolve(db.rpc("purchase_logs_list")).catch(e => ({ error: e }))]);
       if (r.error) throw r.error;
       S.data = r.data; S.missing = false;
+      // purchases logged on Buy (purchasing_log.sql). Without it there's no Log a purchase, and Mark ordered stays as it was.
+      S.logsReady = !!(g && !g.error); S.data.logs = S.logsReady ? g.data || [] : [];
       S.reqs = q && !q.error ? q.data || [] : []; S.depts = d && !d.error ? d.data || [] : [];
       // months left out of the scrap results (lumber_scrap_skips.sql; without it nothing is left out and there's no Leave out link)
       S.skipsReady = !!(k && !k.error); S.skips = S.skipsReady ? k.data || [] : [];
+      S.closedReqs = c && !c.error ? c.data || [] : [];
+      // what each file made or took as another name (purchasing_log.sql; without it a file's new names wait to be matched, as before)
+      S.filesReady = !!(f && !f.error); S.fileItems = S.filesReady ? f.data || [] : [];
       for (const id of [...S.ticked]) if (!S.reqs.some(x => x.id === id && x.state === "requested")) S.ticked.delete(id);
       const years = yearsAvailable();
       if (!S.year || !years.includes(S.year)) S.year = years[0];
@@ -823,15 +990,17 @@ if (typeof document !== "undefined") (function () {
       return;
     }
     tabsEl.hidden = false;
-    tabsEl.innerHTML = TABS.map(([k, t]) => `<button data-tab="${k}" aria-current="${k === S.tab && !S.edit}">${t}${k === "file" && S.data ? matchCount() : ""}</button>`).join("");
+    tabsEl.innerHTML = TABS.map(([k, t]) => `<button data-tab="${k}" aria-current="${k === S.tab && !S.edit}">${t}${k === "prices" && S.data ? matchCount() : ""}</button>`).join("")
+      + `<button class="setupbtn" data-tab="setup" aria-current="${S.tab === "setup" && !S.edit}">Setup</button>`;
     if (!S.loaded) { app.innerHTML = `<main><p class="muted">Loading…</p></main>`; return wire(); }
     if (S.missing) {
       app.innerHTML = `<main><div class="banner">Purchasing isn't set up in the database yet<small>Run purchasing.sql in the Supabase SQL Editor (Walkthrough 54), then purchasing_history.sql from your computer, wait a minute and reload this page.</small></div></main>`;
       return wire();
     }
     const head = S.msg ? `<div class="banner ${S.msg.ok ? "ok" : ""}" role="status">${esc(S.msg.text)}</div>` : "";
-    const body = S.edit ? viewEdit() : ({ buy: viewBuy, pos: viewPos, prices: viewPrices, chase: viewChase, lumber: viewLumber, file: viewFile, setup: viewSetup }[S.tab] || viewBuy)();
-    app.innerHTML = `<main>${head}${body}</main>`;
+    const body = S.edit ? viewEdit() : ({ buy: viewBuy, savings: viewSavings, prices: viewPrices, setup: viewSetup }[S.tab] || viewBuy)();
+    app.innerHTML = `<main>${head}${body}</main>${S.sheet && !S.edit ? sheetHtml() : ""}`;
+    if (S.tab === "savings" && !S.edit) drawChart();
     wire();
   }
   const matchCount = () => { const n = matchGroups(S.data).reduce((a, g) => a + g.ids.length, 0); return n ? ` <span class="pill">${n}</span>` : ""; };
@@ -847,30 +1016,50 @@ if (typeof document !== "undefined") (function () {
     return null;
   }
   function viewBuy() {
-    const open = S.reqs, groups = new Map();
-    for (const r of open) { const g = groups.get(r.department) || { name: r.department_name, rows: [] }; g.rows.push(r); groups.set(r.department, g); }
-    const n = S.ticked.size;
-    const rows = [...groups.values()].map(g => `<div class="dept">${esc(g.name)}</div><div class="tw"><table><tbody>${g.rows.map(r => {
-      const po = r.state === "ordered" ? poForRequest(r.id) : null;
-      return `<tr><td class="chkc">${r.state === "requested" ? `<input type="checkbox" class="chk" data-tick="${esc(r.id)}" ${S.ticked.has(r.id) ? "checked" : ""} aria-label="Tick ${esc(r.item)}">` : ""}</td>
-        <td class="l wrap"><b>${esc(r.qty)} × ${esc(r.item)}</b>${r.note ? `<div class="note">${esc(r.note)}</div>` : ""}</td>
-        <td class="l small muted">${esc(r.requested_by_name || "")} · ${esc(when(r.requested_at))}</td>
-        <td class="l">${r.state === "ordered" ? `<span class="tag done">Ordered${po ? ` on ${esc(po.name)}` : ""}</span>` : `<span class="tag">Waiting</span>`}</td>
-        <td>${S.notOrdering === r.id ? `<span class="row"><input data-noreason style="min-height:40px;border:1px solid var(--gray);border-radius:8px;padding:4px 8px" placeholder="Why (the department sees it)" aria-label="Why not ordering">
-            <button class="btn ghost" data-nosave="${esc(r.id)}">Save</button><button class="link" data-nocancel>Cancel</button></span>`
-          : `<button class="link" data-noorder="${esc(r.id)}">Not ordering…</button>`}</td></tr>`; }).join("")}</tbody></table></div>`).join("");
+    const asked = S.reqs.filter(r => r.state === "requested"), ordered = S.reqs.filter(r => r.state === "ordered"), n = S.ticked.size;
+    const line = (r) => { const po = r.state === "ordered" ? poForRequest(r.id) : null;
+      return `<div class="r"><span class="rc">${r.state === "requested" ? `<input type="checkbox" class="chk" data-tick="${esc(r.id)}" ${S.ticked.has(r.id) ? "checked" : ""} aria-label="Tick ${esc(r.item)}">` : ""}</span>
+        <div class="grow"><b>${r.is_test ? `<span class="tag">TEST</span> ` : ""}${esc(r.qty)} × ${esc(r.item)}</b>
+          <small>${esc(r.department_name)}, ${esc(r.requested_by_name || "")}, ${esc(when(r.requested_at))}${r.note ? `. ${esc(r.note)}` : ""}</small>
+          ${S.notOrdering === r.id ? `<span class="row" style="margin-top:6px"><input data-noreason class="in" placeholder="Why not? The department sees this." aria-label="Why not ordering">
+            <button class="btn ghost" data-nosave="${esc(r.id)}">Save</button><button class="link" data-nocancel>Cancel</button></span>` : ""}</div>
+        ${r.state === "ordered" ? `<span class="tag done">Ordered${po ? ` on ${esc(po.name)}` : ""}</span><button class="link" data-received="${esc(r.id)}">Received</button>`
+          : S.notOrdering === r.id ? "" : `<button class="link" data-noorder="${esc(r.id)}">Not ordering</button>`}</div>`; };
+    const closed = S.closedReqs.map(r => `<div class="r"><div class="grow"><b>${esc(r.qty)} × ${esc(r.item)}</b>
+        <small>${esc(r.department_name)}. ${r.state === "received" ? `Received${r.received_by_name ? ` by ${esc(r.received_by_name)}` : ""}` : r.not_ordering_reason ? `Not ordered: ${esc(r.not_ordering_reason)}` : esc(String(r.state).replace(/_/g, " "))}, ${esc(when(r.updated_at))}</small></div></div>`).join("");
     const deptOpts = S.depts.map(d => `<option value="${esc(d.key)}">${esc(d.name)}</option>`).join("");
-    return `<div class="titlerow"><div class="grow"><h2>To buy</h2><p class="sub" style="margin-bottom:0">What the departments asked for on their tablets' Supplies tab, plus anything added here. Operations shows the same list: ticking it ordered here shows there too.</p></div></div>
-      <div class="row" style="margin:6px 2px 4px">
-        <button class="btn or" data-reqpo ${n ? "" : "disabled"}>Put ${n ? n + " ticked" : "ticked"} on a PO</button>
-        <button class="btn ghost" data-reqorder ${n ? "" : "disabled"}>Mark ${n ? n + " ticked" : "ticked"} as ordered</button></div>
-      ${open.length ? rows : `<p class="muted" style="margin:16px 2px">Nothing waiting to be bought.</p>`}
-      <h3>Add something to buy</h3>
+    return `<h2>Needs buying</h2><p class="sub">What the departments asked for on their tablets, oldest first.</p>
+      <div class="row" style="margin:0 2px 12px">
+        ${S.logsReady ? `<button class="btn or" data-logopen>${n ? `Log a purchase for ${n} ticked` : "Log a purchase"}</button>
+          <button class="btn ghost" data-reqpo ${n ? "" : "disabled"}>Put ${n ? n + " ticked" : "ticked"} on a PO</button>`
+        : `<button class="btn or" data-reqpo ${n ? "" : "disabled"}>Put ${n ? n + " ticked" : "ticked"} on a PO</button>
+          <button class="btn ghost" data-reqorder ${n ? "" : "disabled"}>Mark ${n ? n + " ticked" : "ticked"} as ordered</button>`}
+        <span style="flex:1"></span>${S.adding ? "" : `<button class="link" data-addreq>Add something to buy</button>`}</div>
       ${S.adding ? `<div class="card"><div class="form">
           <label>For<select id="adDept">${deptOpts}</select></label><label>What<input id="adItem" placeholder="Titebond III, 1 gallon"></label>
           <label>Quantity<input id="adQty" class="n" inputmode="numeric" value="1"></label><label>Note<input id="adNote"></label>
-          <button class="btn" data-addsave ${S.busy ? "disabled" : ""}>Add it</button><button class="link" data-addcancel>Cancel</button></div></div>`
-        : `<button class="btn ghost" data-addreq>Add something to buy</button>`}`;
+          <button class="btn" data-addsave ${S.busy ? "disabled" : ""}>Add it</button><button class="link" data-addcancel>Cancel</button></div></div>` : ""}
+      ${asked.length ? `<div class="list">${asked.map(line).join("")}</div>` : `<p class="muted" style="margin:12px 2px">Nothing waiting to be bought.</p>`}
+      ${ordered.length ? `<details class="fold" data-keep="ordered" ${S.keep.has("ordered") ? "open" : ""}><summary>Ordered, not received (${ordered.length})</summary><div class="list">${ordered.map(line).join("")}</div>
+        <p class="note" style="margin:6px 2px">The department taps Received on its tablet when it's in hand; Received here does the same.</p></details>` : ""}
+      ${closed ? `<details class="fold" data-keep="closed" ${S.keep.has("closed") ? "open" : ""}><summary>Closed in the last 60 days (${S.closedReqs.length})</summary><div class="list">${closed}</div></details>` : ""}
+      ${loggedSection()}
+      ${posSection()}`;
+  }
+  /** the purchases logged in the last 60 days, newest first: a line each, with Change and It was a mistake */
+  function loggedSection() {
+    if (!S.logsReady) return "";
+    const since = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
+    const list = (S.data.logs || []).filter(g => String(g.on).slice(0, 10) >= since);
+    if (!list.length) return `<p class="note" style="margin:14px 2px 0">A buy with a PO is logged by its PO. Log a purchase is for everything else: Amazon, a card, a store run, an invoice.</p>`;
+    const total = (g) => (g.lines || []).reduce((a, l) => a + Number(l.amount), 0);
+    return `<h2 style="margin-top:26px">Logged lately</h2>
+      <div class="list">${list.slice(0, 15).map(g => `<div class="r${g.cancelled ? " gone" : ""}"><div class="grow"><b>${esc(g.supplier)}</b>
+          <small>${esc(mdy(g.on))}${g.doc ? `, ${esc(g.doc)}` : ""}. ${(g.lines || []).map(l => `${esc(l.item)} × ${n0(l.qty)}`).join(", ")}${g.logged_by_name ? `. Logged by ${esc(g.logged_by_name)}` : ""}
+          ${g.cancelled ? `. <b>A mistake</b>${g.cancel_reason ? `: ${esc(g.cancel_reason)}` : ""}, not counted` : ""}</small></div>
+        <span class="num">${usd(total(g), true)}</span>
+        ${g.cancelled ? "" : `<button class="link" data-logchange="${esc(g.id)}">Change</button><button class="link" data-logmistake="${esc(g.id)}">It was a mistake</button>`}</div>`).join("")}</div>
+      <p class="note" style="margin:8px 2px 0">A buy with a PO is logged by its PO. Log a purchase is for everything else: Amazon, a card, a store run, an invoice.</p>`;
   }
 
   // ---------- POs ----------
@@ -895,7 +1084,7 @@ if (typeof document !== "undefined") (function () {
       : `<div class="banner">${wait.length} PO${wait.length === 1 ? " is" : "s are"} waiting to be filed in ${esc(S.folder.name)}<div style="margin-top:8px"><button class="btn" data-filenow ${S.filing ? "disabled" : ""}>File ${wait.length === 1 ? "it" : "them"} now</button></div></div>`;
   }
   const nextName = (series) => series === "lumber" ? `Lumber PO ${S.data.next_lumber}` : `PO ${String(S.data.next_po).padStart(5, "0")}`;
-  function viewPos() {
+  function posSection() {
     const pos = (S.data.pos || []).filter(p => yearOf(p.ordered_on) === S.year);
     const rows = pos.map(po => {
       const sum = poSummary(po), open = S.open === po.id, n = (po.lines || []).length;
@@ -905,13 +1094,14 @@ if (typeof document !== "undefined") (function () {
         ${open ? `<tr><td colspan="7" style="padding:0">${poDetail(po)}</td></tr>` : ""}`;
     }).join("");
     const ready = S.data.issuer.ready;
-    return `<div class="titlerow"><div class="grow"><h2>POs ${S.year}</h2><p class="sub" style="margin-bottom:0">Every PO the shop makes, in your PD - PO template, filed in PD - POs. Next: ${esc(nextName("po"))} and ${esc(nextName("lumber"))}. Tap a PO for its lines.</p></div>${yearPicker()}</div>
-      <div class="row" style="margin:0 2px 12px"><button class="btn or" data-newpo="po" ${ready ? "" : "disabled"}>Make a PO</button><button class="btn ghost" data-newpo="lumber" ${ready ? "" : "disabled"}>Make a lumber PO</button></div>
+    return `<div class="titlerow" style="margin-top:26px"><div class="grow"><h2>POs</h2></div>${yearPicker()}</div>
+      <div class="row" style="margin:0 2px 12px"><button class="btn or" data-newpo="po" ${ready ? "" : "disabled"}>Make a PO</button><button class="btn ghost" data-newpo="lumber" ${ready ? "" : "disabled"}>Make a lumber PO</button>
+        <span style="flex:1"></span><span class="note">Next: ${esc(nextName("po"))} and ${esc(nextName("lumber"))}</span></div>
       ${ready ? "" : `<div class="banner">Fill in the PO details first<small>Setup › PO details: who issues it, phone, e-mail, address and the tax-exempt line (the Arrow POs use the same).</small></div>`}
       ${filingBanner()}
       ${pos.length ? `<div class="tw"><table><thead><tr><th>PO</th><th class="l">Supplier</th><th>Issued</th><th class="l">What</th><th>Total</th><th class="l">In</th><th class="l">PDF</th></tr></thead><tbody>${rows}</tbody></table></div>`
         : `<p class="muted">No POs in ${S.year} yet.</p>`}
-      <p class="note" style="margin:10px 2px">Buys off a website, by card or at a store have no PO: they come in through the Purchases file and count in Prices.</p>`;
+      <p class="note" style="margin:10px 2px">Tap a PO for its lines. Buys off a website, by card or at a store have no PO: they come in through the Purchases file, on Prices.</p>`;
   }
   function poDetail(po) {
     const anyLumber = (po.lines || []).some(l => l.lumber), reqs = new Map(S.reqs.map(r => [r.id, r]));
@@ -938,7 +1128,8 @@ if (typeof document !== "undefined") (function () {
         ${po.cancelled_at ? `<button class="btn ghost" data-uncancel="${esc(po.id)}">Put it back</button>` : `<button class="btn ghost" data-changepo="${esc(po.id)}">Change the PO</button>`}
         ${po.file_name ? `<button class="btn ghost" data-pdf="${esc(po.id)}">PDF</button>` : ""}
         ${!po.cancelled_at ? `<button class="link" data-cancelpo="${esc(po.id)}">Cancel the PO</button>` : ""}
-        ${anyLumber ? `<span class="note">Received board feet come from Inventory's lumber slips, picked on the Lumber tab.</span>` : ""}</div></div>`;
+        ${anyLumber && !po.cancelled_at ? `<button class="btn ghost" data-slippo="${esc(po.id)}">${S.slipPo === po.id ? "Hide the delivery slips" : "Pick its delivery slips"}</button>` : ""}</div>
+      ${anyLumber && S.slipPo === po.id ? slipPicker(po) : ""}</div>`;
   }
 
   // ---------- the PO editor ----------
@@ -1044,7 +1235,7 @@ if (typeof document !== "undefined") (function () {
     S.busy = false;
     if (r.error) { S.msg = { ok: false, text: friendlyError(r.error) }; return render(); }
     const d = r.data || {};
-    S.edit = null; S.tab = "pos"; store.set("tab", "pos"); S.open = d.id; S.ticked = new Set();
+    S.edit = null; S.tab = "buy"; store.set("tab", "buy"); S.open = d.id; S.ticked = new Set();
     const reqText = d.requests_ordered ? ` ${d.requests_ordered} supply request${d.requests_ordered === 1 ? " is" : "s are"} marked ordered.` : "";
     S.msg = { ok: true, text: (d.unchanged ? `Nothing changed on ${d.name}.` : E.id ? `${d.name} changed${d.file_name ? `: it's ${d.file_name} now` : ""}.` : `${d.name} made.`) + reqText };
     await load();
@@ -1057,126 +1248,164 @@ if (typeof document !== "undefined") (function () {
     }
   }
 
-  // ---------- Prices ----------
+  // ---------- Savings: the year as pictures ----------
   const stat = (o, t, s, big) => `<div class="stat ${big ? "big" : ""}"><div class="o">${o}</div><div class="t num">${t}</div>${s ? `<div class="s">${s}</div>` : ""}</div>`;
   const signed = (x) => x === null ? "—" : x >= 0 ? usd(x) : "−" + usd(-x);
+  const monthName = (d) => new Date(String(d).slice(0, 10) + "T12:00").toLocaleString("en-US", { month: "long" });
+  /** the data with the months left out of the scrap results taken away */
+  function scrapData() {
+    const out = new Set(S.skips.map(x => String(x.month_end).slice(0, 10)));
+    return { ...S.data, scrap_history: (S.data.scrap_history || []).filter(m => !out.has(String(m.month_end).slice(0, 10))),
+             scrap_inventory: (S.data.scrap_inventory || []).filter(m => !out.has(String(m.month_end).slice(0, 10))) };
+  }
+  /** bars on one scale either side of a line: saved to the right, paid more to the left */
+  function diverging(rows, attr) {
+    const pos = Math.max(1, ...rows.map(r => r.v)), neg = Math.max(0, ...rows.map(r => -r.v));
+    const zero = Math.max(2, 100 * neg / (neg + pos)), unit = (100 - zero) / pos;
+    return rows.map(r => {
+      const w = Math.min(r.v >= 0 ? 100 - zero : zero, Math.abs(r.v) * unit), shown = Math.abs(r.v) > .5 ? Math.max(w, .8) : 0;
+      const inner = `<span class="nm">${esc(r.n)}</span><span class="trk"><i class="${r.v < 0 ? "more" : ""}" style="left:${r.v >= 0 ? zero : zero - shown}%;width:${shown}%"></i><span class="zero" style="left:${zero}%"></span></span>
+        <span class="v">${Math.abs(r.v) < .5 ? "same" : signed(r.v)}</span>`;
+      return attr ? `<button class="b" ${attr}="${esc(r.k)}">${inner}</button>` : `<div class="b">${inner}</div>`;
+    }).join("");
+  }
+  function viewSavings() {
+    const y = S.year, now = yearOf(S.data.today) === y, M = monthlySavings(S.data, y), P = pricesFor(S.data, y);
+    const R = lumberResults(scrapData(), y), leftOut = S.skips.filter(x => yearOf(x.month_end) === y);
+    const cats = P.cats.map(c => ({ n: c.name, v: c.against }));
+    const all = P.rows.filter(r => r.against !== null).map(r => ({ k: r.item.id, n: r.item.name, v: r.against })).sort((a, b) => b.v - a.v);
+    const movers = all.length <= 10 ? all : [...all.slice(0, 6), ...all.slice(-4)];
+    const scrap = [...R.months.map(m => ({ month_end: m.month_end, ratio: m.ratio })), ...leftOut.map(x => ({ month_end: String(x.month_end).slice(0, 10), out: x }))]
+      .sort((a, b) => a.month_end.localeCompare(b.month_end)).map(m => m.out
+        ? `<div class="b"><span class="nm">${esc(monthName(m.month_end))}</span><span class="trk out" title="${esc(m.out.reason || "")}"></span>
+            <span class="v lo">left out <button class="link" data-putbackmonth="${esc(m.month_end)}">Put back</button></span></div>`
+        : `<div class="b"><span class="nm">${esc(monthName(m.month_end))}</span><span class="trk"><i class="${m.ratio > SCRAP_ALLOWANCE ? "more" : ""}" style="left:0;width:${Math.max(1, Math.min(100, (m.ratio - 1) * 100))}%"></i><span class="mark" style="left:70%"></span></span>
+            <span class="v">${m.ratio.toFixed(2)}${S.skipsReady ? ` <button class="link sm" data-skipmonth="${esc(m.month_end)}">Leave out</button>` : ""}</span></div>`).join("");
+    const look = worthALook(S.data), nLook = look.list.length + look.more;
+    const say = M.total >= 0 ? `${usd(M.total)} saved ${now ? "so far in" : "in"} ${y}.` : `${usd(-M.total)} more than the baselines ${now ? "so far in" : "in"} ${y}.`;
+    const any = M.months.some(x => x.paid);
+    return `<div class="yearrow"><p class="say">${say}</p>${yearPicker()}</div>
+      <p class="sub">Against each item's baseline, on ${usd(M.paid)} of production buying.</p>
+      ${any ? `<div class="hero"><div id="chart"></div><p class="readout" id="readout"></p></div>` : `<p class="muted" style="margin:14px 2px">Nothing bought in ${y} yet. POs made on Buy and lines from a Purchases file show here.</p>`}
+      <div class="two">
+        ${cats.length ? `<section><h2>Where it came from</h2><div class="panel">${diverging(cats)}
+          <p class="key"><span class="sw"></span>saved <span class="sw more" style="margin-left:10px"></span>paid more</p></div></section>` : ""}
+        ${scrap ? `<section><h2>Lumber scrap</h2><div class="panel">${scrap}
+          <p class="key">Board feet used for each board foot in a top. The line is the ${SCRAP_ALLOWANCE} allowance; shorter is lumber saved${R.months.length ? `: ${n0(R.savedBf)} bd ft, ${signed(R.scrapDollars)}` : ""}.</p></div></section>` : ""}
+      </div>
+      ${movers.length ? `<h2>Biggest movers</h2><p class="sub">Tap one for every price paid.</p><div class="panel">${diverging(movers, "data-mover")}</div>` : ""}
+      ${nLook ? `<div class="row" style="margin:16px 2px 0"><button class="btn ghost" data-tabgo="prices">${nLook} thing${nLook === 1 ? "" : "s"} worth a look</button></div>` : ""}`;
+  }
+  /** savings so far, month by month: drawn to the width it has, so the words stay readable on a phone */
+  function drawChart() {
+    const el = document.getElementById("chart"); if (!el) return;
+    const M = monthlySavings(S.data, S.year), cum = M.months.map(x => x.cum), last = cum.length - 1;
+    const W = el.clientWidth || 600, H = Math.round(Math.max(210, Math.min(330, W * .4))), m = { l: 6, r: 12, t: 26, b: 28 };
+    const lo = Math.min(0, ...cum), hi = Math.max(0, ...cum), span = (hi - lo) || 1;
+    const raw = span / 3, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 5, 10].map(k => k * mag).find(k => k >= raw) || raw;
+    const top = Math.ceil(hi / step) * step || step, bot = Math.floor(lo / step) * step;
+    const slot = (W - m.l - m.r) / 12, x = (k) => m.l + slot * (k + 1), yv = (v) => m.t + (H - m.t - m.b) * (1 - (v - bot) / (top - bot));
+    const line = `M${m.l},${yv(0).toFixed(1)} L${cum.map((v, k) => `${x(k).toFixed(1)},${yv(v).toFixed(1)}`).join(" L")}`;
+    const tick = (g) => Math.abs(g) >= 1000 ? `${g < 0 ? "−" : ""}$${Math.abs(g) / 1000}k` : signed(g);
+    let grid = ""; for (let g = bot; g <= top + step / 2; g += step) grid += `<line class="${Math.abs(g) < step / 2 ? "c-axis" : "c-grid"}" x1="${m.l}" x2="${W - m.r}" y1="${yv(g)}" y2="${yv(g)}"/>${Math.abs(g) >= step / 2 ? `<text class="c-txt" x="${m.l + 2}" y="${yv(g) - 5}">${tick(g)}</text>` : ""}`;
+    const labels = MONTH_NAMES.map((n, k) => `<text class="c-txt" text-anchor="middle" x="${m.l + slot * (k + .5)}" y="${H - 8}">${W < 520 ? n[0] : n}</text>`).join("");
+    const sel = S.month !== null && S.month <= last ? S.month : null;
+    const guide = sel === null ? "" : `<line class="c-guide" x1="${x(sel)}" x2="${x(sel)}" y1="${m.t}" y2="${H - m.b}"/><circle class="c-dot" cx="${x(sel)}" cy="${yv(cum[sel])}" r="6"/>`;
+    const hits = cum.map((v, k) => `<rect class="c-hit" data-m="${k}" x="${m.l + slot * k}" y="${m.t}" width="${slot}" height="${H - m.t - m.b}"><title>${MONTH_NAMES[k]}</title></rect>`).join("");
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Savings so far in ${S.year}, month by month, reaching ${signed(cum[last])} in ${MONTH_NAMES[last]}">
+      ${grid}<path class="c-area" d="${line} L${x(last)},${yv(0)} Z"/><path class="c-line" d="${line}"/>
+      <circle class="c-dot" cx="${x(last)}" cy="${yv(cum[last])}" r="5"/>
+      <text class="c-end" text-anchor="end" x="${x(last) - 10}" y="${Math.max(18, yv(cum[last]) - 10)}">${signed(cum[last])}</text>
+      ${guide}${labels}${hits}</svg>`;
+    const k = sel === null ? last : sel, v = M.months[k];
+    document.getElementById("readout").innerHTML = `<b>${MONTH_NAMES[k]}:</b> ${v.saved >= 0 ? `${usd(v.saved)} saved` : `${usd(-v.saved)} more than the baselines`} on ${usd(v.paid)} of buying. ${signed(v.cum)} saved by the end of it.`
+      + (sel === null ? ` <span class="muted">Tap a month.</span>` : "");
+    el.querySelectorAll("[data-m]").forEach(r => { const pick = () => { S.month = Number(r.dataset.m); drawChart(); }; r.onclick = pick; r.onpointerenter = (e) => { if (e.pointerType === "mouse") pick(); }; });
+  }
+
+  // ---------- Prices: worth a look, then what was paid ----------
+  function lookHtml() {
+    const L = worthALook(S.data), unit = (it) => it.unit ? ` a ${esc(it.unit)}` : "";
+    if (!L.list.length) return `<p class="muted" style="margin:0 2px 6px">Nothing stands out since ${esc(mdy(L.since))}: no price more than 5% over its baseline, no item at two prices, no big spend with one supplier.</p>`;
+    return `<div class="look">${L.list.map(x => x.kind === "up"
+        ? `<p><b>${esc(x.item.name)} is up ${(x.change * 100).toFixed(1)}%.</b> ${price(x.last.price)}${unit(x.item)} against ${price(x.base.price)} (${esc(x.base.how)}). Last bought ${esc(mdy(x.last.date))} from ${esc(x.last.supplier)}.</p>`
+      : x.kind === "prices"
+        ? `<p><b>${esc(x.item.name)} has ${x.suppliers.length === 2 ? "two" : x.suppliers.length} prices.</b> ${x.suppliers.map(sp => `${price(sp.avg)} at ${esc(sp.name)}`).join(", ")}. All at the lowest is about ${usd(x.potential)} a year.</p>`
+        : `<p><b>${esc(x.item.name)} comes from one supplier.</b> ${usd(x.spend)} in the last year, all ${esc(x.supplier)}. Worth a second quote.</p>`).join("")}
+      ${L.more ? `<p class="note">And ${L.more} more like these.</p>` : ""}</div>`;
+  }
+  /** the newest file's report, until it's dismissed: what it made, what it took as an item the shop has */
+  function fileReport() {
+    const F = S.fileItems[0];
+    if (!F || store.get("fileSeen", "") === F.file_id) return "";
+    const made = F.items.filter(i => i.how === "made"), same = F.items.filter(i => i.how === "same_as" && !i.undone);
+    return `<div class="banner ok filed"><b>${esc(F.file_name)} added: ${F.lines_new} line${F.lines_new === 1 ? "" : "s"}${F.lines_skipped ? `, ${F.lines_skipped} already in` : ""}.</b>
+      ${made.length ? `<div>${made.length} new item${made.length === 1 ? " was" : "s were"} made from the file's own names. <button class="link" data-sheet="newitems">See ${made.length === 1 ? "it" : "them"}</button></div>` : ""}
+      ${same.map(i => `<div>“${esc(i.name)}” was taken as ${esc(i.item)}. <button class="link" data-split="${esc(i.item_id)}|${esc(i.name)}">Not the same</button></div>`).join("")}
+      <div><button class="link" data-seenfile="${esc(F.file_id)}">Dismiss</button></div></div>`;
+  }
+  function fileBox() {
+    const F = S.file; if (!F) return "";
+    if (F.reading) return `<div class="card">Reading ${esc(F.name)}…</div>`;
+    if (F.error) return `<div class="banner">${esc(F.name)} couldn't be read<small>${esc(F.error)}</small><div style="margin-top:8px"><button class="btn ghost" data-fileclear>OK</button></div></div>`;
+    if (F.problems.length) return `<div class="banner">${esc(F.name)}: ${F.problems.length} row${F.problems.length === 1 ? "" : "s"} can't be read, so nothing was added<small>${F.problems.slice(0, 8).map(esc).join("<br>")}${F.problems.length > 8 ? `<br>…and ${F.problems.length - 8} more` : ""}</small>
+        <div style="margin-top:8px"><button class="btn ghost" data-fileclear>OK</button></div></div>`;
+    const tot = F.lines.reduce((a, l) => a + l.amount, 0), d0 = F.lines.reduce((a, l) => l.date < a ? l.date : a, F.lines[0].date), d1 = F.lines.reduce((a, l) => l.date > a ? l.date : a, F.lines[0].date);
+    const forPo = F.lines.filter(l => l.po).length, make = F.names.filter(n => !n.same_as).length;
+    return `<div class="card"><p style="margin-top:0"><b>${esc(F.name)}</b>: ${F.lines.length} line${F.lines.length === 1 ? "" : "s"}, ${usd(tot, true)}, ${esc(mdy(d0))} to ${esc(mdy(d1))}.
+        ${forPo ? `${forPo} say which PO they're for: kept against it, not counted again.` : ""}
+        ${S.filesReady && F.names.length ? `It names ${F.names.length} item${F.names.length === 1 ? "" : "s"} that ${F.names.length === 1 ? "isn't" : "aren't"} here yet${make < F.names.length ? ` (${F.names.length - make} look like ${F.names.length - make === 1 ? "an item" : "items"} you have)` : ""}: they're made as it's added.` : ""}
+        Lines already in are skipped.</p>
+      <div class="row"><button class="btn or" data-filesend ${S.busy ? "disabled" : ""}>Add these lines</button><button class="link" data-fileclear>Cancel</button></div></div>`;
+  }
   function viewPrices() {
-    const P = pricesFor(S.data, S.year), ents = entries(S.data);
-    const cats = P.cats.map(c => `<tr><td>${esc(c.name)}</td><td class="num">${usd(c.spend)}</td><td class="num">${c.items}</td>
-        <td class="num ${c.against < 0 ? "up" : c.against > 0 ? "down" : ""}">${c.against >= 0 ? usd(c.against) + " saved" : usd(-c.against) + " more"}</td><td class="l">${esc(c.top)}</td></tr>`).join("");
-    const rows = P.rows.map(r => {
-      const open = S.openItem === r.item.id, chg = r.change === null ? "—" : `${r.change > 0 ? "+" : ""}${(r.change * 100).toFixed(1)}%`;
-      const paid = open ? ents.filter(e => e.item_id === r.item.id && e.year === S.year).reverse().map(e => `<tr><td>${esc(mdy(e.date))}</td><td class="l">${esc(e.supplier)}</td>
+    const y = S.year, P = pricesFor(S.data, y), ents = entries(S.data), groups = matchGroups(S.data), nWait = groups.reduce((a, g) => a + g.ids.length, 0);
+    const cats = (S.data.categories || []).filter(c => P.rows.some(r => r.item.category_key === c.key));
+    if (S.cat !== "all" && !cats.some(c => c.key === S.cat)) S.cat = "all";
+    const list = P.rows.filter(r => S.cat === "all" || r.item.category_key === S.cat);
+    const rows = list.map(r => {
+      const open = S.openItem === r.item.id, c = r.change;
+      const paid = open ? ents.filter(e => e.item_id === r.item.id && e.year === y).reverse().map(e => `<tr><td>${esc(mdy(e.date))}</td><td class="l">${esc(e.supplier)}</td>
           <td class="l">${esc(e.ref)}</td><td class="num">${e.qty === null ? "" : n0(e.qty)} ${esc(e.unit)}</td><td class="num">${e.price === null ? "" : price(e.price)}</td><td class="num">${usd(e.amount, true)}</td></tr>`).join("") : "";
-      return `<tr class="click ${open ? "open" : ""}" data-openitem="${esc(r.item.id)}"><td><b>${esc(r.item.name)}</b></td><td class="l">${esc(catName(r.item.category_key))}</td>
-        <td class="num">${n0(r.qty)} ${esc(r.item.unit)}</td><td class="num">${usd(r.spend)}</td><td class="num">${r.avg === null ? "—" : price(r.avg)}</td>
-        <td class="num" title="${esc(r.base ? r.base.how : "")}">${r.base ? price(r.base.price) : "—"}</td><td class="num ${r.change > 0.005 ? "up" : r.change < -0.005 ? "down" : ""}">${chg}</td>
-        <td class="num">${signed(r.against)}</td><td class="l">${esc(r.top)}${r.suppliers > 1 ? ` <span class="muted small">+${r.suppliers - 1}</span>` : ""}</td></tr>
-        ${open ? `<tr><td colspan="9" style="padding:0"><div class="detail"><div class="note">Measured against: ${esc(r.base ? r.base.how : "nothing yet")}.</div>
+      return `<tr class="click ${open ? "open" : ""}" data-openitem="${esc(r.item.id)}"><td><b>${esc(r.item.name)}</b></td>
+        <td class="num">${n0(r.qty)} ${esc(r.item.unit)}</td><td class="num">${r.avg === null ? "—" : price(r.avg)}</td>
+        <td class="num ${c > .005 ? "up" : c < -.005 ? "down" : ""}" title="${esc(r.base ? r.base.how : "")}">${c === null ? "—" : Math.abs(c) < .005 ? "same" : `${c > 0 ? "up" : "down"} ${Math.abs(c * 100).toFixed(1)}%`}</td>
+        <td class="num">${signed(r.against)}</td></tr>
+        ${open ? `<tr><td colspan="5" style="padding:0"><div class="detail"><div class="note">Measured against ${r.base ? `${price(r.base.price)}, its ${esc(r.base.how)}` : "nothing yet"}.${r.suppliers > 1 ? ` Bought from ${r.suppliers} suppliers.` : ""}</div>
           <div class="tw"><table><thead><tr><th>Date</th><th class="l">Supplier</th><th class="l">PO or bill</th><th>Quantity</th><th>Price</th><th>Amount</th></tr></thead><tbody>${paid}</tbody></table></div></div></td></tr>` : ""}`;
     }).join("");
-    const y = S.year;
-    return `<div class="titlerow"><div class="grow"><h2>Prices ${y}</h2><p class="sub" style="margin-bottom:0">Every production buy entered, on a PO or not, against the price the year before: a typed baseline (lumber's ${y - 1} averages), else ${y - 1}'s average paid, else the first price paid in ${y}.</p></div>${yearPicker()}
-        <button class="btn ghost" data-export>Export ${y} for the yearly check</button></div>
-      <div class="grid">
-        ${stat("Spent on production", usd(P.spend), P.noItemLines ? `${usd(P.noItemSpend)} of it on ${P.noItemLines} line${P.noItemLines === 1 ? "" : "s"} with no item` : "every line filed under an item", true)}
-        ${stat("Against the baseline", P.saved >= 0 ? `${usd(P.saved)} saved` : `${usd(-P.saved)} more`, "all categories, items with a baseline")}
-        ${stat("Items gone up", String(P.up), "paying more than their baseline")}
-        ${stat("Not matched yet", String(P.toMatch), P.toMatch ? `<button class="link" data-tabgo="file" style="padding:0">Match them on the Purchases file tab</button>` : "nothing waiting")}
-      </div>
-      <h3>By category</h3>
-      ${cats ? `<div class="tw"><table><thead><tr><th>Category</th><th>Spent</th><th>Items</th><th>Against baseline</th><th class="l">Top supplier</th></tr></thead><tbody>${cats}</tbody></table></div>` : `<p class="muted">Nothing bought in ${y} yet.</p>`}
-      <h3>Items (tap one for every price paid)</h3>
-      ${rows ? `<div class="tw"><table><thead><tr><th>Item</th><th class="l">Category</th><th>Bought</th><th>Spent</th><th>Average</th><th>Baseline</th><th>Change</th><th>Saved</th><th class="l">Supplier</th></tr></thead><tbody>${rows}</tbody></table></div>` : ""}
-      <p class="note" style="margin:10px 2px">The export is every line counted in ${y}: date, from a PO or the Purchases file, the PO or bill number, supplier, category, item, quantity, unit, price and amount, to check against the bills once a year.</p>`;
+    let lumber = "";
+    if (S.cat === "lumber") {
+      const R = lumberResults(scrapData(), y), mix = supplierMix(S.data, y), last = y - 1, notes = [];
+      if (R.onOrder) notes.push(`${n0(R.onOrder)} bd ft of it is still on order: counted as ordered until its delivery slips are picked on the PO.`);
+      if (R.noPrice) notes.push(`${R.noPrice} PO line${R.noPrice === 1 ? " has" : "s have"} no price yet, so ${R.noPrice === 1 ? "it isn't" : "they aren't"} in the dollars.`);
+      if (R.noBench) notes.push(`${R.noBench} PO line${R.noBench === 1 ? "'s item has" : "s' items have"} no ${last} baseline (Setup, Baselines).`);
+      const mixRows = mix.rows.map(v => `<tr><td>${esc(v.name)}</td>${mix.hasBefore ? `<td class="num">${pct(v.bfShareBefore)}</td>` : ""}<td class="num">${pct(v.bfShareNow)}</td>
+          ${mix.hasBefore ? `<td class="num">${usd(v.before.dollars)}</td>` : ""}<td class="num">${usd(v.now.dollars)}</td></tr>`).join("");
+      lumber = `<details class="fold" data-keep="lumber" ${S.keep.has("lumber") ? "open" : ""}><summary>More on lumber</summary>
+        <div class="grid">${stat("Board feet on lumber POs", n0(R.bf), `${R.lines} PO line${R.lines === 1 ? "" : "s"}`)}${stat("Spent on lumber POs", usd(R.spent), `${price(R.avg)} a board foot`)}
+          ${stat("Saved on price", usd(R.saving), `against ${last} baselines, ${pct(R.costCut)} less`)}
+          ${stat("Lost on purchase", pct(R.lostOnPurchase), R.lostOnPurchase === null ? "nothing measured after SLR yet" : "measured after SLR against what was billed")}</div>
+        ${notes.map(t => `<p class="note" style="margin:8px 2px 0">${esc(t)}</p>`).join("")}
+        ${mixRows ? `<h3>Who you buy lumber from</h3><div class="tw"><table><thead><tr><th>Supplier</th>${mix.hasBefore ? `<th>Board feet ${last}</th>` : ""}<th>Board feet ${y}</th>${mix.hasBefore ? `<th>Dollars ${last}</th>` : ""}<th>Dollars ${y}</th></tr></thead><tbody>${mixRows}</tbody></table></div>` : ""}
+        <p class="note" style="margin:8px 2px 0">Scrap against the ${SCRAP_ALLOWANCE} allowance is on the Savings tab.</p></details>`;
+    }
+    return `${fileBox()}${fileReport()}
+      ${nWait ? `<div class="banner ask"><b>${nWait} line${nWait === 1 ? " has" : "s have"} no item.</b> ${nWait === 1 ? "It isn't" : "They aren't"} in the prices until ${nWait === 1 ? "it has" : "they have"} one.
+        <div style="margin-top:8px"><button class="btn or" data-sheet="match">Give ${nWait === 1 ? "it an item" : "them items"}</button></div></div>` : ""}
+      <div class="titlerow"><div class="grow"><h2>Worth a look</h2></div>${yearPicker()}
+        <button class="${S.logsReady ? "link" : "btn ghost"}" data-pickfile>${S.logsReady ? "Load past purchases from a file" : "Add a Purchases file"}</button><input type="file" id="fileIn" accept=".xlsx,.csv" hidden>
+        <button class="btn ghost" data-export>Export ${y}</button></div>
+      ${lookHtml()}
+      <h2 style="margin-top:22px">What you paid in ${y}</h2>
+      ${cats.length > 1 ? `<div class="chips"><button class="chip" data-cat="all" aria-pressed="${S.cat === "all"}">All</button>${cats.map(c => `<button class="chip" data-cat="${esc(c.key)}" aria-pressed="${S.cat === c.key}">${esc(c.name)}</button>`).join("")}</div>` : ""}
+      ${rows ? `<div class="tw"><table class="five"><thead><tr><th>Item</th><th>Bought</th><th>Average</th><th>Against its baseline</th><th>Saved</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <p class="note" style="margin:8px 2px">Tap an item for every price paid.${P.noItemLines ? ` ${P.noItemLines} line${P.noItemLines === 1 ? "" : "s"} (${usd(P.noItemSpend)}) ${P.noItemLines === 1 ? "has" : "have"} no item, so ${P.noItemLines === 1 ? "it isn't" : "they aren't"} in this table.` : ""}
+          Export is every line counted in ${y}, to check against the bills once a year.</p>` : `<p class="muted" style="margin:8px 2px">Nothing bought in ${y} yet.</p>`}
+      ${lumber}`;
   }
 
-  // ---------- Savings to chase ----------
-  function viewChase() {
-    const C = chaseFor(S.data);
-    const spread = C.spread.slice(0, 15).map(s => `<tr><td><b>${esc(s.item.name)}</b></td><td class="l wrap">${s.suppliers.map(x => `${esc(x.name)} ${price(x.avg)}`).join(" · ")}</td>
-        <td class="l">${esc(s.best.name)}</td><td class="num">${usd(s.potential)}</td></tr>`).join("");
-    const creep = C.creep.slice(0, 15).map(c => `<tr><td><b>${esc(c.item.name)}</b></td><td class="num">${price(c.base.price)}</td><td class="num">${price(c.last.price)}</td>
-        <td class="num up">+${(c.change * 100).toFixed(1)}%</td><td class="l">${esc(c.last.supplier)} · ${esc(mdy(c.last.date))}</td></tr>`).join("");
-    const single = C.single.slice(0, 15).map(s => `<tr><td><b>${esc(s.item.name)}</b></td><td class="l">${esc(s.supplier)}</td><td class="num">${usd(s.spend)}</td></tr>`).join("");
-    return `<h2>Savings to chase</h2><p class="sub">From everything bought since ${esc(mdy(C.since))}.</p>
-      <h3>The same item from two suppliers at different prices</h3>
-      ${spread ? `<div class="tw"><table><thead><tr><th>Item</th><th class="l">Average paid by supplier</th><th class="l">Cheapest</th><th>If all at the cheapest</th></tr></thead><tbody>${spread}</tbody></table></div>` : `<p class="muted">None: no item bought from two suppliers at prices more than 2% apart.</p>`}
-      <h3>Prices creeping up</h3>
-      ${creep ? `<div class="tw"><table><thead><tr><th>Item</th><th>Baseline</th><th>Last paid</th><th>Up</th><th class="l">Last bought</th></tr></thead><tbody>${creep}</tbody></table></div>` : `<p class="muted">None: no last price more than 5% over its baseline.</p>`}
-      <h3>Big spend from one supplier only</h3>
-      ${single ? `<div class="tw"><table><thead><tr><th>Item</th><th class="l">Supplier</th><th>Spent</th></tr></thead><tbody>${single}</tbody></table></div>
-        <p class="note" style="margin:8px 2px">$2,500 or more in the last year, all from one supplier: worth a quote from another.</p>` : `<p class="muted">None over $2,500.</p>`}`;
-  }
-
-  // ---------- Lumber: the tracker's results, and slips on PO lines ----------
-  async function loadSlips() {
-    const [l, r] = await Promise.all([Promise.resolve(db.rpc("purchase_slip_lines")).catch(e => ({ error: e })),
-      Promise.resolve(db.from("inv_receipts").select("id,received_on,month_end,supplier,item_id,board_feet,mistake_at").eq("kind", "lumber")
-        .is("mistake_at", null).order("received_on", { ascending: false }).limit(80)).catch(e => ({ error: e }))]);
-    if (l.error || r.error) { S.msg = { ok: false, text: friendlyError(l.error || r.error) }; S.slipLines = { lines: [], links: [] }; S.slips = []; return; }
-    S.slipLines = l.data || { lines: [], links: [] }; S.slips = r.data || [];
-  }
-  function viewLumber() {
-    const out = new Set(S.skips.map(x => String(x.month_end).slice(0, 10)));
-    const D = { ...S.data, scrap_history: (S.data.scrap_history || []).filter(m => !out.has(String(m.month_end).slice(0, 10))),
-                scrap_inventory: (S.data.scrap_inventory || []).filter(m => !out.has(String(m.month_end).slice(0, 10))) };
-    const R = lumberResults(D, S.year), mix = supplierMix(S.data, S.year), last = S.year - 1;
-    const leftOut = S.skips.filter(x => yearOf(x.month_end) === S.year);
-    const monthName = (d) => new Date(String(d).slice(0, 10) + "T12:00").toLocaleString("en-US", { month: "long", year: "numeric" });
-    const notes = [];
-    if (R.onOrder) notes.push(`${n0(R.onOrder)} bd ft of it is still on order: counted as ordered until its delivery slips are picked below.`);
-    if (R.noPrice) notes.push(`${R.noPrice} line${R.noPrice === 1 ? " has" : "s have"} no price yet, so ${R.noPrice === 1 ? "it isn't" : "they aren't"} in the dollars.`);
-    if (R.noBench) notes.push(`${R.noBench} line${R.noBench === 1 ? "'s item has" : "s' items have"} no ${last} baseline, so no saving is worked out for ${R.noBench === 1 ? "it" : "them"} (Setup › Baselines).`);
-    const months = R.months.map(m => `<tr><td>${esc(new Date(m.month_end + "T12:00").toLocaleString("en-US", { month: "long" }))}</td><td class="num">${n0(m.zero)}</td><td class="num">${n0(m.used)}</td>
-        <td class="num">${m.ratio.toFixed(2)}</td><td class="num">${n0(m.allow)}</td><td class="num">${n0(m.saved)}</td><td class="l muted small">${esc(m.from)}</td>
-        <td>${S.skipsReady ? `<button class="link" data-skipmonth="${esc(m.month_end)}">Leave out</button>` : ""}</td></tr>`).join("");
-    const mixRows = mix.rows.map(r => `<tr><td>${esc(r.name)}</td>${mix.hasBefore ? `<td class="num">${pct(r.bfShareBefore)}</td>` : ""}<td class="num">${pct(r.bfShareNow)}</td>
-        ${mix.hasBefore ? `<td class="num">${pct(r.dShareBefore)}</td>` : ""}<td class="num">${pct(r.dShareNow)}</td>
-        ${mix.hasBefore ? `<td class="num">${n0(r.before.bf)}</td>` : ""}<td class="num">${n0(r.now.bf)}</td>${mix.hasBefore ? `<td class="num">${usd(r.before.dollars)}</td>` : ""}<td class="num">${usd(r.now.dollars)}</td></tr>`).join("");
-    return `<div class="titlerow"><div class="grow"><h2>Lumber ${S.year}</h2><p class="sub" style="margin-bottom:0">What was bought on lumber POs against ${last}'s baselines, and lumber saved against the 1.7 scrap allowance. Every lumber PO counts from the day it's made.</p></div>${yearPicker()}</div>
-      <div class="grid">
-        ${stat("Board feet bought", n0(R.bf), `${R.lines} PO line${R.lines === 1 ? "" : "s"}`)}
-        ${stat("Spent on lumber", usd(R.spent), `${price(R.avg)} a board foot on average`)}
-        ${stat("Saved on price", usd(R.saving), `against ${last} baselines · ${pct(R.costCut)} less`)}
-        ${stat("Saved on scrap", usd(R.scrapDollars), R.months.length ? `${n0(R.savedBf)} bd ft under the 1.7 allowance · ${pct(R.scrapCut)}` : "no months with scrap figures yet")}
-        ${stat("Estimated total saved", usd(R.total), `${pct(R.totalCut)} in all`, true)}
-        ${stat("Lost on purchase", pct(R.lostOnPurchase), R.lostOnPurchase === null ? "nothing measured after SLR yet" : R.lostOnPurchase < 0 ? "measured after SLR: more than was billed" : "measured after SLR: less than was billed")}
-      </div>
-      ${notes.map(t => `<p class="note" style="margin:8px 2px 0">${esc(t)}</p>`).join("")}
-      <h3>Scrap against the 1.7 allowance</h3>
-      ${R.months.length ? `<div class="tw"><table><thead><tr><th>Month</th><th>0-scrap bd ft</th><th>Used</th><th>Used ÷ 0-scrap</th><th>1.7 allowance</th><th>Saved</th><th class="l">From</th><th></th></tr></thead>
-        <tbody>${months}<tr class="subtot"><td>${S.year}</td><td class="num">${n0(R.months.reduce((a, m) => a + m.zero, 0))}</td><td class="num">${n0(R.months.reduce((a, m) => a + m.used, 0))}</td>
-          <td class="num">${R.ratio === null ? "—" : R.ratio.toFixed(2)}</td><td class="num">${n0(R.months.reduce((a, m) => a + m.allow, 0))}</td><td class="num">${n0(R.savedBf)}</td><td></td><td></td></tr></tbody></table></div>
-        <p class="note" style="margin:8px 2px 0">Inventory's months appear here once they're closed on the Inventory page. Saved board feet × this year's average price = saved on scrap.${S.skipsReady ? " A month whose counts weren't done can be left out; it stays as it is on the Inventory page." : ""}</p>`
-      : `<p class="muted">No months yet: the workbook's April–June figures load with purchasing_history.sql, and Inventory's months appear once closed.</p>`}
-      ${leftOut.length ? `<p class="note" style="margin:8px 2px 0">Left out: ${leftOut.map(x => `<b>${esc(monthName(x.month_end))}</b> (${esc(x.reason)}${x.by ? `, ${esc(x.by)}` : ""}) <button class="link" data-putbackmonth="${esc(x.month_end)}">Put back</button>`).join("; ")}</p>` : ""}
-      <h3>Suppliers</h3>
-      ${mix.rows.length ? `<div class="tw"><table><thead>
-          <tr><th></th><th colspan="${mix.hasBefore ? 2 : 1}">Share of board feet</th><th colspan="${mix.hasBefore ? 2 : 1}">Share of dollars</th><th colspan="${mix.hasBefore ? 2 : 1}">Board feet</th><th colspan="${mix.hasBefore ? 2 : 1}">Dollars</th></tr>
-          <tr><th>Supplier</th>${[0, 1, 2, 3].map(() => `${mix.hasBefore ? `<th>${last}</th>` : ""}<th>${S.year}</th>`).join("")}</tr></thead>
-        <tbody>${mixRows}</tbody></table></div>
-        <p class="note" style="margin:8px 2px 0">${mix.hasBefore ? `${last} is as typed in Setup › Earlier lumber years; ${S.year} adds itself up from the POs.` : `Type ${last}'s figures in Setup › Earlier lumber years to compare.`}</p>`
-      : `<p class="muted">No lumber POs in ${S.year} yet.</p>`}
-      <h3>Delivery slips and PO lines</h3>
-      ${slipsSection()}`;
-  }
-  function slipsSection() {
-    if (!S.slipLines) return `<button class="btn ghost" data-loadslips>Show Inventory's lumber slips</button>
-      <p class="note" style="margin:8px 2px">A lumber PO line counts what was ordered until its slips are picked here; then what they brought in.</p>`;
-    const links = new Map((S.slipLines.links || []).map(x => [x.receipt_id, x.line_id])), lines = S.slipLines.lines || [];
-    const invName = (id) => ((S.data.inv_items || []).find(i => i.id === id) || {}).name || "";
-    const rows = S.slips.map(r => {
-      const cur = links.get(r.id), opts = lines.filter(l => l.open || l.id === cur).sort((a, b) => (b.inv_item_id === r.item_id) - (a.inv_item_id === r.item_id));
-      return `<tr><td>${esc(mdy(r.received_on))}</td><td class="l">${esc(r.supplier || "")}</td><td class="l">${esc(invName(r.item_id))}</td><td class="num">${n0(r.board_feet)}</td>
-        <td><select data-slip="${esc(r.id)}" aria-label="PO line this slip fills"><option value="">No PO line</option>${opts.map(l => `<option value="${esc(l.id)}" ${l.id === cur ? "selected" : ""}>${esc(l.po)} line ${l.position}: ${esc(l.item)} (${n0(l.in_bf)} of ${n0(l.qty)} in)</option>`).join("")}</select></td></tr>`;
-    }).join("");
-    return rows ? `<div class="tw"><table><thead><tr><th>Received</th><th class="l">Supplier</th><th class="l">Inventory item</th><th>Bd ft</th><th class="l">Fills</th></tr></thead><tbody>${rows}</tbody></table></div>
-      <p class="note" style="margin:8px 2px">The last 80 lumber slips from Inventory's Deliveries in. Lines for the same Inventory item are listed first. A slip in a closed month stays as it is.</p>`
-      : `<p class="muted">No lumber slips on the Inventory page yet.</p>`;
-  }
-
-  // ---------- the Purchases file, and Match these ----------
+  // ---------- the Purchases file ----------
   const inflateRaw = async (bytes) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer());
   async function readFile(f) {
     S.file = { name: f.name, reading: true }; render();
@@ -1186,73 +1415,156 @@ if (typeof document !== "undefined") (function () {
       let rows;
       if (/\.csv$/i.test(f.name)) rows = readCsv(new TextDecoder().decode(buf));
       else if (/\.xlsx$/i.test(f.name)) { if (typeof DecompressionStream !== "function") throw new Error("This browser can't open .xlsx files. Use Chrome or Edge, or save the Lines tab as a .csv."); rows = pickSheet(await readXlsx(buf, inflateRaw)); }
-      else throw new Error("Drop the Purchases file as .xlsx or .csv.");
+      else throw new Error("Choose the Purchases file as .xlsx or .csv.");
       const r = sheetToLines(rows);
-      S.file = { name: f.name, sha256: await sha256Hex(buf), client_id: newId(), lines: r.lines, problems: r.problems };
+      if (!r.lines.length && !r.problems.length) throw new Error("The file has no lines under its header row.");
+      S.file = { name: f.name, sha256: await sha256Hex(buf), client_id: newId(), lines: r.lines, problems: r.problems, names: fileNames(r.lines, S.data) };
     } catch (e) { S.file = { name: f.name, error: friendlyError(e) }; }
     render();
   }
   async function sendFile() {
     const F = S.file; if (!F || !F.lines || F.problems.length) return;
     S.busy = true; render();
-    const r = await Promise.resolve(db.rpc("purchases_drop", { p_client_id: F.client_id, p_file: { name: F.name, sha256: F.sha256 }, p_lines: F.lines })).catch(e => ({ error: e }));
+    const file = { name: F.name, sha256: F.sha256 };
+    let r = S.filesReady ? await Promise.resolve(db.rpc("purchases_add", { p_client_id: F.client_id, p_file: file, p_lines: F.lines, p_names: F.names })).catch(e => ({ error: e }))
+      : await Promise.resolve(db.rpc("purchases_drop", { p_client_id: F.client_id, p_file: file, p_lines: F.lines })).catch(e => ({ error: e }));
     S.busy = false;
     if (r.error) { S.msg = { ok: false, text: friendlyError(r.error) }; return render(); }
-    S.file = null; S.msg = { ok: true, text: `${F.name}: ${r.data.summary}` }; await load(); render();
+    S.file = null; store.set("fileSeen", "");
+    S.msg = S.filesReady ? null : { ok: true, text: `${F.name}: ${r.data.summary}` };
+    await load(); render(); window.scrollTo(0, 0);
   }
-  function viewFile() {
-    const F = S.file, groups = matchGroups(S.data), items = (S.data.items || []).filter(i => !i.retired), cats = S.data.categories || [], newNames = fileItemNames(S.data);
-    const itemOpts = `<option value="">Choose the item…</option>${cats.filter(c => items.some(i => i.category_key === c.key)).map(c => `<optgroup label="${esc(c.name)}">${items.filter(i => i.category_key === c.key)
-      .map(it => `<option value="${esc(it.id)}">${esc(it.name)}</option>`).join("")}</optgroup>`).join("")}`;
-    let drop;
-    if (!F) drop = `<label class="drop" id="dropzone"><b>Drop the Purchases file here</b><br><span class="muted">or tap to choose it: .xlsx (its Lines tab) or .csv</span>
-        <input type="file" id="fileIn" accept=".xlsx,.csv" hidden></label>`;
-    else if (F.reading) drop = `<div class="card">Reading ${esc(F.name)}…</div>`;
-    else if (F.error) drop = `<div class="banner">${esc(F.name)} couldn't be read<small>${esc(F.error)}</small><div style="margin-top:8px"><button class="btn ghost" data-fileclear>Choose another file</button></div></div>`;
-    else {
-      const forPo = F.lines.filter(l => l.po).length, tot = F.lines.reduce((a, l) => a + l.amount, 0);
-      drop = F.problems.length
-        ? `<div class="banner">${esc(F.name)}: ${F.problems.length} row${F.problems.length === 1 ? "" : "s"} can't be read, so nothing was added<small>${F.problems.slice(0, 8).map(esc).join("<br>")}${F.problems.length > 8 ? `<br>…and ${F.problems.length - 8} more` : ""}</small>
-           <div style="margin-top:8px"><button class="btn ghost" data-fileclear>Choose another file</button></div></div>`
-        : `<div class="card"><p style="margin-top:0"><b>${esc(F.name)}</b>: ${F.lines.length} line${F.lines.length === 1 ? "" : "s"}, ${usd(tot, true)}, from ${esc(mdy(F.lines.reduce((a, l) => l.date < a ? l.date : a, F.lines[0].date)))} to ${esc(mdy(F.lines.reduce((a, l) => l.date > a ? l.date : a, F.lines[0].date)))}.
-            ${forPo ? `${forPo} of them say which PO they're for: kept against it, not counted again.` : ""} Lines already in are skipped.</p>
-            <div class="row"><button class="btn or" data-filesend ${S.busy ? "disabled" : ""}>Add these lines</button><button class="link" data-fileclear>Cancel</button></div></div>`;
+
+  // ---------- sheets: one thing over the page at a time ----------
+  const itemOptions = (cat, sel) => { const items = (S.data.items || []).filter(i => !i.retired), cats = (S.data.categories || []).filter(c => (!cat || c.key === cat) && items.some(i => i.category_key === c.key));
+    return cats.map(c => `<optgroup label="${esc(c.name)}">${items.filter(i => i.category_key === c.key).map(it => `<option value="${esc(it.id)}" ${it.id === sel ? "selected" : ""}>${esc(it.name)}</option>`).join("")}</optgroup>`).join(""); };
+  // ---------- Log a purchase ----------
+  const blankLogLine = () => ({ name: "", qty: "1", price: "", req: null, asked: "", cat: "", unit: "", quarters: "" });
+  function openLog(g) {
+    if (g) S.log = { id: g.id, client_id: newId(), supplier: g.supplier, on: String(g.on).slice(0, 10), doc: g.doc || "",
+      lines: (g.lines || []).map(l => ({ ...blankLogLine(), name: l.item, qty: String(Number(l.qty)), price: String(Number(l.unit_price)), req: l.supply_request_id || null,
+        asked: ((S.reqs.find(r => r.id === l.supply_request_id) || {}).department_name) || "" })) };
+    else { const ticked = S.reqs.filter(r => S.ticked.has(r.id));
+      S.log = { id: null, client_id: newId(), supplier: "", on: String(S.data.today).slice(0, 10), doc: "",
+        lines: ticked.length ? ticked.map(r => ({ ...blankLogLine(), ...requestLine(S.data, r) })) : [blankLogLine()] }; }
+    S.sheet = "log"; S.msg = null; render();
+    const first = app.querySelector(S.log.id ? "[data-lgf=supplier]" : "[data-lgf=supplier]"); if (first) first.focus();
+  }
+  /** what's typed in the form, into S.log: read before anything redraws it */
+  function readLog() {
+    if (!S.log || !app.querySelector(".logsheet")) return;
+    for (const f of ["supplier", "on", "doc"]) { const e = app.querySelector(`[data-lgf="${f}"]`); if (e) S.log[f] = e.value; }
+    S.log.lines.forEach((l, k) => { for (const f of ["name", "qty", "price", "cat", "unit", "quarters"]) { const e = app.querySelector(`[data-lg="${k}|${f}"]`); if (e) l[f] = e.value; } });
+  }
+  const lineAmount = (l) => { const q = Number(l.qty), p = Number(l.price); return isFinite(q) && isFinite(p) && l.qty !== "" && l.price !== "" ? Math.round(q * p * 100) / 100 : null; };
+  /** the form's amounts, total and new-item fields follow the typing, in place: nothing is redrawn under the cursor */
+  function logLive() {
+    readLog(); if (!S.log) return;
+    S.log.lines.forEach((l, k) => {
+      const a = app.querySelector(`[data-lgamt="${k}"]`), v = lineAmount(l); if (a) a.textContent = v === null ? "" : usd(v, true);
+      const nw = app.querySelector(`[data-lgnew="${k}"]`), isNew = !!l.name.trim() && !itemByName(S.data, l.name);
+      if (nw) { nw.hidden = !isNew; const lum = l.cat === "lumber"; nw.querySelector("[data-lgunit]").hidden = lum; nw.querySelector("[data-lgq]").hidden = !lum; }
+    });
+    const t = app.querySelector("#logTotal"); if (t) t.textContent = usd(S.log.lines.reduce((a, l) => a + (lineAmount(l) || 0), 0), true);
+    const sup = app.querySelector("#logSupNew"), sv = S.log.supplier.trim().toLowerCase();
+    if (sup) sup.hidden = !sv || (S.data.suppliers || []).some(v => [v.name, ...(v.aliases || [])].some(x => String(x).toLowerCase() === sv));
+  }
+  function logSheet() {
+    const L = S.log, cats = (S.data.categories || []).filter(c => !c.retired);
+    const items = (S.data.items || []).filter(i => !i.retired), sups = (S.data.suppliers || []).filter(v => !v.retired);
+    const line = (l, k) => { const isNew = !!l.name.trim() && !itemByName(S.data, l.name), lum = l.cat === "lumber", amt = lineAmount(l);
+      return `<div class="lgrow"><label class="lgi"><span class="lab">${k ? "" : "Item"}</span><input data-lg="${k}|name" list="logItems" value="${esc(l.name)}" placeholder="Pick an item, or type a new one" autocomplete="off"></label>
+          <label class="lgq"><span class="lab">${k ? "" : "Qty"}</span><input data-lg="${k}|qty" value="${esc(l.qty)}" inputmode="decimal"></label>
+          <label class="lgp"><span class="lab">${k ? "" : "Price each"}</span><input data-lg="${k}|price" value="${esc(l.price)}" inputmode="decimal" placeholder="$"></label>
+          <span class="lgamt num" data-lgamt="${k}">${amt === null ? "" : usd(amt, true)}</span>
+          <button class="lgx" data-logx="${k}" aria-label="Take line ${k + 1} off">×</button></div>
+        <div class="lgnew" data-lgnew="${k}" ${isNew ? "" : "hidden"}><span class="note">A new item:</span>
+          <select data-lg="${k}|cat" aria-label="Its category"><option value="">Category…</option>${cats.map(c => `<option value="${esc(c.key)}" ${c.key === l.cat ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
+          <input data-lg="${k}|unit" data-lgunit value="${esc(l.unit)}" placeholder="Bought by: each, box, gallon…" aria-label="What it's bought by" ${lum ? "hidden" : ""}>
+          <input data-lg="${k}|quarters" data-lgq class="n" value="${esc(l.quarters)}" inputmode="numeric" placeholder="Quarters: 6 for 6/4" aria-label="Thickness in quarters" ${lum ? "" : "hidden"}></div>
+        ${l.req ? `<p class="lgasked">${esc(l.asked || "A department")} asked for it: logging it marks their request ordered.</p>` : ""}`; };
+    const tot = L.lines.reduce((a, l) => a + (lineAmount(l) || 0), 0), sv = L.supplier.trim().toLowerCase();
+    const supNew = !!sv && !sups.some(v => [v.name, ...(v.aliases || [])].some(x => String(x).toLowerCase() === sv));
+    return `<div class="scrim" data-sheetclose="1"><div class="sheet logsheet" role="dialog" aria-modal="true" aria-label="${L.id ? "Change a logged purchase" : "Log a purchase"}">
+      <h3>${L.id ? "Change this purchase" : "Log a purchase"}</h3>
+      <p class="sub" style="margin:0 0 12px">What was bought, where, and what it cost. It counts in Prices and Savings straight away.</p>
+      <div class="lgtop"><label><span class="lab">From</span><input data-lgf="supplier" list="logSups" value="${esc(L.supplier)}" placeholder="Amazon, Home Depot…" autocomplete="off"></label>
+        <label><span class="lab">Date</span><input data-lgf="on" type="date" value="${esc(L.on)}"></label>
+        <label><span class="lab">Order or receipt # (optional)</span><input data-lgf="doc" value="${esc(L.doc)}"></label></div>
+      <p class="note" id="logSupNew" ${supNew ? "" : "hidden"} style="margin:-2px 0 6px">A supplier the shop hasn't used: it's added by this name.</p>
+      <datalist id="logSups">${sups.map(v => `<option value="${esc(v.name)}">`).join("")}</datalist>
+      <datalist id="logItems">${items.map(i => `<option value="${esc(i.name)}">`).join("")}</datalist>
+      ${L.lines.map(line).join("")}
+      <div class="row" style="margin-top:8px"><button class="link" data-logadd>Add a line</button><span style="flex:1"></span><b class="num" id="logTotal">${usd(tot, true)}</b></div>
+      <div class="row end" style="margin-top:12px"><button class="link" data-sheetclose="1">Cancel</button>
+        <button class="btn or" data-logsave ${S.busy ? "disabled" : ""}>${L.id ? "Save the change" : "Log it"}</button></div></div></div>`;
+  }
+  async function saveLog() {
+    readLog(); const L = S.log; if (!L) return;
+    const lines = L.lines.filter(l => l.name.trim() || l.price !== "").map(l => {
+      const it = itemByName(S.data, l.name);
+      return { ...(it ? { item_id: it.id } : { new_item: { name: l.name.trim(), category_key: l.cat, unit: l.unit.trim(), quarters: l.quarters.trim() } }),
+               qty: l.qty.trim(), unit_price: l.price.trim().replace(/^\$/, ""), supply_request_id: l.req || null };
+    });
+    const p = { id: L.id, supplier: L.supplier.trim(), bought_on: L.on, doc: L.doc.trim(), lines };
+    const d = await call("purchase_log_save", { p_client_id: L.client_id, p }, (x) => x.summary);
+    if (d) { S.log = null; S.sheet = null; S.ticked = new Set(); render(); }
+  }
+
+  function sheetHtml() {
+    if (S.sheet === "log" && S.log) return logSheet();
+    const wrap = (label, inner) => `<div class="scrim" data-sheetclose="1"><div class="sheet" role="dialog" aria-modal="true" aria-label="${label}">${inner}</div></div>`;
+    if (S.sheet === "match") {
+      const groups = matchGroups(S.data), g = groups[0], cats = (S.data.categories || []).filter(c => !c.retired);
+      if (!g) return wrap("Lines with no item", `<h3>Every line has an item</h3><div class="row end"><button class="btn" data-sheetclose="1">Done</button></div>`);
+      const text = ((S.data.buys || []).find(b => b.id === g.ids[0]) || {}).item_text || "";
+      return wrap("Give it an item", `<p class="note" style="margin:0 0 4px">${groups.length} to go</p>
+        <h3>${esc(g.description)}</h3>
+        <p class="sub" style="margin:0 0 12px">${esc(g.supplier)}, ${g.ids.length} line${g.ids.length === 1 ? "" : "s"}, ${usd(g.total, true)}, last ${esc(mdy(g.last))}${text ? `. The file calls it “${esc(text)}”` : ""}.</p>
+        ${S.matchNew === g.key ? `<div class="form" style="grid-template-columns:1fr 1fr"><label style="grid-column:1/-1">New item<input data-nm="name" value="${esc(text)}"></label>
+            <label>Category<select data-nm="category_key">${cats.map(c => `<option value="${esc(c.key)}" ${c.key === (g.category || "") ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>
+            <label>Unit (lumber: leave blank)<input data-nm="unit" placeholder="sheet, each, gallon…"></label>
+            <label>Lumber: thickness in quarters<input data-nm="quarters" class="n" inputmode="numeric" placeholder="6 for 6/4"></label></div>
+          <div class="row end"><button class="link" data-newitemcancel>Back</button><button class="btn or" data-newitem="0">Make it and match</button></div>`
+        : `<select data-matchsel="0" aria-label="Item"><option value="">Choose the item…</option>${itemOptions()}</select>
+          <div class="row end" style="margin-top:12px"><button class="link" data-newitemopen="${esc(g.key)}">New item</button><button class="link" data-forpo="0">It's for a PO</button>
+            <button class="link" data-leaveout="0">Leave it out</button><span style="flex:1"></span><button class="link" data-sheetclose="1">Close</button><button class="btn or" data-match="0">Save</button></div>
+          <p class="note" style="margin:10px 0 0">Saved once, it's remembered: the next file's line from this supplier with these words files itself.</p>`}`);
     }
-    const mrows = groups.slice(0, 60).map((g, gi) => {
-      const mk = S.matchNew === g.key;
-      return `<tr><td class="l wrap"><b>${esc(g.description)}</b><div class="note">${esc(g.supplier)} · ${g.ids.length} line${g.ids.length === 1 ? "" : "s"} · last ${esc(mdy(g.last))}${g.category ? ` · ${esc(catName(g.category))}` : ""}</div></td>
-        <td class="num">${usd(g.total, true)}</td>
-        <td style="min-width:240px">${mk ? `<div class="form" style="grid-template-columns:1fr"><label>New item<input data-nm="name" value="${esc(((S.data.buys || []).find(b => b.id === g.ids[0]) || {}).item_text || "")}"></label>
-              <label>Category<select data-nm="category_key">${cats.filter(c => !c.retired).map(c => `<option value="${esc(c.key)}" ${c.key === (g.category || "") ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>
-              <label>Unit (lumber: bd ft)<input data-nm="unit" placeholder="sheet, each, gallon…"></label><label>Lumber: quarters<input data-nm="quarters" class="n" inputmode="numeric" placeholder="6 for 6/4"></label>
-              <div class="row"><button class="btn" data-newitem="${gi}">Make it and match</button><button class="link" data-newitemcancel>Cancel</button></div></div>`
-          : `<select data-matchsel="${gi}" aria-label="Item for ${esc(g.description)}">${itemOpts}</select>`}</td>
-        <td>${mk ? "" : `<div class="row"><button class="btn ghost" data-match="${gi}">Match</button><button class="link" data-newitemopen="${esc(g.key)}">New item</button>
-          <button class="link" data-forpo="${gi}">For a PO</button><button class="link" data-leaveout="${gi}">Leave out</button></div>`}</td></tr>`;
-    }).join("");
-    const files = (S.data.files || []).slice(0, 12).map(f => `<tr><td class="l">${esc(f.file_name)}</td><td>${esc(when(f.dropped_at))}</td><td class="l">${esc(f.dropped_by_name || "")}</td><td class="num">${f.lines_new}</td><td class="num">${f.lines_skipped}</td></tr>`).join("");
-    const left = (S.data.buys || []).filter(b => b.ignored);
-    return `<h2>Purchases file</h2><p class="sub">Buys with no PO (card, Amazon, a store run, a supplier's invoice), from the Purchases project, in the Lines tab's shape. A line that's for a PO is kept against it and not counted again.</p>
-      ${drop}
-      ${newNames.length ? `<h3>The file names ${newNames.length} item${newNames.length === 1 ? "" : "s"} that ${newNames.length === 1 ? "isn't" : "aren't"} here yet</h3>
-        <div class="tw"><table><thead><tr><th class="l">As the file names it</th><th class="l">Category</th><th class="l">Unit</th><th>Spent</th><th class="l">Do</th></tr></thead><tbody>${newNames.map((n, i) => `<tr>
-          <td class="l"><b>${esc(n.name)}</b><div class="note">${n.ids.length} line${n.ids.length === 1 ? "" : "s"}</div></td>
-          <td class="l">${n.category ? esc(catName(n.category)) : `<select data-fncat="${i}" aria-label="Category for ${esc(n.name)}">${cats.filter(c => !c.retired).map(c => `<option value="${esc(c.key)}">${esc(c.name)}</option>`).join("")}</select>`}</td>
-          <td class="l">${n.category === "lumber" ? (n.quarters ? `bd ft · ${n.quarters}/4` : `<input data-fnq="${i}" class="n" style="width:90px" placeholder="quarters" aria-label="Quarters for ${esc(n.name)}">`)
-             : `<input data-fnunit="${i}" style="width:110px" value="${esc(n.unit || "")}" placeholder="sheet, each…" aria-label="Unit for ${esc(n.name)}">`}</td>
-          <td class="num">${usd(n.total)}</td>
-          <td><select data-fndo="${i}" aria-label="What to do with ${esc(n.name)}"><option value="new" ${!n.same && n.category ? "selected" : ""}>Make it a new item</option><option value="" ${!n.same && !n.category ? "selected" : ""}>Leave it for now</option>
-            ${items.filter(it => !n.category || it.category_key === n.category).map(it => `<option value="${esc(it.id)}" ${n.same && n.same.id === it.id ? "selected" : ""}>Same as ${esc(it.name)}</option>`).join("")}</select></td></tr>`).join("")}</tbody></table></div>
-        <div class="row" style="margin:8px 2px 4px"><button class="btn" data-fnapply ${S.busy ? "disabled" : ""}>Do these</button>
-          <span class="note">A new item takes the file's name, category and unit. "Same as" keeps the file's name as one of that item's other names. Either way the lines are filed now, and every future file's lines naming it file themselves.</span></div>` : ""}
-      <h3>Match these${groups.length ? ` <span class="pill">${groups.reduce((a, g) => a + g.ids.length, 0)} lines</span>` : ""}</h3>
-      ${mrows ? `<div class="tw"><table><thead><tr><th class="l">Bought</th><th>Spent</th><th class="l">Item</th><th></th></tr></thead><tbody>${mrows}</tbody></table></div>
-        <p class="note" style="margin:8px 2px">Matching remembers: the next file's line from the same supplier with the same words, or naming the same item, files itself. ${groups.length > 60 ? `Showing the 60 biggest of ${groups.length}.` : ""}</p>`
-        : `<p class="muted">Nothing waiting: every line is filed under an item.</p>`}
-      <div class="row" style="margin:12px 2px"><button class="btn ghost" data-itemscsv>Download the item list</button><span class="note">For the Purchases project, so it uses the shop's names for things.</span></div>
-      ${files ? `<h3>Files added</h3><div class="tw"><table><thead><tr><th class="l">File</th><th>Added</th><th class="l">By</th><th>New lines</th><th>Already in</th></tr></thead><tbody>${files}</tbody></table></div>` : ""}
-      ${left.length ? `<details class="fold"><summary>Left out (${left.length})</summary><div class="tw"><table><tbody>${left.map(b => `<tr><td class="l wrap">${esc(b.description)}<div class="note">${esc(b.supplier)} · ${esc(mdy(b.on))} · ${esc(b.ignore_reason || "")}</div></td>
-          <td class="num">${usd(b.amount, true)}</td><td><button class="link" data-putback="${esc(b.id)}">Put it back</button></td></tr>`).join("")}</tbody></table></div></details>` : ""}`;
+    if (S.sheet === "newitems") {
+      const F = S.fileItems[0], made = F ? F.items.filter(i => i.how === "made") : [];
+      return wrap("New items", `<h3>${made.length} new item${made.length === 1 ? "" : "s"} from ${esc(F ? F.file_name : "the file")}</h3>
+        <p class="sub" style="margin:0 0 10px">Made from the file's names. If one is really an item you already had, pick it and its lines move over.</p>
+        <div class="list">${made.map((i, k) => `<div class="r"><div class="grow"><b>${esc(i.name)}</b><small>${esc(catName(i.category_key))}, ${esc(i.unit)}${i.retired ? `. Folded: ${esc(i.item)}` : ""}</small></div>
+          ${i.retired ? "" : `<select data-foldsel="${k}" aria-label="Same as, for ${esc(i.name)}" style="max-width:190px"><option value="">Same as…</option>${itemOptions(i.category_key).replace(`value="${esc(i.item_id)}"`, `value="${esc(i.item_id)}" disabled`)}</select>
+            <button class="btn ghost" data-foldgo="${k}|${esc(i.item_id)}">Move</button>`}</div>`).join("")}</div>
+        <div class="row end" style="margin-top:12px"><button class="btn" data-sheetclose="1">Done</button></div>`);
+    }
+    return "";
+  }
+
+  // ---------- a lumber PO's delivery slips (Inventory's Deliveries in) ----------
+  async function loadSlips() {
+    const [l, r] = await Promise.all([Promise.resolve(db.rpc("purchase_slip_lines")).catch(e => ({ error: e })),
+      Promise.resolve(db.from("inv_receipts").select("id,received_on,month_end,supplier,item_id,board_feet,mistake_at").eq("kind", "lumber")
+        .is("mistake_at", null).order("received_on", { ascending: false }).limit(120)).catch(e => ({ error: e }))]);
+    if (l.error || r.error) { S.msg = { ok: false, text: friendlyError(l.error || r.error) }; S.slipLines = { lines: [], links: [] }; S.slips = []; return; }
+    S.slipLines = l.data || { lines: [], links: [] }; S.slips = r.data || [];
+  }
+  function slipPicker(po) {
+    if (!S.slipLines) return `<p class="note">Loading Inventory's lumber slips…</p>`;
+    const mine = new Set((po.lines || []).filter(l => l.lumber).map(l => l.id)), links = new Map((S.slipLines.links || []).map(x => [x.receipt_id, x.line_id]));
+    const lines = (S.slipLines.lines || []).filter(l => mine.has(l.id)), invName = (id) => ((S.data.inv_items || []).find(i => i.id === id) || {}).name || "";
+    const inv = new Set(lines.map(l => l.inv_item_id).filter(Boolean));
+    // this PO's slips, then slips on no PO line yet for the same Inventory items (any, if the items aren't tied to Inventory)
+    const list = S.slips.filter(r => mine.has(links.get(r.id)) || (!links.has(r.id) && (!inv.size || inv.has(r.item_id))));
+    const rows = list.map(r => { const cur = links.get(r.id);
+      return `<tr><td>${esc(mdy(r.received_on))}</td><td class="l">${esc(r.supplier || "")}</td><td class="l">${esc(invName(r.item_id))}</td><td class="num">${n0(r.board_feet)}</td>
+        <td><select data-slip="${esc(r.id)}" aria-label="PO line this slip fills"><option value="">Not this PO</option>${lines.slice().sort((a, b) => (b.inv_item_id === r.item_id) - (a.inv_item_id === r.item_id))
+          .map(l => `<option value="${esc(l.id)}" ${l.id === cur ? "selected" : ""}>Line ${l.position}: ${esc(l.item)} (${n0(l.in_bf)} of ${n0(l.qty)} in)</option>`).join("")}</select></td></tr>`; }).join("");
+    return rows ? `<div class="tw" style="margin-top:10px"><table><thead><tr><th>Received</th><th class="l">Supplier</th><th class="l">Inventory item</th><th>Bd ft</th><th class="l">Fills</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <p class="note" style="margin:6px 2px 0">Inventory's lumber slips that are on this PO, or on no PO yet. A line counts what was ordered until its slips are picked; then what they brought in. A slip in a closed month stays as it is.</p>`
+      : `<p class="note" style="margin-top:10px">No lumber slips on the Inventory page for this PO's lumber yet.</p>`;
   }
 
   // ---------- Setup ----------
@@ -1277,8 +1589,11 @@ if (typeof document !== "undefined") (function () {
     const folder = !canPickFolder() ? `<p class="muted">This browser can't save into a folder: use Chrome or Edge on the office PC, or download each PO with PDF.</p>`
       : S.folder ? `<p>Filing in <b>${esc(S.folder.name)}</b>${S.perm === "granted" ? "" : ` <span class="tag flag">needs permission again</span> <button class="btn ghost" data-resume>Resume filing</button>`}. <button class="link" data-pickfolder>Choose another folder</button></p>`
       : `<p class="muted">Not chosen on this computer yet.</p><button class="btn" data-pickfolder>Choose the PD - POs folder</button>`;
+    const files = (D.files || []).slice(0, 12).map(f => `<tr><td class="l">${esc(f.file_name)}</td><td>${esc(when(f.dropped_at))}</td><td class="l">${esc(f.dropped_by_name || "")}</td><td class="num">${f.lines_new}</td><td class="num">${f.lines_skipped}</td></tr>`).join("");
+    const left = (D.buys || []).filter(b => b.ignored);
     const itemSel = `<select id="blItem"><option value="">Item…</option>${(D.items || []).filter(i => !i.retired && !i.compare_as).map(i => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join("")}</select>`;
     return `<h2>Setup</h2>
+      <p class="sub">Things you set once. Buy, Savings and Prices are the tabs along the top.</p>
       <h3>PO details <span class="muted small">(the Arrow POs print the same)</span></h3>
       <div class="card"><div class="form">
         <label>Issued by<input id="isBy" value="${esc(is.issued_by || "")}"></label><label>Contact #<input id="isPhone" value="${esc(is.phone || "")}"></label>
@@ -1306,6 +1621,11 @@ if (typeof document !== "undefined") (function () {
       ${bl ? `<div class="tw"><table><thead><tr><th class="l">Item</th><th>Year</th><th>Price</th><th class="l">Note</th><th></th></tr></thead><tbody>${bl}</tbody></table></div>` : ""}
       <div class="card" style="margin-top:8px"><div class="form"><label>Item${itemSel}</label><label>Year<input id="blYear" class="n" inputmode="numeric" value="${last}"></label>
         <label>Price per unit<input id="blPrice" class="n" inputmode="decimal"></label><label>Note<input id="blNote" placeholder="2025 average"></label><button class="btn ghost" data-savebase>Save the baseline</button></div></div>
+      <h3>Purchases files</h3>
+      <div class="row" style="margin:0 2px 10px"><button class="btn ghost" data-itemscsv>Download the item list</button><span class="note">For the Purchases project, so its files use the shop's names for things.</span></div>
+      ${files ? `<div class="tw"><table><thead><tr><th class="l">File</th><th>Added</th><th class="l">By</th><th>New lines</th><th>Already in</th></tr></thead><tbody>${files}</tbody></table></div>` : `<p class="muted">No Purchases file added yet. Add one on Prices.</p>`}
+      ${left.length ? `<details class="fold" data-keep="left" ${S.keep.has("left") ? "open" : ""}><summary>Lines left out (${left.length})</summary><div class="tw"><table><tbody>${left.map(b => `<tr><td class="l wrap">${esc(b.description)}<div class="note">${esc(b.supplier)}, ${esc(mdy(b.on))}. ${esc(b.ignore_reason || "")}</div></td>
+          <td class="num">${usd(b.amount, true)}</td><td><button class="link" data-putback="${esc(b.id)}">Put it back</button></td></tr>`).join("")}</tbody></table></div></details>` : ""}
       <h3>Earlier lumber years: ${last}</h3>
       ${yt ? `<div class="tw"><table><thead><tr><th>Supplier</th><th>Board feet</th><th>Dollars</th></tr></thead><tbody>${yt}</tbody></table></div>
         <button class="btn ghost" style="margin-top:8px" data-saveyears>Save ${last}</button>` : `<p class="muted">Add a supplier first.</p>`}`;
@@ -1334,7 +1654,10 @@ if (typeof document !== "undefined") (function () {
         : `<label>Unit<input data-i="unit" value="${esc(it.unit || "")}" placeholder="sheet, each, gallon, box, ft"></label>`}
       <label style="grid-column:1/-1">Other names on bills, one per line<textarea data-i="aliases">${esc((it.aliases || []).join("\n"))}</textarea></label>
       ${it.id ? `<label><span>&nbsp;</span><span style="display:flex;gap:6px;align-items:center;min-height:42px"><input type="checkbox" data-i="retired" ${it.retired ? "checked" : ""}> No longer used</span></label>` : ""}
-      <button class="btn" data-saveitem="${esc(it.id || "")}">Save</button><button class="link" data-closesetup>Cancel</button></div></td></tr>`;
+      <button class="btn" data-saveitem="${esc(it.id || "")}">Save</button><button class="link" data-closesetup>Cancel</button>
+      ${it.id && !it.retired && S.filesReady ? `<label style="grid-column:1/-1">Really the same thing as another item? Everything bought as this moves there, and this one is retired
+          <select id="foldInto"><option value="">Pick the item it's the same as…</option>${itemOptions(it.category_key).replace(`value="${esc(it.id)}"`, `value="${esc(it.id)}" disabled`)}</select></label>
+        <button class="btn ghost" data-folditem="${esc(it.id)}">Move it over</button>` : ""}</div></td></tr>`;
   }
 
   // ---------- wiring ----------
@@ -1344,9 +1667,38 @@ if (typeof document !== "undefined") (function () {
     tabsEl.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { if (S.edit && !confirm("Leave the PO without saving it?")) return; S.edit = null; go(b.dataset.tab); });
     const on = (sel, fn) => app.querySelectorAll(sel).forEach(el => el.onclick = (e) => fn(el, e));
     on("[data-tabgo]", (b) => go(b.dataset.tabgo));
-    app.querySelectorAll("[data-year]").forEach(s => s.onchange = () => { S.year = Number(s.value); S.open = null; S.openItem = null; render(); });
+    app.querySelectorAll("[data-year]").forEach(s => s.onchange = () => { S.year = Number(s.value); S.open = null; S.openItem = null; S.month = null; render(); });
+    app.querySelectorAll("details[data-keep]").forEach(d => d.ontoggle = () => { d.open ? S.keep.add(d.dataset.keep) : S.keep.delete(d.dataset.keep); });
+    on("[data-sheet]", (b) => { S.sheet = b.dataset.sheet; S.matchNew = null; render(); });
+    on("[data-sheetclose]", (el, e) => { if (el.classList.contains("scrim") && e.target !== el) return; S.sheet = null; S.matchNew = null; S.log = null; render(); });
+    on("[data-received]", (b) => { if (confirm("Mark this received? It leaves the list.")) call("receive_supply", { p_request: b.dataset.received }, (d) => d.summary || "Marked received."); });
+    on("[data-cat]", (b) => { S.cat = b.dataset.cat; S.openItem = null; render(); });
+    on("[data-mover]", (b) => { S.tab = "prices"; store.set("tab", "prices"); S.cat = "all"; S.openItem = b.dataset.mover; render();
+      const row = app.querySelector(`[data-openitem="${b.dataset.mover}"]`); if (row) row.scrollIntoView({ block: "center" }); });
+    on("[data-pickfile]", () => { const i = app.querySelector("#fileIn"); if (i) i.click(); });
+    on("[data-seenfile]", (b) => { store.set("fileSeen", b.dataset.seenfile); render(); });
+    on("[data-split]", (b) => { const [item, name] = b.dataset.split.split("|");
+      call("purchase_item_split", { p_item: item, p_name: name }, (d) => d.summary); });
+    on("[data-foldgo]", (b) => { const [k, from] = b.dataset.foldgo.split("|"), into = val(`[data-foldsel="${k}"]`);
+      if (!into) { S.msg = { ok: false, text: "Pick the item it's the same as first." }; S.sheet = null; return render(); }
+      call("purchase_item_fold", { p_from: from, p_into: into }, (d) => d.summary); });
+    on("[data-folditem]", async (b) => { const into = val("#foldInto");
+      if (!into) { S.msg = { ok: false, text: "Pick the item it's the same as first." }; return render(); }
+      if (!confirm("Move everything bought as this item over to the one you picked, and retire this one?")) return;
+      if (await call("purchase_item_fold", { p_from: b.dataset.folditem, p_into: into }, (d) => d.summary)) { S.setupEdit = null; render(); } });
+    on("[data-slippo]", async (b) => { S.slipPo = S.slipPo === b.dataset.slippo ? null : b.dataset.slippo; if (S.slipPo) { S.slipLines = null; render(); await loadSlips(); } render(); });
     // To buy
     app.querySelectorAll("[data-tick]").forEach(c => c.onchange = () => { if (c.checked) S.ticked.add(c.dataset.tick); else S.ticked.delete(c.dataset.tick); render(); });
+    on("[data-logopen]", () => openLog(null));
+    on("[data-logchange]", (b) => openLog((S.data.logs || []).find(g => g.id === b.dataset.logchange)));
+    on("[data-logmistake]", (b) => { const g = (S.data.logs || []).find(x => x.id === b.dataset.logmistake); if (!g) return;
+      const why = window.prompt(`Mark the purchase from ${g.supplier} a mistake? It stays on record and stops counting. Why (optional)?`, "");
+      if (why === null) return;
+      call("purchase_log_cancel", { p_id: g.id, p_reason: why }, (d) => d.summary); });
+    on("[data-logadd]", () => { readLog(); S.log.lines.push(blankLogLine()); render(); const e = app.querySelector(`[data-lg="${S.log.lines.length - 1}|name"]`); if (e) e.focus(); });
+    on("[data-logx]", (b) => { readLog(); S.log.lines.splice(Number(b.dataset.logx), 1); if (!S.log.lines.length) S.log.lines.push(blankLogLine()); render(); });
+    on("[data-logsave]", () => saveLog());
+    if (app.querySelector(".logsheet")) app.querySelectorAll(".logsheet input, .logsheet select").forEach(e => { e.oninput = logLive; e.onchange = logLive; });
     on("[data-reqorder]", () => call("order_supplies", { p_requests: [...S.ticked] }, (d) => { S.ticked = new Set(); return d.summary || "Marked ordered."; }));
     on("[data-reqpo]", () => startEdit(null, "po", S.reqs.filter(r => S.ticked.has(r.id))));
     on("[data-noorder]", (b) => { S.notOrdering = b.dataset.noorder; render(); const i = app.querySelector("[data-noreason]"); if (i) i.focus(); });
@@ -1397,7 +1749,6 @@ if (typeof document !== "undefined") (function () {
     });
     on("[data-putbackmonth]", (b) => call("lumber_scrap_skip_save", { p_month: b.dataset.putbackmonth.slice(0, 10), p_out: false, p_reason: null }, (d) => d.summary));
     // Lumber slips
-    on("[data-loadslips]", async () => { await loadSlips(); render(); });
     app.querySelectorAll("[data-slip]").forEach(s => s.onchange = async () => {
       const r = await Promise.resolve(db.rpc("purchase_slip_link", { p_receipt: s.dataset.slip, p_line: s.value || null })).catch(e => ({ error: e }));
       S.msg = r.error ? { ok: false, text: friendlyError(r.error) } : { ok: true, text: r.data.summary };
@@ -1433,28 +1784,6 @@ if (typeof document !== "undefined") (function () {
           if (r.error) { S.msg = { ok: false, text: friendlyError(r.error) }; return render(); } }
         S.msg = { ok: true, text: `Left out (${g.ids.length} line${g.ids.length === 1 ? "" : "s"}). It stays on record under Left out.` }; await load(); render(); })(); });
     on("[data-putback]", (b) => call("purchase_buy_ignore", { p_id: b.dataset.putback, p_ignore: false, p_reason: null }, "Put back: it's waiting in Match these again."));
-    on("[data-fnapply]", async () => {
-      const names = fileItemNames(S.data), done = [], left = [];
-      S.busy = true; render();
-      for (const [i, n] of names.entries()) {
-        const what = app.querySelector(`[data-fndo="${i}"]`) ? app.querySelector(`[data-fndo="${i}"]`).value : "";
-        if (!what) { left.push(n.name); continue; }
-        let item = what;
-        if (what === "new") {
-          const cat = n.category || val(`[data-fncat="${i}"]`), p = { name: n.name, category_key: cat };
-          if (cat === "lumber") p.quarters = n.quarters || Number(val(`[data-fnq="${i}"]`)); else p.unit = val(`[data-fnunit="${i}"]`) || n.unit;
-          const r = await Promise.resolve(db.rpc("purchase_item_save", { p })).catch(e => ({ error: e }));
-          if (r.error) { S.busy = false; S.msg = { ok: false, text: `${n.name}: ${friendlyError(r.error)}` }; await load(); return render(); }
-          item = r.data.id;
-        }
-        const r = await Promise.resolve(db.rpc("purchase_buys_match", { p_ids: n.ids, p_item: item, p_remember: true })).catch(e => ({ error: e }));
-        if (r.error) { S.busy = false; S.msg = { ok: false, text: `${n.name}: ${friendlyError(r.error)}` }; await load(); return render(); }
-        done.push(n.name);
-      }
-      S.busy = false;
-      S.msg = { ok: true, text: `${done.length} item name${done.length === 1 ? "" : "s"} done; their lines are filed.${left.length ? ` Left for now: ${left.join(", ")}.` : ""}` };
-      await load(); render();
-    });
     on("[data-itemscsv]", () => saveBlob(new TextEncoder().encode(itemsCsv(S.data)), `Purchasing items (${S.data.today}).csv`, "text/csv;charset=utf-8"));
     // Setup
     on("[data-saveissuer]", () => call("set_arrow_po_settings", { p: { issued_by: val("#isBy"), phone: val("#isPhone"), email: val("#isEmail"),
@@ -1496,6 +1825,10 @@ if (typeof document !== "undefined") (function () {
       S.msg = { ok: true, text: `${last} saved.` }; await load(); render();
     });
   }
+
+  // the address names a tab (a bookmark, or one of the old tabs' names): follow it when it changes on an open page too
+  addEventListener("hashchange", () => { const k = tabOf((location.hash || "").replace("#", "")); if (k && k !== S.tab && S.me && !S.edit) go(k); });
+  addEventListener("resize", () => { if (S.tab === "savings" && !S.edit && S.loaded && !S.missing) drawChart(); });
 
   // ---------- start ----------
   async function start(user) {

@@ -137,7 +137,8 @@ insert into sql_file_catalog (file, run_order, fingerprint, check_fn, replaces) 
   ('job_items.sql',        55, 'check_job_items',         'check_job_items',          '{job_status.sql}'),
   ('qc_checklist.sql',     56, 'check_qc_checklist',      'check_qc_checklist',       '{}'),
   ('purchasing.sql',       57, 'check_purchasing',        'check_purchasing',         '{}'),
-  ('lumber_scrap_skips.sql', 58, 'check_lumber_scrap_skips', 'check_lumber_scrap_skips', '{}')
+  ('lumber_scrap_skips.sql', 58, 'check_lumber_scrap_skips', 'check_lumber_scrap_skips', '{}'),
+  ('purchasing_log.sql',    59, 'check_purchasing_log',    'check_purchasing_log',     '{}')
 on conflict (file) do update set run_order = excluded.run_order, fingerprint = excluded.fingerprint, check_fn = excluded.check_fn, replaces = excluded.replaces;
 
 -- does the database already have this file's fingerprint?

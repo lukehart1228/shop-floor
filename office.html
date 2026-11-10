@@ -1018,7 +1018,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-11-04.2";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-11-10.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -1117,6 +1117,8 @@ if (typeof document !== "undefined") (function () {
     // Upload a work order and the Prototype lab left the menu 4 Nov (Luke); upload.html and lab.html stay on GitHub, unlinked
     { key: "drop", label: "Project Handoff", file: "drop.html", page: "drop", note: "Loads the floor, sends machine files. Only you see this", lab: true },
     { key: "deliveries", label: "Deliveries", file: "delivery.html", page: "delivery", note: "Schedule, signed tickets", scheduler: true },
+    // Purchasing (10 Nov, Luke): its own page like Deliveries; buying left Operations for its Buy tab. Managers only (the database decides).
+    { key: "purchasing", label: "Purchasing", file: "purchasing.html", page: "purchasing", note: "Buy, savings, prices" },
     { key: "inventory", label: "Inventory", file: "inventory.html", page: "inventory", note: "Month-end counts, scrap rate" },
     // Data (4 Nov; was Pace): every tracked number lives here from now on, each kind as a tab inside data's page (pace.html)
     { key: "pace", label: "Data", file: "pace.html", page: "pace", note: "Pace, time in stage, working days" },
@@ -1839,15 +1841,12 @@ if (typeof document !== "undefined") (function () {
   function needsScreen() {
     const { open, answered } = officeIssues(S.problems, S.defects);
     const groups = needToOrder(S.supplies);
-    const ordered = orderedNotReceived(S.supplies);
-    const closed = (S.supplies || []).filter(r => !r.is_open).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
     const stale = staleFlags(S.flags);
     const late = (S.arrow || []).filter(a => a.at_vendor && !a.waiting && a.days_out > S.arrowDays).sort((a, b) => b.days_out - a.days_out);
     const ho = S.columns.find(c => c.key === "handed_off");
     const connected = ho && ho.column_id && (ho.col_type === "checkbox" || ho.yes_label);
     const handoffs = buildTasks(S.tasks);
     const nLines = groups.reduce((a, g) => a + g.lines.length, 0);
-    const nTicked = groups.reduce((a, g) => a + g.lines.filter(l => S.oticked.has(l.id)).length, 0);
     const who = (r) => `${esc(r.requested_by_name)} · ${esc(fmtDay(r.requested_at))}`;
     const scope = (x) => x.department_name ? `${x.department_name} only` : "whole job";
     const what = (a) => [a.sheet_numbers && a.sheet_numbers.length ? `sheet${a.sheet_numbers.length === 1 ? "" : "s"} ${a.sheet_numbers.join(", ")}` : "", a.description].filter(Boolean).join(" — ");
@@ -1863,16 +1862,11 @@ if (typeof document !== "undefined") (function () {
 
     if (open.length) parts.push(sec("problems", "Issues from the floor", open.length, `<p class="sub">Issues, and defects the floor asked you about. Work stopped comes first.</p>${open.map(issueCard).join("")}`));
 
-    if (groups.length) parts.push(sec("ordering", "Supplies to order", nLines, `<div class="panel">
-        ${groups.map(g => `<div class="deptname">${esc(g.name)}</div>${g.lines.map(r => `<div class="line">
-          <input type="checkbox" data-otick="${esc(r.id)}" ${S.oticked.has(r.id) ? "checked" : ""} aria-label="Ordered: ${esc(r.item)}">
-          <span class="qty">${r.qty}</span>
-          <span class="body"><b>${testTag(r)}${esc(r.item)}</b>${r.note ? `<div class="meta2">${esc(r.note)}</div>` : ""}<div class="meta2">${who(r)}</div>
-            ${S.notOrdering === r.id ? `<div class="btns"><input class="in" style="flex:1 1 260px" data-noreason placeholder="Why not? The department sees this.">
-                <button class="plain" data-nosave="${esc(r.id)}">Not ordering</button><button class="link" data-nocancel="1">Cancel</button></div>`
-              : `<button class="link" data-noopen="${esc(r.id)}">Not ordering…</button>`}</span></div>`).join("")}`).join("")}
-        <div class="btns"><button class="go" data-order="1" ${nTicked && !S.busy ? "" : "disabled"}>Mark ${nTicked || ""} ticked as ordered</button>
-          <span class="meta2">The department taps Received when it's in hand.</span></div></div>`));
+    // 10 Nov (Luke): buying left Operations for Purchasing › Buy. One line stays here while requests wait, counted as before.
+    if (groups.length) parts.push(sec("ordering", "Supplies to order", nLines, `<div class="panel"><div class="line">
+        <span class="body"><b>${nLines} supply request${nLines === 1 ? " is" : "s are"} waiting</b> from ${groups.map(g => esc(g.name)).join(", ")}.
+          <div class="meta2">They're ordered in Purchasing now, under Buy: log the purchase, put them on a PO, or say why not.</div></span>
+        <span class="btns" style="margin:0"><button class="go" data-section="purchasing">Open Purchasing</button></span></div></div>`));
 
     if (stale.length) parts.push(sec("flags", "Flags older than two weeks — still right?", stale.length, `<div class="panel">${stale.map(x => `<div class="line">
         <span class="body"><span class="flagtag ${x.level}">${LEVEL_NAME[x.level]}</span> <b>${testTag(x)}${pidLink(x)}</b> <span class="meta2">${esc(x.job_name)} · ${esc(scope(x))}</span>
@@ -1932,14 +1926,6 @@ if (typeof document !== "undefined") (function () {
       ${flagsSection()}
       <section class="later">
         <details class="more" data-keep="answered" ${keep("answered")}><summary>Answered issues — last 30 days (${answered.length})</summary>${answered.map(issueCard).join("") || `<p class="sub">None.</p>`}</details>
-        <details class="more" data-keep="ordered" ${keep("ordered")}><summary>Ordered, not received (${ordered.length})</summary>
-          ${ordered.length ? `<div class="panel">${ordered.map(r => { const n = daysSince(r.ordered_at); return `<div class="line"><span class="qty">${r.qty}</span>
-            <span class="body"><b>${testTag(r)}${esc(r.item)}</b> <span class="meta2">· ${esc(DEPT_NAME[r.department] || r.department)}</span>
-              <div class="meta2">Ordered ${n === 0 ? "today" : n + " day" + (n === 1 ? "" : "s") + " ago"} by ${esc(r.ordered_by_name)} · asked by ${who(r)}</div></span>
-            <button class="plain" data-oreceive="${esc(r.id)}">Mark received</button></div>`; }).join("")}</div>` : `<p class="sub">Nothing on order.</p>`}</details>
-        <details class="more" data-keep="closed" ${keep("closed")}><summary>Supply requests closed — last 60 days (${closed.length})</summary>
-          ${closed.map(r => `<div class="line"><span class="qty">${r.qty}</span><span class="body"><b>${testTag(r)}${esc(r.item)}</b> <span class="meta2">· ${esc(DEPT_NAME[r.department] || r.department)}</span>
-            <div class="meta2">${r.state === "received" ? `Received ${esc(fmtDay(r.received_at))} by ${esc(r.received_by_name)}` : r.state === "cancelled" ? `Cancelled ${esc(fmtDay(r.closed_at))} by ${esc(r.closed_by_name)}` : `Not ordering — ${esc(r.not_ordering_reason)} (${esc(r.closed_by_name)})`} · asked by ${who(r)}</div></span></div>`).join("") || `<p class="sub">None.</p>`}</details>
         <details class="more" data-keep="defects" ${keep("defects")}><summary>Defects logged</summary>${defectsPanel()}</details>
       </section>`;
   }
@@ -3034,13 +3020,6 @@ if (typeof document !== "undefined") (function () {
     on("[data-fbkstate]", (b) => act("set_feedback_state", { p_feedback_id: b.dataset.fbk, p_state: b.dataset.fbkstate }, null, "fbk"));
     on("[data-clearflag]", (b) => { if (confirm("Clear this flag? It stays in the history.")) act("clear_flag", { p_flag: b.dataset.clearflag, p_note: null }, null, "flags"); });
 
-    app.querySelectorAll("[data-otick]").forEach(box => box.onchange = () => { box.checked ? S.oticked.add(box.dataset.otick) : S.oticked.delete(box.dataset.otick); render(); });
-    on("[data-order]", () => act("order_supplies", { p_requests: [...S.oticked] }, () => { S.oticked = new Set(); }));
-    on("[data-noopen]", (b) => { S.notOrdering = b.dataset.noopen; render(); const i = app.querySelector("[data-noreason]"); if (i) i.focus(); });
-    on("[data-nocancel]", () => { S.notOrdering = null; render(); });
-    on("[data-nosave]", (b) => { const reason = (app.querySelector("[data-noreason]") || {}).value || "";
-      act("not_ordering_supply", { p_request: b.dataset.nosave, p_reason: reason }, () => { S.notOrdering = null; S.oticked.delete(b.dataset.nosave); }); });
-    on("[data-oreceive]", (b) => { if (confirm("Mark this received? It leaves every list.")) act("receive_supply", { p_request: b.dataset.oreceive }); });
 
     on("[data-fbsave]", (b) => { const d = b.dataset.fbsave, box = app.querySelector(`[data-fbdays="${d}"]`);
       const v = box && box.value.trim() !== "" && /^\d+$/.test(box.value.trim()) ? Number(box.value) : null;
