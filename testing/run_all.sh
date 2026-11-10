@@ -85,7 +85,7 @@ run test_lab_reference     none  LAB=$P/lab.html -- node test_lab_reference.js
 run test_app_name          none  OUT=$P -- node test_app_name.js   # 4 Nov: the app is called Production
 # 4 Nov: test_same sets the top bar and tab strip aside and skips Arrow: Arrow left Metal's, Assembly's and Delivery's tabs for its own department
 if [ -f $OUT/index.html ]; then run test_same seed NEWPAGE=$OUT/index.html HEADER=ignore NAV=ignore SKIP_TABS=arrow -- node test_same.js; else want test_same && row test_same skipped "no tablet page in OUT"; fi
-run test_same_office       seed  OUT=$P PHOTOSPACE=ignore ARROWPOS=ignore NAMES=ignore EXPORT=ignore BUYING=ignore -- node test_same_office.js   # 31 Oct: the Photos tab changed on purpose; 1 Nov: the Arrow POs panel; 4 Nov: the office names, and Inventory's Export counts
+run test_same_office       seed  OUT=$P PHOTOSPACE=ignore ARROWPOS=ignore NAMES=ignore EXPORT=ignore BUYING=ignore INVENTORY=ignore -- node test_same_office.js   # 31 Oct: the Photos tab changed on purpose; 1 Nov: the Arrow POs panel; 4 Nov: the office names, and Inventory's Export counts; 10 Nov: Inventory laid out again (test_inventory_screens)
 run test_feedback          seed  OUT=$P -- node test_feedback.js
 run test_feedback_close    seed  OUT=$P -- node test_feedback_close.js
 run test_trip_types        seed  OUT=$P -- node test_trip_types.js
@@ -113,7 +113,8 @@ run test_office_link       seed  PAGE=$PAGE $PW -- node test_office_link.js
 run test_auto_update       seed  PAGE=$PAGE ROOT=$P $PW -- node test_auto_update.js
 run test_sw_assets         none  SW=$P/sw.js $PW -- node test_sw_assets.js
 run test_drawing_pictures  seed  PAGE=$PAGE $PW -- node test_drawing_pictures.js
-run test_inv_export       seed  OUT=$P $PW -- node test_inv_export.js   # 4 Nov: Export counts on the Inventory page
+run test_inv_export       seed  OUT=$P $PW -- node test_inv_export.js   # 4 Nov: Export counts on the Inventory page (on Results from 10 Nov)
+run test_inventory_screens seed OUT=$P $PW -- node test_inventory_screens.js   # 10 Nov: Inventory, two tabs and a Setup button
 fi
 if in_group browser2; then
 run test_pdf_chromium      seed  $PW -- node test_pdf_chromium.js

@@ -139,6 +139,61 @@
   .invitem .eq{color:var(--ink2); font-size:14px; min-width:70px}
   .invbar{position:sticky; bottom:0; background:var(--paper); display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:10px 2px}
   .invbar .invcount{flex:1; font-weight:600}
+  /* 10 Nov: two tabs, a Setup button, the month-end steps, screens of their own */
+  nav.tabs{align-items:center}
+  nav.tabs .sp{flex:1 1 auto}
+  nav.tabs .back{display:inline-flex; align-items:center; gap:6px; background:none; border:1px solid #4A5068; color:var(--sawdust); border-radius:10px;
+                 padding:0 14px; min-height:40px; margin:4px 0; font-weight:600; white-space:nowrap}
+  nav.tabs .back .badge{margin-left:4px}
+  nav.tabs .ttl{font-weight:700; font-size:18px; color:var(--sawdust); padding:0 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  nav.tabs .saving{margin-left:auto; color:var(--gray); white-space:nowrap; padding-left:8px}
+  .sec{font-size:14px; color:var(--ink2); margin:22px 2px 8px; text-transform:uppercase; letter-spacing:.05em; font-weight:700}
+  .sechead{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:22px 2px 8px}
+  .sechead .sec{margin:0; flex:1 1 auto}
+  .steps{background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:12px}
+  .steps>*+*{border-top:1px solid var(--line)}
+  .srow{display:flex; align-items:center; gap:14px; padding:14px 16px; width:100%; background:none; border:none; text-align:left;
+        min-height:68px; cursor:pointer; color:inherit; list-style:none; flex-wrap:wrap}
+  summary.srow::-webkit-details-marker{display:none}
+  .srow.done{background:var(--teal-bg)}
+  .srow .tx{flex:1 1 220px; min-width:0}
+  .srow .tt{display:block; font-weight:700; font-size:19px}
+  .srow .ss{display:block; color:var(--ink2); font-size:15px}
+  .srow.done .ss{color:var(--teal-ink); font-weight:600}
+  .srow .big{font-size:26px; font-weight:700; white-space:nowrap}
+  .srow .chev{color:var(--ink2); flex:none; transition:transform .15s}
+  details[open]>summary .chev{transform:rotate(90deg)}
+  .circ{width:32px; height:32px; border-radius:99px; border:2px solid var(--gray); display:grid; place-items:center; flex:none;
+        font-family:'Barlow Condensed',sans-serif; font-weight:700; color:var(--ink2)}
+  .circ.ok{background:var(--teal); border-color:var(--teal); color:var(--midnight)}
+  .fbody{padding:0 16px 12px 62px}
+  .fbody.flat{padding:4px 16px 14px}
+  .fbody.flush{padding:0}
+  .fbody .rointro{margin:0; padding:10px 14px; border-top:1px solid var(--line)}
+  .fbody.flush .ro{border-top:1px solid var(--line); border-bottom:none}
+  .ro.robar{background:var(--paper)}
+  .subrow{display:flex; gap:14px; align-items:center; padding:6px 0; border-top:1px solid var(--line); flex-wrap:wrap; min-height:56px}
+  .subrow .nm{flex:0 0 150px; font-weight:700}
+  .subrow .nm small{display:block; font-weight:500; color:var(--ink2); font-size:14px}
+  .subrow .st{flex:1 1 220px; font-weight:600}
+  .subrow.ok .st{color:var(--teal-ink)}
+  .subrow.off .st,.subrow.off .nm{color:var(--ink2)}
+  .slipform{margin-top:6px}
+  .closebar{display:flex; gap:14px; align-items:center; flex-wrap:wrap}
+  .closebar .note{flex:1 1 300px}
+  .lumtop{display:flex; gap:14px; align-items:center; flex-wrap:wrap}
+  .lumtot{font-size:30px; font-weight:700; white-space:nowrap}
+  .resbar{margin:4px 2px 14px}
+  .resbar .btn{display:inline-flex; align-items:center; gap:8px}
+  select.pick.big{font-size:20px; font-weight:700; min-height:46px}
+  .kpis{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; margin-bottom:12px}
+  .kpi{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 18px}
+  .kpi .kt{color:var(--ink2); font-weight:600}
+  .kpi .n{font-size:46px; font-weight:700; line-height:1.1}
+  details.more{margin-top:8px}
+  details.more>summary{list-style:none; cursor:pointer; display:inline-block; min-height:44px; padding:10px 2px}
+  details.more>summary::-webkit-details-marker{display:none}
+  @media (max-width:700px){ .fbody{padding-left:16px} .subrow .nm{flex-basis:100%} }
   @media (max-width:700px){ .brand{display:none} h2{font-size:22px} .bundle .lbl{width:100%} }
 </style>
 </head>
@@ -155,7 +210,7 @@
 <script>
 /* The two settings (project address, publishable key), the key check, the connection test, the id maker and the
    Feedback button are in the shared file loaded above, sf-common-2026-10-05.1.js. */
-var PAGE_VERSION = "2026-11-05.2";          // this page's version: bump it with every change (it shows in select * from devices();)
+var PAGE_VERSION = "2026-11-10.1";          // this page's version: bump it with every change (it shows in select * from devices();)
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -323,15 +378,19 @@ if (typeof document !== "undefined") (function () {
   sfEmbed("header .hrow");                                        // inside the office app: the office's header is above
   if (!SF_EMBEDDED) sfFeedbackSetup({ db, page: "inventory", version: PAGE_VERSION, mount: "header .hrow" });
   sfReportDevice(db, "inventory", PAGE_VERSION);
-  const TABS = [["month", "This month"], ["lumber", "Lumber count"], ["dept", "Department counts"], ["deliveries", "Deliveries in"], ["rollover", "Month-end"], ["scrap", "Scrap rate"], ["values", "Values"], ["setup", "Setup"]];
+  /* 10 Nov: tabs This month and Results; lumber, dept and setup are screens of their own. A tab remembered from before
+     10 Nov opens where its content lives now. */
+  const OLD_TABS = { deliveries: "month", rollover: "month", scrap: "results", values: "results" };
+  const startTab = (t) => OLD_TABS[t] || (["month", "results", "lumber", "dept", "setup"].includes(t) ? t : "month");
   const S = {
-    me: null, tab: store.get("tab", "month"), loaded: false, missing: false, msg: null, toast: null,
+    me: null, tab: startTab(store.get("tab", "month")), back: store.get("back", "month"), loaded: false, missing: false, msg: null, toast: null,
     month: null, status: [], months: [], items: [], prices: new Map(), curLines: [], prevLines: [], lines: new Map(),
     closeByMonth: [], receipts: [], pool: [], scrap: [], values: [], rules: [], matches: [],
     open: store.get("open", {}), pickMonth: null, drill: null, setupList: "lumber", editItem: null,
     pending: store.get("pending_lines", {}), saving: false,
     counts: [], deptList: store.get("deptlist", "plywood"), deptDrafts: store.get("deptdrafts", {}),
     exportMonth: null, exporting: false, exportMsg: null,
+    folds: store.get("folds", {}), working: store.get("working", false), valItems: false, slipKind: "lumber",
   };
 
   // ---------- data ----------
@@ -391,7 +450,7 @@ if (typeof document !== "undefined") (function () {
     if (r.error) { S.msg = { ok: false, text: friendlyError(r.error) }; render(); return null; }
     S.toast = (r.data && r.data.summary) || okText || "Saved"; S.msg = null;
     await load(); render(); setTimeout(() => { S.toast = null; render(); }, 2600);
-    return r.data;
+    return r.data ?? true;
   }
 
   // ---- lumber: each line is sent whole (absolute numbers), a moment after the last keystroke ----
@@ -433,6 +492,19 @@ if (typeof document !== "undefined") (function () {
   window.addEventListener("online", () => flushLines());
 
   // ---------- screens ----------
+  /* 10 Nov: two tabs (This month, Results) and a Setup button. This month is the month's work in the order it's done: the
+     slips all month, then three month-end steps, then Close. The lumber count, a department's list and Setup each take
+     the whole screen, with the way back at the top. Every number, button and database call is the same as before. */
+  const FULL = { lumber: "Lumber count", dept: "Department counts", setup: "Setup" };
+  const CHECK = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+  const CHEV = `<svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
+  const BACK = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>`;
+  const DOWN = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/></svg>`;
+  const circ = (n, ok) => `<span class="circ ${ok ? "ok" : ""}" aria-hidden="true">${ok ? CHECK : n}</span>`;
+  const probsOf = () => S.pool.filter(p => p.problem && !p.rolled);
+  const noPriceItems = () => S.items.filter(i => i.gl_account && !i.retired && !S.prices.get(i.id));
+  const foldOpen = (k, dflt) => (k in S.folds ? !!S.folds[k] : !!dflt);
+
   function render() {
     if (!S.me) return;
     meEl.innerHTML = `<a href="office.html">← Office</a> · ${esc(S.me.name)} · <button id="so">Sign out</button>`;
@@ -444,70 +516,143 @@ if (typeof document !== "undefined") (function () {
     }
     if (!S.loaded) { app.innerHTML = `<main><p class="muted">Loading…</p></main>`; return; }
     if (S.missing) { tabsEl.hidden = true; app.innerHTML = `<main><div class="banner">Inventory isn't set up in the database yet<small>Run inventory.sql in the Supabase SQL Editor (Walkthrough 15), wait a minute, then reload this page.</small></div></main>`; return; }
-    const probs = S.pool.filter(p => p.problem && !p.rolled).length;
     tabsEl.hidden = false;
-    tabsEl.innerHTML = TABS.map(([k, t]) => `<button data-tab="${k}" aria-current="${S.tab === k}">${t}${
-      k === "rollover" && !monthRow().rollover_done_at && !closed() ? `<span class="badge">!</span>` : ""}${k === "setup" && probs ? `<span class="badge">${probs}</span>` : ""}</button>`).join("");
+    if (FULL[S.tab]) {                                   // a screen of its own: the way back, its name, and (lumber) the saving line
+      const backTo = S.tab === "setup" ? (S.back === "results" ? "results" : "month") : "month";
+      tabsEl.innerHTML = `<button class="back" data-go="${backTo}">${BACK}${backTo === "results" ? "Results" : "This month"}</button>
+        <span class="ttl" aria-current="true">${esc(FULL[S.tab])}</span>${S.tab === "lumber" ? `<span class="saving" id="saving"></span>` : ""}`;
+    } else {
+      const probs = probsOf().length;
+      tabsEl.innerHTML = [["month", "This month"], ["results", "Results"]].map(([k, t]) => `<button data-tab="${k}" aria-current="${S.tab === k}">${t}</button>`).join("")
+        + `<span class="sp"></span><button class="back" data-go="setup">Setup${probs ? `<span class="badge">${probs}</span>` : ""}</button>`;
+    }
     const head = (S.msg ? `<div class="banner ${S.msg.ok ? "ok" : ""}">${esc(S.msg.text)}</div>` : "")
-      + (closed() ? `<div class="banner ok">${esc(monthName(S.month))} is closed<small>Closed by ${esc(monthRow().closed_by_name || "")}. Its numbers and prices are saved as they were.</small></div>` : "");
-    const body = { month: viewMonth, lumber: viewLumber, dept: viewDept, deliveries: viewDeliveries, rollover: viewRollover, scrap: viewScrap, values: viewValues, setup: viewSetup }[S.tab] || viewMonth;
+      + (closed() && S.tab !== "results" && S.tab !== "setup" ? `<div class="banner ok">${esc(monthName(S.month))} is closed<small>Closed by ${esc(monthRow().closed_by_name || "")}. Its numbers and prices are saved as they were.</small></div>` : "");
+    const body = { month: viewMonth, results: viewResults, lumber: viewLumber, dept: viewDept, setup: viewSetup }[S.tab] || viewMonth;
     app.innerHTML = `<main>${head}${body()}</main>${S.drill ? drillPane() : ""}${S.toast ? `<div class="toast" role="status">${esc(S.toast)}</div>` : ""}`;
     wire();
     showSaving();
   }
-
-  function viewMonth() {
-    const m = S.month, lumberTot = lumberItems(true).reduce((a, i) => a + closingBf(i.id), 0);
-    const cards = S.status.map(s => {
-      const due = s.due;
-      const st = !due ? `Not due — counted every three months` : s.done ? `${s.list_key === "lumber" ? "Counted" : "Sent"} ${dayShort(s.done_at)} by ${s.done_by}` :
-        s.list_key === "lumber" ? "In progress — Lumber count tab" : s.count_day_reached ? "Waiting — on their tablet now" : `Opens on their tablet ${dayShort(m)}`;
-      return `<div class="stat ${due ? (s.done ? "done" : "") : "off"}"><div class="t">${esc(s.name)}</div>
-        <div class="o">${esc(s.department_name || "Office")} · ${s.every_months === 1 ? "monthly" : "every three months"}</div>
-        ${s.list_key === "lumber" ? `<div class="num" style="font-size:26px;font-weight:700;margin-top:6px">${f0(lumberTot)} bd ft</div>` : ""}
-        <div class="s">${esc(st)}</div>${s.list_key !== "lumber" && due ? `<button class="link" data-golist="${esc(s.list_key)}">${s.done ? "See the count" : "Open the list"}</button>` : ""}</div>`;
-    }).join("");
-    const probs = S.pool.filter(p => p.problem && !p.rolled).length;
-    const allIn = S.status.every(s => !s.due || s.done);
-    const today = new Date().toISOString().slice(0, 10);
-    const steps = [
-      ["Every count due is in", allIn, S.status.filter(s => s.due && !s.done).map(s => s.name).join(", ") + " still to come"],
-      ["Month-end roll-over reviewed", !!monthRow().rollover_done_at, "Pick the sheets whose lumber hasn't been pulled (Month-end tab)"],
-      ["Every sheet has a stock size and species match", probs === 0, `${probs} sheet${probs === 1 ? "" : "s"} need${probs === 1 ? "s" : ""} Setup`],
-    ];
-    const canClose = steps.every(s => s[1]) && !closed();
-    return `<h2>${esc(monthName(m))}</h2><p class="sub">Counted on the last day of the month. The scrap rate needs the lumber count, the deliveries and the roll-over.</p>
-      <div class="grid">${cards}</div>
-      <h3>Before closing the month</h3>
-      <div class="card">${steps.map(([t, ok, why]) => `<div class="step ${ok ? "ok" : ""}"><span class="mk">${ok ? "✓" : "○"}</span><span><b>${esc(t)}</b>${ok ? "" : `<br><span class="note">${esc(why)}</span>`}</span></div>`).join("")}
-        <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-          ${closed() ? `<span class="muted">Closed.</span>` : `<button class="btn or" data-close ${canClose ? "" : "disabled"}>Close ${esc(monthShort(m))}</button>
-          <span class="note">Closing saves the counts, the sheets and today's prices for good. It can't be done before ${esc(dayShort(m))}.</span>`}
-        </div></div>
-      ${viewExport()}`;
+  function go(tab) {
+    if (tab === "setup" && S.tab !== "setup") S.back = S.tab === "results" ? "results" : "month";
+    S.tab = tab; store.set("tab", tab); store.set("back", S.back); S.msg = null; S.drill = null;
+    render(); scrollTo(0, 0);
   }
 
-  // ---- export a month's counts as a spreadsheet file (CSV) ----
+  // ---- This month: the slips, the three month-end steps, Close ----
+  function viewMonth() {
+    const m = S.month, mr = monthRow();
+    const lumSt = statusOf("lumber"), lumDone = !!mr.lumber_done_at, lumberTot = lumberItems(true).reduce((a, i) => a + closingBf(i.id), 0);
+    const lumStarted = S.curLines.some(l => (l.bundles || []).length) || Object.keys(S.pending).length > 0;
+    const depts = DEPT_LISTS(), due = depts.filter(s => s.due), inn = due.filter(s => s.done), deptDone = due.length > 0 && inn.length === due.length;
+    const reached = depts.some(s => s.count_day_reached);
+    const roDone = !!mr.rollover_done_at, pool = S.pool.filter(p => !p.mill_finished), probs = probsOf();
+    const allIn = S.status.every(s => !s.due || s.done);
+    const canClose = allIn && roDone && probs.length === 0 && !closed();
+
+    // step 1: the lumber count (its own screen)
+    const lumSub = lumDone ? `Counted ${esc(dayShort(mr.lumber_done_at))} by ${esc(mr.lumber_done_by || lumSt.done_by || "")}`
+      : lumStarted ? "In progress · every number saves itself" : "Not started";
+    const step1 = `<button class="srow ${lumDone ? "done" : ""}" data-go="lumber">${circ(1, lumDone)}
+      <span class="tx"><span class="tt">Lumber count</span><span class="ss">${lumSub}</span></span>
+      <span class="big num">${f0(lumberTot)} bd ft</span>${CHEV}</button>`;
+
+    // step 2: the department lists, each opening on its own screen
+    const deptRows = depts.map(s => {
+      const dept = s.department_name || s.name;
+      const st = !s.due ? `Not due · counted every three months` : s.done ? `Sent ${esc(dayShort(s.done_at))} by ${esc(s.done_by)}`
+        : s.count_day_reached ? `Waiting · on ${esc(dept)}'s tablet now` : `Opens on their tablet ${esc(dayShort(m))}`;
+      const btn = !s.due ? `<button class="link" data-golist="${esc(s.list_key)}">See the list</button>`
+        : s.done ? `<button class="link" data-golist="${esc(s.list_key)}">See the count</button>`
+        : s.count_day_reached && !closed() ? `<button class="link" data-golist="${esc(s.list_key)}">Count it here</button>`
+        : `<button class="link" data-golist="${esc(s.list_key)}">${closed() ? "See the list" : "Preview the list"}</button>`;
+      return `<div class="subrow ${s.done && s.due ? "ok" : ""} ${s.due ? "" : "off"}"><span class="nm">${esc(s.name)}${s.department_name && s.department_name !== s.name ? `<small>${esc(s.department_name)}</small>` : ""}</span>
+        <span class="st">${st}</span>${btn}</div>`;
+    }).join("");
+    const waiting = due.filter(s => !s.done).map(s => s.name);
+    const deptSub = deptDone ? "Every list due is in" : !reached && !closed() ? `They open on the tablets ${esc(dayShort(m))}` : `Waiting on ${esc(waiting.join(", "))}`;
+    const step2 = `<details class="sfold" data-fold="dept" ${foldOpen("dept", !deptDone) ? "open" : ""}>
+      <summary class="srow ${deptDone ? "done" : ""}">${circ(2, deptDone)}<span class="tx"><span class="tt">Department counts</span><span class="ss">${deptSub}</span></span>
+        <span class="big num">${inn.length} of ${due.length} in</span>${CHEV}</summary>
+      <div class="fbody">${deptRows || `<p class="note">No department lists yet.</p>`}</div></details>`;
+
+    // step 3: the roll-over, ticked in place
+    const step3 = `<details class="sfold" data-fold="roll" ${foldOpen("roll", false) ? "open" : ""}>
+      <summary class="srow ${roDone ? "done" : ""}">${circ(3, roDone)}<span class="tx"><span class="tt">Roll-over</span>
+        <span class="ss">${roDone ? `Reviewed by ${esc(mr.rollover_done_by || "")}` : "Tick the sheets whose lumber hasn't been pulled"}${probs.length ? ` <span class="flag">${probs.length} need${probs.length === 1 ? "s" : ""} Setup</span>` : ""}</span></span>
+        <span class="big num">${pool.length} sheet${pool.length === 1 ? "" : "s"}</span>${CHEV}</summary>
+      <div class="fbody flush">${rolloverBody()}</div></details>`;
+
+    // what's still standing between now and Close
+    const left = [...S.status.filter(s => s.due && !s.done).map(s => s.list_key === "lumber" ? "the lumber count" : `${s.name}'s count`),
+      ...(roDone ? [] : ["the roll-over"]), ...(probs.length ? [`${probs.length} sheet${probs.length === 1 ? "" : "s"} to match in Setup`] : [])];
+    const leftText = left.length === 1 ? left[0] : left.slice(0, -1).join(", ") + " and " + left[left.length - 1];
+    return `<h2>${esc(monthName(m))}</h2><p class="sub">Counted on the last day of the month, ${esc(dayShort(m))}.</p>
+      <div class="sec">All month</div>
+      ${viewDeliveries()}
+      <div class="sec">Month-end</div>
+      <div class="steps">${step1}${step2}${step3}</div>
+      <div class="card closebar">${closed() ? `<span class="muted">Closed.</span>`
+        : `<button class="btn or" data-close ${canClose ? "" : "disabled"}>Close ${esc(monthShort(m))}</button>
+          <span class="note">${canClose ? "Everything's in." : `Still to do: ${esc(leftText)}.`} Closing saves the counts, the sheets and today's prices for good. It can't be done before ${esc(dayShort(m))}.</span>`}</div>`;
+  }
+
+  // the slips, all month: one line, opening to one form and the list
+  function viewDeliveries() {
+    const rec = S.receipts.filter(r => r.month_end === S.month), live = rec.filter(r => !r.mistake_at);
+    const lum = live.filter(r => r.kind === "lumber"), ply = live.filter(r => r.kind === "plywood");
+    const lumTot = lum.reduce((a, r) => a + Number(r.board_feet), 0), plyTot = ply.reduce((a, r) => a + r.sheets, 0);
+    const today = new Date(), iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const maxDate = iso < S.month ? iso : S.month, kind = S.slipKind === "plywood" ? "plywood" : "lumber";
+    const slips = (n) => `${n} slip${n === 1 ? "" : "s"}`;
+    const sum = rec.length ? `Lumber ${f0(lumTot)} bd ft on ${slips(lum.length)} · Plywood ${plyTot} sheet${plyTot === 1 ? "" : "s"} on ${slips(ply.length)}` : "None yet this month";
+    const rows = [...rec].sort((a, b) => String(a.received_on).localeCompare(String(b.received_on))).map(r => `<tr class="${r.mistake_at ? "mistake" : ""}"><td>${esc(dayShort(r.received_on))}</td>
+      <td class="l">${esc(r.supplier || "—")}</td><td class="l">${r.kind === "plywood" ? `Plywood · <b class="num">${r.sheets}</b> sheets` : `${esc((itemById(r.item_id) || {}).name || "?")} · <b class="num">${f0(r.board_feet)}</b> bd ft`}</td>
+      <td>${r.mistake_at ? `<span class="note">Entered by mistake · ${esc(r.mistake_by_name)}</span>` : closed() ? "" : `<button class="link" data-mistake="${esc(r.id)}">Entered by mistake</button>`}</td></tr>`).join("");
+    const form = closed() ? "" : `<div class="form slipform">
+        <label>Lumber or plywood<select id="rkind"><option value="lumber" ${kind === "lumber" ? "selected" : ""}>Lumber</option><option value="plywood" ${kind === "plywood" ? "selected" : ""}>Plywood</option></select></label>
+        <label>Date<input type="date" id="rd" value="${esc(maxDate)}" max="${esc(maxDate)}"></label>
+        <label>Supplier<input id="rs" list="suppliers" placeholder="${kind === "plywood" ? "Hood Distribution – DSI" : "Frank Miller Lumber"}"></label>
+        <label data-for="lumber" ${kind === "lumber" ? "" : "hidden"}>Species and thickness<select id="rk"><option value="">Choose…</option>${lumberItems(false).map(i => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join("")}</select></label>
+        <label data-for="lumber" ${kind === "lumber" ? "" : "hidden"}>Board feet<input id="rb" type="number" inputmode="decimal" min="1"></label>
+        <label data-for="plywood" ${kind === "plywood" ? "" : "hidden"}>Sheets<input id="pn" type="number" inputmode="numeric" min="1"></label>
+        <button class="btn" data-addslip>Add the slip</button></div>
+      <datalist id="suppliers">${[...new Set(["Frank Miller Lumber", "Charles F. Shiels & Co.", "Hood Distribution – DSI", ...S.receipts.map(r => r.supplier).filter(Boolean)])].map(s => `<option>${esc(s)}</option>`).join("")}</datalist>`;
+    return `<details class="sfold steps" data-fold="deliv" ${foldOpen("deliv", false) ? "open" : ""}>
+      <summary class="srow"><span class="tx"><span class="tt">Deliveries in</span><span class="ss">${sum}</span></span>
+        <span class="link">${closed() ? "See the slips" : "Add or see slips"}</span>${CHEV}</summary>
+      <div class="fbody flat">${form}
+        ${rec.length ? `<div class="tw" style="margin-top:12px"><table style="min-width:520px"><thead><tr><th>Date</th><th class="l">Supplier</th><th class="l">What</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : ""}
+        <p class="note">One line per packing slip; the totals add themselves up. Nothing is deleted: a wrong slip is marked <i>Entered by mistake</i> and stops counting, but stays on record.</p></div></details>`;
+  }
+
+  function rolloverBody() {
+    const pool = S.pool.filter(p => !p.mill_finished).sort((a, b) => (b.mill_done === 0) - (a.mill_done === 0) || a.project_id.localeCompare(b.project_id) || a.sheet_number - b.sheet_number);
+    const fromBefore = S.pool.filter(p => p.carried_over).length, finished = S.pool.length - pool.length;
+    const rolled = pool.filter(p => p.rolled), rolledBf = rolled.reduce((a, p) => a + (Number(p.board_feet) || 0), 0);
+    const done = !!monthRow().rollover_done_at, probs = probsOf();
+    return `<p class="note rointro">${S.pool.length} sheets go through Milling this month${fromBefore ? ` (${fromBefore} rolled over from before)` : ""}; ${finished} are finished in Milling and count by themselves. These ${pool.length} are still in Milling.</p>
+      ${pool.length ? pool.map(p => `<div class="ro ${p.rolled ? "rolled" : ""}"><div class="w"><b>${esc(p.project_id)}</b><span>Sheet ${p.sheet_number} · ${esc(p.item_code || "")}</span>
+          ${p.carried_over ? ` <span class="tag">From ${esc(monthShort(p.upload_month))}</span>` : ""}${p.is_active ? "" : ` <span class="tag">Job not in production</span>`}
+          <div class="note">${esc(p.species || "no species")} · ${esc(p.shape || "")} ${esc(p.width || "?")}${p.length ? ` × ${esc(p.length)}` : ""} · ${esc(p.thickness || "?")} · ${p.qty} top${p.qty === 1 ? "" : "s"} · Milling ${p.mill_done} of ${p.mill_required}</div>
+          ${p.problem ? `<div style="margin-top:4px"><span class="flag">${esc(p.problem)}</span></div>` : p.leave_out ? `<div class="note">Left out — not lumber</div>` : ""}</div>
+        <div class="bfv"><b class="num">${p.board_feet !== null ? f0(p.board_feet) : "—"}</b><div class="note">${p.board_feet !== null ? `bd ft ${esc(p.stock)}` : p.leave_out ? "left out" : "fix in Setup"}</div></div>
+        ${p.mill_done > 0 ? `<span class="note" style="width:160px">Pieces counted — lumber is out</span>`
+          : `<label class="tick"><input type="checkbox" data-roll="${esc(p.job_id)}|${p.sheet_number}" ${p.rolled ? "checked" : ""} ${closed() ? "disabled" : ""}> Not pulled</label>`}</div>`).join("")
+        : `<div class="ro muted">Nothing is still in Milling. Every sheet on the list counts this month.</div>`}
+      <div class="ro robar"><span style="flex:1 1 240px">${rolled.length} sheet${rolled.length === 1 ? "" : "s"} roll${rolled.length === 1 ? "s" : ""} to next month (${f0(rolledBf)} bd ft).${probs.length ? ` ${probs.length} sheet${probs.length === 1 ? " needs" : "s need"} a match in Setup.` : ""}</span>
+        ${probs.length ? `<button class="link" data-go="setup">Match in Setup</button>` : ""}
+        ${closed() ? "" : done ? `<span style="color:var(--teal-ink);font-weight:700">✓ Reviewed by ${esc(monthRow().rollover_done_by)}</span> <button class="link" data-rodone="0">Change it</button>`
+                              : `<button class="btn" data-rodone="1">Done — these are right</button>`}</div>`;
+  }
+
+  // ---- export a month's counts as a spreadsheet file (CSV): on Results, for the month picked there ----
   function exportMonths() {
     const ms = S.months.map(r => r.month_end);
     if (S.month && !ms.includes(S.month)) ms.push(S.month);
     return [...new Set(ms)].sort().reverse();
   }
   const monthRowOf = (me) => S.months.find(r => r.month_end === me) || { month_end: me, kind: "count", status: "open" };
-  function viewExport() {
-    const ms = exportMonths(); if (!ms.length) return "";
-    if (!ms.includes(S.exportMonth)) {                      // this month once anything is in, else the last closed month
-      const anyIn = S.status.some(s => s.done) || S.curLines.length > 0;
-      S.exportMonth = anyIn || ms.length === 1 ? ms[0] : (ms.find(me => monthRowOf(me).status === "closed") || ms[0]);
-    }
-    const label = (me) => { const r = monthRowOf(me); return monthName(me) + (r.kind === "starting" ? " (starting count)" : r.status === "closed" ? "" : " (not closed)"); };
-    return `<h3>Export counts</h3>
-      <div class="card"><div class="monthpick" style="margin:0 0 8px"><label class="muted small" for="xm">Month</label>
-        <select class="pick" id="xm">${ms.map(me => `<option value="${esc(me)}" ${me === S.exportMonth ? "selected" : ""}>${esc(label(me))}</option>`).join("")}</select>
-        <button class="btn ghost" data-export ${S.exporting ? "disabled" : ""}>${S.exporting ? "Exporting…" : "Export counts"}</button></div>
-        ${S.exportMsg ? `<div class="banner ${S.exportMsg.ok ? "ok" : ""}" role="status" style="margin:4px 0 10px">${esc(S.exportMsg.text)}</div>` : ""}
-        <p class="note" style="margin:0">A spreadsheet file (CSV) with every list's counts for that month, as sent: one row per item, and lumber one row per bundle (its board feet, length, width and rows). No prices. It goes to your Downloads folder.</p></div>`;
-  }
   async function all(make) {                                 // every row, a thousand at a time (the API's limit)
     const out = [];
     for (let from = 0; ; from += 1000) {
@@ -540,7 +685,7 @@ if (typeof document !== "undefined") (function () {
     } finally { S.exporting = false; render(); }
   }
 
-  // ---- a department's list, as its tablet shows it; the office can count and send it on their behalf ----
+  // ---- a department's list, as its tablet shows it; the office can count and send it on their behalf (its own screen) ----
   const DEPT_LISTS = () => S.status.filter(s => s.list_key !== "lumber");
   function deptDraft(key) { const k = key + "_" + S.month; return S.deptDrafts[k] || (S.deptDrafts[k] = {}); }
   const deptItems = (key) => S.items.filter(i => i.list_key === key && !i.retired).sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
@@ -549,7 +694,7 @@ if (typeof document !== "undefined") (function () {
   function viewDept() {
     const lists = DEPT_LISTS();
     if (!lists.some(l => l.list_key === S.deptList)) S.deptList = lists[0] ? lists[0].list_key : null;
-    const s = statusOf(S.deptList); if (!s.list_key) return `<h2>Department counts</h2><p class="sub">No department lists yet.</p>`;
+    const s = statusOf(S.deptList); if (!s.list_key) return `<p class="sub">No department lists yet.</p>`;
     const dept = s.department_name || s.name, m = monthShort(S.month), sent = !!s.done, locked = sent || closed();
     const canSend = s.due && !sent && !closed() && s.count_day_reached;
     const quarterly = s.every_months === 3, items = deptItems(s.list_key), d = deptDraft(s.list_key);
@@ -574,29 +719,31 @@ if (typeof document !== "undefined") (function () {
       : closed() ? `<div class="banner">${esc(m)} is closed<small>This list wasn't sent.</small></div>`
       : !s.count_day_reached ? `<div class="banner">Preview — this is the list ${esc(dept)} sees on their tablet from ${esc(dayShort(S.month))}<small>You can type numbers to try it; nothing is sent. From ${esc(dayShort(S.month))} the office can send it here if ${esc(dept)} can't.</small></div>`
       : `<div class="banner">Waiting for ${esc(dept)}'s tablet<small>If they're out, count it here and send it. It's recorded as sent by you, and their tablet shows it as sent.</small></div>`;
-    return `<h2>Department counts</h2><p class="sub">Each department's list, laid out the way their tablet shows it.</p>
-      <div class="seg" role="group" aria-label="Which list">${lists.map(l => `<button data-dlist="${esc(l.list_key)}" aria-pressed="${l.list_key === s.list_key}">${esc(l.name)}${l.department_name && l.department_name !== l.name ? `<span class="note"> · ${esc(l.department_name)}</span>` : ""}${
+    return `<div class="seg" role="group" aria-label="Which list">${lists.map(l => `<button data-dlist="${esc(l.list_key)}" aria-pressed="${l.list_key === s.list_key}">${esc(l.name)}${l.department_name && l.department_name !== l.name ? `<span class="note"> · ${esc(l.department_name)}</span>` : ""}${
         !l.due ? `<span class="mk">–</span>` : l.done ? `<span class="mk ok">✓</span>` : ""}</button>`).join("")}</div>
-      ${head}<div class="invlist">${body || `<div class="invitem">Nothing on the list. Add items in Setup → Count lists.</div>`}</div>
+      ${head}<div class="invlist">${body || `<div class="invitem">Nothing on the list. Add items in Setup → Count lists and prices.</div>`}</div>
       ${s.due ? `<div class="invbar"><span class="invcount">${filled} of ${items.length} counted${!locked && filled < items.length ? " — blanks count as 0" : ""}</span>
         ${sent && !closed() ? `<button class="btn ghost" data-dreopen="${esc(s.list_key)}">Change the count</button>`
           : locked ? "" : `<button class="btn or" data-dsend="${esc(s.list_key)}" ${canSend ? "" : "disabled"}>Send for ${esc(dept)}</button>${canSend ? "" : `<span class="note">Opens ${esc(dayShort(S.month))}</span>`}`}</div>` : ""}`;
   }
 
+  // ---- the lumber count (its own screen) ----
   function viewLumber() {
     const items = lumberItems(false);
     const shown = items.filter(i => (S.lines.get(i.id) || []).length > 0 || S.open["add_" + i.id]);
     const tot = items.reduce((a, i) => a + closingBf(i.id), 0), openTot = items.reduce((a, i) => a + openingBf(i.id), 0);
     const addable = items.filter(i => !shown.includes(i));
     const done = !!monthRow().lumber_done_at;
-    return `<h2>Lumber count</h2><p class="sub">Each length has its bundles; type the rows in each. Row width is 42". Leave out lumber already marked for jobs in production. Every number saves itself.</p>
-      <div class="card" style="display:flex;gap:14px;align-items:baseline;flex-wrap:wrap"><span class="num" style="font-size:30px;font-weight:700">${f0(tot)} bd ft</span>
-        <span class="muted">on the racks · ${esc(dayShort(prevMonthEnd(S.month)))} was ${f0(openTot)}</span><span class="saving" id="saving" style="margin-left:auto"></span></div>
+    const doneBar = closed() ? "" : done ? `<span class="note">Marked counted by ${esc(monthRow().lumber_done_by)}. You can still correct a number until the month closes.</span><button class="link" data-lumdone="0">Not done yet</button>`
+      : `<button class="btn" data-lumdone="1">Lumber count is done</button>`;
+    return `<div class="card lumtop"><span class="num lumtot">${f0(tot)} bd ft</span>
+        <span class="muted" style="flex:1 1 200px">on the racks · ${esc(dayShort(prevMonthEnd(S.month)))} was ${f0(openTot)}</span>${doneBar}</div>
+      <p class="sub">Each length has its bundles; type the rows in each. Row width is 42". Leave out lumber already marked for jobs in production. Every number saves itself.</p>
       ${shown.sort((a, b) => closingBf(b.id) - closingBf(a.id) || openingBf(b.id) - openingBf(a.id)).map(specCard).join("")}
-      <div class="addrow card"><select class="pick" id="newkey"><option value="">Add a species and thickness…</option>${addable.map(i => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join("")}</select>
-        <button class="btn ghost" data-addkey>Add</button><span class="note">Not on the list? Add it in Setup → Count lists.</span></div>
-      <div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span style="flex:1">${done ? `Marked counted by ${esc(monthRow().lumber_done_by)}. You can still correct a number until the month closes.` : "When every rack is counted, mark it done."}</span>
-        ${closed() ? "" : done ? `<button class="link" data-lumdone="0">Not done yet</button>` : `<button class="btn" data-lumdone="1">Lumber count is done</button>`}</div>`;
+      ${closed() ? "" : `<div class="addrow card"><select class="pick" id="newkey" aria-label="Add a species and thickness"><option value="">Add a species and thickness…</option>${addable.map(i => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join("")}</select>
+        <button class="btn ghost" data-addkey>Add</button><span class="note">Not on the list? Add it in Setup → Count lists and prices.</span></div>`}
+      <div class="card lumtop"><span style="flex:1 1 240px">${done ? "Marked counted. Back to This month for the next step." : "When every rack is counted, mark it done."}</span>
+        ${closed() || done ? `<button class="btn ghost" data-go="month">Back to This month</button>` : `<button class="btn" data-lumdone="1">Lumber count is done</button>`}</div>`;
   }
   function specCard(it) {
     const lines = S.lines.get(it.id) || [], isOpen = !!S.open[it.id];
@@ -619,78 +766,47 @@ if (typeof document !== "undefined") (function () {
         <button class="btn ghost" data-addlen="${esc(it.id)}">Add a length</button></div>`}</div></details>`;
   }
 
-  function viewDeliveries() {
-    const rec = S.receipts.filter(r => r.month_end === S.month);
-    const lum = rec.filter(r => r.kind === "lumber"), ply = rec.filter(r => r.kind === "plywood");
-    const live = (a) => a.filter(r => !r.mistake_at);
-    const lumTot = live(lum).reduce((a, r) => a + Number(r.board_feet), 0), plyTot = live(ply).reduce((a, r) => a + r.sheets, 0);
-    const today = new Date(), iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-    const maxDate = iso < S.month ? iso : S.month;
-    const row = (r, what) => `<tr class="${r.mistake_at ? "mistake" : ""}"><td>${esc(dayShort(r.received_on))}</td><td class="l">${esc(r.supplier || "—")}</td><td class="l">${what}</td>
-      <td>${r.mistake_at ? `<span class="note">Entered by mistake · ${esc(r.mistake_by_name)}</span>` : closed() ? "" : `<button class="link" data-mistake="${esc(r.id)}">Entered by mistake</button>`}</td></tr>`;
-    const form = !closed();
-    return `<h2>Deliveries in — ${esc(monthShort(S.month))}</h2><p class="sub">One line per packing slip. The monthly totals add themselves up.</p>
-      <h3>Lumber · ${f0(lumTot)} bd ft</h3>
-      ${lum.length ? `<div class="tw"><table><thead><tr><th>Date</th><th class="l">Supplier</th><th class="l">What</th><th></th></tr></thead><tbody>
-        ${lum.map(r => row(r, `${esc((itemById(r.item_id) || {}).name || "?")} · <b class="num">${f0(r.board_feet)}</b> bd ft`)).join("")}</tbody></table></div>` : `<p class="muted small" style="margin:0 2px">None yet this month.</p>`}
-      ${form ? `<div class="card" style="margin-top:10px"><div class="form">
-        <label>Date<input type="date" id="rd" value="${esc(maxDate)}" max="${esc(maxDate)}"></label>
-        <label>Supplier<input id="rs" list="suppliers" placeholder="Frank Miller Lumber"></label>
-        <label>Species and thickness<select id="rk"><option value="">Choose…</option>${lumberItems(false).map(i => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join("")}</select></label>
-        <label>Board feet<input id="rb" type="number" inputmode="decimal" min="1"></label>
-        <button class="btn" data-addrec>Add lumber slip</button></div></div>` : ""}
-      <h3>Plywood · ${plyTot} sheets</h3>
-      ${ply.length ? `<div class="tw"><table><thead><tr><th>Date</th><th class="l">Supplier</th><th class="l">Sheets</th><th></th></tr></thead><tbody>
-        ${ply.map(r => row(r, `<b class="num">${r.sheets}</b>`)).join("")}</tbody></table></div>` : `<p class="muted small" style="margin:0 2px">None yet this month.</p>`}
-      ${form ? `<div class="card" style="margin-top:10px"><div class="form">
-        <label>Date<input type="date" id="pd" value="${esc(maxDate)}" max="${esc(maxDate)}"></label>
-        <label>Supplier<input id="ps" list="suppliers" placeholder="Hood Distribution – DSI"></label>
-        <label>Sheets<input id="pn" type="number" inputmode="numeric" min="1"></label>
-        <button class="btn" data-addply>Add plywood slip</button></div></div>` : ""}
-      <datalist id="suppliers">${[...new Set(["Frank Miller Lumber", "Charles F. Shiels & Co.", "Hood Distribution – DSI", ...S.receipts.map(r => r.supplier).filter(Boolean)])].map(s => `<option>${esc(s)}</option>`).join("")}</datalist>
-      <p class="note">Nothing is deleted: a wrong slip is marked <i>Entered by mistake</i> and stops counting, but stays on record.</p>`;
-  }
-
-  function viewRollover() {
-    const pool = S.pool.filter(p => !p.mill_finished).sort((a, b) => (b.mill_done === 0) - (a.mill_done === 0) || a.project_id.localeCompare(b.project_id) || a.sheet_number - b.sheet_number);
-    const fromBefore = S.pool.filter(p => p.carried_over).length, finished = S.pool.length - pool.length;
-    const rolled = pool.filter(p => p.rolled), rolledBf = rolled.reduce((a, p) => a + (Number(p.board_feet) || 0), 0);
-    const done = !!monthRow().rollover_done_at;
-    return `<h2>Month-end roll-over</h2>
-      <p class="sub">${esc(monthShort(S.month))}'s list is every sheet uploaded this month${fromBefore ? ` plus ${fromBefore} rolled over from before` : ""} — ${S.pool.length} sheets that go through Milling. ${finished} are finished in Milling and count automatically. Below are the ${pool.length} still in Milling: tick the ones whose lumber hasn't been pulled. They move to next month.</p>
-      ${pool.length ? `<div class="card" style="padding:0">${pool.map(p => `<div class="ro ${p.rolled ? "rolled" : ""}"><div class="w"><b>${esc(p.project_id)}</b><span>Sheet ${p.sheet_number} · ${esc(p.item_code || "")}</span>
-          ${p.carried_over ? ` <span class="tag">From ${esc(monthShort(p.upload_month))}</span>` : ""}${p.is_active ? "" : ` <span class="tag">Job not in production</span>`}
-          <div class="note">${esc(p.species || "no species")} · ${esc(p.shape || "")} ${esc(p.width || "?")}${p.length ? ` × ${esc(p.length)}` : ""} · ${esc(p.thickness || "?")} · ${p.qty} top${p.qty === 1 ? "" : "s"} · Milling ${p.mill_done} of ${p.mill_required}</div>
-          ${p.problem ? `<div style="margin-top:4px"><span class="flag">${esc(p.problem)}</span></div>` : p.leave_out ? `<div class="note">Left out — not lumber</div>` : ""}</div>
-        <div class="bfv"><b class="num">${p.board_feet !== null ? f0(p.board_feet) : "—"}</b><div class="note">${p.board_feet !== null ? `bd ft ${esc(p.stock)}` : p.leave_out ? "left out" : "fix in Setup"}</div></div>
-        ${p.mill_done > 0 ? `<span class="note" style="width:160px">Pieces counted — lumber is out</span>`
-          : `<label class="tick"><input type="checkbox" data-roll="${esc(p.job_id)}|${p.sheet_number}" ${p.rolled ? "checked" : ""} ${closed() ? "disabled" : ""}> Not pulled</label>`}</div>`).join("")}</div>`
-        : `<div class="card muted">Nothing is still in Milling. Every sheet on the list counts this month.</div>`}
-      <div class="card" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
-        <span style="flex:1">${rolled.length} sheet${rolled.length === 1 ? "" : "s"} roll${rolled.length === 1 ? "s" : ""} to next month (${f0(rolledBf)} bd ft).</span>
-        ${closed() ? "" : done ? `<span style="color:var(--teal-ink);font-weight:700">✓ Reviewed by ${esc(monthRow().rollover_done_by)}</span> <button class="link" data-rodone="0">Change it</button>`
-                              : `<button class="btn" data-rodone="1">Done — these are right</button>`}</div>`;
-  }
-
-  function monthPicker() {
-    const ms = [...new Set(S.scrap.map(r => r.month_end))].sort().reverse();
-    if (ms.length < 2) return "";
-    return `<div class="monthpick"><label class="muted small" for="mp">Month</label><select class="pick" id="mp">${ms.map(m => `<option value="${m}" ${m === S.pickMonth ? "selected" : ""}>${esc(monthName(m))}${m === S.month && !closed() ? " (open)" : ""}</option>`).join("")}</select></div>`;
-  }
-  function viewScrap() {
-    const pm = S.pickMonth || S.month;
-    const rows = S.scrap.filter(r => r.month_end === pm && (Number(r.used_bf) || Number(r.zero_bf) || Number(r.received_bf)));
+  // ---- Results: one month picked, the scrap rate and the values, and the export ----
+  function viewResults() {
+    const ms = exportMonths();
+    if (!S.pickMonth || !ms.includes(S.pickMonth)) S.pickMonth = ms.includes(S.month) ? S.month : ms[0];
+    const pm = S.pickMonth, mr = monthRowOf(pm), starting = mr.kind === "starting";
     const isOpen = pm === S.month && !closed();
-    const probs = isOpen ? S.pool.filter(p => p.problem && !p.rolled) : [];
-    const by = {}; rows.forEach(r => (by[r.stock] = by[r.stock] || []).push(r));
+    const label = (me) => { const r = monthRowOf(me); return monthName(me) + (r.kind === "starting" ? " (starting count)" : r.status === "closed" ? "" : " (not closed)"); };
+    const rows = S.scrap.filter(r => r.month_end === pm && (Number(r.used_bf) || Number(r.zero_bf) || Number(r.received_bf)));
+    const probs = isOpen ? probsOf() : [];
+    const sum = (a, f) => a.reduce((x, r) => x + (Number(r[f]) || 0), 0);
+    const counted = rows.filter(r => r.used_bf !== null && r.used_bf !== undefined);
+    const usedAll = sum(counted, "used_bf"), zeroAll = sum(counted, "zero_bf"), rateAll = usedAll > 0 && zeroAll > 0 ? (usedAll - zeroAll) / usedAll : null;
+    const vals = S.values.filter(v => v.month_end === pm), valTot = vals.reduce((a, v) => a + Number(v.value || 0), 0);
+
+    const kScrap = starting ? `<div class="n num">—</div><div class="note">The starting count: there's no month before it to work from</div>`
+      : rateAll === null ? `<div class="n num">—</div><div class="note">${rows.length ? "No tops started yet" : "Nothing to work out yet"}</div>`
+      : `<div class="n num">${f1(rateAll * 100)}%</div><div class="note">${f0(usedAll - zeroAll)} of ${f0(usedAll)} bd ft used</div>`;
+    const kValue = `<div class="n num">${money(valTot)}</div><div class="note">${isOpen ? "At today's prices; they're saved when the month closes" : "At the prices the month closed with"}</div>`;
+    return `<div class="monthpick resbar"><label class="muted small" for="xm">Month</label>
+        <select class="pick big" id="xm">${ms.map(me => `<option value="${esc(me)}" ${me === pm ? "selected" : ""}>${esc(label(me))}</option>`).join("")}</select>
+        <button class="btn" data-export ${S.exporting ? "disabled" : ""}>${S.exporting ? "Exporting…" : `${DOWN}Export counts`}</button></div>
+      ${S.exportMsg ? `<div class="banner ${S.exportMsg.ok ? "ok" : ""}" role="status">${esc(S.exportMsg.text)}</div>` : ""}
+      <p class="note" style="margin:-6px 2px 14px">Export counts: a spreadsheet file (CSV) of every list's counts for the month picked, as sent — one row per item, and lumber one row per bundle. No prices. It goes to your Downloads folder.</p>
+      <div class="kpis"><div class="kpi"><div class="kt">Scrap rate, all lumber</div>${kScrap}</div><div class="kpi"><div class="kt">Inventory value</div>${kValue}</div></div>
+      ${isOpen && !monthRow().rollover_done_at ? `<div class="banner">The month-end roll-over isn't done yet<small>Until you pick the sheets whose lumber hasn't been pulled, they count as used and the 0-scrap numbers run high.</small></div>` : ""}
+      ${isOpen && !monthRow().lumber_done_at ? `<div class="banner">The lumber count isn't marked done<small>Until it is, "this month's count" is whatever has been typed so far.</small></div>` : ""}
+      ${probs.length ? `<div class="banner">${probs.length} sheet${probs.length === 1 ? "" : "s"} left out of 0-scrap<small>${probs.slice(0, 6).map(p => `${esc(p.project_id)} sheet ${p.sheet_number}: ${esc(p.problem)}`).join(" · ")}${probs.length > 6 ? " …" : ""} — fix in Setup.</small></div>` : ""}
+      ${scrapTable(rows)}
+      ${valuesTable(vals)}`;
+  }
+  function scrapTable(rows) {
+    const work = !!S.working, by = {}; rows.forEach(r => (by[r.stock] = by[r.stock] || []).push(r));
     const sum = (a, f) => a.reduce((x, r) => x + (Number(r[f]) || 0), 0);
     const line = (r, cls, click) => {
       const used = Number(r.used_bf) || 0, zero = Number(r.zero_bf) || 0, rate = used > 0 && zero > 0 ? (used - zero) / used : null;
       const verdict = r.opening_bf === null || r.opening_bf === undefined ? (cls ? "" : `<span class="note">starting count</span>`)
         : zero > used + 0.5 ? `<span class="flag o">Check</span>` : rate === null ? `<span class="note">${used > 0 ? "no tops" : "—"}</span>` : `<span class="rate num">${f1(rate * 100)}%</span>`;
-      return `<tr class="${cls || ""} ${click ? "click" : ""}" ${click ? `data-drill="${esc(r.species)}|${esc(r.stock)}"` : ""}><td>${esc(r.label || r.name)}</td>
-        <td class="num">${r.opening_bf === null ? "—" : f0(r.opening_bf)}</td><td class="num">+ ${f0(r.received_bf)}</td><td class="num">− ${f0(r.closing_bf)}</td>
-        <td class="num"><b>${r.used_bf === null ? "—" : f0(used)}</b></td><td class="num">${f0(zero)}</td><td class="num">${r.used_bf === null ? "—" : f0(used - zero)}</td><td>${verdict}</td></tr>`;
+      const name = `<td>${esc(r.label || r.name)}</td>`, usedC = `<td class="num"><b>${r.used_bf === null ? "—" : f0(used)}</b></td>`, scrapC = `<td class="num">${r.used_bf === null ? "—" : f0(used - zero)}</td>`;
+      return `<tr class="${cls || ""} ${click ? "click" : ""}" ${click ? `data-drill="${esc(r.species)}|${esc(r.stock)}"` : ""}>${name}${work
+        ? `<td class="num">${r.opening_bf === null ? "—" : f0(r.opening_bf)}</td><td class="num">+ ${f0(r.received_bf)}</td><td class="num">− ${f0(r.closing_bf)}</td>${usedC}<td class="num">${f0(zero)}</td>${scrapC}`
+        : `${usedC}${scrapC}`}<td>${verdict}</td></tr>`;
     };
     let body = "";
     for (const st of Object.keys(by).sort()) {
@@ -698,15 +814,31 @@ if (typeof document !== "undefined") (function () {
       body += line({ label: `All ${st}`, opening_bf: sum(by[st], "opening_bf"), received_bf: sum(by[st], "received_bf"), closing_bf: sum(by[st], "closing_bf"), used_bf: sum(by[st], "used_bf"), zero_bf: sum(by[st], "zero_bf") }, "subtot");
     }
     body += line({ label: "All lumber", opening_bf: sum(rows, "opening_bf"), received_bf: sum(rows, "received_bf"), closing_bf: sum(rows, "closing_bf"), used_bf: sum(rows, "used_bf"), zero_bf: sum(rows, "zero_bf") }, "grand");
-    return `<h2>Scrap rate — ${esc(monthName(pm))}</h2>
-      <p class="sub">Used = last month's count + received − this month's count. 0-scrap = every top started this month at full rectangle × stock thickness. Scrap rate = (used − 0-scrap) ÷ used. Tap a row to see its tops.</p>
-      ${monthPicker()}
-      ${isOpen && !monthRow().rollover_done_at ? `<div class="banner">The month-end roll-over isn't done yet<small>Until you pick the sheets whose lumber hasn't been pulled, they count as used and the 0-scrap numbers run high.</small></div>` : ""}
-      ${isOpen && !monthRow().lumber_done_at ? `<div class="banner">The lumber count isn't marked done<small>Until it is, "this month's count" is whatever has been typed so far.</small></div>` : ""}
-      ${probs.length ? `<div class="banner">${probs.length} sheet${probs.length === 1 ? "" : "s"} left out of 0-scrap<small>${probs.slice(0, 6).map(p => `${esc(p.project_id)} sheet ${p.sheet_number}: ${esc(p.problem)}`).join(" · ")}${probs.length > 6 ? " …" : ""} — fix in Setup.</small></div>` : ""}
-      ${rows.length ? `<div class="tw"><table><thead><tr><th>Species and thickness</th><th>Last count</th><th>Received</th><th>This count</th><th>Used</th><th>0-scrap</th><th>Scrap</th><th>Scrap rate</th></tr></thead><tbody>${body}</tbody></table></div>`
-        : `<div class="card muted">Nothing to show for this month yet.</div>`}
-      <p class="note"><span class="flag o">Check</span> means more tops started than lumber used — usually a sheet that should roll over, a missed delivery slip, or a counting slip. Board feet throughout. Lumber used with no tops started (4/4 for other parts, say) shows "no tops".</p>`;
+    const headRow = work ? `<th>Species and thickness</th><th>Last count</th><th>Received</th><th>This count</th><th>Used</th><th>0-scrap</th><th>Scrap</th><th>Scrap rate</th>`
+      : `<th>Species and thickness</th><th>Used</th><th>Scrap</th><th>Scrap rate</th>`;
+    return `<div class="sechead"><div class="sec">Scrap by species · board feet</div>${rows.length ? `<button class="link" data-working aria-expanded="${work}">${work ? "Hide the working" : "Show the working"}</button>` : ""}</div>
+      ${rows.length ? `<div class="tw"><table style="min-width:${work ? 640 : 0}px"><thead><tr>${headRow}</tr></thead><tbody>${body}</tbody></table></div>
+        <p class="note">${work ? `Used = last count + received − this count. 0-scrap = every top started this month at full rectangle × stock thickness. Scrap rate = (used − 0-scrap) ÷ used. ` : ""}Tap a row to see its tops. <span class="flag o">Check</span> means more tops started than lumber used — usually a sheet that should roll over, a missed delivery slip, or a counting slip.</p>`
+        : `<div class="card muted">Nothing to show for this month yet.</div>`}`;
+  }
+  function valuesTable(rows) {
+    const gl = { "1201": 0, "1204-01": 0, "1207": 0, "1208": 0 };
+    for (const v of rows) if (v.gl_account) gl[v.gl_account] = (gl[v.gl_account] || 0) + Number(v.value || 0);
+    const names = { "1201": "Wood (lumber + plywood)", "1204-01": "Steel", "1207": "Other", "1208": "Finishing materials" };
+    const tot = Object.values(gl).reduce((a, b) => a + b, 0);
+    const byList = {}; rows.filter(v => v.gl_account).forEach(v => (byList[v.list_key] = byList[v.list_key] || []).push(v));
+    const listName = (k) => ({ lumber: "Lumber", plywood: "Plywood", metal: "Metal", finish: "Finish", other: "Other" }[k] || k);
+    const noPrice = rows.filter(v => v.gl_account && Number(v.qty) > 0 && (v.price === null || v.price === undefined));
+    const items = !!S.valItems;
+    return `<div class="sechead"><div class="sec">Value by GL account</div><button class="link" data-valitems aria-expanded="${items}">${items ? "Hide the items" : "See every item"}</button></div>
+      <div class="tw"><table style="min-width:0"><thead><tr><th>GL account</th><th class="l">What</th><th>Value</th></tr></thead><tbody>
+        ${["1201", "1204-01", "1207", "1208", ...Object.keys(gl).filter(a => !["1201", "1204-01", "1207", "1208"].includes(a))].map(a => `<tr><td>${a}</td><td class="l">${names[a] || ""}</td><td class="num">${money(gl[a])}</td></tr>`).join("")}
+        <tr class="grand"><td>Total</td><td></td><td class="num">${money(tot)}</td></tr></tbody></table></div>
+      <p class="note">Count × price — the same totals as the Summary tab of your spreadsheet. A count not in yet adds nothing. Metal's shop supplies have no dollar value, as on your sheet.${noPrice.length ? ` ${noPrice.length} counted item${noPrice.length === 1 ? " has" : "s have"} no price <button class="link" data-go="setup">Set prices in Setup</button>` : ""}</p>
+      ${items ? Object.keys(byList).map(k => `<div class="sec">${esc(listName(k))} · ${money(byList[k].reduce((a, v) => a + Number(v.value || 0), 0))}</div>
+        <div class="tw"><table style="min-width:520px"><thead><tr><th>Item</th><th>Count</th><th>Price</th><th>Value</th></tr></thead><tbody>
+        ${byList[k].filter(v => Number(v.qty) > 0).sort((a, b) => Number(b.value) - Number(a.value)).map(v => `<tr><td>${esc(v.name)}</td><td class="num">${f1(v.qty)} ${esc(v.unit)}</td>
+          <td class="num">${v.price === null ? `<span class="flag">No price</span>` : "$" + Number(v.price).toFixed(2)}</td><td class="num">${money(v.value)}</td></tr>`).join("")}</tbody></table></div>`).join("") : ""}`;
   }
   function drillPane() {
     const [sp, st] = S.drill.split("|"), pm = S.pickMonth || S.month;
@@ -723,60 +855,42 @@ if (typeof document !== "undefined") (function () {
       <p class="note">Only the sheet number, item code and the top size used for the maths — the work order page itself stays the source.</p></div></div>`;
   }
 
-  function viewValues() {
-    const pm = S.pickMonth || S.month;
-    const rows = S.values.filter(v => v.month_end === pm);
-    const gl = { "1201": 0, "1204-01": 0, "1207": 0, "1208": 0 };
-    for (const v of rows) if (v.gl_account) gl[v.gl_account] = (gl[v.gl_account] || 0) + Number(v.value || 0);
-    const names = { "1201": "Wood (lumber + plywood)", "1204-01": "Steel", "1207": "Other", "1208": "Finishing materials" };
-    const tot = Object.values(gl).reduce((a, b) => a + b, 0);
-    const byList = {}; rows.filter(v => v.gl_account).forEach(v => (byList[v.list_key] = byList[v.list_key] || []).push(v));
-    const listName = (k) => ({ lumber: "Lumber", plywood: "Plywood", metal: "Metal", finish: "Finish", other: "Other" }[k] || k);
-    const noPrice = rows.filter(v => v.gl_account && Number(v.qty) > 0 && (v.price === null || v.price === undefined));
-    return `<h2>Values — ${esc(monthName(pm))}</h2><p class="sub">Count × price, by GL account — the same totals as the Summary tab of your spreadsheet. ${pm === S.month && !closed() ? "Today's prices; they're frozen when the month closes." : "The prices this month closed with."}</p>
-      ${monthPicker()}
-      <div class="tw"><table style="min-width:420px"><thead><tr><th>GL account</th><th class="l">What</th><th>Value</th></tr></thead><tbody>
-        ${Object.keys(gl).map(a => `<tr><td>${a}</td><td class="l">${names[a] || ""}</td><td class="num">${money(gl[a])}</td></tr>`).join("")}
-        <tr class="grand"><td>Total</td><td></td><td class="num">${money(tot)}</td></tr></tbody></table></div>
-      <p class="note">A count not in yet adds nothing. Metal's shop supplies have no dollar value, as on your sheet.${noPrice.length ? ` ${noPrice.length} counted item${noPrice.length === 1 ? " has" : "s have"} no price — Setup → Prices.` : ""}</p>
-      ${Object.keys(byList).map(k => `<h3>${esc(listName(k))} · ${money(byList[k].reduce((a, v) => a + Number(v.value || 0), 0))}</h3>
-        <div class="tw"><table style="min-width:520px"><thead><tr><th>Item</th><th>Count</th><th>Price</th><th>Value</th></tr></thead><tbody>
-        ${byList[k].filter(v => Number(v.qty) > 0).sort((a, b) => Number(b.value) - Number(a.value)).map(v => `<tr><td>${esc(v.name)}</td><td class="num">${f1(v.qty)} ${esc(v.unit)}</td>
-          <td class="num">${v.price === null ? `<span class="flag">No price</span>` : "$" + Number(v.price).toFixed(2)}</td><td class="num">${money(v.value)}</td></tr>`).join("")}</tbody></table></div>`).join("")}`;
-  }
-
+  // ---- Setup (its own screen): three folded lists, each saying what needs you ----
   function viewSetup() {
     const cur = currentMatches(S.matches);
     const invSpecies = [...new Set(lumberItems(false).map(i => i.species))].sort();
     const woSpecies = new Map();
     for (const p of S.pool) if (p.species) woSpecies.set(norm(p.species), p.species);
     for (const m of cur.values()) if (!woSpecies.has(m.wo_norm)) woSpecies.set(m.wo_norm, m.wo_species);
-    const speciesRows = [...woSpecies.entries()].sort((a, b) => a[1].localeCompare(b[1])).map(([n, name]) => {
+    const speciesRow = ([n, name]) => {
       const m = cur.get(n), auto = !m && invSpecies.find(s => norm(s) === n);
       const val = m ? (m.leave_out ? "__out" : m.inventory_species) : auto || "";
       const waiting = S.pool.some(p => norm(p.species) === n && p.problem && /matched/.test(p.problem));
-      return `<div class="ro"><div class="w"><b>${esc(name)}</b>${waiting ? ` <span class="flag">Not matched</span>` : auto ? ` <span class="note">matches by itself</span>` : ""}</div>
-        <select class="pick" data-match="${esc(name)}"><option value="">Choose inventory species…</option>
-          ${invSpecies.map(s => `<option ${val === s ? "selected" : ""}>${esc(s)}</option>`).join("")}<option value="__out" ${val === "__out" ? "selected" : ""}>Not lumber — leave out</option></select></div>`;
-    }).join("");
-    const rules = S.rules.filter(r => !r.retired_at);
+      return { waiting, html: `<div class="ro"><div class="w"><b>${esc(name)}</b>${waiting ? ` <span class="flag">Not matched</span>` : auto ? ` <span class="note">matches by itself</span>` : ""}</div>
+        <select class="pick" data-match="${esc(name)}" aria-label="Inventory species for ${esc(name)}"><option value="">Choose inventory species…</option>
+          ${invSpecies.map(s => `<option ${val === s ? "selected" : ""}>${esc(s)}</option>`).join("")}<option value="__out" ${val === "__out" ? "selected" : ""}>Not lumber — leave out</option></select></div>` };
+    };
+    const sp = [...woSpecies.entries()].sort((a, b) => a[1].localeCompare(b[1])).map(speciesRow);
+    const spWait = sp.filter(r => r.waiting), spRest = sp.filter(r => !r.waiting);
+    const rules = S.rules.filter(r => !r.retired_at), probs = probsOf(), noPrice = noPriceItems();
     const L = S.setupList, list = S.items.filter(i => i.list_key === L).sort((a, b) => (a.retired - b.retired) || String(a.section).localeCompare(String(b.section)) || a.sort_order - b.sort_order || a.name.localeCompare(b.name));
     const lists = [["lumber", "Lumber"], ["plywood", "Plywood"], ["metal", "Metal"], ["finish", "Finish"], ["other", "Other"]];
     const e = S.editItem;
-    return `<h2>Setup</h2>
-      <h3>Thickness rules — finished top to stock</h3>
-      <div class="card" style="padding:0">${rules.map(r => `<div class="ro"><div class="w"><b class="num">${Number(r.from_in)}"${Number(r.to_in) !== Number(r.from_in) ? ` – ${Number(r.to_in)}"` : ""}</b> → <b>${esc(r.stock)}</b> <span class="note">· ${esc(r.set_by_name)}</span></div>
-        <button class="link" data-retirerule="${r.id}">Retire</button></div>`).join("")}</div>
-      <div class="card"><div class="form">
+    const fold = (k, title, sub, flag, dflt, inner) => `<details class="sfold" data-fold="${k}" ${foldOpen(k, dflt) ? "open" : ""}>
+      <summary class="srow"><span class="tx"><span class="tt">${title}</span><span class="ss">${sub}</span></span>${flag ? `<span class="flag">${flag}</span>` : ""}${CHEV}</summary>
+      <div class="fbody flat">${inner}</div></details>`;
+    const speciesInner = `<p class="note" style="margin:0 0 8px">Names that are the same apart from spacing, capitals or hyphens match by themselves. Pick one for the rest; "Not lumber" leaves those sheets out of the scrap rate.</p>
+      ${!sp.length ? `<div class="card muted">No work order species on this month's list yet.</div>`
+        : `${spWait.length ? `<div class="card" style="padding:0">${spWait.map(r => r.html).join("")}</div>` : `<p class="note">Every work order species on this month's list has a match.</p>`}
+          ${spRest.length ? `<details class="more" data-fold="spmore" ${foldOpen("spmore", false) ? "open" : ""}><summary class="link">See the ${spRest.length} that match</summary><div class="card" style="padding:0">${spRest.map(r => r.html).join("")}</div></details>` : ""}`}`;
+    const rulesInner = `<div class="card" style="padding:0">${rules.map(r => `<div class="ro"><div class="w"><b class="num">${Number(r.from_in)}"${Number(r.to_in) !== Number(r.from_in) ? ` – ${Number(r.to_in)}"` : ""}</b> → <b>${esc(r.stock)}</b> <span class="note">· ${esc(r.set_by_name)}</span></div>
+        <button class="link" data-retirerule="${r.id}">Retire</button></div>`).join("") || `<div class="ro muted">No rules yet.</div>`}</div>
+      <div class="form">
         <label>Finished thickness from (inches)<input id="tf" type="number" step="0.01" min="0" placeholder="1.75"></label>
         <label>to (leave blank for just one)<input id="tt" type="number" step="0.01" min="0"></label>
         <label>Stock<select id="ts"><option>4/4</option><option>5/4</option><option>6/4</option><option selected>8/4</option><option>10/4</option><option>12/4</option></select></label>
-        <button class="btn" data-addrule>Add rule</button></div></div>
-      <h3>Species — work order name to inventory name</h3>
-      <p class="note" style="margin:0 2px 8px">Names that are the same apart from spacing, capitals or hyphens match by themselves. Pick one for the rest; "Not lumber" leaves those sheets out of the scrap rate.</p>
-      ${speciesRows ? `<div class="card" style="padding:0">${speciesRows}</div>` : `<div class="card muted">No work order species on this month's list yet.</div>`}
-      <h3>Count lists and prices</h3>
-      <div class="monthpick">${lists.map(([k, t]) => `<button class="btn ${k === L ? "" : "ghost"}" data-setlist="${k}">${t}</button>`).join("")}</div>
+        <button class="btn" data-addrule>Add rule</button></div>`;
+    const listsInner = `<div class="monthpick">${lists.map(([k, t]) => `<button class="btn ${k === L ? "" : "ghost"}" data-setlist="${k}">${t}</button>`).join("")}</div>
       <div class="card" style="padding:0">${list.map(i => {
         const p = S.prices.get(i.id);
         return `<div class="ro"><div class="w"><b>${esc(i.name)}</b>${i.retired ? ` <span class="tag">Retired</span>` : ""}<div class="note">${esc(i.section || "")}${i.section ? " · " : ""}${esc(i.unit)}${i.std_length_ft ? ` · ${Number(i.std_length_ft)}' sticks` : ""} · ${i.gl_account ? "GL " + esc(i.gl_account) : "no dollar value"}</div></div>
@@ -793,12 +907,22 @@ if (typeof document !== "undefined") (function () {
           <label>GL account (blank = no dollar value)<input id="ei_gl" value="${esc(e ? e.gl_account || "" : { plywood: "1201", metal: "1204-01", finish: "1208", other: "1207" }[L] || "")}"></label>`}
         <button class="btn" data-saveitem>${e && e.id ? "Save" : "Add"}</button>${e && e.id ? `<button class="link" data-canceledit>Cancel</button>` : ""}</div></div>
       <p class="note">Every price change is kept with who made it; a closed month keeps its own prices. Retired items keep their history.</p>`;
+    return `${probs.length ? `<div class="banner">${probs.length} sheet${probs.length === 1 ? " is" : "s are"} left out of the scrap rate until matched<small>${probs.slice(0, 6).map(p => `${esc(p.project_id)} sheet ${p.sheet_number}: ${esc(p.problem)}`).join(" · ")}${probs.length > 6 ? " …" : ""}</small></div>` : ""}
+      <div class="steps">
+      ${fold("species", "Species matches", `Work order name to inventory name · ${spRest.length} matched`, spWait.length ? `${spWait.length} need${spWait.length === 1 ? "s" : ""} you` : "", spWait.length > 0, speciesInner)}
+      ${fold("rules", "Thickness rules", `Finished top to stock · ${rules.length} rule${rules.length === 1 ? "" : "s"}`, "", false, rulesInner)}
+      ${fold("lists", "Count lists and prices", "Lumber, Plywood, Metal, Finish, Other", noPrice.length ? `${noPrice.length} item${noPrice.length === 1 ? " has" : "s have"} no price` : "", !!S.editItem, listsInner)}
+      </div>`;
   }
-
   // ---------- events ----------
   function wire() {
     const on = (sel, fn, ev = "click") => app.querySelectorAll(sel).forEach(el => el.addEventListener(ev, (e) => fn(el, e)));
-    tabsEl.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { S.tab = b.dataset.tab; store.set("tab", S.tab); S.msg = null; if (S.tab !== "scrap" && S.tab !== "values") S.pickMonth = S.month; render(); scrollTo(0, 0); });
+    tabsEl.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => go(b.dataset.tab));
+    tabsEl.querySelectorAll("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
+    on("[data-go]", (el) => go(el.dataset.go));
+    on("details[data-fold] > summary", (el) => { const d = el.parentElement; S.folds[d.dataset.fold] = !d.open; store.set("folds", S.folds); });
+    on("[data-working]", () => { S.working = !S.working; store.set("working", S.working); render(); });
+    on("[data-valitems]", () => { S.valItems = !S.valItems; render(); });
     on("details.spec", (el) => { S.open[el.dataset.item] = el.open; store.set("open", S.open); }, "toggle");
     on("[data-b]", (el) => {
       const [id, li, bi] = el.dataset.b.split("|"), line = S.lines.get(id)[li];
@@ -824,9 +948,9 @@ if (typeof document !== "undefined") (function () {
     });
     on("[data-addkey]", () => { const id = document.getElementById("newkey").value; if (!id) return; S.open["add_" + id] = true; S.open[id] = true;
       if (!(S.lines.get(id) || []).length) S.lines.set(id, [{ item_id: id, length_in: 114, width_in: ROW_W, bundles: [null] }]); render(); });
-    on("#xm", (el) => { S.exportMonth = el.value; S.exportMsg = null; render(); }, "change");
-    on("[data-export]", () => { const el = document.getElementById("xm"); exportCounts(el ? el.value : S.exportMonth); });
-    on("[data-golist]", (el) => { S.deptList = el.dataset.golist; store.set("deptlist", S.deptList); S.tab = "dept"; store.set("tab", "dept"); render(); scrollTo(0, 0); });
+    on("#xm", (el) => { S.pickMonth = el.value; S.exportMsg = null; render(); }, "change");
+    on("[data-export]", () => { const el = document.getElementById("xm"); exportCounts(el ? el.value : S.pickMonth); });
+    on("[data-golist]", (el) => { S.deptList = el.dataset.golist; store.set("deptlist", S.deptList); go("dept"); });
     on("[data-dlist]", (el) => { S.deptList = el.dataset.dlist; store.set("deptlist", S.deptList); S.msg = null; render(); });
     on("[data-dinv]", (el) => {
       const [id, part] = el.dataset.dinv.split("|"), d = deptDraft(S.deptList);
@@ -841,7 +965,7 @@ if (typeof document !== "undefined") (function () {
       if (!confirm(`Send the ${s.name} count for ${s.department_name || s.name}?\n\n${blanks ? `${blanks} item${blanks === 1 ? " is" : "s are"} blank and will count as 0.` : "Every item has a number."}\nIt's recorded as sent by ${S.me.name}.`)) return;
       el.disabled = true;
       const r = await rpc("send_inventory_count", { p_list: key, p_counts: payload, p_client_id: newId() });
-      if (r) { delete S.deptDrafts[key + "_" + S.month]; store.set("deptdrafts", S.deptDrafts); render(); }
+      if (r) { delete S.deptDrafts[key + "_" + S.month]; store.set("deptdrafts", S.deptDrafts); go("month"); }
     });
     on("[data-dreopen]", async (el) => {
       const key = el.dataset.dreopen, s = statusOf(key);
@@ -857,16 +981,18 @@ if (typeof document !== "undefined") (function () {
       store.set("deptdrafts", S.deptDrafts);
       rpc("reopen_inventory_count", { p_list: key });
     });
-    on("[data-lumdone]", (el) => rpc("set_lumber_done", { p_done: el.dataset.lumdone === "1" }));
+    on("[data-lumdone]", async (el) => { el.disabled = true; const r = await rpc("set_lumber_done", { p_done: el.dataset.lumdone === "1" }); if (r && el.dataset.lumdone === "1") go("month"); });
     on("[data-rodone]", (el) => rpc("set_rollover_done", { p_done: el.dataset.rodone === "1" }));
     on("[data-roll]", (el) => { const [job, n] = el.dataset.roll.split("|"); rpc("set_rollover", { p_job: job, p_sheet_number: Number(n), p_rolled: el.checked }); }, "change");
-    on("[data-addrec]", () => rpc("add_inventory_receipt", { p_kind: "lumber", p_date: val("rd"), p_supplier: val("rs"), p_item: val("rk") || null,
-      p_board_feet: Number(val("rb")) || null, p_sheets: null, p_note: null, p_client_id: newId() }));
-    on("[data-addply]", () => rpc("add_inventory_receipt", { p_kind: "plywood", p_date: val("pd"), p_supplier: val("ps"), p_item: null,
-      p_board_feet: null, p_sheets: Number(val("pn")) || null, p_note: null, p_client_id: newId() }));
+    on("#rkind", (el) => { S.slipKind = el.value; app.querySelectorAll("[data-for]").forEach(x => { x.hidden = x.dataset.for !== el.value; }); }, "change");
+    on("[data-addslip]", () => {                          // one form for both kinds of slip; the same call as before
+      const ply = val("rkind") === "plywood";
+      rpc("add_inventory_receipt", ply
+        ? { p_kind: "plywood", p_date: val("rd"), p_supplier: val("rs"), p_item: null, p_board_feet: null, p_sheets: Number(val("pn")) || null, p_note: null, p_client_id: newId() }
+        : { p_kind: "lumber", p_date: val("rd"), p_supplier: val("rs"), p_item: val("rk") || null, p_board_feet: Number(val("rb")) || null, p_sheets: null, p_note: null, p_client_id: newId() });
+    });
     on("[data-mistake]", (el) => { if (confirm("Mark this slip as entered by mistake? It stays on record but stops counting.")) rpc("mark_receipt_mistake", { p_id: el.dataset.mistake }); });
     on("[data-close]", () => { if (confirm(`Close ${monthName(S.month)}? The counts, the sheets and today's prices are saved for good, and next month's list starts with the rolled-over sheets.`)) rpc("close_inventory_month", {}); });
-    on("#mp", (el) => { S.pickMonth = el.value; render(); }, "change");
     on("[data-drill]", (el) => { S.drill = el.dataset.drill; render(); });
     app.querySelectorAll("[data-shut]").forEach(el => el.addEventListener("click", (e) => { if (e.target.closest("[data-stay]") && !e.target.matches("button[data-shut]")) return; S.drill = null; render(); }));
     on("[data-addrule]", () => rpc("add_thickness_rule", { p_from: Number(val("tf")) || null, p_to: Number(val("tt")) || null, p_stock: val("ts") }));

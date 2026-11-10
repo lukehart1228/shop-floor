@@ -3,7 +3,8 @@
 // "count not finished", the file name, the cells). Part 2, real Chromium through the real test database as each login:
 // counts sent the real way (Willie, Eric, KP, Luke), the download's name and every line that matters, the 31 Aug starting
 // count against the spec (36,440 bd ft of lumber, 207 sheets of plywood), a month with nothing in it, inside the office
-// frame, phone width, and a supervisor who gets no export.
+// frame, phone width, and a supervisor who gets no export. 10 Nov (inventory.html 2026-11-10.1): Export counts moved to the
+// Results tab, beside its one month picker; everything about the file is unchanged.
 //   bash /home/claude/sf/base/fresh.sh
 //   PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers TZ=America/Indiana/Indianapolis OUT=/tmp/allpages node test_inv_export.js
 const fs = require("fs"), http = require("http"), path = require("path");
@@ -155,9 +156,9 @@ ok("a month with nothing in it gives no rows", X.exportRows({ month: { month_end
     let s = await session(browser, users.luke), p = s.p;
     await p.goto(`${base}/inventory.html`);
     await p.waitForSelector("nav.tabs [data-tab]", { timeout: 15000 });
-    await p.click('[data-tab="month"]');
+    await p.click('[data-tab="results"]');
     await p.waitForSelector("[data-export]", { timeout: 5000 }).catch(() => {});
-    ok("This month has an Export counts section", !!(await p.$("[data-export]")) && (await p.textContent("main")).includes("Export counts"));
+    ok("Results has Export counts", !!(await p.$("[data-export]")) && (await p.textContent("main")).includes("Export counts"));
     const opts = await p.$$eval("#xm option", os => os.map(o => [o.value, o.textContent.trim(), o.selected]));
     ok("the months: the open one (not closed) and the starting count", opts.some(o => o[0] === openMonth && /not closed/.test(o[1])) && opts.some(o => o[0] === "2026-08-31" && /starting count/.test(o[1])), JSON.stringify(opts));
     ok("newest month first, and picked to start with once something is counted", opts[0][0] === openMonth && opts[0][2]);
@@ -200,7 +201,7 @@ ok("a month with nothing in it gives no rows", X.exportRows({ month: { month_end
     // a month with nothing in it
     await admin.query("insert into inv_months (month_end, kind, status) values ('2026-07-31', 'count', 'open') on conflict do nothing");
     await p.reload(); await p.waitForSelector("[data-export]");
-    await p.selectOption("#xm", "2026-07-31");
+    await p.selectOption("#xm", "2026-07-31"); await p.waitForTimeout(300);
     let fired = false; p.once("download", () => { fired = true; });
     await p.click("[data-export]"); await p.waitForTimeout(1500);
     ok("a month with nothing counted: no file, and the page says so", !fired && /Nothing has been counted for July 2026 yet/.test(await p.textContent("main")));
@@ -226,7 +227,7 @@ ok("a month with nothing in it gives no rows", X.exportRows({ month: { month_end
     let fr = null; for (let i = 0; i < 40 && !fr; i++) { fr = p.frames().find(f => f.url().includes("inventory.html")); if (!fr) await p.waitForTimeout(250); }
     ok("the office opens Inventory in its frame", !!fr);
     if (fr) {
-      await fr.waitForSelector("nav.tabs [data-tab]", { timeout: 15000 }); await fr.click('[data-tab="month"]'); await fr.waitForSelector("[data-export]");
+      await fr.waitForSelector("nav.tabs [data-tab]", { timeout: 15000 }); await fr.click('[data-tab="results"]'); await fr.waitForSelector("[data-export]");
       [dl] = await Promise.all([p.waitForEvent("download", { timeout: 15000 }), fr.click("[data-export]")]);
       ok("inside the office: the download still arrives", dl.suggestedFilename() === `inventory-counts-${ym}-not-closed.csv`, dl.suggestedFilename());
     }
