@@ -1,9 +1,11 @@
 // 10 Nov: Purchasing, the simpler page (purchasing.sql, lumber_scrap_skips.sql, purchasing_log.sql, purchasing.html).
 // In real Chromium through the real database as Luke. Three tabs and Setup. Setup: PO details, a supplier with other names,
 // items, a baseline. Buy: a tablet's request put on PO 00001 and marked ordered, then under Ordered, not received and marked
-// Received; Not ordering. Log a purchase: no Mark ordered; two ticked requests fill the form, one as an item the shop has and
-// one as a new item; a supplier the shop hasn't used is added; the requests are marked ordered naming where; Logged lately;
-// it counts in Prices; Change takes a line off and its request is to be ordered again; It was a mistake stops it counting.
+// Received; Not ordering. Log a purchase: no Mark ordered and no lumber; two ticked requests fill the form, one as an item
+// the shop has and one as a new item; a box of 50 for $50 shows $1.00 each and counts per piece; a link kept; a supplier the
+// shop hasn't used is added; the requests are marked ordered naming where; Logged lately; Prices counts it, Find an item
+// narrows it, the item's history has the link; next time the form fills In each and says what it cost and where, with the
+// link; Change takes a line off and its request is to be ordered again; It was a mistake stops it counting.
 // The POs: the PD - POs folder chosen and PO 00001.pdf filed; Lumber PO 24 numbered apart, its delivery slips offered on
 // the PO. Prices: a Purchases file as a real .xlsx added in one step; a line with no item given one from a sheet; the same
 // file again adds nothing; the next file's line files itself; a file naming new items makes them without a question, takes
@@ -170,43 +172,68 @@ wb.save(sys.argv[1])`;
   await q(`insert into supply_requests (department, item, qty, requested_by_name) values ('assembly_qc', 'Titebond III gallon', 1, 'KP'), ('metal', 'Steel wire brushes', 3, 'Willie J')`);
   await tab(p, "prices"); await tab(p, "buy");
   const rqT = (await q("select id from supply_requests where item = 'Titebond III gallon' and state = 'requested'"))[0].id, rqB = (await q("select id from supply_requests where item = 'Steel wire brushes'"))[0].id;
-  await p.check(`[data-tick="${rqT}"]`); await p.check(`[data-tick="${rqB}"]`); await sleep(200);
+  await p.check(`[data-tick="${rqT}"]`); await sleep(150); await p.check(`[data-tick="${rqB}"]`); await sleep(200);
   ok("Ticking two: the button says Log a purchase for 2 ticked", /Log a purchase for 2 ticked/.test(await p.innerText("[data-logopen]")));
   await p.click("[data-logopen]"); await sleep(400);
-  ok("The form opens with both requests as lines: Titebond as the item the shop has, the brushes as a new item asking its category",
+  ok("The form opens with both requests as lines: Titebond as the item the shop has, the brushes as a new item asking only its category",
      (await p.inputValue('[data-lg="0|name"]')) === "Titebond III gallon" && (await p.inputValue('[data-lg="0|qty"]')) === "1"
      && (await p.inputValue('[data-lg="1|name"]')) === "Steel wire brushes" && (await p.isHidden('[data-lgnew="0"]')) && (await p.isVisible('[data-lgnew="1"]'))
-     && /Assembly \/ QC asked for it/.test(await txt(p)) && /Metal asked for it/.test(await txt(p)));
+     && !(await p.$('[data-lg="1|unit"]')) && /Assembly \/ QC asked for it/.test(await txt(p)) && /Metal asked for it/.test(await txt(p)));
+  const catOpts = await p.$$eval('[data-lg="1|cat"] option', o => o.map(x => x.value)), itemOpts = await p.$$eval("#logItems option", o => o.map(x => x.value));
+  ok("No lumber in the form: not among the categories, and 8/4 Ash isn't offered as an item", !catOpts.includes("lumber") && catOpts.includes("hardware") && !itemOpts.includes("8/4 Ash") && itemOpts.includes("Titebond III gallon"), catOpts.join(",") + " | " + itemOpts.join(","));
   await p.fill('[data-lgf="supplier"]', "Corner Hardware"); await p.fill('[data-lgf="doc"]', "R-1188");
-  await p.fill('[data-lg="0|price"]', "31.49"); await p.fill('[data-lg="1|price"]', "6.98");
-  await p.selectOption('[data-lg="1|cat"]', "hardware"); await p.fill('[data-lg="1|unit"]', "each"); await sleep(200);
-  ok("It totals as you type ($52.43), and says the supplier is new", (await p.innerText("#logTotal")) === "$52.43" && (await p.isVisible("#logSupNew")), await p.innerText("#logTotal"));
+  await p.fill('[data-lg="0|price"]', "31.49"); await p.fill('[data-lg="0|url"]', "https://www.example.com/titebond-iii-gallon");
+  await p.fill('[data-lg="1|price"]', "6.98"); await p.selectOption('[data-lg="1|cat"]', "hardware");
+  await p.click("[data-logadd]"); await sleep(300);
+  await p.fill('[data-lg="2|name"]', "Sanding discs 120"); await p.fill('[data-lg="2|price"]', "50"); await p.fill('[data-lg="2|pack"]', "50");
+  await p.selectOption('[data-lg="2|cat"]', "hardware"); await sleep(200);
+  ok("A box of 50 for $50: the grey box beside it says $1.00 each; the total adds up ($102.43); the supplier is new",
+     (await p.inputValue('[data-lgper="2"]')) === "$1.00 each" && (await p.inputValue('[data-lgper="0"]')) === "$31.49 each" && (await p.innerText("#logTotal")) === "$102.43"
+     && (await p.isVisible("#logSupNew")) && (await p.getAttribute('[data-lgper="2"]', "readonly")) !== null, (await p.inputValue('[data-lgper="2"]')) + " " + (await p.innerText("#logTotal")));
   await p.click("[data-logsave]"); await sleep(1800);
   t = await banner(p);
-  ok("Logged: $52.43 from Corner Hardware, 2 requests marked ordered, the brushes a new item, the supplier added", /Logged: \$52\.43 from Corner Hardware/.test(t) && /2 supply requests are marked ordered/.test(t)
-     && /New item: Steel wire brushes/.test(t) && /Corner Hardware is a new supplier/.test(t), t);
-  ok("In the database: both requests ordered, naming where they were bought", (await q("select count(*)::int n from supply_request_events where what = 'Ordered: bought from Corner Hardware'"))[0].n === 2
-     && (await q("select state from supply_requests where id = $1", [rqB]))[0].state === "ordered");
+  ok("Logged: $102.43 from Corner Hardware, 2 requests marked ordered, two new items, the supplier added", /Logged: \$102\.43 from Corner Hardware/.test(t) && /2 supply requests are marked ordered/.test(t)
+     && /New items: Steel wire brushes, Sanding discs 120/.test(t) && /Corner Hardware is a new supplier/.test(t), t);
+  ok("In the database: both requests ordered naming where; the link and the 50 in each kept; the new items counted per piece", (await q("select count(*)::int n from supply_request_events where what = 'Ordered: bought from Corner Hardware'"))[0].n === 2
+     && (await q("select url from purchase_log_lines where position = 1"))[0].url === "https://www.example.com/titebond-iii-gallon"
+     && Number((await q("select pack from purchase_log_lines where position = 3"))[0].pack) === 50 && (await q("select unit from purchase_items where name = 'Sanding discs 120'"))[0].unit === "each");
   t = await txt(p);
-  ok("Logged lately: Corner Hardware, R-1188, both items, $52.43, with Change and It was a mistake", /Logged lately/.test(t) && /Corner Hardware/.test(t) && /R-1188/.test(t)
-     && /Titebond III gallon × 1, Steel wire brushes × 3/.test(t) && /\$52\.43/.test(t) && !!(await p.$("[data-logchange]")), t.slice(0, 900));
+  ok("Logged lately: Corner Hardware, R-1188, the items (50 in each) and a link, $102.43, with Change and It was a mistake", /Logged lately/.test(t) && /R-1188/.test(t)
+     && /Titebond III gallon × 1 link, Steel wire brushes × 3, Sanding discs 120 × 1 \(50 in each\)/.test(t) && /\$102\.43/.test(t) && !!(await p.$("[data-logchange]")), t.slice(0, 900));
   await tab(p, "prices"); t = await txt(p);
-  ok("Prices counts it straight away: Steel wire brushes, 3 each at $6.98", /Steel wire brushes 3 each \$6\.98/.test(t), t.slice(0, 1200));
+  ok("Prices counts it straight away, per piece: Sanding discs 120, 50 each at $1.00", /Sanding discs 120 50 each \$1\.00/.test(t) && /Steel wire brushes 3 each \$6\.98/.test(t), t.slice(0, 1400));
+  await p.fill("#findItem", "sanding"); await sleep(200);
+  const shown = await p.$$eval("tr[data-names]", r => r.filter(x => !x.hidden).map(x => x.innerText.split("\t")[0].trim()));
+  ok("Find an item: typing “sanding” leaves only Sanding discs 120", shown.length === 1 && /Sanding discs 120/.test(shown[0]), shown.join(" | "));
+  await p.fill("#findItem", ""); await sleep(100);
+  const tite = (await q("select id from purchase_items where name = 'Titebond III gallon'"))[0].id;
+  await p.click(`[data-openitem="${tite}"]`); await sleep(300);
+  ok("Tap Titebond: its logged buy has its Link, to the page it was bought from", (await p.$$eval(".detail a", a => a.map(x => x.getAttribute("href")))).includes("https://www.example.com/titebond-iii-gallon")
+     && (await p.$$eval(".detail a", a => a.every(x => x.target === "_blank" && /noopener/.test(x.rel)))));
   await tab(p, "buy");
+  await p.click("[data-logopen]"); await sleep(400);
+  await p.fill('[data-lg="0|name"]', "Sanding discs 120"); await sleep(250);
+  t = await p.innerText('[data-lglast="0"]');
+  ok("Next time: picking Sanding discs 120 fills In each with 50 and says what it cost last time and where", (await p.inputValue('[data-lg="0|pack"]')) === "50" && /Last time: \$50\.00 for 50 \(\$1\.00 each\) at Corner Hardware/.test(t), t);
+  await p.click("[data-logadd]"); await sleep(300); await p.fill('[data-lg="1|name"]', "Titebond III gallon"); await sleep(250);
+  ok("…and picking Titebond gives the link it was bought from", (await p.$$eval('[data-lglast="1"] a', a => a.map(x => x.getAttribute("href")))).includes("https://www.example.com/titebond-iii-gallon"), await p.innerText('[data-lglast="1"]'));
+  await p.click(".logsheet [data-sheetclose]"); await sleep(300);
   const lg = (await q("select id from purchase_logs"))[0].id;
   await p.click(`[data-logchange="${lg}"]`); await sleep(400);
-  ok("Change: the form opens with what was logged", (await p.inputValue('[data-lgf="supplier"]')) === "Corner Hardware" && (await p.inputValue('[data-lg="1|price"]')) === "6.98");
+  ok("Change: the form opens with what was logged, link and In each included", (await p.inputValue('[data-lgf="supplier"]')) === "Corner Hardware" && (await p.inputValue('[data-lg="1|price"]')) === "6.98"
+     && (await p.inputValue('[data-lg="0|url"]')) === "https://www.example.com/titebond-iii-gallon" && (await p.inputValue('[data-lg="2|pack"]')) === "50");
   await p.click('[data-logx="1"]'); await sleep(300); await p.fill('[data-lg="0|price"]', "30.99"); await p.click("[data-logsave]"); await sleep(1800);
-  ok("Changed: the brushes came off, so Metal's request is to be ordered again; Titebond is now $30.99", /Changed: \$30\.99 from Corner Hardware/.test(await banner(p)) && /1 request is back to be ordered/.test(await banner(p))
+  ok("Changed: the brushes came off, so Metal's request is to be ordered again; Titebond is now $30.99 ($80.99 in all)", /Changed: \$80\.99 from Corner Hardware/.test(await banner(p)) && /1 request is back to be ordered/.test(await banner(p))
      && (await q("select state from supply_requests where id = $1", [rqB]))[0].state === "requested" && /3 × Steel wire brushes/.test(await txt(p)), await banner(p));
   p.once("dialog", d => d.accept("Logged it twice"));
   await p.click(`[data-logmistake="${lg}"]`); await sleep(1800); t = await txt(p);
   ok("It was a mistake: kept under Logged lately, marked and not counted; its request is to be ordered again", /A mistake: Logged it twice, not counted/.test(t)
      && (await q("select state from supply_requests where id = $1", [rqT]))[0].state === "requested" && !(await p.$(`[data-logchange="${lg}"]`)), t.slice(0, 900));
   await tab(p, "prices");
-  ok("…and Prices no longer counts it", !/Steel wire brushes 3 each/.test(await txt(p)));
+  ok("…and Prices no longer counts it", !/Sanding discs 120 50 each/.test(await txt(p)));
   await tab(p, "buy");
   for (const id of [rqT, rqB]) { await p.click(`[data-noorder="${id}"]`); await sleep(200); await p.fill("[data-noreason]", "Test"); await p.click(`[data-nosave="${id}"]`); await sleep(1200); }
+
   // ---- the folder, filing, the PDF ----
   t = await txt(p);
   ok("Buy: PO 00001 not filed yet; the banner offers the folder", /PO 00001/.test(t) && /Not filed/.test(t) && /Choose the PD - POs folder/.test(t), t.slice(0, 300));

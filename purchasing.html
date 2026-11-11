@@ -153,14 +153,25 @@
   .logsheet input, .logsheet select{width:100%; min-height:42px; border:1px solid var(--gray); border-radius:8px; padding:6px 9px; background:#fff}
   .lab{display:block; font-size:13px; font-weight:600; color:var(--ink2); margin-bottom:2px}
   .lgtop{display:grid; grid-template-columns:1fr 160px 1fr; gap:8px; margin:0 0 8px}
-  .lgrow{display:grid; grid-template-columns:minmax(0,1fr) 72px 100px 84px 30px; gap:8px; align-items:end; margin:6px 0 0}
+  .logsheet{max-width:860px}
+  .lgline{border-top:1px solid var(--line); padding-top:8px; margin-top:8px}
+  .lgline:first-of-type{border-top:0}
+  .lgrow{display:grid; grid-template-columns:minmax(0,1fr) 60px 88px 64px 124px 76px 30px; gap:8px; align-items:end; margin:6px 0 0}
+  .lgpp input{background:var(--paper); color:var(--ink2); border-color:var(--line); font-variant-numeric:tabular-nums}
+  .lglink{margin:6px 0 0; display:flex; align-items:center; gap:8px}
+  .lglink .lab{margin:0; white-space:nowrap}
+  .lglast{font-size:13px; color:var(--ink2); margin:4px 2px 0}
+  .lglast:empty{display:none}
+  .lglast a, .r small a, .detail td a{color:var(--teal-ink); font-weight:600}
+  .findrow{margin:0 0 8px}
+  .findrow input{width:100%; max-width:520px; min-height:42px; border:1px solid var(--gray); border-radius:8px; padding:6px 10px; background:#fff}
   .lgamt{text-align:right; font-weight:600; padding-bottom:10px}
   .lgx{border:0; background:none; color:var(--ink2); font-size:22px; padding:0 0 6px; min-height:40px}
   .lgnew{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:6px 0 0 0; padding:8px 10px; background:var(--paper); border-radius:8px}
   .lgnew[hidden], .lgnew [hidden]{display:none}
   .lgnew select{width:auto; flex:0 1 170px} .lgnew input{width:auto; flex:1 1 180px}
   .lgasked{font-size:13px; color:var(--ink2); margin:3px 2px 0}
-  @media (max-width:600px){ .lgtop{grid-template-columns:1fr} .lgrow{grid-template-columns:1fr 1fr 30px} .lgrow .lgamt{display:none} .lgrow .lgi{grid-column:1 / -1} .lgrow .lab{white-space:nowrap} }
+  @media (max-width:600px){ .lgtop{grid-template-columns:1fr} .lgrow{grid-template-columns:1fr 1fr 30px} .lgrow .lgamt{display:none} .lgrow .lgi{grid-column:1 / -1} .lgrow .lgpp{grid-column:1 / 3} .lgrow .lab{white-space:nowrap} }
   .drop{display:block; cursor:pointer; border:2px dashed var(--gray); border-radius:12px; background:#fff; padding:22px; text-align:center; margin-bottom:6px}
   .drop.over{border-color:var(--orange); background:var(--sawdust)}
   .chk{width:22px; height:22px; accent-color:var(--midnight)}
@@ -465,10 +476,12 @@ function entries(data) {
   for (const g of data.logs || []) {
     if (g.cancelled) continue;
     for (const l of g.lines || []) {
-      const it = items.get(l.item_id) || null, qty = Number(l.qty), p = Number(l.unit_price);
+      // counted per piece: 1 box of 50 for $50 is 50 at $1 (a line's "In each"), so a box of 50 and a box of 100 compare
+      const it = items.get(l.item_id) || null, pack = Number(l.pack) > 0 ? Number(l.pack) : 1, qty = Number(l.qty) * pack, p = Number(l.unit_price) / pack;
       out.push({ date: String(g.on).slice(0, 10), year: yearOf(g.on), source: "Logged", ref: g.doc || "", supplier: sups.get(g.supplier_id) || g.supplier, supplier_id: g.supplier_id,
                  item_id: l.item_id, category: it ? it.category_key : null, description: l.item || (it ? it.name : ""), qty,
-                 unit: l.unit || (it ? it.unit : ""), price: p, amount: Number(l.amount), in_baseline: true, log_id: g.id, note: "" });
+                 unit: it ? it.unit : (l.unit || "each"), price: p, amount: Number(l.amount), in_baseline: true, log_id: g.id, note: "",
+                 url: /^https?:\/\//i.test(l.url || "") ? l.url : "", pack });
     }
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));
@@ -630,10 +643,28 @@ function itemByName(data, name) {
   const t = String(name || "").trim().toLowerCase(); if (!t) return null;
   return (data.items || []).find(i => !i.retired && [i.name, ...(i.aliases || [])].some(x => String(x).trim().toLowerCase() === t)) || null;
 }
+/** the last time an item was logged (not a mistake): its price for one, how many in one, where, when, and its link if it
+ *  had one; the newest link this item was ever bought from is given too, in case the last buy had none */
+function lastLogged(data, itemId) {
+  let last = null, link = null;
+  for (const g of data.logs || []) {
+    if (g.cancelled) continue;
+    for (const l of g.lines || []) {
+      if (l.item_id !== itemId) continue;
+      const x = { on: String(g.on).slice(0, 10), supplier: g.supplier, price: Number(l.unit_price), pack: Number(l.pack) > 0 ? Number(l.pack) : 1, url: /^https?:\/\//i.test(l.url || "") ? l.url : "" };
+      if (!last || x.on > last.on) last = x;
+      if (x.url && (!link || x.on > link.on)) link = x;
+    }
+  }
+  return last ? { ...last, link: last.url ? last : link } : null;
+}
 /** a request's words as a line to log: the item it plainly is (its own words, or a look-alike in any category), else a new one */
 function requestLine(data, r) {
-  const it = itemByName(data, r.item) || (data.items || []).filter(i => !i.retired && looksLike(i.name, r.item)).sort((a, b) => a.name.length - b.name.length)[0] || null;
-  return { name: it ? it.name : String(r.item || "").trim(), qty: String(r.qty || 1), price: "", req: r.id, asked: r.department_name || "" };
+  // lumber isn't logged (it's bought on a lumber PO), so a lumber item is never offered here
+  const it = [itemByName(data, r.item)].filter(i => i && i.category_key !== "lumber")[0]
+    || (data.items || []).filter(i => !i.retired && i.category_key !== "lumber" && looksLike(i.name, r.item)).sort((a, b) => a.name.length - b.name.length)[0] || null;
+  const last = it ? lastLogged(data, it.id) : null;
+  return { name: it ? it.name : String(r.item || "").trim(), qty: String(r.qty || 1), price: "", pack: last ? String(last.pack) : "1", req: r.id, asked: r.department_name || "" };
 }
 
 /* ---- the simpler page (10 Nov): Savings as pictures, Worth a look as sentences, a file that asks nothing ---- */
@@ -816,7 +847,7 @@ if (typeof module !== "undefined") module.exports = {
   poPdf, poNumberText, poGrid, colPt, SCRAP_ALLOWANCE,
   poName, poFromNote, entries, baselineFor, pricesFor, chaseFor, lastPaid, csvCell, exportRows, exportCsv, EXPORT_HEAD, itemsCsv, matchGroups,
   cellDate, cellNum, sheetToLines, readCsv, readXlsx, pickSheet, looksLike, fileItemNames,
-  MONTH_NAMES, monthlySavings, worthALook, fileNames, itemByName, requestLine,
+  MONTH_NAMES, monthlySavings, worthALook, fileNames, itemByName, requestLine, lastLogged,
 };
 /* ---- the screen ---- */
 if (typeof document !== "undefined") (function () {
@@ -848,7 +879,7 @@ if (typeof document !== "undefined") (function () {
     reqs: [], depts: [], ticked: new Set(), notOrdering: null, adding: false, skips: [], skipsReady: false,
     openItem: null, file: null, matchNew: null, slips: [], slipLines: null,
     closedReqs: [], fileItems: [], filesReady: false, month: null, cat: "all", sheet: null, slipPo: null, keep: new Set(),
-    logsReady: false, log: null,
+    logsReady: false, log: null, find: "",
   };
   /** a tab: drawn at once, then again with what's new (supply requests come in from the tablets all day) */
   const go = async (tab) => { S.tab = tab; store.set("tab", tab); try { history.replaceState(null, "", "#" + tab); } catch (e) {}
@@ -1001,6 +1032,7 @@ if (typeof document !== "undefined") (function () {
     const body = S.edit ? viewEdit() : ({ buy: viewBuy, savings: viewSavings, prices: viewPrices, setup: viewSetup }[S.tab] || viewBuy)();
     app.innerHTML = `<main>${head}${body}</main>${S.sheet && !S.edit ? sheetHtml() : ""}`;
     if (S.tab === "savings" && !S.edit) drawChart();
+    if (S.tab === "prices" && !S.edit && S.find) filterPrices();
     wire();
   }
   const matchCount = () => { const n = matchGroups(S.data).reduce((a, g) => a + g.ids.length, 0); return n ? ` <span class="pill">${n}</span>` : ""; };
@@ -1055,7 +1087,7 @@ if (typeof document !== "undefined") (function () {
     const total = (g) => (g.lines || []).reduce((a, l) => a + Number(l.amount), 0);
     return `<h2 style="margin-top:26px">Logged lately</h2>
       <div class="list">${list.slice(0, 15).map(g => `<div class="r${g.cancelled ? " gone" : ""}"><div class="grow"><b>${esc(g.supplier)}</b>
-          <small>${esc(mdy(g.on))}${g.doc ? `, ${esc(g.doc)}` : ""}. ${(g.lines || []).map(l => `${esc(l.item)} × ${n0(l.qty)}`).join(", ")}${g.logged_by_name ? `. Logged by ${esc(g.logged_by_name)}` : ""}
+          <small>${esc(mdy(g.on))}${g.doc ? `, ${esc(g.doc)}` : ""}. ${(g.lines || []).map(l => `${esc(l.item)} × ${n0(l.qty)}${Number(l.pack) > 1 ? ` (${n0(l.pack)} in each)` : ""}${/^https?:\/\//i.test(l.url || "") ? ` <a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">link</a>` : ""}`).join(", ")}${g.logged_by_name ? `. Logged by ${esc(g.logged_by_name)}` : ""}
           ${g.cancelled ? `. <b>A mistake</b>${g.cancel_reason ? `: ${esc(g.cancel_reason)}` : ""}, not counted` : ""}</small></div>
         <span class="num">${usd(total(g), true)}</span>
         ${g.cancelled ? "" : `<button class="link" data-logchange="${esc(g.id)}">Change</button><button class="link" data-logmistake="${esc(g.id)}">It was a mistake</button>`}</div>`).join("")}</div>
@@ -1366,13 +1398,15 @@ if (typeof document !== "undefined") (function () {
     const rows = list.map(r => {
       const open = S.openItem === r.item.id, c = r.change;
       const paid = open ? ents.filter(e => e.item_id === r.item.id && e.year === y).reverse().map(e => `<tr><td>${esc(mdy(e.date))}</td><td class="l">${esc(e.supplier)}</td>
-          <td class="l">${esc(e.ref)}</td><td class="num">${e.qty === null ? "" : n0(e.qty)} ${esc(e.unit)}</td><td class="num">${e.price === null ? "" : price(e.price)}</td><td class="num">${usd(e.amount, true)}</td></tr>`).join("") : "";
-      return `<tr class="click ${open ? "open" : ""}" data-openitem="${esc(r.item.id)}"><td><b>${esc(r.item.name)}</b></td>
+          <td class="l">${esc(e.ref || (e.source === "Logged" ? "Logged" : ""))}</td><td class="num">${e.qty === null ? "" : n0(e.qty)} ${esc(e.unit)}</td><td class="num">${e.price === null ? "" : price(e.price)}</td><td class="num">${usd(e.amount, true)}</td>
+          <td>${e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">Link</a>` : ""}</td></tr>`).join("") : "";
+      const names = [r.item.name, ...(r.item.aliases || [])].join(" ").toLowerCase();
+      return `<tr class="click ${open ? "open" : ""}" data-openitem="${esc(r.item.id)}" data-names="${esc(names)}"><td><b>${esc(r.item.name)}</b></td>
         <td class="num">${n0(r.qty)} ${esc(r.item.unit)}</td><td class="num">${r.avg === null ? "—" : price(r.avg)}</td>
         <td class="num ${c > .005 ? "up" : c < -.005 ? "down" : ""}" title="${esc(r.base ? r.base.how : "")}">${c === null ? "—" : Math.abs(c) < .005 ? "same" : `${c > 0 ? "up" : "down"} ${Math.abs(c * 100).toFixed(1)}%`}</td>
         <td class="num">${signed(r.against)}</td></tr>
         ${open ? `<tr><td colspan="5" style="padding:0"><div class="detail"><div class="note">Measured against ${r.base ? `${price(r.base.price)}, its ${esc(r.base.how)}` : "nothing yet"}.${r.suppliers > 1 ? ` Bought from ${r.suppliers} suppliers.` : ""}</div>
-          <div class="tw"><table><thead><tr><th>Date</th><th class="l">Supplier</th><th class="l">PO or bill</th><th>Quantity</th><th>Price</th><th>Amount</th></tr></thead><tbody>${paid}</tbody></table></div></div></td></tr>` : ""}`;
+          <div class="tw"><table><thead><tr><th>Date</th><th class="l">Supplier</th><th class="l">PO or bill</th><th>Quantity</th><th>Price</th><th>Amount</th><th></th></tr></thead><tbody>${paid}</tbody></table></div></div></td></tr>` : ""}`;
     }).join("");
     let lumber = "";
     if (S.cat === "lumber") {
@@ -1399,10 +1433,22 @@ if (typeof document !== "undefined") (function () {
       ${lookHtml()}
       <h2 style="margin-top:22px">What you paid in ${y}</h2>
       ${cats.length > 1 ? `<div class="chips"><button class="chip" data-cat="all" aria-pressed="${S.cat === "all"}">All</button>${cats.map(c => `<button class="chip" data-cat="${esc(c.key)}" aria-pressed="${S.cat === c.key}">${esc(c.name)}</button>`).join("")}</div>` : ""}
-      ${rows ? `<div class="tw"><table class="five"><thead><tr><th>Item</th><th>Bought</th><th>Average</th><th>Against its baseline</th><th>Saved</th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${rows ? `<div class="findrow"><input id="findItem" type="search" value="${esc(S.find || "")}" placeholder="Find an item: what did we buy, and where from last time?" aria-label="Find an item" autocomplete="off"></div>
+        <div class="tw"><table class="five"><thead><tr><th>Item</th><th>Bought</th><th>Average</th><th>Against its baseline</th><th>Saved</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <p class="note" id="findNone" hidden style="margin:8px 2px">No item ${S.year} matches that. Try fewer letters, or another year.</p>
         <p class="note" style="margin:8px 2px">Tap an item for every price paid.${P.noItemLines ? ` ${P.noItemLines} line${P.noItemLines === 1 ? "" : "s"} (${usd(P.noItemSpend)}) ${P.noItemLines === 1 ? "has" : "have"} no item, so ${P.noItemLines === 1 ? "it isn't" : "they aren't"} in this table.` : ""}
           Export is every line counted in ${y}, to check against the bills once a year.</p>` : `<p class="muted" style="margin:8px 2px">Nothing bought in ${y} yet.</p>`}
       ${lumber}`;
+  }
+
+  /** Find an item: hide the rows (and an open item's history) whose names don't have every word typed */
+  function filterPrices() {
+    const words = String(S.find || "").toLowerCase().split(/\s+/).filter(Boolean); let shown = 0;
+    app.querySelectorAll("tr[data-names]").forEach(tr => {
+      const hit = words.every(w => tr.dataset.names.includes(w)); tr.hidden = !hit; if (hit) shown++;
+      const nx = tr.nextElementSibling; if (tr.classList.contains("open") && nx && !nx.hasAttribute("data-names")) nx.hidden = !hit;
+    });
+    const none = app.querySelector("#findNone"); if (none) none.hidden = shown > 0 || !words.length;
   }
 
   // ---------- the Purchases file ----------
@@ -1439,72 +1485,98 @@ if (typeof document !== "undefined") (function () {
   const itemOptions = (cat, sel) => { const items = (S.data.items || []).filter(i => !i.retired), cats = (S.data.categories || []).filter(c => (!cat || c.key === cat) && items.some(i => i.category_key === c.key));
     return cats.map(c => `<optgroup label="${esc(c.name)}">${items.filter(i => i.category_key === c.key).map(it => `<option value="${esc(it.id)}" ${it.id === sel ? "selected" : ""}>${esc(it.name)}</option>`).join("")}</optgroup>`).join(""); };
   // ---------- Log a purchase ----------
-  const blankLogLine = () => ({ name: "", qty: "1", price: "", req: null, asked: "", cat: "", unit: "", quarters: "" });
+  // a line: the item, how many, the price for one of what was bought, how many in one ("In each": 50 for a box of 50),
+  // and the link it was bought from. Lumber isn't logged here: it's bought on a lumber PO.
+  const blankLogLine = () => ({ name: "", qty: "1", price: "", pack: "1", url: "", req: null, asked: "", cat: "", packSet: false });
+  const loggable = () => (S.data.items || []).filter(i => !i.retired && i.category_key !== "lumber");
+  const logItem = (name) => { const it = itemByName(S.data, name); return it && it.category_key !== "lumber" ? it : null; };
   function openLog(g) {
     if (g) S.log = { id: g.id, client_id: newId(), supplier: g.supplier, on: String(g.on).slice(0, 10), doc: g.doc || "",
-      lines: (g.lines || []).map(l => ({ ...blankLogLine(), name: l.item, qty: String(Number(l.qty)), price: String(Number(l.unit_price)), req: l.supply_request_id || null,
-        asked: ((S.reqs.find(r => r.id === l.supply_request_id) || {}).department_name) || "" })) };
+      lines: (g.lines || []).map(l => ({ ...blankLogLine(), name: l.item, qty: String(Number(l.qty)), price: String(Number(l.unit_price)), pack: String(Number(l.pack) || 1),
+        url: l.url || "", packSet: true, req: l.supply_request_id || null, asked: ((S.reqs.find(r => r.id === l.supply_request_id) || {}).department_name) || "" })) };
     else { const ticked = S.reqs.filter(r => S.ticked.has(r.id));
       S.log = { id: null, client_id: newId(), supplier: "", on: String(S.data.today).slice(0, 10), doc: "",
         lines: ticked.length ? ticked.map(r => ({ ...blankLogLine(), ...requestLine(S.data, r) })) : [blankLogLine()] }; }
     S.sheet = "log"; S.msg = null; render();
-    const first = app.querySelector(S.log.id ? "[data-lgf=supplier]" : "[data-lgf=supplier]"); if (first) first.focus();
+    const first = app.querySelector("[data-lgf=supplier]"); if (first) first.focus();
   }
   /** what's typed in the form, into S.log: read before anything redraws it */
   function readLog() {
     if (!S.log || !app.querySelector(".logsheet")) return;
     for (const f of ["supplier", "on", "doc"]) { const e = app.querySelector(`[data-lgf="${f}"]`); if (e) S.log[f] = e.value; }
-    S.log.lines.forEach((l, k) => { for (const f of ["name", "qty", "price", "cat", "unit", "quarters"]) { const e = app.querySelector(`[data-lg="${k}|${f}"]`); if (e) l[f] = e.value; } });
+    S.log.lines.forEach((l, k) => { for (const f of ["name", "qty", "price", "pack", "url", "cat"]) { const e = app.querySelector(`[data-lg="${k}|${f}"]`); if (e) l[f] = e.value; } });
   }
-  const lineAmount = (l) => { const q = Number(l.qty), p = Number(l.price); return isFinite(q) && isFinite(p) && l.qty !== "" && l.price !== "" ? Math.round(q * p * 100) / 100 : null; };
-  /** the form's amounts, total and new-item fields follow the typing, in place: nothing is redrawn under the cursor */
-  function logLive() {
+  const num = (v) => { const t = String(v === undefined || v === null ? "" : v).trim().replace(/^\$/, "").replace(/,/g, ""); return t === "" ? null : Number(t); };
+  const lineAmount = (l) => { const q = num(l.qty), p = num(l.price); return q !== null && p !== null && isFinite(q) && isFinite(p) ? Math.round(q * p * 100) / 100 : null; };
+  const perPiece = (l) => { const p = num(l.price), k = num(l.pack); return p !== null && k !== null && isFinite(p) && k > 0 ? p / k : null; };
+  const safeUrl = (u) => /^https?:\/\/\S+$/i.test(String(u || "").trim()) ? String(u).trim() : "";
+  /** "Last time: $50.00 for 50 (= $1.00 each) at Amazon, Nov 2. The link" for a line's item, or "" */
+  function lastHint(l) {
+    const it = logItem(l.name); if (!it) return "";
+    const L = lastLogged(S.data, it.id); if (!L) return "";
+    const lk = L.link ? `<a href="${esc(L.link.url)}" target="_blank" rel="noopener noreferrer">${L.link === L ? "The link" : `The link (${esc(mdy(L.link.on))})`}</a>` : "No link saved yet";
+    return `Last time: ${price(L.price)}${L.pack !== 1 ? ` for ${n0(L.pack)} (${price(L.price / L.pack)} each)` : ""} at ${esc(L.supplier)}, ${esc(mdy(L.on))}. ${lk}`;
+  }
+  /** the form follows the typing, in place: nothing is redrawn under the cursor */
+  function logLive(e) {
     readLog(); if (!S.log) return;
+    const t = e && e.target && e.target.dataset ? e.target.dataset.lg || "" : "";
     S.log.lines.forEach((l, k) => {
+      if (t === `${k}|pack`) l.packSet = true;
+      if (t === `${k}|name`) {                                   // a known item: its last "In each", unless one was typed
+        const it = logItem(l.name), L = it ? lastLogged(S.data, it.id) : null;
+        if (L && !l.packSet) { l.pack = String(L.pack); const pe = app.querySelector(`[data-lg="${k}|pack"]`); if (pe) pe.value = l.pack; }
+      }
       const a = app.querySelector(`[data-lgamt="${k}"]`), v = lineAmount(l); if (a) a.textContent = v === null ? "" : usd(v, true);
-      const nw = app.querySelector(`[data-lgnew="${k}"]`), isNew = !!l.name.trim() && !itemByName(S.data, l.name);
-      if (nw) { nw.hidden = !isNew; const lum = l.cat === "lumber"; nw.querySelector("[data-lgunit]").hidden = lum; nw.querySelector("[data-lgq]").hidden = !lum; }
+      const pp = app.querySelector(`[data-lgper="${k}"]`), x = perPiece(l); if (pp) pp.value = x === null ? "" : price(x) + " each";
+      const nw = app.querySelector(`[data-lgnew="${k}"]`); if (nw) nw.hidden = !(l.name.trim() && !logItem(l.name));
+      const h = app.querySelector(`[data-lglast="${k}"]`); if (h && t === `${k}|name`) h.innerHTML = lastHint(l);
     });
-    const t = app.querySelector("#logTotal"); if (t) t.textContent = usd(S.log.lines.reduce((a, l) => a + (lineAmount(l) || 0), 0), true);
+    const tot = app.querySelector("#logTotal"); if (tot) tot.textContent = usd(S.log.lines.reduce((a, l) => a + (lineAmount(l) || 0), 0), true);
     const sup = app.querySelector("#logSupNew"), sv = S.log.supplier.trim().toLowerCase();
     if (sup) sup.hidden = !sv || (S.data.suppliers || []).some(v => [v.name, ...(v.aliases || [])].some(x => String(x).toLowerCase() === sv));
   }
   function logSheet() {
-    const L = S.log, cats = (S.data.categories || []).filter(c => !c.retired);
-    const items = (S.data.items || []).filter(i => !i.retired), sups = (S.data.suppliers || []).filter(v => !v.retired);
-    const line = (l, k) => { const isNew = !!l.name.trim() && !itemByName(S.data, l.name), lum = l.cat === "lumber", amt = lineAmount(l);
-      return `<div class="lgrow"><label class="lgi"><span class="lab">${k ? "" : "Item"}</span><input data-lg="${k}|name" list="logItems" value="${esc(l.name)}" placeholder="Pick an item, or type a new one" autocomplete="off"></label>
+    const L = S.log, cats = (S.data.categories || []).filter(c => !c.retired && c.key !== "lumber");
+    const sups = (S.data.suppliers || []).filter(v => !v.retired);
+    const line = (l, k) => { const isNew = !!l.name.trim() && !logItem(l.name), amt = lineAmount(l), pp = perPiece(l);
+      return `<div class="lgline">
+        <div class="lgrow"><label class="lgi"><span class="lab">${k ? "" : "Item"}</span><input data-lg="${k}|name" list="logItems" value="${esc(l.name)}" placeholder="Pick an item, or type a new one" autocomplete="off"></label>
           <label class="lgq"><span class="lab">${k ? "" : "Qty"}</span><input data-lg="${k}|qty" value="${esc(l.qty)}" inputmode="decimal"></label>
           <label class="lgp"><span class="lab">${k ? "" : "Price each"}</span><input data-lg="${k}|price" value="${esc(l.price)}" inputmode="decimal" placeholder="$"></label>
+          <label class="lgk"><span class="lab">${k ? "" : "In each"}</span><input data-lg="${k}|pack" value="${esc(l.pack)}" inputmode="decimal" title="How many in one: 50 for a box of 50"></label>
+          <label class="lgpp"><span class="lab">${k ? "" : "Per piece"}</span><input data-lgper="${k}" value="${pp === null ? "" : price(pp) + " each"}" readonly tabindex="-1" aria-label="Price per piece"></label>
           <span class="lgamt num" data-lgamt="${k}">${amt === null ? "" : usd(amt, true)}</span>
           <button class="lgx" data-logx="${k}" aria-label="Take line ${k + 1} off">×</button></div>
-        <div class="lgnew" data-lgnew="${k}" ${isNew ? "" : "hidden"}><span class="note">A new item:</span>
-          <select data-lg="${k}|cat" aria-label="Its category"><option value="">Category…</option>${cats.map(c => `<option value="${esc(c.key)}" ${c.key === l.cat ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
-          <input data-lg="${k}|unit" data-lgunit value="${esc(l.unit)}" placeholder="Bought by: each, box, gallon…" aria-label="What it's bought by" ${lum ? "hidden" : ""}>
-          <input data-lg="${k}|quarters" data-lgq class="n" value="${esc(l.quarters)}" inputmode="numeric" placeholder="Quarters: 6 for 6/4" aria-label="Thickness in quarters" ${lum ? "" : "hidden"}></div>
-        ${l.req ? `<p class="lgasked">${esc(l.asked || "A department")} asked for it: logging it marks their request ordered.</p>` : ""}`; };
+        <div class="lgnew" data-lgnew="${k}" ${isNew ? "" : "hidden"}><span class="note">A new item. Its category:</span>
+          <select data-lg="${k}|cat" aria-label="Its category"><option value="">Category…</option>${cats.map(c => `<option value="${esc(c.key)}" ${c.key === l.cat ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></div>
+        <div class="lglink"><span class="lab">Link</span><input data-lg="${k}|url" value="${esc(l.url)}" placeholder="The page it was bought from (optional)" inputmode="url" autocomplete="off" aria-label="Link it was bought from, line ${k + 1}"></div>
+        <p class="lglast" data-lglast="${k}">${lastHint(l)}</p>
+        ${l.req ? `<p class="lgasked">${esc(l.asked || "A department")} asked for it: logging it marks their request ordered.</p>` : ""}</div>`; };
     const tot = L.lines.reduce((a, l) => a + (lineAmount(l) || 0), 0), sv = L.supplier.trim().toLowerCase();
     const supNew = !!sv && !sups.some(v => [v.name, ...(v.aliases || [])].some(x => String(x).toLowerCase() === sv));
     return `<div class="scrim" data-sheetclose="1"><div class="sheet logsheet" role="dialog" aria-modal="true" aria-label="${L.id ? "Change a logged purchase" : "Log a purchase"}">
       <h3>${L.id ? "Change this purchase" : "Log a purchase"}</h3>
-      <p class="sub" style="margin:0 0 12px">What was bought, where, and what it cost. It counts in Prices and Savings straight away.</p>
+      <p class="sub" style="margin:0 0 12px">What was bought, where, and what it cost. It counts in Prices and Savings straight away. Lumber goes on a lumber PO.</p>
       <div class="lgtop"><label><span class="lab">From</span><input data-lgf="supplier" list="logSups" value="${esc(L.supplier)}" placeholder="Amazon, Home Depot…" autocomplete="off"></label>
         <label><span class="lab">Date</span><input data-lgf="on" type="date" value="${esc(L.on)}"></label>
         <label><span class="lab">Order or receipt # (optional)</span><input data-lgf="doc" value="${esc(L.doc)}"></label></div>
       <p class="note" id="logSupNew" ${supNew ? "" : "hidden"} style="margin:-2px 0 6px">A supplier the shop hasn't used: it's added by this name.</p>
       <datalist id="logSups">${sups.map(v => `<option value="${esc(v.name)}">`).join("")}</datalist>
-      <datalist id="logItems">${items.map(i => `<option value="${esc(i.name)}">`).join("")}</datalist>
+      <datalist id="logItems">${loggable().map(i => `<option value="${esc(i.name)}">`).join("")}</datalist>
       ${L.lines.map(line).join("")}
       <div class="row" style="margin-top:8px"><button class="link" data-logadd>Add a line</button><span style="flex:1"></span><b class="num" id="logTotal">${usd(tot, true)}</b></div>
+      <p class="note" style="margin:6px 0 0">Price each is for one of what you bought; In each is how many are in it (50 for a box of 50 sheets), so prices compare per piece.</p>
       <div class="row end" style="margin-top:12px"><button class="link" data-sheetclose="1">Cancel</button>
         <button class="btn or" data-logsave ${S.busy ? "disabled" : ""}>${L.id ? "Save the change" : "Log it"}</button></div></div></div>`;
   }
   async function saveLog() {
     readLog(); const L = S.log; if (!L) return;
-    const lines = L.lines.filter(l => l.name.trim() || l.price !== "").map(l => {
-      const it = itemByName(S.data, l.name);
-      return { ...(it ? { item_id: it.id } : { new_item: { name: l.name.trim(), category_key: l.cat, unit: l.unit.trim(), quarters: l.quarters.trim() } }),
-               qty: l.qty.trim(), unit_price: l.price.trim().replace(/^\$/, ""), supply_request_id: l.req || null };
+    const lines = L.lines.filter(l => l.name.trim() || String(l.price).trim() !== "").map(l => {
+      const it = logItem(l.name);
+      return { ...(it ? { item_id: it.id } : { new_item: { name: l.name.trim(), category_key: l.cat } }),
+               qty: String(l.qty).trim(), unit_price: String(l.price).trim().replace(/^\$/, "").replace(/,/g, ""), pack: String(l.pack).trim() || "1",
+               url: String(l.url || "").trim(), supply_request_id: l.req || null };
     });
     const p = { id: L.id, supplier: L.supplier.trim(), bought_on: L.on, doc: L.doc.trim(), lines };
     const d = await call("purchase_log_save", { p_client_id: L.client_id, p }, (x) => x.summary);
@@ -1699,6 +1771,9 @@ if (typeof document !== "undefined") (function () {
     on("[data-logx]", (b) => { readLog(); S.log.lines.splice(Number(b.dataset.logx), 1); if (!S.log.lines.length) S.log.lines.push(blankLogLine()); render(); });
     on("[data-logsave]", () => saveLog());
     if (app.querySelector(".logsheet")) app.querySelectorAll(".logsheet input, .logsheet select").forEach(e => { e.oninput = logLive; e.onchange = logLive; });
+    // Prices: Find an item narrows the table as you type, in place
+    const fi = app.querySelector("#findItem");
+    if (fi) fi.oninput = () => { S.find = fi.value; filterPrices(); };
     on("[data-reqorder]", () => call("order_supplies", { p_requests: [...S.ticked] }, (d) => { S.ticked = new Set(); return d.summary || "Marked ordered."; }));
     on("[data-reqpo]", () => startEdit(null, "po", S.reqs.filter(r => S.ticked.has(r.id))));
     on("[data-noorder]", (b) => { S.notOrdering = b.dataset.noorder; render(); const i = app.querySelector("[data-noreason]"); if (i) i.focus(); });

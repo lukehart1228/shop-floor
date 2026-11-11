@@ -50,9 +50,6 @@ const aside = (h) => {
 (async () => {
   let bad = 0;
   for (const [page, pre] of [["office.html", { sfo_pin: JSON.stringify({ none: true }) }], ["delivery.html", {}], ["inventory.html", {}], ["pace.html", {}], ["upload.html", {}]]) {
-    // INVENTORY=ignore (10 Nov, inventory.html 2026-11-10.1): Inventory was laid out again on purpose (two tabs and a Setup
-    // button; test_inventory_screens.js covers it), so it isn't compared screen by screen. Every other page still must match.
-    if (process.env.INVENTORY === "ignore" && page === "inventory.html") { console.log("SKIP  inventory.html: laid out again on purpose 10 Nov (test_inventory_screens.js)"); continue; }
     const a = await draw("/home/claude/sf/repo/" + page, page, pre), b = await draw((process.env.OUT || "/home/claude/sf/out") + "/" + page, page, pre);
     const diff = a.map((h, i) => norm(aside(h)) === norm(aside(b[i] || "")) ? null : i).filter(x => x !== null);
     console.log(`${diff.length || a.length !== b.length ? "FAIL" : "PASS"}  ${page}: ${a.length} screens the same apart from the Feedback button${diff.length ? " — differ: " + diff : ""}`);

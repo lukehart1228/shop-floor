@@ -16,7 +16,12 @@
 --                         and price. A PO already logs its own buy.
 --   purchase_log_save()   logs one, or changes it. An item is picked from
 --                         the shop's list, or made there and then (its
---                         category and unit picked once). A supplier the
+--                         category picked once). Each line says how many
+--                         are in one of what was bought ("In each": 50
+--                         for a box of 50 sheets), so prices compare per
+--                         piece, and can keep the link it was bought from,
+--                         to find it again next time. Lumber isn't logged:
+--                         it's bought on a lumber PO. A supplier the
 --                         shop doesn't know yet is added by its name. A
 --                         tablet's supply request on a line is marked
 --                         ordered, naming where it was bought; taken off
@@ -247,12 +252,17 @@ create table if not exists purchase_log_lines (
   position          int not null check (position between 1 and 40),
   item_id           uuid not null references purchase_items(id),
   qty               numeric not null check (qty > 0 and qty <= 10000000),
-  unit_price        numeric(14,4) not null check (unit_price >= 0 and unit_price <= 1000000),
+  unit_price        numeric(14,4) not null check (unit_price >= 0 and unit_price <= 1000000),   -- for one of what was bought (the box)
+  pack              numeric not null default 1 check (pack > 0 and pack <= 100000),           -- how many in one: 50 for a box of 50 sheets
   amount            numeric(14,2) not null,
+  url               text check (url is null or (length(url) <= 2000 and url ~* '^https?://[^[:space:]]+$')),   -- the page it was bought from
   supply_request_id uuid references supply_requests(id),      -- a tablet's request this line orders
   removed_at        timestamptz,                                 -- taken off by a change: kept, not counted
   removed_by_name   text
 );
+-- added after the first build of this file (10 Nov), so a database with that copy gets them too
+alter table purchase_log_lines add column if not exists pack numeric not null default 1 check (pack > 0 and pack <= 100000);
+alter table purchase_log_lines add column if not exists url text check (url is null or (length(url) <= 2000 and url ~* '^https?://[^[:space:]]+$'));
 create index if not exists purchase_log_lines_log on purchase_log_lines (log_id);
 create index if not exists purchase_log_lines_req on purchase_log_lines (supply_request_id) where supply_request_id is not null;
 alter table purchase_logs enable row level security;
@@ -260,12 +270,12 @@ alter table purchase_log_lines enable row level security;
 revoke all on purchase_logs, purchase_log_lines from anon, authenticated;
 
 -- p: { id (to change one), supplier (a name, or one of a supplier's other names), bought_on, doc,
---      lines: [{ item_id | new_item: { name, category_key, unit, quarters }, qty, unit_price, supply_request_id }] }
+--      lines: [{ item_id | new_item: { name, category_key }, qty, unit_price (for one), pack (how many in one), url, supply_request_id }] }
 create or replace function purchase_log_save(p_client_id uuid, p jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
   lg purchase_logs; v_sup uuid; v_sup_name text; v_new_sup boolean := false; v_on date; v_doc text; l jsonb; i int := 0;
-  v_item uuid; v_ni jsonb; v_name text; v_cat text; v_q int; v_unit text; v_qty numeric; v_price numeric; v_req uuid;
+  v_item uuid; v_ni jsonb; v_name text; v_cat text; v_qty numeric; v_price numeric; v_pack numeric; v_url text; v_req uuid;
   v_reqs uuid[] := '{}'; v_items text[] := '{}'; v_made text[] := '{}'; v_total numeric := 0; v_rows jsonb := '[]'::jsonb; v_label text;
   n_back int := 0; n_ord int := 0;
 begin
@@ -318,21 +328,17 @@ begin
       if v_item is null then
         select key into v_cat from purchase_categories where key = v_ni ->> 'category_key' and not retired;
         if v_cat is null then raise exception 'Line %: pick a category for %.', i, v_name; end if;
-        if v_cat = 'lumber' then
-          v_q := case when coalesce(v_ni ->> 'quarters', '') ~ '^\d{1,2}$' then (v_ni ->> 'quarters')::int end;
-          if v_q is null or v_q < 4 or v_q > 16 then raise exception 'Line %: say how thick % is, in quarters (6 for 6/4).', i, v_name; end if;
-          insert into purchase_items (name, category_key, unit, quarters, changed_by_name) values (v_name, 'lumber', 'bd ft', v_q, my_name()) returning id into v_item;
-        else
-          v_unit := btrim(coalesce(v_ni ->> 'unit', ''));
-          if v_unit = '' then raise exception 'Line %: say what % is bought by (each, box, gallon, sheet…).', i, v_name; end if;
-          if length(v_unit) > 20 then raise exception 'Line %: keep the unit short (each, box, gallon…).', i; end if;
-          insert into purchase_items (name, category_key, unit, changed_by_name) values (v_name, v_cat, v_unit, my_name()) returning id into v_item;
-        end if;
+        if v_cat = 'lumber' then raise exception 'Line %: lumber is bought on a lumber PO, not logged here.', i; end if;
+        insert into purchase_items (name, category_key, unit, changed_by_name) values (v_name, v_cat, 'each', my_name()) returning id into v_item;   -- counted per piece
         v_made := v_made || v_name;
       end if;
     end if;
-    begin v_qty := (l ->> 'qty')::numeric; v_price := (l ->> 'unit_price')::numeric;
-    exception when others then raise exception 'Line %: the quantity and the price each must be numbers.', i; end;
+    if (select category_key from purchase_items where id = v_item) = 'lumber' then raise exception 'Line %: lumber is bought on a lumber PO, not logged here.', i; end if;
+    begin v_qty := (l ->> 'qty')::numeric; v_price := (l ->> 'unit_price')::numeric; v_pack := coalesce(nullif(btrim(coalesce(l ->> 'pack', '')), '')::numeric, 1);
+    exception when others then raise exception 'Line %: the quantity, the price each and how many in each must be numbers.', i; end;
+    if v_pack <= 0 or v_pack > 100000 then raise exception 'Line %: say how many are in each (1 if it''s one thing).', i; end if;
+    v_url := nullif(btrim(coalesce(l ->> 'url', '')), '');
+    if v_url is not null and (length(v_url) > 2000 or v_url !~* '^https?://[^[:space:]]+$') then raise exception 'Line %: the link must be a web address starting https://', i; end if;
     if v_qty is null or v_qty <= 0 then raise exception 'Line %: say how many.', i; end if;
     if v_qty > 10000000 then raise exception 'Line %: that quantity is too big.', i; end if;
     if v_price is null or v_price < 0 then raise exception 'Line %: say the price each.', i; end if;
@@ -349,7 +355,7 @@ begin
       if (select state from supply_requests where id = v_req) not in ('requested', 'ordered') then raise exception 'Line %: that request is closed already.', i; end if;
       v_reqs := v_reqs || v_req;
     end if;
-    v_rows := v_rows || jsonb_build_object('pos', i, 'item', v_item, 'qty', v_qty, 'price', v_price, 'amount', round(v_qty * v_price, 2), 'req', v_req);
+    v_rows := v_rows || jsonb_build_object('pos', i, 'item', v_item, 'qty', v_qty, 'price', v_price, 'pack', v_pack, 'url', v_url, 'amount', round(v_qty * v_price, 2), 'req', v_req);
     v_total := v_total + round(v_qty * v_price, 2);
   end loop;
 
@@ -366,8 +372,9 @@ begin
     get diagnostics n_back = row_count;
     update purchase_log_lines set removed_at = now(), removed_by_name = my_name() where log_id = lg.id and removed_at is null;
   end if;
-  insert into purchase_log_lines (log_id, position, item_id, qty, unit_price, amount, supply_request_id)
-  select lg.id, (r ->> 'pos')::int, (r ->> 'item')::uuid, (r ->> 'qty')::numeric, (r ->> 'price')::numeric, (r ->> 'amount')::numeric, nullif(r ->> 'req', '')::uuid
+  insert into purchase_log_lines (log_id, position, item_id, qty, unit_price, pack, url, amount, supply_request_id)
+  select lg.id, (r ->> 'pos')::int, (r ->> 'item')::uuid, (r ->> 'qty')::numeric, (r ->> 'price')::numeric, (r ->> 'pack')::numeric, nullif(r ->> 'url', ''),
+         (r ->> 'amount')::numeric, nullif(r ->> 'req', '')::uuid
     from jsonb_array_elements(v_rows) r;
   with done as (
     update supply_requests set state = 'ordered', ordered_by_name = my_name(), ordered_at = now(), updated_at = now()
@@ -419,7 +426,7 @@ begin
       'logged_by_name', g.logged_by_name, 'logged_at', g.logged_at, 'changed_by_name', g.changed_by_name, 'changed_at', g.changed_at,
       'cancelled', g.cancelled_at is not null, 'cancelled_by_name', g.cancelled_by_name, 'cancel_reason', g.cancel_reason,
       'lines', (select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'position', x.position, 'item_id', x.item_id, 'item', i.name, 'unit', i.unit,
-                  'qty', x.qty, 'unit_price', x.unit_price, 'amount', x.amount, 'supply_request_id', x.supply_request_id) order by x.position), '[]'::jsonb)
+                  'qty', x.qty, 'unit_price', x.unit_price, 'pack', x.pack, 'url', x.url, 'amount', x.amount, 'supply_request_id', x.supply_request_id) order by x.position), '[]'::jsonb)
                 from purchase_log_lines x join purchase_items i on i.id = x.item_id where x.log_id = g.id and x.removed_at is null))
       order by g.bought_on desc, g.logged_at desc)
     from purchase_logs g join purchase_suppliers v on v.id = g.supplier_id), '[]'::jsonb);
@@ -586,25 +593,35 @@ begin
       begin perform purchase_log_save(gen_random_uuid(), jsonb_build_object('supplier', 'Check Log Store', 'bought_on', local_today() + 5,
               'lines', jsonb_build_array(jsonb_build_object('item_id', glue, 'qty', 1, 'unit_price', 1)))); msg := msg || 'a future date; '; exception when others then null; end;
       begin perform purchase_log_save(gen_random_uuid(), jsonb_build_object('supplier', 'Check Log Store', 'bought_on', local_today(),
-              'lines', jsonb_build_array(jsonb_build_object('new_item', jsonb_build_object('name', 'Check Log Thing', 'category_key', 'lumber'), 'qty', 1, 'unit_price', 1)))); msg := msg || 'lumber with no thickness; '; exception when others then null; end;
+              'lines', jsonb_build_array(jsonb_build_object('new_item', jsonb_build_object('name', 'Check Log Thing', 'category_key', 'lumber'), 'qty', 1, 'unit_price', 1)))); msg := msg || 'a new lumber item; '; exception when others then null; end;
+      begin perform purchase_log_save(gen_random_uuid(), jsonb_build_object('supplier', 'Check Log Store', 'bought_on', local_today(),
+              'lines', jsonb_build_array(jsonb_build_object('item_id', qs, 'qty', 1, 'unit_price', 1)))); msg := msg || 'a lumber item; '; exception when others then null; end;
+      begin perform purchase_log_save(gen_random_uuid(), jsonb_build_object('supplier', 'Check Log Store', 'bought_on', local_today(),
+              'lines', jsonb_build_array(jsonb_build_object('item_id', glue, 'qty', 1, 'unit_price', 1, 'url', 'javascript:alert(1)')))); msg := msg || 'a link that isn''t a web address; '; exception when others then null; end;
+      begin perform purchase_log_save(gen_random_uuid(), jsonb_build_object('supplier', 'Check Log Store', 'bought_on', local_today(),
+              'lines', jsonb_build_array(jsonb_build_object('item_id', glue, 'qty', 1, 'unit_price', 1, 'pack', 0)))); msg := msg || '0 in each; '; exception when others then null; end;
       begin perform purchase_log_save(gen_random_uuid(), jsonb_build_object('supplier', 'Check Log Store', 'bought_on', local_today(),
               'lines', jsonb_build_array(jsonb_build_object('item_id', glue, 'qty', 0, 'unit_price', 1)))); msg := msg || 'a quantity of 0; '; exception when others then null; end;
       r := purchase_log_save(lcid, jsonb_build_object('supplier', 'cls', 'bought_on', local_today(), 'doc', 'R-77', 'lines', jsonb_build_array(
-             jsonb_build_object('item_id', glue, 'qty', 2, 'unit_price', 31.49, 'supply_request_id', rq1),
-             jsonb_build_object('new_item', jsonb_build_object('name', 'Check Log brushes', 'category_key', 'hardware', 'unit', 'each'), 'qty', 3, 'unit_price', 6.98, 'supply_request_id', rq2))));
+             jsonb_build_object('item_id', glue, 'qty', 2, 'unit_price', 31.49, 'supply_request_id', rq1, 'url', 'https://www.example.com/titebond-iii-gallon'),
+             jsonb_build_object('new_item', jsonb_build_object('name', 'Check Log brushes', 'category_key', 'hardware'), 'qty', 3, 'unit_price', 6.98, 'supply_request_id', rq2),
+             jsonb_build_object('new_item', jsonb_build_object('name', 'Check Log sandpaper', 'category_key', 'hardware'), 'qty', 1, 'unit_price', 50, 'pack', 50))));
       r2 := purchase_log_save(lcid, jsonb_build_object('supplier', 'cls', 'bought_on', local_today(), 'lines', '[]'::jsonb));
       execute 'reset role';
       lg := (r ->> 'id')::uuid;
-      ok := msg = '' and (r ->> 'total')::numeric = 83.92 and (r2 ->> 'already')::boolean
-            and (select count(*) from purchase_log_lines where log_id = lg and removed_at is null) = 2
+      ok := msg = '' and (r ->> 'total')::numeric = 133.92 and (r2 ->> 'already')::boolean
+            and (select count(*) from purchase_log_lines where log_id = lg and removed_at is null) = 3
+            and (select url from purchase_log_lines where log_id = lg and position = 1) = 'https://www.example.com/titebond-iii-gallon'
+            and (select pack = 50 and amount = 50 from purchase_log_lines where log_id = lg and position = 3)
             and (select state from supply_requests where id = rq1) = 'ordered' and (select state from supply_requests where id = rq2) = 'ordered'
             and exists (select 1 from supply_request_events where request_id = rq1 and what = 'Ordered: bought from Check Log Store Co')
             and (select supplier_id from purchase_logs where client_id = lcid) = (select id from purchase_suppliers where name = 'Check Log Store Co')
             and exists (select 1 from purchase_items where name = 'Check Log brushes' and category_key = 'hardware' and unit = 'each')
+            and exists (select 1 from purchase_items where name = 'Check Log sandpaper' and unit = 'each')
             and (select count(*) from purchase_logs where client_id = lcid) = 1 and not (r ->> 'new_supplier')::boolean;
       msg := coalesce(nullif(msg, ''), left(r::text, 400));
     exception when others then execute 'reset role'; ok := false; msg := 'Error: ' || sqlerrm; end;
-    res := res || check_row(10, 'A purchase is logged with an item from the list and one made there and then ($83.92), the store found by its other name, its two tablet requests marked ordered naming where it was bought, and sent twice it''s logged once; no lines, a future date, lumber with no thickness or a quantity of 0 are refused', ok, msg);
+    res := res || check_row(10, 'A purchase is logged ($133.92) with an item from the list and its link, a new item, and a box of 50 for $50, the store found by its other name, its two tablet requests marked ordered naming where it was bought, and sent twice it''s logged once; no lines, a future date, lumber (new or not), a link that isn''t a web address, 0 in each or a quantity of 0 are refused', ok, msg);
 
     -- ---- 11: changed, then a mistake; the list ----
     begin execute 'set local role authenticated';
@@ -617,8 +634,9 @@ begin
       execute 'reset role';
       ok := ok and (select state from supply_requests where id = rq2) = 'requested'
             and exists (select 1 from supply_request_events where request_id = rq2 and what like 'Taken off the purchase from Check Log Store Co%')
-            and (select count(*) from purchase_log_lines where log_id = lg and removed_at is null) = 1 and (select count(*) from purchase_log_lines where log_id = lg) = 3
-            and exists (select 1 from jsonb_array_elements(r2) x where (x ->> 'id')::uuid = lg and jsonb_array_length(x -> 'lines') = 1 and (x -> 'lines' -> 0 ->> 'amount')::numeric = 61.98);
+            and (select count(*) from purchase_log_lines where log_id = lg and removed_at is null) = 1 and (select count(*) from purchase_log_lines where log_id = lg) = 4
+            and exists (select 1 from jsonb_array_elements(r2) x where (x ->> 'id')::uuid = lg and jsonb_array_length(x -> 'lines') = 1 and (x -> 'lines' -> 0 ->> 'amount')::numeric = 61.98
+                        and x -> 'lines' -> 0 ->> 'url' is null and (x -> 'lines' -> 0 ->> 'pack')::numeric = 1);
       execute 'set local role authenticated';
       r := purchase_log_cancel(lg, 'Logged twice');
       execute 'reset role';
