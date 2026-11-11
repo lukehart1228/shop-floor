@@ -34,6 +34,7 @@
                   border-bottom:4px solid transparent; border-radius:0}
   nav.tabs button[aria-current="true"]{color:var(--sawdust); border-bottom-color:var(--orange)}
   nav.tabs .badge{display:inline-grid; place-items:center; min-width:20px; height:20px; border-radius:99px; background:var(--orange); color:#fff; font-size:13px; margin-left:6px; padding:0 5px}
+  nav.tabs .setupbtn{margin-left:auto; font-size:15px}
   main{max-width:1060px; margin:0 auto; padding:16px 14px 90px}
   h2{font-size:25px; margin:4px 2px 2px}
   h3{font-size:17px; color:var(--ink2); margin:24px 2px 10px}
@@ -136,7 +137,7 @@
 <script>
 /* The two settings (project address, publishable key), the key check, the connection test, the id maker and the
    Feedback button are in the shared file loaded above, sf-common-2026-10-05.1.js. */
-var PAGE_VERSION = "2026-11-04.1";          // this page's version: bump it with every change (it shows in select * from devices();)
+var PAGE_VERSION = "2026-11-11.1";          // this page's version: bump it with every change (it shows in select * from devices();)
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -216,7 +217,8 @@ if (typeof document !== "undefined") (function () {
   sfEmbed("header .hrow");                                        // inside the office app: the office's header is above
   if (!SF_EMBEDDED) sfFeedbackSetup({ db, page: "pace", version: PAGE_VERSION, mount: "header .hrow" });
   sfReportDevice(db, "pace", PAGE_VERSION);
-  const TABS = [["pace", "Pace"], ["days", "Working days"]];
+  // 11 Nov: Working days is set up now and then, so it sits behind Setup, as on Purchasing and Inventory
+  const TABS = [["pace", "Pace"]];
   const S = {
     me: null, tab: store.get("tab", "pace"), weeks: store.get("weeks", 4), dept: store.get("dept", "finishing"),
     loaded: false, missing: false, msg: null, report: null, drafts: {}, busy: false,
@@ -250,7 +252,8 @@ if (typeof document !== "undefined") (function () {
     if (!S.loaded) { app.innerHTML = `<main><p class="muted">Loading…</p></main>`; return; }
     if (S.missing) { tabsEl.hidden = true; app.innerHTML = `<main><div class="banner">Pace isn't set up in the database yet<small>Run pace.sql in the Supabase SQL Editor (Walkthrough 16), wait a minute, then reload this page.</small></div></main>`; return; }
     tabsEl.hidden = false;
-    tabsEl.innerHTML = TABS.map(([k, t]) => `<button data-tab="${k}" aria-current="${S.tab === k}">${t}</button>`).join("");
+    tabsEl.innerHTML = TABS.map(([k, t]) => `<button data-tab="${k}" aria-current="${S.tab === k}">${t}</button>`).join("")
+      + `<button class="setupbtn" data-tab="days" aria-current="${S.tab === "days"}">Setup</button>`;
     const head = S.msg ? `<div class="banner ${S.msg.ok ? "ok" : ""}">${esc(S.msg.text)}</div>` : "";
     const body = !S.report ? "" : S.tab === "days" ? viewDays() : viewPace();
     app.innerHTML = `<main>${head}${body}</main>`;

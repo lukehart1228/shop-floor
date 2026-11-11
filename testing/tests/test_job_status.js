@@ -186,7 +186,7 @@ const shot = async (p, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
   { const { p, errs, ctx } = await session(browser, users.luke, { width: 1366, height: 860 });
     await p.goto(`${BASE}/office.html`); await p.waitForSelector("nav.tabs .tab", { timeout: 8000 });
     const tabs = await p.$$eval("nav.tabs .tab", els => els.map(e => ((e.firstChild && e.firstChild.textContent) || e.textContent).trim()));
-    ok("The office's tabs are Operations, Job status, Arrow, OneDrive", JSON.stringify(tabs) === JSON.stringify(["Operations", "Job status", "Arrow", "OneDrive"]), tabs.join(", "));
+    ok("The office's tabs are Operations, Job status, Purchasing, Deliveries (11 Nov)", JSON.stringify(tabs) === JSON.stringify(["Operations", "Job status", "Purchasing", "Deliveries"]), tabs.join(", "));
     await p.click("[data-menu]"); await p.waitForSelector(".menu");
     // each item's own label (its first text), not innerText: the office re-draws as its data arrives (31 Oct)
     const items = await p.$$eval(".menu .mitem, .menu a", els => els.map(e => ((e.firstChild && e.firstChild.textContent) || e.textContent).trim()));

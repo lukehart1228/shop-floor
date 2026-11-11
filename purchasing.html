@@ -206,7 +206,7 @@
    the data comes in from now on). A Purchases file is for loading past buys: it asks nothing, its new item names become
    items as it's added, and the page says so afterwards. Managers only.
    What's entered is the truth: PO lines, and buys with no PO from the Purchases file. */
-var PAGE_VERSION = "2026-11-10.1";          // this page's version: bump it with every change (it shows in select * from devices();)
+var PAGE_VERSION = "2026-11-11.1";          // this page's version: bump it with every change (it shows in select * from devices();)
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
 const SCRAP_ALLOWANCE = 1.7;                 // the workbook's allowance: 1.7 bd ft bought for each bd ft in a top
 function isMissing(err) { return /could not find the function|schema cache|does not exist/i.test(String((err && err.message) || err || "")); }
@@ -342,6 +342,92 @@ function poGrid() {
 }
 /** the number a PO prints: 24 for Lumber PO 24, 00001 for PO 00001 */
 const poNumberText = (po) => po.series === "po" ? String(po.po_number || "").padStart(5, "0") : String(po.po_number || "");
+/* ---- 11 Nov: the Arrow POs live here now. arrowPoPdf below is a copy of office.html's, kept byte for byte equal
+   (test_arrow_po_same.js): the office's save files it in the Arrow folder, this page downloads it. ---- */
+/** An Arrow PO as a PDF: a copy of the NEW form in Luke's Arrow Powder Coat PO Sheet template (4 Nov; the tablet prints the
+ *  same as HTML). `po` is an arrow_pos row: its header and lines exactly as made. Letter, portrait; at least ten line rows,
+ *  the grey label boxes and the shaded Base Description, Arrow Color and Amount columns as on the sheet. */
+async function arrowPoPdf(PDFLib, po) {
+  const { PDFDocument, StandardFonts, rgb } = PDFLib, doc = await PDFDocument.create();
+  const f = await doc.embedFont(StandardFonts.Helvetica), b = await doc.embedFont(StandardFonts.HelveticaBold);
+  const W = 612, H = 792, M = 27, IW = W - 2 * M, h = po.header || {}, black = rgb(0, 0, 0);
+  const grey = rgb(0.851, 0.851, 0.851), light = rgb(0.949, 0.949, 0.949);
+  let page = doc.addPage([W, H]), y = H - M;
+  const clean = (t) => String(t == null ? "" : t).replace(/[^\x20-\x7e]/g, (c) => ({ "\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"', "\u2013": "-", "\u2014": "-" })[c] || "");
+  const tw = (t, size, font) => font.widthOfTextAtSize(clean(t), size);
+  const text = (t, x, yy, size = 9, font = f) => page.drawText(clean(t), { x, y: yy, size, font, color: black });
+  const fit = (t, width, size, font) => { let s = clean(t); while (s && tw(s, size, font) > width) s = s.slice(0, -1); return s; };
+  const centred = (t, x, width, yy, size = 9, font = f) => { const s = fit(t, width - 4, size, font); text(s, x + (width - tw(s, size, font)) / 2, yy, size, font); };
+  const wrap = (t, width, size = 8.5) => { const out = []; let line = "";
+    for (const w of clean(t).split(/\s+/).filter(Boolean)) { const tryL = line ? line + " " + w : w; if (tw(tryL, size, f) > width && line) { out.push(line); line = w; } else line = tryL; }
+    if (line) out.push(line); return out.length ? out : [""]; };
+  const cell = (x, yy, w, hgt, fill, border = true) => page.drawRectangle({ x, y: yy - hgt, width: w, height: hgt, ...(fill ? { color: fill } : {}), ...(border ? { borderColor: black, borderWidth: .6 } : {}) });
+  const day = (d) => { if (!d) return ""; const [yy, m, dd] = String(d).slice(0, 10).split("-"); return `${Number(m)}/${Number(dd)}/${yy}`; };
+
+  centred("Purchase Order", M, IW, y - 20, 20, b); y -= 40;
+  // the address on the left, the PO's own box on the right
+  const half = (IW - 24) / 2, rx = M + half + 24, rh = 15, kw = half * 0.58;
+  String(h.address || "").split(/\n/).slice(0, 6).forEach((l, i) => text(fit(l, half, 9.5, b), M, y - 11 - i * 15, 9.5, b));
+  [["PO Number:", po.name], ["Date Issued:", day(h.date_issued)], ["Issued by:", h.issued_by], ["Contact Number:", h.phone], ["Contact e-mail:", h.email]]
+    .forEach(([k, v], i) => { const yy = y - i * rh; cell(rx, yy, kw, rh, grey); cell(rx + kw, yy, half - kw, rh, null);
+      text(k, rx + 4, yy - 11, 9, b); centred(v, rx + kw, half - kw, yy - 11, 9, b); });
+  y -= 5 * rh + 18;
+  // To: and Ship To:
+  [[M, "To:", h.to], [rx, "Ship To:", h.ship_to]].forEach(([x, k, v]) => {
+    cell(x, y, half, rh, null); text(k, x + 4, y - 11, 9, b); cell(x, y - rh, half, rh, grey); text(fit(v, half - 8, 9, b), x + 4, y - rh - 11, 9, b); });
+  y -= 2 * rh + 16;
+  // Date, Date Required, Terms, How Shipped, PO# / Job Number
+  const dw = [11.4, 27.7, 16.3, 26.3, 18.3].map(p => IW * p / 100);
+  const dv = [day(h.date_issued), day(h.date_required), "", h.how_shipped, h.po_jobs];
+  let x = M;
+  ["Date", "Date Required", "Terms", "How Shipped", "PO# / Job Number"].forEach((k, i) => {
+    cell(x, y, dw[i], rh, grey); centred(k, x, dw[i], y - 11, 9, b);
+    cell(x, y - rh, dw[i], 24, null); centred(dv[i], x, dw[i], y - rh - 15, 8.5); x += dw[i]; });
+  y -= rh + 24 + 18;
+  // the lines: the form's columns, the three shaded ones, no grid (as on the sheet); a rule between colours
+  const cw = [11.4, 10.3, 17.4, 16.3, 14.3, 12, 9.2, 9.1].map(p => IW * p / 100);
+  const shade = [null, null, light, null, light, null, null, grey];
+  const heads = ["Quantity", "Base ID", "Base Description", "PD Color", "Arrow Color", "Project #", "Unit Price", "Amount"];
+  const headRow = () => { let xx = M; heads.forEach((k, i) => { centred(k, xx, cw[i], y - 11, 8.5, b); xx += cw[i]; }); y -= 16; };
+  const row = (cells, opts = {}) => {
+    const lines = cells.map((c, i) => wrap(c, cw[i] - 6)), rht = opts.total ? 16 : Math.max(36, Math.max(...lines.map(l => l.length)) * 10 + 6);
+    if (y - rht < M + 70) { page = doc.addPage([W, H]); y = H - M; headRow(); }
+    let xx = M;
+    cw.forEach((w, i) => { if (shade[i] && (!opts.total || i === 7)) cell(xx, y, w, rht, shade[i], false);
+      lines[i].forEach((l, k) => i === 0 ? centred(l, xx, w, y - 11 - k * 10, 8.5, opts.total ? b : f) : text(l, xx + 3, y - 11 - k * 10, 8.5, f)); xx += w; });
+    if (opts.rule) page.drawLine({ start: { x: M, y }, end: { x: M + IW, y }, thickness: 1.2, color: black });
+    y -= rht; };
+  headRow();
+  let prev = null;
+  const ls = po.lines || [];
+  for (const l of ls) { row([l.qty == null ? "" : String(l.qty), l.base, l.description, l.pd_color, l.arrow_color, l.project, "", ""], { rule: prev !== null && l.pd_color !== prev }); prev = l.pd_color; }
+  for (let i = ls.length; i < 10; i++) row(["", "", "", "", "", "", "", ""]);
+  row(["Total", "", "", "", "", "", "", ""], { total: true });
+  if (y < M + 70) { page = doc.addPage([W, H]); y = H - M; }
+  y -= 18; centred("*BLAST AND COAT ALL BASES*", M, IW, y, 9.5, b);
+  if (h.tax_line) { y -= 22; text(fit(h.tax_line, IW, 9, f), M, y, 9); }
+  y -= 8; const lw = 137;
+  cell(M, y, lw, 15, grey, false); centred("Authorized Signature:", M, lw, y - 11, 9, b);
+  text(fit(h.issued_by, 195, 9, b), M + lw + 4, y - 11, 9, b);
+  page.drawLine({ start: { x: M + lw, y: y - 15 }, end: { x: M + lw + 200, y: y - 15 }, thickness: .8, color: black });
+  doc.setTitle(po.name || "Arrow PO"); doc.setCreator("Purposeful Design Production");
+  return await doc.save({ useObjectStreams: false });
+}
+/** "Post.step" + 2 → "Post r2.step": a revised job file is filed beside the old one (3 Nov: was the drop date, 11 letters longer) */
+function parseOptions(text) { return String(text || "").split(",").map(x => x.trim()).filter(Boolean); }
+function choicesFromForm(groups) {
+  return (groups || []).map(g => ({ label: String(g.label || "").trim(), options: parseOptions(g.options) }))
+    .filter(g => g.label || g.options.length);
+}
+function choiceSummary(choices) {
+  return (choices || []).map(g => `${g.label}: ${(g.options || []).join(", ")}`).join(" · ");
+}
+function supplyListFor(items, dept) {
+  const mine = (items || []).filter(i => i.department === dept);
+  const byOrder = (a, b) => (a.sort_order - b.sort_order) || String(a.name).localeCompare(String(b.name));
+  return { live: mine.filter(i => !i.retired).sort(byOrder), retired: mine.filter(i => i.retired).sort(byOrder) };
+}
+const SUP_DEPTS = ["milling", "cnc", "sanding", "finishing", "full_custom", "metal", "assembly_qc"];   // the departments with a Supplies tab
 async function poPdf(PDFLib, po, logoBytes) {
   const { PDFDocument, StandardFonts, rgb } = PDFLib, doc = await PDFDocument.create();
   const f = await doc.embedFont(StandardFonts.Helvetica), b = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -880,6 +966,7 @@ if (typeof document !== "undefined") (function () {
     openItem: null, file: null, matchNew: null, slips: [], slipLines: null,
     closedReqs: [], fileItems: [], filesReady: false, month: null, cat: "all", sheet: null, slipPo: null, keep: new Set(),
     logsReady: false, log: null, find: "",
+    arrowPos: null, arrowSet: null, supItems: null, supEdit: null,
   };
   /** a tab: drawn at once, then again with what's new (supply requests come in from the tablets all day) */
   const go = async (tab) => { S.tab = tab; store.set("tab", tab); try { history.replaceState(null, "", "#" + tab); } catch (e) {}
@@ -972,6 +1059,12 @@ if (typeof document !== "undefined") (function () {
         Promise.resolve(db.from("v_supply_requests").select("*").eq("is_open", false).gte("updated_at", since).order("updated_at", { ascending: false })).catch(e => ({ error: e })),
         Promise.resolve(db.rpc("purchase_file_items_list")).catch(e => ({ error: e })),
         Promise.resolve(db.rpc("purchase_logs_list")).catch(e => ({ error: e }))]);
+      // 11 Nov: the Arrow POs (arrow_pos.sql) and the supply lists (supply_lists.sql) moved here from the office
+      const [ap, as, si] = await Promise.all([Promise.resolve(db.from("arrow_pos").select("*").order("made_at", { ascending: false }).limit(500)).catch(e => ({ error: e })),
+        Promise.resolve(db.rpc("arrow_po_settings_get")).catch(e => ({ error: e })),
+        Promise.resolve(db.from("supply_items").select("*")).catch(e => ({ error: e }))]);
+      S.arrowPos = ap && !ap.error ? ap.data || [] : null; S.arrowSet = as && !as.error ? as.data || {} : null;
+      S.supItems = si && !si.error ? si.data || [] : null;
       if (r.error) throw r.error;
       S.data = r.data; S.missing = false;
       // purchases logged on Buy (purchasing_log.sql). Without it there's no Log a purchase, and Mark ordered stays as it was.
@@ -1133,7 +1226,24 @@ if (typeof document !== "undefined") (function () {
       ${filingBanner()}
       ${pos.length ? `<div class="tw"><table><thead><tr><th>PO</th><th class="l">Supplier</th><th>Issued</th><th class="l">What</th><th>Total</th><th class="l">In</th><th class="l">PDF</th></tr></thead><tbody>${rows}</tbody></table></div>`
         : `<p class="muted">No POs in ${S.year} yet.</p>`}
-      <p class="note" style="margin:10px 2px">Tap a PO for its lines. Buys off a website, by card or at a store have no PO: they come in through the Purchases file, on Prices.</p>`;
+      <p class="note" style="margin:10px 2px">Tap a PO for its lines. Buys off a website, by card or at a store have no PO: they come in through the Purchases file, on Prices.</p>
+      ${arrowPosSection()}`;
+  }
+  /** 11 Nov: Arrow's POs, made on the tablets' Arrow department and filed by the office's save in the Arrow folder */
+  function arrowPosSection() {
+    if (!S.arrowPos) return "";
+    const list = S.arrowPos.filter(p => yearOf(p.gone_on) === S.year);
+    const rows = list.map(p => { const bare = (p.lines || []).filter(l => !String(l.pd_color || "").trim()).length;
+      return `<tr><td><b>${p.is_test ? `<span class="tag">TEST</span> ` : ""}${esc(p.name)}</b>${p.revision > 1 ? ` <span class="tag">r${esc(p.revision)}</span>` : ""}</td>
+        <td class="l">${esc((p.jobs || []).join(", "))}</td><td>${esc(mdy(p.gone_on))}</td>
+        <td class="l">${esc(p.made_by_name || "")}${p.remade_by_name ? `<div class="note">made again by ${esc(p.remade_by_name)}</div>` : ""}</td>
+        <td class="l">${p.onedrive_at && p.backup_at ? "In the Arrow folder" : p.is_test ? "" : "At the next save"}${bare ? `<div class="note">${bare} line${bare === 1 ? "" : "s"} without colours</div>` : ""}</td>
+        <td class="l"><button class="btn ghost" data-arpdf="${esc(p.id)}">PDF</button>${"revision" in p ? ` <button class="link" data-arremake="${esc(p.id)}">Make it again</button>` : ""}</td></tr>`; }).join("");
+    const st = S.arrowSet || {};
+    return `<h3 style="margin-top:22px">Arrow POs</h3>
+      <p class="sub">Made on the tablets' Arrow department when items go to Arrow, numbered AR-…; the office's save files each one in Claudes Shop System Folder › Arrow.${st.next_number ? ` The next is AR-${esc(st.next_number)}.` : ""}</p>
+      ${list.length ? `<div class="tw"><table><thead><tr><th>PO</th><th class="l">Jobs</th><th>Gone</th><th class="l">Made by</th><th class="l">Filed</th><th class="l"></th></tr></thead><tbody>${rows}</tbody></table></div>`
+        : `<p class="muted">No Arrow POs in ${S.year}.</p>`}`;
   }
   function poDetail(po) {
     const anyLumber = (po.lines || []).some(l => l.lumber), reqs = new Map(S.reqs.map(r => [r.id, r]));
@@ -1162,6 +1272,35 @@ if (typeof document !== "undefined") (function () {
         ${!po.cancelled_at ? `<button class="link" data-cancelpo="${esc(po.id)}">Cancel the PO</button>` : ""}
         ${anyLumber && !po.cancelled_at ? `<button class="btn ghost" data-slippo="${esc(po.id)}">${S.slipPo === po.id ? "Hide the delivery slips" : "Pick its delivery slips"}</button>` : ""}</div>
       ${anyLumber && S.slipPo === po.id ? slipPicker(po) : ""}</div>`;
+  }
+
+  // ---------- 11 Nov: the supply lists, moved from the office's Setup ----------
+  function supplyForm(e) {
+    return `<div class="card" style="margin:6px 0"><div class="form" style="flex-direction:column; align-items:stretch">
+      <label>${e.id ? "Name" : "New item"}<input id="supName" data-supf="name" value="${esc(e.name)}" placeholder="e.g. Boxes of biscuits" maxlength="60"></label>
+      <p class="note" style="margin:0">Choices (optional): up to two sets, with a comma between each choice.</p>
+      ${e.groups.map((g, i) => `<div class="row"><input data-supg="${i}" data-part="label" value="${esc(g.label)}" placeholder="${i ? "e.g. Thickness" : "e.g. Wood"}" aria-label="Name of choice set ${i + 1}">
+        <input data-supg="${i}" data-part="options" value="${esc(g.options)}" placeholder="${i ? "e.g. 1/4, 1/2, 3/4, 3/4 MDF" : "e.g. Ash, Maple, White Oak"}" aria-label="Choices in set ${i + 1}" style="flex:1"></div>`).join("")}
+      <div class="row"><button class="btn or" data-supsave ${S.busy || !e.name.trim() ? "disabled" : ""}>${e.id ? "Save" : "Add to the list"}</button><button class="link" data-supcancel>Cancel</button></div></div></div>`;
+  }
+  function supplySection() {
+    if (!S.supItems) return "";
+    const nameOf = (d) => (S.depts.find(x => x.key === d) || {}).name || d;
+    const dept = (d) => {
+      const { live, retired } = supplyListFor(S.supItems, d), e = S.supEdit && S.supEdit.dept === d ? S.supEdit : null;
+      const row = (i, k) => e && e.id === i.id ? supplyForm(e) : `<div class="r"><div class="grow"><b>${esc(i.name)}</b>${(i.choices || []).length ? `<small>${esc(choiceSummary(i.choices))}</small>` : ""}</div>
+        ${i.retired ? `<button class="link" data-supback="${esc(i.id)}">Bring back</button>` : `
+          <button class="link" data-supmove="${esc(i.id)}" data-up="1" ${k === 0 ? "disabled" : ""} aria-label="Move ${esc(i.name)} up">↑</button>
+          <button class="link" data-supmove="${esc(i.id)}" data-up="0" ${k === live.length - 1 ? "disabled" : ""} aria-label="Move ${esc(i.name)} down">↓</button>
+          <button class="link" data-supedit="${esc(i.id)}">Edit</button><button class="link" data-supretire="${esc(i.id)}">Retire</button>`}</div>`;
+      return `<details class="fold" data-keep="sup_${d}" ${S.keep.has("sup_" + d) ? "open" : ""}><summary>${esc(nameOf(d))} (${live.length})</summary><div class="list">
+        ${live.map(row).join("") || `<p class="note">No list yet: the tablet shows only the typed box.</p>`}
+        ${e && !e.id ? supplyForm(e) : `<button class="btn ghost" style="margin:6px 0" data-supadd="${d}">Add an item</button>`}
+        ${retired.length ? `<p class="note">Retired</p>${retired.map(row).join("")}` : ""}</div></details>`;
+    };
+    return `<h3>Supply lists</h3>
+      <p class="sub">What each department taps on its tablet's Supplies tab; what they send arrives on Buy. An item can have up to two sets of choices, like the wood and the thickness; the tablet won't send it until each is picked. Anything not on the list can still be typed. Retiring takes an item off the tablets; past requests keep it.</p>
+      ${SUP_DEPTS.map(dept).join("")}`;
   }
 
   // ---------- the PO editor ----------
@@ -1676,8 +1815,9 @@ if (typeof document !== "undefined") (function () {
       <h3>PO numbers</h3>
       <div class="card"><div class="form">
         <label>Next PO<input id="nextPo" class="n" inputmode="numeric" value="${esc(D.next_po)}"></label><button class="btn ghost" data-savenext="po">Save</button>
-        <label>Next lumber PO<input id="nextLumber" class="n" inputmode="numeric" value="${esc(D.next_lumber)}"></label><button class="btn ghost" data-savenext="lumber">Save</button></div>
-        <p class="note">${D.last_po ? `The last PO is PO ${esc(String(D.last_po).padStart(5, "0"))}. ` : ""}${D.last_lumber ? `The last lumber PO is Lumber PO ${esc(D.last_lumber)}. ` : ""}The next has to be higher; a number is never used twice. Arrow POs keep their own on the Arrow tab.</p></div>
+        <label>Next lumber PO<input id="nextLumber" class="n" inputmode="numeric" value="${esc(D.next_lumber)}"></label><button class="btn ghost" data-savenext="lumber">Save</button>
+        ${S.arrowSet ? `<label>Next Arrow PO (AR-…)<input id="nextArrow" class="n" inputmode="numeric" value="${esc(S.arrowSet.next_number || "")}"></label><button class="btn ghost" data-savenextarrow>Save</button>` : ""}</div>
+        <p class="note">${D.last_po ? `The last PO is PO ${esc(String(D.last_po).padStart(5, "0"))}. ` : ""}${D.last_lumber ? `The last lumber PO is Lumber PO ${esc(D.last_lumber)}. ` : ""}${S.arrowSet && S.arrowSet.last_number ? `The last Arrow PO is AR-${esc(S.arrowSet.last_number)}. ` : ""}The next has to be higher; a number is never used twice.</p></div>
       <h3>The PD - POs folder on this computer</h3>
       <div class="card">${folder}<p class="note">Production › Production Utilization › PD - POs. Each PO made here is filed there as a PDF (PO 00001.pdf, Lumber PO 24.pdf; a change is … r2.pdf beside it). A file already there is never overwritten.</p></div>
       <h3>Suppliers</h3>
@@ -1688,6 +1828,7 @@ if (typeof document !== "undefined") (function () {
       <div class="tw"><table><thead><tr><th>Item</th><th class="l">Unit</th><th class="l">Compared as</th><th>Measured against now</th><th></th></tr></thead><tbody>${items}${ed.cat === "new" ? catForm({}) : ""}</tbody></table></div>
       ${ed.cat ? "" : `<button class="btn ghost" style="margin-top:8px" data-editcat="new">Add a category</button>`}
       <p class="note">Other names: what a Purchases file or a supplier's bill calls it, so those lines file themselves. A lumber item compared as another (7/4 Ash as 8/4 Ash) takes that item's price at the same square feet: 8/4's × 8/7.</p>
+      ${supplySection()}
       <h3>Baselines</h3>
       <p class="sub">An item's price for a year, typed. A buy is measured against the year before's; without one, against the year before's average paid, or the first price paid this year.</p>
       ${bl ? `<div class="tw"><table><thead><tr><th class="l">Item</th><th>Year</th><th>Price</th><th class="l">Note</th><th></th></tr></thead><tbody>${bl}</tbody></table></div>` : ""}
@@ -1865,6 +2006,28 @@ if (typeof document !== "undefined") (function () {
       address: val("#isAddr"), tax_line: val("#isTax") } }, "PO details saved. The POs and Arrow POs print them from now on."));
     on("[data-savenext]", (b) => { const series = b.dataset.savenext, n = Number(val(series === "po" ? "#nextPo" : "#nextLumber"));
       call("purchase_next_number_save", { p_series: series, p_next: n }, () => `The next ${series === "po" ? "PO is PO " + String(n).padStart(5, "0") : "lumber PO is Lumber PO " + n}.`); });
+    // 11 Nov: the next Arrow PO number, the Arrow POs' PDF and Make it again, and the supply lists (all moved from the office)
+    on("[data-savenextarrow]", () => { const n = Number(val("#nextArrow"));
+      call("set_arrow_po_settings", { p: { next_number: n } }, `The next Arrow PO is AR-${n}.`); });
+    on("[data-arpdf]", async (b) => { const po = (S.arrowPos || []).find(p => p.id === b.dataset.arpdf); if (!po) return;
+      try { saveBlob(await arrowPoPdf(await pdfLib(), po), po.file_name, "application/pdf"); } catch (e) { S.msg = { ok: false, text: friendlyError(e) }; render(); } });
+    on("[data-arremake]", (b) => { const po = (S.arrowPos || []).find(p => p.id === b.dataset.arremake); if (!po) return;
+      if (confirm(`Make ${po.name} again? It keeps its number, items and dates, takes the colours from the jobs' Arrow lines now and the PO details as they are now, and the next save files it as a new PDF (r${(po.revision || 1) + 1}) beside the first one. The first one is kept.`))
+        call("arrow_po_remake", { p_po: po.id }, `${po.name} made again (r${(po.revision || 1) + 1}). The office's next save files it beside the first.`); });
+    const supOpen = (d, item) => {
+      const g = [0, 1].map(i => { const c = item && (item.choices || [])[i]; return { label: c ? c.label : "", options: c ? c.options.join(", ") : "" }; });
+      S.supEdit = { id: item ? item.id : null, dept: d, name: item ? item.name : "", groups: g }; S.keep.add("sup_" + d); S.msg = null; render();
+      const n = app.querySelector("#supName"); if (n) n.focus(); };
+    on("[data-supadd]", (b) => supOpen(b.dataset.supadd, null));
+    on("[data-supedit]", (b) => { const i = (S.supItems || []).find(x => x.id === b.dataset.supedit); if (i) supOpen(i.department, i); });
+    on("[data-supcancel]", () => { S.supEdit = null; render(); });
+    app.querySelectorAll("[data-supf]").forEach(el => el.oninput = () => { S.supEdit.name = el.value; const go = app.querySelector("[data-supsave]"); if (go) go.disabled = !el.value.trim(); });
+    app.querySelectorAll("[data-supg]").forEach(el => el.oninput = () => { S.supEdit.groups[Number(el.dataset.supg)][el.dataset.part] = el.value; });
+    on("[data-supsave]", async () => { const e = S.supEdit;
+      if (await call("set_supply_item", { p_id: e.id, p_department: e.dept, p_name: e.name.trim(), p_choices: choicesFromForm(e.groups) }, "Saved. The tablets show it from their next look.")) { S.supEdit = null; render(); } });
+    on("[data-supmove]", (b) => call("move_supply_item", { p_id: b.dataset.supmove, p_up: b.dataset.up === "1" }));
+    on("[data-supretire]", (b) => { if (confirm("Retire this item? It comes off the tablets. Past requests keep it, and you can bring it back.")) call("retire_supply_item", { p_id: b.dataset.supretire, p_retire: true }, "Retired."); });
+    on("[data-supback]", (b) => call("retire_supply_item", { p_id: b.dataset.supback, p_retire: false }, "Back on the list."));
     on("[data-editsupplier]", (b) => { S.setupEdit = { supplier: b.dataset.editsupplier }; render(); });
     on("[data-edititem]", (b) => { S.setupEdit = { item: b.dataset.edititem }; render(); });
     on("[data-editcat]", (b) => { S.setupEdit = { cat: b.dataset.editcat }; render(); });

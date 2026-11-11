@@ -204,7 +204,7 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
      hasOff ? /Nothing is due yet/.test(txt(t.w)) : /until off_supabase\.sql has been run \(Walkthrough 42\)/.test(txt(t.w)), txt(t.w).match(/Space on Supabase.{0,400}/) || "");
   await click(t.w, '[data-tab="tasks"]', 1200);
   ok("Needs you: \"hasn't been set up yet\", with Open Photos; no Photo archive card", /Saving to OneDrive/.test(txt(t.w)) && /hasn't been set up yet/.test(txt(t.w)) && !/Photo archive/.test(txt(t.w)));
-  await click(t.w, '[data-tab="photos"]', 900);
+  await click(t.w, '[data-menu]', 200); await click(t.w, '[data-tab="photos"]', 900);
 
   // choose the folders; a backup folder inside OneDrive is refused
   PICK = [od]; await click(t.w, '[data-savepick="od"]', 400);
@@ -278,7 +278,7 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
   ok("No test job is ever saved", !bk.find("TEST-00418") && !bk.files().some(f => /TEST-/.test(f)));
   await click(t.w, '[data-tab="tasks"]', 1200);
   ok("Needs you: the saving card has gone", !/Saving to OneDrive/.test(txt(t.w)));
-  await click(t.w, '[data-tab="photos"]', 900);
+  await click(t.w, '[data-menu]', 200); await click(t.w, '[data-tab="photos"]', 900);
 
   // ---------- a second save writes nothing; a changed file in OneDrive is never overwritten ----------
   const photoFile = odJob.find("Delivery/TB-03/1 Delivery.jpg"); photoFile.data = new TextEncoder().encode("EDITED BY HAND");
@@ -341,7 +341,7 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
     await admin.query(`insert into delivery_docs (client_id, loadout_id, job_id, kind, file_name, storage_path, mime, bytes, added_by_name, added_at)
         values (gen_random_uuid(), $1, $2, 'ticket', 'ticket.pdf', $3, 'application/pdf', $4, 'Julia', now() - interval '61 days')`, [lo, J418, TICKET, ticketBytes.length]);
     const inStorage = async (p) => (await admin.query("select count(*)::int as n from storage.objects where name = $1", [p])).rows[0].n === 1;
-    await click(t.w, '[data-tab="tasks"]', 600); await click(t.w, '[data-tab="photos"]', 1200);
+    await click(t.w, '[data-tab="tasks"]', 600); await click(t.w, '[data-menu]', 200); await click(t.w, '[data-tab="photos"]', 1200);
     ok("Off Supabase: the Photos tab says PROJ-00418's 3 files are due now", /3 files are due now: they go with the next save that finds them in both OneDrive and the backup folder/.test(txt(t.w)),
        txt(t.w).match(/Space on Supabase.{0,500}/) || "");
 

@@ -1,3 +1,4 @@
+// 11 Nov: on Purchasing now (POs on Buy, PO details in Setup).
 // 4 Nov: Make an Arrow PO again (arrow_po_remake.sql) and the office's PDF as a copy of the NEW form. As AR-10 happened:
 // the PO details had Arrow's name where Purposeful Design's address goes and "?" for the tax line, and the job had no
 // Arrow lines yet, so the PO printed an item with blanks. Luke fixes the details on the office page, the job's lines
@@ -74,35 +75,35 @@ async function session(browser, user) {
   const bad = setup.filter(r => r.error).map(r => r.error.message);
   ok("setup through the real functions: the send, the PO details as they were, AR-10 made before the job's lines", !bad.length, bad.join(" | "));
 
+  // 11 Nov: the Arrow POs are in Purchasing (POs on Buy; PO details in Setup), no longer on the office's Arrow tab
   const browser = await chromium.launch();
   const s = await session(browser, users.luke), p = s.p;
   p.on("dialog", d => d.accept());
-  await p.goto(base); await p.waitForSelector('header.top [data-tab]', { timeout: 15000 });
-  await p.click('[data-tab="arrow"]'); await p.waitForSelector("[data-popdf]", { timeout: 15000 });
+  await p.goto(base.replace("office.html", "purchasing.html")); await p.waitForSelector("#tabs [data-tab]", { timeout: 15000 });
+  await p.click('#tabs [data-tab="buy"]'); await p.waitForSelector("[data-arpdf]", { timeout: 15000 });
   const txt = async () => p.evaluate(() => document.querySelector("#app").innerText.replace(/\s+/g, " "));
   let t = await txt();
-  ok("The office lists AR-10, and the PO details label says whose address goes there", /AR-10/.test(t) && /Purposeful Design's name and address/.test(await p.evaluate(() => document.querySelector("#app").textContent)), t.slice(0, 300));
+  ok("Purchasing › POs lists AR-10 under Arrow POs", /Arrow POs/.test(t) && /AR-10/.test(t), t.slice(0, 300));
 
   if (OLDDB) {
-    ok("Older database: no Make it again", !(await p.$("[data-poremake]")));
+    ok("Older database: no Make it again", !(await p.$("[data-arremake]")));
   } else {
-    ok("…AR-10 says 1 line without colours, with Make it again beside PDF", /1 line without colours/.test(t) && !!(await p.$("[data-poremake]")));
-    // Luke fixes the details on the page
-    // the details panel folds away once filled in; open it and save, in one go (the page redraws)
-    await p.evaluate(() => { document.querySelector("#poAddr").closest("details").open = true;
-      document.querySelector("#poAddr").value = "Purposeful Design\n1 Test Street\nIndianapolis, IN";
-      document.querySelector("#poTax").value = "* Purposeful Design is tax exempt (test)";
-      document.querySelector("[data-posave]").click(); });
-    await sleep(1500);
+    ok("…AR-10 says 1 line without colours, with Make it again beside PDF", /1 line without colours/.test(t) && !!(await p.$("[data-arremake]")));
+    // Luke fixes the details in Setup, where the label says whose address goes there
+    await p.click('#tabs [data-tab="setup"]'); await p.waitForSelector("#isAddr"); await sleep(2500);   // a tab draws at once, then again when its data is in
+    ok("Setup's PO details say whose name and address goes there", /Purposeful Design's name and address/.test(await p.evaluate(() => document.querySelector("#app").textContent)));
+    await p.fill("#isAddr", "Purposeful Design\n1 Test Street\nIndianapolis, IN"); await p.fill("#isTax", "* Purposeful Design is tax exempt (test)");
+    await p.click("[data-saveissuer]"); await sleep(1500);
     // the job's lines arrive, as dropping its zip saves them
     const r = await luke.rpc("set_sheet_arrow", { p_work_order: s5.work_order_id, p_sheets: [{ sheet_number: 5, arrow: [
       { qty: 15, base: "JESS", description: "Pedestal Base, Round Disc, 3.5\" Post", pd_color: "Stardust Silver", arrow_color: "RAL 9006 White Aluminum" }] }] });
     ok("…the details saved from the page; the job's lines saved", !r.error && (await q("select address from arrow_po_settings"))[0].address.startsWith("Purposeful Design"), r.error && r.error.message);
-    await p.click("[data-poremake]");
+    await p.click('#tabs [data-tab="buy"]'); await p.waitForSelector("[data-arremake]");
+    await p.click("[data-arremake]");
     await p.waitForFunction(() => /made again/.test(document.querySelector("#app").innerText), null, { timeout: 15000 }).catch(() => {});
     t = await txt();
     const po = (await q("select * from arrow_pos where name = 'AR-10'"))[0];
-    ok("Make it again: the office says so; AR-10 is r2 with the colour, 15 JESS, the address and tax line now; filed next save as r2",
+    ok("Make it again: the page says so; AR-10 is r2 with the colour, 15 JESS, the address and tax line now; filed next save as r2",
        /made again \(r2\)/.test(t) && /r2/.test(t) && !/without colours/.test(t) && po.revision === 2 && po.file_name === "AR-10(418).pdf".replace(".pdf", " r2.pdf")
        && po.lines[0].pd_color === "Stardust Silver" && po.lines[0].qty === 15 && po.header.address.startsWith("Purposeful Design") && po.onedrive_at === null,
        `${po.file_name} ${JSON.stringify(po.lines)} | ${t.slice(0, 200)}`);
@@ -110,7 +111,7 @@ async function session(browser, user) {
        && po.earlier[0].header.tax_line === "?" && po.earlier[0].lines[0].pd_color === "" && po.earlier[0].file_name === "AR-10(418).pdf");
   }
   // the PDF: portrait letter, the form's words
-  const [dl] = await Promise.all([p.waitForEvent("download", { timeout: 15000 }), p.click("[data-popdf]")]);
+  const [dl] = await Promise.all([p.waitForEvent("download", { timeout: 15000 }), p.click("[data-arpdf]")]);
   const file = "/tmp/remake_test.pdf"; await dl.saveAs(file);
   const info = cp.execSync(`pdfinfo ${file}`).toString(), words = cp.execSync(`pdftotext -layout ${file} -`).toString();
   ok("The PDF is portrait letter with the NEW form's words: Purchase Order, the boxes, To and Ship To, the date row, the columns, the footer",

@@ -96,10 +96,11 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   await p.click("[data-menu]"); await p.waitForSelector(".menu"); await p.click('.menu [data-section=""]'); await p.waitForTimeout(400);
   const items = await menu(p);
   // 4 Nov: Upload and the Prototype lab left the menu; Pace is called Data, Drop a job's zip Project Handoff; Job status is a tab. 10 Nov: Purchasing
-  ok("Luke's ☰ menu: Operations, Project Handoff (he's let in), Deliveries, Purchasing, Inventory, Data; Tablet app, Setup, Feedback",
-     JSON.stringify(items) === JSON.stringify(["Operations", "Project Handoff", "Deliveries", "Purchasing", "Inventory", "Data", "Tablet app", "Setup", "Feedback", "Sign out"]), JSON.stringify(items));
+  // 11 Nov: Purchasing and Deliveries are tabs now, and OneDrive moved into the menu
+  ok("Luke's ☰ menu: Operations, Project Handoff (he's let in), Inventory, Data, OneDrive; Tablet app, Setup, Feedback",
+     JSON.stringify(items) === JSON.stringify(["Operations", "Project Handoff", "Inventory", "Data", "OneDrive", "Tablet app", "Setup", "Feedback", "Sign out"]), JSON.stringify(items));
   ok("…each item just its name, with no description under it (Luke, 4 Nov)", (await p.$$(".menu small")).length === 0);
-  await p.click('.menu [data-section="deliveries"]');
+  await p.click("[data-menuclose]"); await p.click('header.top [data-section="deliveries"]');
   await p.waitForFunction(() => { const f = document.querySelector("#secs iframe"); return f && f.contentDocument && f.contentDocument.querySelector("#app") && f.contentDocument.querySelector("#app").textContent.length > 20; }, null, { timeout: 15000 });
   let fr = frameOf(p, "delivery.html");
   ok("Deliveries opens inside the office: the header says Deliveries, and the address says #deliveries",
@@ -123,11 +124,11 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   ok("Feedback from inside Inventory is kept as Inventory, with its tab and its version", f && f.page === "inventory" && /^Inventory › /.test(f.screen) && f.page_version === pageV("inventory.html") && f.person_name === "Luke H",
      JSON.stringify({ where, page: f && f.page, screen: f && f.screen, v: f && f.page_version }));
   await p.waitForTimeout(2700);
-  await menu(p); await p.click('.menu [data-section="deliveries"]'); await p.waitForTimeout(300);
+  await p.click('header.top [data-section="deliveries"]'); await p.waitForTimeout(300);
   fr = frameOf(p, "delivery.html");
   ok("Back to Deliveries: the same page, not reloaded (nothing typed there is lost)", await fr.evaluate(() => window.__mark) === "kept");
-  await p.click('header.top [data-tab="arrow"]'); await p.waitForTimeout(800);
-  ok("A tab (Arrow) leaves the section: the office screen shows, the section hides", /Arrow/.test(await p.$eval("main h1", e => e.textContent)) && !(await visible(p, "#secs")) && !p.url().includes("#"));
+  await p.click('header.top [data-tab="tasks"]'); await p.waitForTimeout(800);
+  ok("A tab (Operations) leaves the section: the office screen shows, the section hides", /Operations/.test(await p.$eval("main h1", e => e.textContent)) && !(await visible(p, "#secs")) && !p.url().includes("#"));
   ok("…and the page scrolls normally again", await p.evaluate(() => !document.documentElement.classList.contains("in-section")));
   await p.goto(base + "#pace"); await p.waitForFunction(() => [...document.querySelectorAll("#secs iframe")].some(f => !f.hidden && /pace/.test(f.src)), null, { timeout: 15000 });
   ok("A link to office.html#pace (bookmarks from before 4 Nov) opens straight into Data", /^Data$/.test((await p.$eval("header.top .place", e => e.textContent)).trim()));
@@ -186,7 +187,7 @@ const visible = (p, sel) => p.$eval(sel, el => !!(el.offsetWidth || el.offsetHei
   await s.ctx.close();
 
   // ---- each section opened on its own still works (as before) ----
-  for (const [file, word] of [["delivery.html", "Deliveries"], ["inventory.html", "Inventory"], ["pace.html", "Data"], ["upload.html", "upload"], ["purchasing.html", "Purchasing"]]) {
+  for (const [file, word] of [["delivery.html", "Deliveries"], ["inventory.html", "Inventory"], ["pace.html", "Data"], ["purchasing.html", "Purchasing"]]) {
     s = await session(browser, users.luke); p = s.p;
     await p.goto(base.replace("office.html", file)); await p.waitForTimeout(2500);
     ok(`${file} opened on its own: its header shows, with its Feedback button`, await visible(p, "header") && !!(await p.$("header [data-sffb]")) && new RegExp(word, "i").test(await p.$eval("header", e => e.innerText)) && s.errs.length === 0, s.errs.join(" | "));

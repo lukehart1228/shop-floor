@@ -197,17 +197,20 @@ const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
      !ok1.error && sys["Database/Metal/Cut sheets/SAM 30x60.pdf"] === "%PDF cut sheet from the zip" && !!(await q("select removed_at from parked_files where id = $1", [sam]))[0].removed_at);
   ok("…and the index shows its new size", (sys["Database/Database index.csv"] || "").includes(`Metal/Cut sheets/SAM 30x60.pdf,cut sheet,${"%PDF cut sheet from the zip".length},`));
 
-  // the office's Arrow tab: the PO details and the list, with the PDF
+  // 11 Nov: the Arrow POs moved from the office's Arrow tab to Purchasing (POs, on Buy; the details and the next number in Setup)
   if (hasPo) {
-    await p.click('[data-tab="arrow"]'); await p.waitForSelector("[data-posave]", { state: "attached", timeout: 15000 });
-    ok("Office › Arrow: Arrow POs lists AR-10 (saved in the Arrow folder) with its PDF", /AR-10/.test(await p.innerText("main")) && /saved in the Arrow folder/.test(await p.innerText("main")) && !!(await p.$("[data-popdf]")));
-    const [dl] = await Promise.all([p.waitForEvent("download", { timeout: 10000 }).catch(() => null), p.click("[data-popdf]")]);
+    const pq = await p.context().newPage(); pq.on("dialog", d => d.accept());
+    await pq.goto(p.url().split("#")[0].replace("office.html", "purchasing.html")); await pq.waitForSelector("#tabs [data-tab]", { timeout: 15000 });
+    await pq.click('#tabs [data-tab="buy"]'); await pq.waitForSelector("[data-arpdf]", { state: "attached", timeout: 15000 });
+    ok("Purchasing › POs: Arrow POs lists AR-10 (in the Arrow folder) with its PDF", /AR-10/.test(await pq.innerText("main")) && /In the Arrow folder/.test(await pq.innerText("main")) && !!(await pq.$("[data-arpdf]")));
+    const [dl] = await Promise.all([pq.waitForEvent("download", { timeout: 10000 }).catch(() => null), pq.click("[data-arpdf]")]);
     ok("…its PDF downloads under the PO's own file name", dl && dl.suggestedFilename() === "AR-10(99).pdf", dl ? dl.suggestedFilename() : "no download");
-    await p.evaluate(() => { document.querySelector("details:has([data-posave])").open = true; }); await p.fill("#poPhone", "317-000-0000"); await p.click("[data-posave]"); await p.waitForTimeout(1200);
-    ok("…the PO details save from the office (kept in the database)", (await q("select phone from arrow_po_settings"))[0].phone === "317-000-0000");
-    await p.evaluate(() => { document.querySelector("details:has([data-posave])").open = true; }); await p.fill("#poNext", "5"); await p.click("[data-posave]"); await p.waitForTimeout(1200);
-    ok("…and the next number can't go back to one already used", (await q("select next_number from arrow_po_settings"))[0].next_number === 11 && /already used/.test(await p.innerText("main")));
-    await p.click('[data-tab="photos"]'); await p.waitForSelector("[data-savenow]");
+    await pq.click('#tabs [data-tab="setup"]'); await pq.waitForSelector("#isPhone"); await pq.waitForTimeout(2500);   // a tab draws at once, then again when its data is in
+    await pq.fill("#isPhone", "317-000-0000"); await pq.click("[data-saveissuer]"); await pq.waitForTimeout(1500);
+    ok("…the PO details save from Purchasing › Setup (kept in the database)", (await q("select phone from arrow_po_settings"))[0].phone === "317-000-0000");
+    await pq.waitForSelector("#nextArrow"); await pq.fill("#nextArrow", "5"); await pq.click("[data-savenextarrow]"); await pq.waitForTimeout(1500);
+    ok("…and the next Arrow PO number can't go back to one already used", (await q("select next_number from arrow_po_settings"))[0].next_number === 11 && /already used/.test(await pq.innerText("main")));
+    await pq.close();
   }
 
   // 4. nothing new

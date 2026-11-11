@@ -189,7 +189,7 @@ async function sendShared(w, note) {
   w.close();
 
   // ---- 6. deliveries, inventory, pace (called Data from 4 Nov), upload ----
-  for (const [page, key, name] of [["delivery.html", "delivery", "Deliveries"], ["inventory.html", "inventory", "Inventory"], ["pace.html", "pace", "Data"], ["upload.html", "upload", "Work order upload"]]) {
+  for (const [page, key, name] of [["delivery.html", "delivery", "Deliveries"], ["inventory.html", "inventory", "Inventory"], ["pace.html", "pace", "Data"]]) {
     t = boot(page, users.luke); w = t.w;
     await until(() => $(w, "header [data-sffb]"), 8000); await wait(600);
     ok(`${name}: the header has a Feedback button`, !!$(w, "header [data-sffb]"));

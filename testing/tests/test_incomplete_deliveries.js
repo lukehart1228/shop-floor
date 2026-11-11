@@ -221,8 +221,8 @@ const piece = (w, k) => $(w, `[data-partpiece="${k}"]`);
 
   // ---- the office: the job's trips (Photos › Look up a job), and its own record page, the one the OneDrive save files ----
   const O = bootPage("office.html", users.luke, { sfo_pin: JSON.stringify({ none: true }) }).w;
-  await until(() => $(O, '[data-tab="photos"]'), 8000);
-  await click(O, '[data-tab="photos"]', 900);
+  await until(() => $(O, '[data-menu]'), 8000);
+  await click(O, '[data-menu]', 300); await click(O, '[data-tab="photos"]', 900);   // 11 Nov: OneDrive is in the ☰ menu
   await until(() => $(O, "#phJob"), 6000);
   $(O, "#phJob").value = "PROJ-00418"; await click(O, "[data-phfind]", 300);
   await until(() => /Part delivered/.test(txt(O)), 8000);

@@ -1018,7 +1018,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-11-10.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-11-11.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -1116,9 +1116,9 @@ if (typeof document !== "undefined") (function () {
     // Project Handoff (4 Nov; was Drop a job's zip): loads the floor, sends machine files, parks the rest for the save.
     // Upload a work order and the Prototype lab left the menu 4 Nov (Luke); upload.html and lab.html stay on GitHub, unlinked
     { key: "drop", label: "Project Handoff", file: "drop.html", page: "drop", note: "Loads the floor, sends machine files. Only you see this", lab: true },
-    { key: "deliveries", label: "Deliveries", file: "delivery.html", page: "delivery", note: "Schedule, signed tickets", scheduler: true },
+    { key: "deliveries", label: "Deliveries", file: "delivery.html", page: "delivery", note: "Schedule, signed tickets", scheduler: true, tab: true },
     // Purchasing (10 Nov, Luke): its own page like Deliveries; buying left Operations for its Buy tab. Managers only (the database decides).
-    { key: "purchasing", label: "Purchasing", file: "purchasing.html", page: "purchasing", note: "Buy, savings, prices" },
+    { key: "purchasing", label: "Purchasing", file: "purchasing.html", page: "purchasing", note: "Buy, savings, prices", tab: true },
     { key: "inventory", label: "Inventory", file: "inventory.html", page: "inventory", note: "Month-end counts, scrap rate" },
     // Data (4 Nov; was Pace): every tracked number lives here from now on, each kind as a tab inside data's page (pace.html)
     { key: "pace", label: "Data", file: "pace.html", page: "pace", note: "Pace, time in stage, working days" },
@@ -1161,7 +1161,7 @@ if (typeof document !== "undefined") (function () {
   const S = {
     // Problems and Ordering are part of "Needs you" (the tasks tab) now; a computer that remembers either opens there
     // Flags is part of Operations; Routine tasks and Departments are sections of Setup (25 Sep)
-    me: null, tab: ({ problems: "tasks", ordering: "tasks", flags: "tasks", routine: "setup", departments: "setup" })[store.get("tab", "tasks")] || store.get("tab", "tasks"), notice: null,
+    me: null, tab: ({ problems: "tasks", ordering: "tasks", flags: "tasks", routine: "setup", departments: "setup", arrow: "tasks" })[store.get("tab", "tasks")] || store.get("tab", "tasks"), notice: null,
     tasks: [], depts: [], liveLog: [], names: {},
     columns: [], lastSync: null, rules: [], preview: null, ticked: new Set(), cuResult: null,
     uploaded: [], testMsg: null, busy: false,
@@ -1182,7 +1182,9 @@ if (typeof document !== "undefined") (function () {
   // Operations = what used to be Needs you, with Flags; Routine tasks and Departments live in Setup
   // 4 Nov: Photos is called OneDrive (its key stays "photos", so a computer that remembers it still opens there);
   // Job status sits beside Operations but is a section (status.html in the frame), hence data-section
-  const TABS = [["tasks", "Operations"], ["status", "Job status", "section"], ["arrow", "Arrow"], ["photos", "OneDrive"]];
+  // 11 Nov (Luke): the tabs are the daily work, Operations · Job status · Purchasing · Deliveries. Arrow's list moved onto
+  // Operations and its POs to Purchasing; OneDrive went to the ☰ menu (Operations says when the save needs you)
+  const TABS = [["tasks", "Operations"], ["status", "Job status", "section"], ["purchasing", "Purchasing", "section"], ["deliveries", "Deliveries", "section"]];
 
   // ---------- data ----------
   const q = async (p) => { const { data, error } = await p; if (error) throw error; return data; };
@@ -1249,6 +1251,8 @@ if (typeof document !== "undefined") (function () {
       if (S.tab === "tasks") {          // Operations: problems, ordering, stale flags, overdue routine tasks, Arrow, saving, handoffs, then flags
         await loadCounts();
         await Promise.all([loadFlags(), loadRoutine()]);
+        const ar = await soft(db.from("v_outside_jobs").select("*").eq("voided", false));   // 11 Nov: Arrow's list lives on Operations
+        if (ar) S.arrow = ar.filter(x => x.at_vendor || daysSince(x.returned_on) <= 92);
         const [h, cols, r] = await Promise.all([soft(db.from("v_handoff_tasks").select("*")), soft(db.from("monday_columns").select("*")),
           soft(db.from("v_supply_requests").select("*"))]);
         if (h) S.tasks = h;
@@ -1267,23 +1271,12 @@ if (typeof document !== "undefined") (function () {
         if (r.error && !S.fbkMissing) S.notice = friendlyError(r.error); else S.feedback = r.data || [];
         return;
       }
-      if (S.tab === "arrow") {
-        const [a, set] = await Promise.all([soft(db.from("v_outside_jobs").select("*").eq("voided", false)), soft(db.from("app_settings").select("*"))]);
-        if (a) S.arrow = a.filter(x => x.at_vendor || daysSince(x.returned_on) <= 92);
-        if (set) { const s = set.find(x => x.key === "arrow_alert_days"); if (s) S.arrowDays = Number(s.value); }
-        // Arrow POs (arrow_pos.sql, 1 Nov): the details and the list; none before it
-        const [ps, pl] = await Promise.all([db.rpc("arrow_po_settings_get").then(r => r, e => ({ error: e })),
-          db.from("arrow_pos").select("*").order("made_at", { ascending: false }).limit(60).then(r => r, e => ({ error: e }))]);
-        S.po = ps.error || pl.error ? null : { settings: ps.data || {}, list: pl.data || [] };
-        return;
-      }
       if (S.tab === "setup") {
         await Promise.all([loadRoutine(), loadDepartments()]);
         const [ty, set] = await Promise.all([soft(db.from("defect_types").select("*")), soft(db.from("app_settings").select("*"))]);
         if (ty) S.types = ty;
-        try { S.supItems = await q(db.from("supply_items").select("*")) || []; S.supMissing = false; }
-        catch (e) { if (/does not exist|schema cache|could not find/i.test(String(e.message))) S.supMissing = true; else S.notice = friendlyError(e); }
-        if (set) { const t = set.find(s => s.key === "tv_link_made"); S.tvMade = t || null; }
+        if (set) { const t = set.find(s => s.key === "tv_link_made"); S.tvMade = t || null;
+                   const a = set.find(s => s.key === "arrow_alert_days"); if (a) S.arrowDays = Number(a.value); }
         const [fbd, fbh] = await Promise.all([quiet(db.from("v_finish_by_days").select("*")),
           quiet(db.from("finish_by_days").select("*").order("set_at", { ascending: false }))]);   // finish_by.sql
         S.fbMissing = !fbd; if (fbd) { S.fbDays = fbd.sort((a, b) => a.sort_order - b.sort_order); S.fbHist = fbh || []; }
@@ -1373,9 +1366,10 @@ if (typeof document !== "undefined") (function () {
       <nav class="menu" aria-label="Menu">
         <div class="mhead"><b>PRODUCTION</b><button class="link" data-menuclose="1">Close</button></div>
         <div class="mlabel">Office</div>
-        ${isManager(S.me) ? `<button class="mitem" data-section="" aria-current="${(!S.section || S.section === "status") && !S.jobView && ["tasks", "arrow", "photos"].includes(S.tab)}">Operations</button>` : ""}
-        ${mySections().filter(x => !x.tab).map(x => `<button class="mitem" data-section="${x.key}" aria-current="${S.section === x.key}">${esc(x.label)}</button>`).join("")}
-        ${isManager(S.me) ? `<a href="index.html">Tablet app</a>
+        ${isManager(S.me) ? `<button class="mitem" data-section="" aria-current="${!S.section && !S.jobView && S.tab === "tasks"}">Operations</button>` : ""}
+        ${mySections().filter(x => !x.tab || !isManager(S.me)).map(x => `<button class="mitem" data-section="${x.key}" aria-current="${S.section === x.key}">${esc(x.label)}</button>`).join("")}
+        ${isManager(S.me) ? `<button class="mitem" data-tab="photos" aria-current="${S.tab === "photos" && !S.jobView && !S.section}">OneDrive</button>
+        <a href="index.html">Tablet app</a>
         <div class="mline"></div>
         <button class="mitem" data-tab="setup" aria-current="${S.tab === "setup" && !S.jobView && !S.section}">Setup</button>
         <button class="mitem" data-tab="feedback" aria-current="${S.tab === "feedback" && !S.jobView && !S.section}">Feedback</button>` : `<div class="mline"></div>`}
@@ -1444,7 +1438,7 @@ if (typeof document !== "undefined") (function () {
     const what = (a) => [a.sheet_numbers && a.sheet_numbers.length ? `sheet${a.sheet_numbers.length === 1 ? "" : "s"} ${a.sheet_numbers.join(", ")}` : "", a.description].filter(Boolean).join(" — ");
     const cols = `grid-template-columns: minmax(110px, auto) repeat(${Math.max(1, g.depts.length)}, minmax(76px, 1fr))`;
 
-    const grid = !J.wo ? `<div class="empty"><b>No work order uploaded</b>Counts start once the work order is uploaded on the upload page.</div>`
+    const grid = !J.wo ? `<div class="empty"><b>No work order uploaded</b>Counts start once the job’s zip is dropped on Project Handoff.</div>`
       : `<div class="gkey" style="margin-bottom:10px"><span><i style="background:var(--teal)"></i>Complete</span><span><i style="background:var(--sawdust); border:1px solid var(--gray)"></i>Started</span>
            <span><i style="background:#fff; border:1px solid var(--gray)"></i>Not started</span><span>— not this department</span></div>
          <div class="scroll"><div class="grid" style="${cols}">
@@ -1472,10 +1466,10 @@ if (typeof document !== "undefined") (function () {
     const side = `
       <section class="panel"><h2>Status</h2>
         <div class="srow"><span class="k">Issues${openP.length + askedD.length ? `<span class="n">${openP.length + askedD.length} open</span>` : ""}</span><span class="v">${issuesV}</span>${openP.length + askedD.length ? `<button class="a" data-tab="tasks">Answer</button>` : "<span></span>"}</div>
-        <div class="srow"><span class="k">Arrow${toGo.length + atArrow.length ? `<span class="n">${toGo.length + atArrow.length}</span>` : ""}</span><span class="v">${arrowV}</span><button class="a" data-tab="arrow">Arrow tab</button></div>
+        <div class="srow"><span class="k">Arrow${toGo.length + atArrow.length ? `<span class="n">${toGo.length + atArrow.length}</span>` : ""}</span><span class="v">${arrowV}</span><button class="a" data-arrowjump="1">On Operations</button></div>
         <div class="srow"><span class="k">Defects${J.defects.length ? `<span class="n">${J.defects.length}</span>` : ""}</span><span class="v">${defectsV}</span><span></span></div>
         <div class="srow"><span class="k">Photos${J.photoCount ? `<span class="n">${J.photoCount}</span>` : ""}</span><span class="v">${J.photoCount ? `${J.photoCount} photo${J.photoCount === 1 ? "" : "s"}` : "None yet"}</span>${J.photoCount ? `<button class="a" data-jobphotos="${esc(j.project_id)}">See them</button>` : "<span></span>"}</div>
-        ${tv.length ? `<div class="srow"><span class="k">Floor TV</span><span class="v">${tvV}<span class="m">To hide one picture, open it on the OneDrive tab and use the button under it.</span></span>${tvA || "<span></span>"}</div>` : ""}
+        ${tv.length ? `<div class="srow"><span class="k">Floor TV</span><span class="v">${tvV}<span class="m">To hide one picture, open it on OneDrive (in the ☰ menu) and use the button under it.</span></span>${tvA || "<span></span>"}</div>` : ""}
         <div class="srow"><span class="k">Load-outs</span><span class="v">${loV}</span><span></span></div>
       </section>`;
 
@@ -1619,34 +1613,6 @@ if (typeof document !== "undefined") (function () {
     </div>`;
   }
   const issueCard = (x) => x.kind === "defect" ? defectCard(x) : problemCard(x);
-  function supplyForm(e) {
-    return `<div class="supform">
-      ${S.msg && !S.msg.ok && S.msgFrom === "sup" ? `<div class="banner warn" style="margin:0 0 10px">${esc(S.msg.text)}</div>` : ""}
-      <label for="supName">${e.id ? "Name" : "New item"}</label>
-      <input class="in" id="supName" data-supf="name" value="${esc(e.name)}" placeholder="e.g. Boxes of biscuits" maxlength="60">
-      <label>Choices <span style="font-weight:400">(optional — up to two sets, with a comma between each choice)</span></label>
-      ${e.groups.map((g, i) => `<div class="grp">
-        <input class="in" data-supg="${i}" data-part="label" value="${esc(g.label)}" placeholder="${i ? "e.g. Thickness" : "e.g. Wood"}" aria-label="Name of choice set ${i + 1}">
-        <input class="in" data-supg="${i}" data-part="options" value="${esc(g.options)}" placeholder="${i ? "e.g. 1/4, 1/2, 3/4, 3/4 MDF" : "e.g. Ash, Maple, White Oak"}" aria-label="Choices in set ${i + 1}"></div>`).join("")}
-      <div class="btns"><button class="go" data-supsave="1" ${S.busy || !e.name.trim() ? "disabled" : ""}>${e.id ? "Save" : "Add to the list"}</button>
-        <button class="plain" data-supcancel="1">Cancel</button></div></div>`;
-  }
-  function supplyDept(d) {
-    const { live, retired } = supplyListFor(S.supItems, d);
-    const e = S.supEdit && S.supEdit.dept === d ? S.supEdit : null;
-    const row = (i, k) => e && e.id === i.id ? supplyForm(e) : `<div class="typ${i.retired ? " off" : ""}">
-      <span>${esc(i.name)}${(i.choices || []).length ? `<small>${esc(choiceSummary(i.choices))}</small>` : ""}</span>
-      ${i.retired ? `<button class="link" data-supback="${esc(i.id)}">Bring back</button>` : `
-        <button class="link" data-supmove="${esc(i.id)}" data-up="1" ${k === 0 ? "disabled" : ""} aria-label="Move ${esc(i.name)} up">↑</button>
-        <button class="link" data-supmove="${esc(i.id)}" data-up="0" ${k === live.length - 1 ? "disabled" : ""} aria-label="Move ${esc(i.name)} down">↓</button>
-        <button class="link" data-supedit="${esc(i.id)}">Edit</button>
-        <button class="link" data-supretire="${esc(i.id)}">Retire</button>`}</div>`;
-    return `<details class="more" data-keep="sup_${d}" ${S.openDetails.has("sup_" + d) ? "open" : ""}><summary>${esc(DEPT_NAME[d])} — ${live.length}</summary>
-      ${live.map(row).join("") || `<p class="sub" style="margin:4px 0">No list yet — the tablet shows only the typed box.</p>`}
-      ${e && !e.id ? supplyForm(e) : `<div class="btns"><button class="plain" data-supadd="${d}">Add an item</button></div>`}
-      ${retired.length ? `<div class="deptname">Retired</div>${retired.map(row).join("")}` : ""}</details>`;
-  }
-
   function defectsPanel() {
     const month = localISO(new Date()).slice(0, 7) + "-01";
     const sum = defectSummary(S.defects, S.defFrom === "month" ? month : "0000");
@@ -1743,62 +1709,34 @@ if (typeof document !== "undefined") (function () {
     return list.map(f => `${fbWhen(f.created_at)} — ${f.person_name}${f.is_test ? " (TEST)" : ""} — ${fbPageName(f.page)}${f.screen ? ": " + f.screen : ""}\n${f.body}`).join("\n\n");
   }
 
-  /** Arrow POs: the details the PO prints (kept in the database, never in a file) and every PO made, as a PDF */
-  function poPanel() {
-    if (!S.po) return "";
-    const st = S.po.settings || {}, list = S.po.list || [];
-    return `<section class="panel"><h2>Arrow POs</h2>
-      ${st.ready ? "" : `<div class="banner warn">Fill in Issued by below before the floor makes its first PO. Until then the tablets' Make the PO button says the office hasn't filled in the details.</div>`}
-      <details${st.ready ? "" : " open"}><summary style="cursor:pointer; font-weight:600; margin:4px 0 8px">PO details</summary>
-        <div class="grid2" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:8px 14px">
-          <label>Issued by<input class="in" id="poBy" value="${esc(st.issued_by || "")}"></label>
-          <label>Contact number<input class="in" id="poPhone" value="${esc(st.phone || "")}"></label>
-          <label>Contact e-mail<input class="in" id="poEmail" value="${esc(st.email || "")}"></label>
-          <label>Next PO number (AR-…)<input class="in" id="poNext" type="number" min="1" value="${esc(st.next_number || "")}"></label>
-          <label style="grid-column:1/-1">Purposeful Design's name and address, one line each (top left of the PO; not Arrow's)<textarea class="in" id="poAddr" rows="4" style="width:100%">${esc(st.address || "")}</textarea></label>
-          <label style="grid-column:1/-1">The tax-exempt sentence (printed above the signature)<input class="in" id="poTax" value="${esc(st.tax_line || "")}" style="width:100%"></label>
-        </div>
-        <div class="btns" style="margin-top:8px"><button class="go" data-posave="1">Save the PO details</button>
-          <span class="meta2">${st.last_number ? `The last PO was AR-${esc(st.last_number)}.` : "No PO made yet."}</span></div></details>
-      ${list.length ? `<div style="margin-top:10px">${list.map(p => `<div class="line"><span class="body"><b>${p.is_test ? `<span class="tag">TEST</span> ` : ""}${esc(p.name)}</b>
-          ${p.revision > 1 ? ` <span class="tag">r${esc(p.revision)}</span>` : ""}
-          <span class="meta2">· ${esc((p.jobs || []).join(", "))} · ${esc(fmtDay(p.gone_on))}${p.made_by_name ? ` · by ${esc(p.made_by_name)}` : ""}${p.remade_by_name ? ` · made again by ${esc(p.remade_by_name)}` : ""}${p.onedrive_at && p.backup_at ? " · saved in the Arrow folder" : p.is_test ? "" : " · saved at the next save"}${(() => {
-            const bare = (p.lines || []).filter(l => !String(l.pd_color || "").trim()).length;
-            return bare ? ` · ${bare} line${bare === 1 ? "" : "s"} without colours` : ""; })()}</span></span>
-          <button class="plain" data-popdf="${esc(p.id)}">PDF</button>${"revision" in p ? `<button class="plain" data-poremake="${esc(p.id)}">Make it again</button>` : ""}</div>`).join("")}</div>` : `<p class="sub" style="margin-top:8px">No POs yet. The floor makes them on the tablets' Arrow tab.</p>`}
-    </section>`;
-  }
-  function arrowScreen() {
+  /** Arrow on Operations (11 Nov, was the Arrow tab): waiting to go, at Arrow now, and what came back. Its POs are in
+   *  Purchasing › POs; the TV's alert days in Setup. */
+  function arrowSection() {
     const out = (S.arrow || []).filter(a => a.at_vendor && !a.waiting).sort((a, b) => b.days_out - a.days_out);
     const wait = (S.arrow || []).filter(a => a.at_vendor && a.waiting).sort((a, b) => String(a.queued_on || a.sent_on).localeCompare(String(b.queued_on || b.sent_on)));
     const back = (S.arrow || []).filter(a => !a.at_vendor).sort((a, b) => String(b.returned_on).localeCompare(String(a.returned_on)));
     const what = (a) => [a.sheet_numbers && a.sheet_numbers.length ? `sheet${a.sheet_numbers.length === 1 ? "" : "s"} ${a.sheet_numbers.join(", ")}` : "", a.description].filter(Boolean).join(" — ");
-    return `<h1>Arrow</h1>
-      <p class="sub">Everything waiting to go to Arrow and at Arrow now, from every department. Anything out longer than the number below shows on the TV's attention strip; the count starts when it goes.</p>
-      ${missingNote()}${msgBanner()}${poPanel()}
-      <div class="btns" style="margin:0 0 16px"><label for="arDays" style="font-weight:600">Show on the TV after</label>
-        <input class="in" id="arDays" type="number" min="1" max="90" value="${esc(S.arrowDays)}" style="width:90px"> <span>days</span>
-        <button class="plain" data-ardays="1">Save</button></div>
-      ${wait.length ? `<section class="panel"><h2>Waiting to go to Arrow <span class="cnt num" style="color:var(--ink2)">${wait.length}</span></h2>
+    const keep = (k) => S.openDetails.has(k) ? "open" : "";
+    const head = [wait.length ? `${wait.length} waiting to go` : "", out.length ? `${out.length} at Arrow` : ""].filter(Boolean).join(" · ");
+    return `<section class="ops-flags" id="opsarrow"><h2>Arrow${head ? ` <span class="meta2" style="font-weight:600">· ${head}</span>` : ""}</h2>
+      ${wait.length ? `<h3 class="setsub">Waiting to go to Arrow</h3>
         <p class="sub" style="margin:0 0 8px">Done by Metal and sent on, not taken over yet. Whoever takes it taps Gone to Arrow on their tablet.</p>
-        ${wait.map(a => `<div class="line"><span class="qty">${a.days_out}</span>
+        <div class="panel">${wait.map(a => `<div class="line"><span class="qty">${a.days_out}</span>
           <span class="body"><b>${testTag(a)}${esc(a.project_id)}</b> <span class="meta2">· ${esc(a.job_name)}</span>
             <div>${esc(what(a))}</div>
             <div class="meta2">${a.service === "paint" ? "Paint" : "Powdercoat"} · sent on ${esc(fmtDay(a.queued_on || a.sent_on))} by ${esc(a.queued_by_name || a.sent_by_name)} · waiting ${a.days_out} day${a.days_out === 1 ? "" : "s"}</div></span>
-          <span class="btns" style="margin:0"><button class="plain" data-argone="${esc(a.id)}">Gone to Arrow</button></span></div>`).join("")}
-      </section>` : ""}
-      <section class="panel"><h2>At Arrow now</h2>
-        ${out.length ? out.map(a => `<div class="line"><span class="qty">${a.days_out}</span>
+          <span class="btns" style="margin:0"><button class="plain" data-argone="${esc(a.id)}">Gone to Arrow</button></span></div>`).join("")}</div>` : ""}
+      ${out.length ? `${wait.length ? `<h3 class="setsub" style="margin-top:14px">At Arrow now</h3>` : ""}<div class="panel">${out.map(a => `<div class="line"><span class="qty">${a.days_out}</span>
           <span class="body"><b>${testTag(a)}${esc(a.project_id)}</b> <span class="meta2">· ${esc(a.job_name)}</span>
             <div>${esc(what(a))}</div>
             <div class="meta2">${a.service === "paint" ? "Paint" : "Powdercoat"} · sent ${esc(fmtDay(a.sent_on))} by ${esc(a.sent_by_name)} (${esc(a.department_name)})${a.gone_by_name ? ` · taken by ${esc(a.gone_by_name)}` : ""} · ${a.days_out} day${a.days_out === 1 ? "" : "s"} out${a.days_out > S.arrowDays ? " — <b>over " + S.arrowDays + " days</b>" : ""}</div></span>
-          <span class="btns" style="margin:0"><button class="plain" data-arret="${esc(a.id)}">Mark returned</button><button class="link" data-arvoid="${esc(a.id)}">Entered by mistake</button></span></div>`).join("")
-          : `<p class="sub" style="margin:0">Nothing at Arrow.</p>`}
-      </section>
-      <details class="more"><summary>Returned in the last three months (${back.length})</summary>
+          <span class="btns" style="margin:0"><button class="plain" data-arret="${esc(a.id)}">Mark returned</button><button class="link" data-arvoid="${esc(a.id)}">Entered by mistake</button></span></div>`).join("")}</div>`
+        : wait.length ? "" : `<div class="empty"><b>Nothing at Arrow</b>Items the floor sends to Arrow show here until they're back.</div>`}
+      <p class="meta2" style="margin:10px 0 0">The floor makes the Arrow POs on the tablets' Arrow department; they're listed in Purchasing, under POs.</p>
+      <details class="more" data-keep="arrowback" ${keep("arrowback")}><summary>Back from Arrow — last three months (${back.length})</summary>
         ${back.map(a => `<div class="line"><span class="qty">${a.days_out}</span><span class="body"><b>${testTag(a)}${esc(a.project_id)}</b> <span class="meta2">· ${esc(what(a))}</span>
           <div class="meta2">${esc(fmtDay(a.sent_on))} → ${esc(fmtDay(a.returned_on))} · ${a.days_out}-day turnaround · back by ${esc(a.returned_by_name)}</div></span></div>`).join("") || `<p class="sub">None.</p>`}
-      </details>`;
+      </details></section>`;
   }
 
   // ---------- Routine tasks ----------
@@ -1886,13 +1824,13 @@ if (typeof document !== "undefined") (function () {
 
     const sv = S.save && S.save.status;
     if (sv && sv.due && !S.save.missing && !savePaused()) parts.push(sec("saving", "Saving to OneDrive", 0, `<div class="panel"><p class="sub" style="margin:0 0 10px">${!sv.ever
-        ? "Saving the Production app's files to OneDrive and the hard drive hasn't been set up yet. Choose the two folders on the OneDrive tab, on the computer that stays open in the office."
-        : !sv.good_at ? "No save has reached both OneDrive and the backup folder yet. The OneDrive tab says what's in the way."
-        : `The last save that reached both OneDrive and the backup folder was ${sv.days_since_good} days ago${sv.good_by ? `, on ${esc(sv.good_by)}'s computer` : ""}. Open the office page there, or check the OneDrive tab for what's in the way.`}</p>
+        ? "Saving the Production app's files to OneDrive and the hard drive hasn't been set up yet. Choose the two folders on OneDrive (in the ☰ menu), on the computer that stays open in the office."
+        : !sv.good_at ? "No save has reached both OneDrive and the backup folder yet. OneDrive (in the ☰ menu) says what's in the way."
+        : `The last save that reached both OneDrive and the backup folder was ${sv.days_since_good} days ago${sv.good_by ? `, on ${esc(sv.good_by)}'s computer` : ""}. Open the office page there, or check OneDrive (in the ☰ menu) for what's in the way.`}</p>
         <button class="go" data-tab="photos">Open OneDrive</button></div>`));
 
     if ((S.inv || []).length) parts.push(sec("inventory", "Inventory", S.inv.length, `<div class="panel">${S.inv.map(n => `
-        <div class="task"><div class="what">${esc(n.text)}</div><div class="detail"><a href="inventory.html">Open the Inventory page</a></div></div>`).join("")}</div>`));
+        <div class="task"><div class="what">${esc(n.text)}</div><div class="detail"><button class="link" data-section="inventory" style="padding:0">Open Inventory</button></div></div>`).join("")}</div>`));
 
     if ((S.metal || []).length) parts.push(sec("metal", "Needs metal cut sheets", S.metal.length, `<p class="sub">Jobs where Monday's Metal Status says “Not Ready”. Each clears by itself within 15 minutes of Metal Status changing in Monday.</p>
       <div class="panel">${S.metal.map(t => { const d = daysLeft(t.delivery_date); return `
@@ -1924,6 +1862,7 @@ if (typeof document !== "undefined") (function () {
       <h2 class="opshead">Needs you</h2>
       ${parts.length ? parts.join("") : syncProblem() ? "" : `<div class="empty"><b>Nothing needs you</b>No issues waiting, nothing to order, nothing overdue, no handoffs.</div>`}
       ${flagsSection()}
+      ${arrowSection()}
       <section class="later">
         <details class="more" data-keep="answered" ${keep("answered")}><summary>Answered issues — last 30 days (${answered.length})</summary>${answered.map(issueCard).join("") || `<p class="sub">None.</p>`}</details>
         <details class="more" data-keep="defects" ${keep("defects")}><summary>Defects logged</summary>${defectsPanel()}</details>
@@ -1987,14 +1926,51 @@ if (typeof document !== "undefined") (function () {
     const real = S.uploaded.filter(u => !u.is_test && u.is_active).sort((a, b) => a.project_id.localeCompare(b.project_id));
     const tests = S.uploaded.filter(u => u.is_test && u.is_active).sort((a, b) => a.project_id.localeCompare(b.project_id));
 
-    const jumps = [["set-routine", "Routine tasks"], ["set-departments", "Departments"], ["set-monday", "Monday connection"], ["set-catchup", "Catch up from Monday"],
-      ["set-tv", "TV link"], ["set-defects", "Defect lists"], ["set-finishby", "Finish-by days"], ["set-supplies", "Supply lists"], ["set-test", "Test jobs"]];
+    // 11 Nov: the floor's rules first, then the connections set once at go-live; Supply lists moved to Purchasing › Setup
+    const jumps = [["set-routine", "Routine tasks"], ["set-departments", "Departments"], ["set-defects", "Defect lists"], ["set-finishby", "Finish-by days"],
+      ["set-arrow", "Arrow alert"], ["set-monday", "Monday connection"], ["set-catchup", "Catch up from Monday"], ["set-tv", "TV link"], ["set-test", "Test jobs"]];
     return `<h1>Setup</h1>
-      <p class="sub">Things set up once, or changed now and then. Jump to a section:</p>
+      <p class="sub">The floor's rules, then the connections set up once. Supply lists are in Purchasing's Setup; each page keeps its own settings. Jump to a section:</p>
       <nav class="jumps" aria-label="Setup sections">${jumps.map(([id, t]) => `<button class="plain" data-jump="${id}">${t}</button>`).join("")}</nav>
       ${routineSection()}
       ${departmentsSection()}
 
+      <section class="panel" id="set-defects">
+        <h2>Defect lists</h2>
+        <p class="sub">What each department picks from when it logs a defect. Retiring one takes it off the tablets; defects already logged keep it.</p>
+        ${LOG_DEPTS.map(d => { const list = (S.types || []).filter(t => t.department === d).sort((a, b) => a.sort_order - b.sort_order);
+          return `<details class="more"><summary>${esc(DEPT_NAME[d])} — ${list.filter(t => t.active).length}</summary>
+            ${list.map(t => `<div class="typ${t.active ? "" : " off"}"><span>${esc(t.label)}</span>
+              <button class="link" data-typeset="${esc(d)}" data-label="${esc(t.label)}" data-active="${t.active ? "0" : "1"}">${t.active ? "Retire" : "Bring back"}</button></div>`).join("")}
+            <div class="btns"><input class="in" style="flex:1 1 260px" data-newtype="${esc(d)}" placeholder="Add to ${esc(DEPT_NAME[d])}'s list">
+              <button class="plain" data-typeadd="${esc(d)}">Add</button></div></details>`; }).join("")}
+      </section>
+
+      <section class="panel" id="set-finishby">
+        <h2>Finish-by days</h2>
+        <p class="sub">How many days before Monday's delivery date each department's <b>last piece</b> must be done. Each supervisor's job cards show their own date. Calendar days; a date on a weekend stays there. Delivery keeps the delivery date. Every change is kept.</p>
+        ${S.fbMissing ? `<div class="banner warn" style="margin:0">Finish-by dates aren't set up in the database yet. Run <b>finish_by.sql</b> in the SQL Editor, wait a minute, then reload.</div>`
+          : (S.msg && S.msgFrom === "fb" ? `<div class="banner ${S.msg.ok ? "ok" : "warn"}" style="margin:0 0 8px">${esc(S.msg.text)}</div>` : "")
+            + (S.fbDays || []).map(f => `<div class="fbrow"><span class="nm">${esc(f.department_name)}</span>
+                <input class="in num" type="number" min="0" max="90" step="1" inputmode="numeric" value="${f.days}" data-fbdays="${esc(f.department)}" aria-label="${esc(f.department_name)}: days before delivery">
+                <span>days before</span>
+                <button class="plain" data-fbsave="${esc(f.department)}" ${S.busy ? "disabled" : ""}>Save</button>
+                <span class="who">${f.changes ? `Changed by ${esc(f.set_by_name)}, ${esc(ago(f.set_at))}` : "Starting number"}</span></div>`).join("")
+            + ((S.fbHist || []).some(h => h.set_by_name !== "Starting number") ? `<details class="more"><summary>Every change</summary>
+                ${(S.fbHist || []).filter(h => h.set_by_name !== "Starting number").map(h => `<div class="typ"><span>${esc(DEPT_NAME[h.department] || h.department)}: ${h.days} days</span>
+                  <span class="meta2">${esc(h.set_by_name)}, ${esc(fmtWhen(h.set_at))}</span></div>`).join("")}</details>` : "")}
+      </section>
+
+      <section class="panel" id="set-arrow">
+        <h2>Arrow alert</h2>
+        <p class="sub">Anything at Arrow longer than this shows on the TV's attention strip and on Operations. The count starts when it goes.</p>
+        ${S.msg && S.msgFrom === "arrowdays" ? `<div class="banner ${S.msg.ok ? "ok" : "warn"}" style="margin:0 0 8px">${esc(S.msg.text)}</div>` : ""}
+        <div class="btns" style="margin:0"><label for="arDays" style="font-weight:600">Show on the TV after</label>
+          <input class="in" id="arDays" type="number" min="1" max="90" value="${esc(S.arrowDays)}" style="width:90px"> <span>days</span>
+          <button class="plain" data-ardays="1">Save</button></div>
+      </section>
+
+      <h2 class="sethead" style="margin-top:30px">Connections, set up once</h2>
       <section class="panel" id="set-monday">
         <h2>Monday connection</h2>
         ${sync}
@@ -2027,40 +2003,6 @@ if (typeof document !== "undefined") (function () {
         ${S.tvKey ? `<div class="tvlink"><code id="tvUrl">${esc(tvLink(location.href, S.tvKey))}</code>
             <button class="plain" data-tvcopy="1">Copy</button><a class="plain" href="${esc(tvLink(location.href, S.tvKey))}" target="_blank" rel="noopener">Open it</a></div>
           <p class="sub" style="margin:8px 0 0">This is the only time the link is shown. If it's lost, make a new one.</p>` : ""}
-      </section>
-
-      <section class="panel" id="set-defects">
-        <h2>Defect lists</h2>
-        <p class="sub">What each department picks from when it logs a defect. Retiring one takes it off the tablets; defects already logged keep it.</p>
-        ${LOG_DEPTS.map(d => { const list = (S.types || []).filter(t => t.department === d).sort((a, b) => a.sort_order - b.sort_order);
-          return `<details class="more"><summary>${esc(DEPT_NAME[d])} — ${list.filter(t => t.active).length}</summary>
-            ${list.map(t => `<div class="typ${t.active ? "" : " off"}"><span>${esc(t.label)}</span>
-              <button class="link" data-typeset="${esc(d)}" data-label="${esc(t.label)}" data-active="${t.active ? "0" : "1"}">${t.active ? "Retire" : "Bring back"}</button></div>`).join("")}
-            <div class="btns"><input class="in" style="flex:1 1 260px" data-newtype="${esc(d)}" placeholder="Add to ${esc(DEPT_NAME[d])}'s list">
-              <button class="plain" data-typeadd="${esc(d)}">Add</button></div></details>`; }).join("")}
-      </section>
-
-      <section class="panel" id="set-finishby">
-        <h2>Finish-by days</h2>
-        <p class="sub">How many days before Monday's delivery date each department's <b>last piece</b> must be done. Each supervisor's job cards show their own date. Calendar days; a date on a weekend stays there. Delivery keeps the delivery date. Every change is kept.</p>
-        ${S.fbMissing ? `<div class="banner warn" style="margin:0">Finish-by dates aren't set up in the database yet. Run <b>finish_by.sql</b> in the SQL Editor, wait a minute, then reload.</div>`
-          : (S.msg && S.msgFrom === "fb" ? `<div class="banner ${S.msg.ok ? "ok" : "warn"}" style="margin:0 0 8px">${esc(S.msg.text)}</div>` : "")
-            + (S.fbDays || []).map(f => `<div class="fbrow"><span class="nm">${esc(f.department_name)}</span>
-                <input class="in num" type="number" min="0" max="90" step="1" inputmode="numeric" value="${f.days}" data-fbdays="${esc(f.department)}" aria-label="${esc(f.department_name)}: days before delivery">
-                <span>days before</span>
-                <button class="plain" data-fbsave="${esc(f.department)}" ${S.busy ? "disabled" : ""}>Save</button>
-                <span class="who">${f.changes ? `Changed by ${esc(f.set_by_name)}, ${esc(ago(f.set_at))}` : "Starting number"}</span></div>`).join("")
-            + ((S.fbHist || []).some(h => h.set_by_name !== "Starting number") ? `<details class="more"><summary>Every change</summary>
-                ${(S.fbHist || []).filter(h => h.set_by_name !== "Starting number").map(h => `<div class="typ"><span>${esc(DEPT_NAME[h.department] || h.department)}: ${h.days} days</span>
-                  <span class="meta2">${esc(h.set_by_name)}, ${esc(fmtWhen(h.set_at))}</span></div>`).join("")}</details>` : "")}
-      </section>
-
-      <section class="panel" id="set-supplies">
-        <h2>Supply lists</h2>
-        <p class="sub">What each department taps on its tablet's Supplies tab. An item can have up to two sets of choices, like the wood and the thickness; the tablet won't send it until each is picked, and the office sees the full wording ("Plywood — White Oak, 3/4 MDF"). Anything not on the list can still be typed. Retiring takes an item off the tablets; past requests keep it.</p>
-        ${S.supMissing ? `<div class="banner warn" style="margin:0">Supply lists aren't set up in the database yet. Run <b>supply_lists.sql</b> in the SQL Editor, wait a minute, then reload.</div>`
-          : (S.msg && S.msgFrom === "sup" && !(S.supEdit && !S.msg.ok) ? `<div class="banner ${S.msg.ok ? "ok" : "warn"}" style="margin:0 0 8px">${esc(S.msg.text)}</div>` : "")
-            + DEPT_ORDER.map(supplyDept).join("")}
       </section>
 
       <section class="panel" id="set-test">
@@ -2110,7 +2052,7 @@ if (typeof document !== "undefined") (function () {
     return `<section class="panel"><h2>Floor TV</h2><p class="sub" style="margin:0 0 8px">${esc(words)}</p>
       ${jobHidden ? `<button class="plain" data-tvjob="${esc(J.id)}" data-hide="0">Let this job's pictures show again</button>`
                   : withCopy ? `<button class="plain" data-tvjob="${esc(J.id)}" data-hide="1">Hide this job's pictures from the TV</button>` : ""}
-      <p class="meta2" style="margin:8px 0 0">To hide one picture, open it on the OneDrive tab and use the button under it.</p></section>`;
+      <p class="meta2" style="margin:8px 0 0">To hide one picture, open it on OneDrive (in the ☰ menu) and use the button under it.</p></section>`;
   }
   /** Thumbnails; a photo off Supabase says where it is: an archive batch's zip, or OneDrive (off_supabase.sql, 31 Oct). */
   function photoStrip(list, caption = false) {
@@ -2819,7 +2761,7 @@ if (typeof document !== "undefined") (function () {
     const sv = S.save;
     return !!(sv && sv.supported && !sv.missing && isManager(S.me) && ["od", "bk", "sys"].some(k => sv[k] && sv.perm[k] && sv.perm[k] !== "granted"));
   }
-  /** The panel on the OneDrive tab (was Photos) */
+  /** The panel on OneDrive (was Photos; in the ☰ menu since 11 Nov) */
   function savePanel() {
     const sv = S.save, st = sv.status, r = sv.result;
     if (sv.missing) return `<section class="panel"><h2>Saving to OneDrive and the hard drive</h2>
@@ -2865,7 +2807,7 @@ if (typeof document !== "undefined") (function () {
     showSections();
     if (S.locked) return pinScreen("unlock");
     if (S.section) { app.innerHTML = topBar() + menuHtml(); wire(); return; }
-    const screens = { setup: setupScreen, photos: photosScreen, arrow: arrowScreen, feedback: feedbackScreen };
+    const screens = { setup: setupScreen, photos: photosScreen, feedback: feedbackScreen };
     const body = S.jobView ? jobScreen() : (screens[S.tab] || needsScreen)();
     // a redraw mustn't pull the cursor out of Find a job while someone is typing in it
     const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches("[data-jobfind]");
@@ -3012,6 +2954,10 @@ if (typeof document !== "undefined") (function () {
     on("[data-fflevel]", (b) => { S.flagForm.level = b.dataset.fflevel; render(); });
     on("[data-flagform]", (b) => { S.flagFormOpen = b.dataset.flagform === "1"; if (S.msgFrom === "flags") S.msg = null; render();
       const j = app.querySelector("#ffJob"); if (j && S.flagFormOpen) j.focus(); });
+    on("[data-arrowjump]", async () => {
+      S.jobView = null; S.job = null; S.tab = "tasks"; store.set("tab", "tasks"); render(); await loadTab(); render();
+      const go = () => { const el = document.getElementById("opsarrow"); if (el && el.scrollIntoView) el.scrollIntoView({ block: "start" }); };
+      go(); setTimeout(go, 700); });                                     // again once the rest of Operations has drawn above it
     on("[data-jump]", (b) => { const el = document.getElementById(b.dataset.jump); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" }); });
     on("[data-setflag]", () => { const f = S.flagForm;
       act("set_flag", { p_job: f.jobId, p_level: f.level, p_note: f.note.trim(), p_department: f.department || null },
@@ -3024,16 +2970,7 @@ if (typeof document !== "undefined") (function () {
     on("[data-fbsave]", (b) => { const d = b.dataset.fbsave, box = app.querySelector(`[data-fbdays="${d}"]`);
       const v = box && box.value.trim() !== "" && /^\d+$/.test(box.value.trim()) ? Number(box.value) : null;
       act("set_finish_by_days", { p_department: d, p_days: v }, null, "fb"); });
-    on("[data-posave]", () => { const v = (id) => (app.querySelector(id) || {}).value || "";
-      act("set_arrow_po_settings", { p: { issued_by: v("#poBy"), phone: v("#poPhone"), email: v("#poEmail"), address: v("#poAddr"), tax_line: v("#poTax"),
-        ...(v("#poNext") && Number(v("#poNext")) !== Number((S.po.settings || {}).next_number) ? { next_number: Number(v("#poNext")) } : {}) } }); });
-    on("[data-poremake]", (b) => { const po = ((S.po || {}).list || []).find(p => p.id === b.dataset.poremake); if (!po) return;
-      if (confirm(`Make ${po.name} again? It keeps its number, items and dates, takes the colours from the jobs' Arrow lines now and the PO details as they are now, and the next save files it as a new PDF (r${(po.revision || 1) + 1}) beside the first one. The first one is kept.`))
-        act("arrow_po_remake", { p_po: po.id }); });
-    on("[data-popdf]", async (b) => { const po = ((S.po || {}).list || []).find(p => p.id === b.dataset.popdf); if (!po) return;
-      try { saveBlob(new Blob([await arrowPoPdf(await pdfLib(), po)], { type: "application/pdf" }), po.file_name); }
-      catch (e) { S.msg = { ok: false, text: friendlyError(e) }; render(); } });
-    on("[data-ardays]", () => act("set_arrow_alert_days", { p_days: Number((app.querySelector("#arDays") || {}).value) }));
+    on("[data-ardays]", () => act("set_arrow_alert_days", { p_days: Number((app.querySelector("#arDays") || {}).value) }, null, "arrowdays"));
     on("[data-arret]", (b) => { if (confirm("Mark this back from Arrow today?")) act("return_from_arrow", { p_item: b.dataset.arret, p_returned_on: null }); });
     on("[data-argone]", (b) => { if (confirm("Mark this gone to Arrow today? Its days-out count starts today.")) act("arrow_gone", { p_items: [b.dataset.argone], p_gone_on: null }); });
     on("[data-arvoid]", (b) => { if (confirm("Mark this entered by mistake? It comes off the lists and stays in history.")) act("void_arrow", { p_item: b.dataset.arvoid, p_reason: null }); });
@@ -3056,26 +2993,6 @@ if (typeof document !== "undefined") (function () {
       act("new_tv_link", {}, (data) => { S.tvKey = data.key; });
     });
     on("[data-tvcopy]", async () => { try { await navigator.clipboard.writeText(tvLink(location.href, S.tvKey)); S.msg = { ok: true, text: "Copied." }; } catch (e) { S.msg = { ok: false, text: "Couldn't copy — select the link and copy it by hand." }; } render(); });
-    // ---- supply lists ----
-    const supOpen = (d, item) => {
-      const g = [0, 1].map(i => { const c = item && (item.choices || [])[i]; return { label: c ? c.label : "", options: c ? c.options.join(", ") : "" }; });
-      S.supEdit = { id: item ? item.id : null, dept: d, name: item ? item.name : "", groups: g };
-      S.openDetails.add("sup_" + d); S.msg = null; S.msgFrom = null; render();
-      const n = app.querySelector("#supName"); if (n) n.focus();
-    };
-    on("[data-supadd]", (b) => supOpen(b.dataset.supadd, null));
-    on("[data-supedit]", (b) => { const i = S.supItems.find(x => x.id === b.dataset.supedit); if (i) supOpen(i.department, i); });
-    on("[data-supcancel]", () => { S.supEdit = null; render(); });
-    app.querySelectorAll("[data-supf]").forEach(el => el.oninput = () => {
-      S.supEdit.name = el.value;
-      const go = app.querySelector("[data-supsave]"); if (go) go.disabled = !el.value.trim();
-    });
-    app.querySelectorAll("[data-supg]").forEach(el => el.oninput = () => { S.supEdit.groups[Number(el.dataset.supg)][el.dataset.part] = el.value; });
-    on("[data-supsave]", () => { const e = S.supEdit;
-      act("set_supply_item", { p_id: e.id, p_department: e.dept, p_name: e.name.trim(), p_choices: choicesFromForm(e.groups) }, () => { S.supEdit = null; }, "sup"); });
-    on("[data-supmove]", (b) => act("move_supply_item", { p_id: b.dataset.supmove, p_up: b.dataset.up === "1" }, null, "sup"));
-    on("[data-supretire]", (b) => { if (confirm("Retire this item? It comes off the tablets. Past requests keep it, and you can bring it back.")) act("retire_supply_item", { p_id: b.dataset.supretire, p_retire: true }, null, "sup"); });
-    on("[data-supback]", (b) => act("retire_supply_item", { p_id: b.dataset.supback, p_retire: false }, null, "sup"));
     on("[data-typeset]", (b) => act("set_defect_type", { p_department: b.dataset.typeset, p_label: b.dataset.label, p_active: b.dataset.active === "1" }));
     // ---- photos ----
     on("[data-viewphoto]", (b) => { S.viewer = S.photos.find(x => x.id === b.dataset.viewphoto) || null; render(); });
