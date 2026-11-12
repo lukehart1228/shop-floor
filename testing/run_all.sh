@@ -76,6 +76,8 @@ run test_guards            seed  LIVE=$NEWSQL -- bash $B/test_guards.sh
 run test_devices           seed  -- bash $B/test_devices.sh
 run test_direct_counts_off none  F=$NEWSQL/direct_counts_off.sql -- bash $B/test_direct_counts_off.sh
 [ -f $B/monday_standin.py ] && run test_connector_safety none -- bash $B/test_connector_safety.sh || { want test_connector_safety && row test_connector_safety skipped "needs helpers/monday_standin.py"; }
+# 12 Nov: the checks release (R-26's two days, retiring a placeholder, R-14 accepted, the device line) on a database made to look like live
+run test_checks_clean      none  SQL=$NEWSQL -- bash $B/test_checks_clean.sh
 fi
 
 # 4. pages, no browser engine (two sections)

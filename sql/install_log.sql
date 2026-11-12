@@ -1,6 +1,7 @@
 -- =====================================================================
 -- install_log.sql — what's installed, guards, one check for everything,
--- which page each tablet runs (30 Sep 2026; 21 Oct: files register themselves)
+-- which page each tablet runs (30 Sep 2026; 21 Oct: files register themselves;
+-- 12 Nov: the device line counts each floor device once, by its latest page)
 --
 -- 1. The install log. From now on every SQL file writes a line here
 --    when it runs. This file also looks for every file that ran before
@@ -16,7 +17,12 @@
 --    line each. Nothing any check does is kept.
 -- 5. select * from devices();           which page each tablet and
 --    phone is running, and when it last opened it. A device not opened
---    in 14 days is listed but not counted (21 Oct).
+--    in 14 days is listed but not counted (21 Oct). Since 12 Nov a device
+--    counts once, by the page it opened last, and only a floor device
+--    (the tablet app or the machine page, not signed in as a manager)
+--    can fail the line: an office computer gets the newest page each
+--    time it opens one, so an older row there only means "not opened
+--    since".
 -- 6. Since 21 Oct a new SQL file registers itself (sql_file_register):
 --    its run order, fingerprint, check and what it replaces. So a
 --    release is one paste, and this file is re-run only when it changes
@@ -139,7 +145,9 @@ insert into sql_file_catalog (file, run_order, fingerprint, check_fn, replaces) 
   ('purchasing.sql',       57, 'check_purchasing',        'check_purchasing',         '{}'),
   ('lumber_scrap_skips.sql', 58, 'check_lumber_scrap_skips', 'check_lumber_scrap_skips', '{}'),
   ('purchasing_log.sql',    59, 'check_purchasing_log',    'check_purchasing_log',     '{}'),
-  ('delivery_photos_open.sql', 60, 'unsent_on_phones',      'check_delivery_photos_open', '{photos.sql}')
+  ('delivery_photos_open.sql', 60, 'unsent_on_phones',      'check_delivery_photos_open', '{photos.sql}'),
+  ('two_day_rule.sql',      61, 'check_two_day_rule',      'check_two_day_rule',       '{off_supabase.sql,zip_drop.sql,short_names.sql}'),
+  ('checks_clean.sql',      62, 'retire_placeholder',      'check_checks_clean',       '{office.sql,inventory.sql,pace.sql,onedrive_save.sql,connector_safety.sql,incomplete_deliveries.sql,job_status.sql}')
 on conflict (file) do update set run_order = excluded.run_order, fingerprint = excluded.fingerprint, check_fn = excluded.check_fn, replaces = excluded.replaces;
 
 -- does the database already have this file's fingerprint?
@@ -331,18 +339,30 @@ end $$;
 revoke all on function report_device(text, text, text, text) from public, anon;
 grant execute on function report_device(text, text, text, text) to authenticated;
 
--- select * from devices();   newest page first; "older page" = not the newest any device has; a device not opened in 14 days is listed but not counted (an old row can never update)
+-- select * from devices();   one row per device and page, as before. What each row's note means (12 Nov):
+--   Newest page                       its device's latest page, on the newest version anyone has of that page
+--   Older page — close the app…       a FLOOR device whose latest page is behind: the only rows the check fails on.
+--                                     A floor device's latest page is the tablet app (index) or the machine page,
+--                                     and its login isn't a manager's.
+--   Not opened in 14 days             listed, not counted (an old row can never update)
+--   An earlier page on this device    the device has opened another page since; its latest page is what counts
+--   Office computer, older page…      not counted: a computer fetches the newest page every time it opens one
 create or replace function devices()
 returns table (person text, login text, page text, version text, last_opened text, note text)
 language sql security definer set search_path = public as $$
-  with newest as (select page, max(version) as v from device_versions group by page)
+  with newest as (select page, max(version) as v from device_versions group by page),
+  d as (select dv.*, row_number() over (partition by dv.device_id order by dv.last_seen desc, dv.page) = 1 as latest
+          from device_versions dv)
   select coalesce(p.full_name, '(no profile)') || case when p.is_test then ' (test)' else '' end,
          u.email, d.page, d.version,
          to_char(d.last_seen at time zone 'America/Indiana/Indianapolis', 'Mon DD, HH12:MI am'),
          case when d.last_seen < now() - interval '14 days' then 'Not opened in 14 days — not counted'
-              when d.version < n.v then 'Older page — close the app fully and reopen it on Wi-Fi'
-              else 'Newest page' end
-  from device_versions d
+              when not d.latest then 'An earlier page on this device — not counted (its latest page is what counts)'
+              when d.version >= n.v then 'Newest page'
+              when d.page in ('index', 'machine') and coalesce(p.role::text, '') not in ('manager', 'admin')
+                then 'Older page — close the app fully and reopen it on Wi-Fi'
+              else 'Office computer, older page when last opened — not counted (it gets the newest page the next time it''s opened)' end
+  from d
   join newest n on n.page = d.page
   left join profiles p on p.id = d.user_id
   left join auth.users u on u.id = d.user_id
@@ -366,7 +386,7 @@ declare
   total int; passed int; firstbad text;
   bad   int;
   n     int := 1;
-  stale int; seen int;
+  stale int; seen int; office int; acc int; accnote text;
 begin
   select coalesce(array_agg(c.check_fn order by c.run_order), '{}') into fns from sql_file_catalog c where c.check_fn is not null;
   step := 1; check_name := 'Every SQL file installed, in order';
@@ -393,8 +413,12 @@ begin
     end;
     select count(*), count(*) filter (where e->>'result' = 'PASS'),
            (array_agg(coalesce('step ' || (e->>'step') || ': ', '') || coalesce(e->>'check_name', e->>'looking_for', e->>'name', '')
-                      || coalesce(' — ' || coalesce(e->>'detail', e->>'if_it_failed'), '')) filter (where e->>'result' <> 'PASS'))[1]
-      into total, passed, firstbad
+                      || coalesce(' — ' || coalesce(e->>'detail', e->>'if_it_failed'), '')) filter (where e->>'result' <> 'PASS'))[1],
+           -- 12 Nov: a line that passes because a finding was accepted, not fixed, says so in its words ("Accepted, not fixed (R-14, …")
+           count(*) filter (where e->>'result' = 'PASS' and coalesce(e->>'detail', e->>'if_it_failed', '') like 'Accepted, not fixed%'),
+           (array_agg(substring(coalesce(e->>'detail', e->>'if_it_failed') from '^Accepted, not fixed \(([^)]*)\)'))
+              filter (where e->>'result' = 'PASS' and coalesce(e->>'detail', e->>'if_it_failed', '') like 'Accepted, not fixed%'))[1]
+      into total, passed, firstbad, acc, accnote
     from jsonb_array_elements(coalesce(rows, '[]'::jsonb)) e;
     -- advice written before a file was replaced ("Run photos.sql again") would now stop at its guard, or undo newer work
     if firstbad ~ 'Run monday_sync\.sql again' then
@@ -406,22 +430,31 @@ begin
                   || ' has been replaced by newer files, so don''t run it. Bring this line to Claude in a chat.';
     end if;
     result := case when total > 0 and passed = total then 'PASS' else 'FAIL' end;
-    detail := passed || '/' || total || case when firstbad is not null then '. First: ' || firstbad else '' end;
+    detail := passed || '/' || total || case when firstbad is not null then '. First: ' || firstbad else '' end
+              || case when acc > 0 then format('. %s of them accepted, not fixed (%s): select * from %s(); for the words', acc, accnote, fn) else '' end;
     return next;
   end loop;
 
-  n := n + 1; step := n; check_name := 'Every device on the newest page';     -- tablets, phones and (from 5 Oct) office computers
-  select count(*) filter (where d.note like 'Older page%'), count(*) filter (where d.note not like 'Not opened%'),
+  n := n + 1; step := n; check_name := 'Every device on the newest page';     -- 12 Nov: each floor device once, by its latest page
+  select count(*) filter (where d.note like 'Older page%'),
+         count(*) filter (where d.note like 'Older page%' or (d.note = 'Newest page' and d.page in ('index', 'machine'))),
          string_agg(case when d.note like 'Older page%' then d.person || ' (' || d.version || ', opened ' || d.last_opened || ')' end, '; '),
-         count(*) filter (where d.note like 'Not opened%')
-    into stale, seen, firstbad, total
+         count(*) filter (where d.note like 'Not opened%'),
+         count(*) filter (where d.note like 'An earlier page%' or d.note like 'Office computer%' or (d.note = 'Newest page' and d.page not in ('index', 'machine')))
+    into stale, seen, firstbad, total, office
   from devices() d;
   result := case when stale = 0 then 'PASS' else 'FAIL' end;
-  detail := case when seen = 0 and total = 0 then 'No device has reported yet — each one does the first time it opens a page.'
-                 when seen = 0 then 'No device has opened a page in 14 days (' || total || ' older rows not counted).'
-                 when stale = 0 then seen || ' device' || case when seen = 1 then '' else 's' end || ' opened in the last 14 days, all on the newest page'
+  detail := case when seen = 0 and total = 0 and office = 0 then 'No device has reported yet — each one does the first time it opens a page.'
+                 when seen = 0 and office = 0 then 'No device has opened a page in 14 days (' || total || ' older rows not counted).'
+                 when seen = 0 then 'No floor device has opened the app in 14 days.'
                                     || case when total > 0 then ' (' || total || ' not opened in 14 days, not counted)' else '' end
-                 else stale || ' on an older page: ' || firstbad || '. Close the app fully and reopen it on Wi-Fi (on a computer, reload the page).  (select * from devices(); for all)' end;
+                 when stale = 0 then seen || ' floor device' || case when seen = 1 then '' else 's' end || ' opened in the last 14 days, all on the newest page'
+                                    || case when total > 0 then ' (' || total || ' not opened in 14 days, not counted)' else '' end
+                 else stale || ' floor device' || case when stale = 1 then '' else 's' end || ' on an older page: ' || firstbad
+                      || '. Close the app fully and reopen it on Wi-Fi.  (select * from devices(); for all)'
+                      || case when total > 0 then ' (' || total || ' not opened in 14 days, not counted)' else '' end end
+            || case when office > 0 and (seen > 0 or total > 0)
+                    then '. Also not counted: ' || office || ' office and earlier rows (a computer gets the newest page each time it opens one)' else '' end;
   return next;
 end $$;
 revoke all on function check_everything() from public, anon, authenticated;

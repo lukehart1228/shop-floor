@@ -341,8 +341,12 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
     await admin.query(`insert into delivery_docs (client_id, loadout_id, job_id, kind, file_name, storage_path, mime, bytes, added_by_name, added_at)
         values (gen_random_uuid(), $1, $2, 'ticket', 'ticket.pdf', $3, 'application/pdf', $4, 'Julia', now() - interval '61 days')`, [lo, J418, TICKET, ticketBytes.length]);
     const inStorage = async (p) => (await admin.query("select count(*)::int as n from storage.objects where name = $1", [p])).rows[0].n === 1;
+    // 12 Nov (two_day_rule.sql, R-26): a file leaves only once its copies were first found a day or more ago and found again today.
+    // "A day later" here: every copy's first sighting is moved back 25 hours; the next save then finds it again.
+    const twoDay = (await admin.query("select count(*)::int as n from information_schema.columns where table_name = 'filed_copies' and column_name = 'first_seen'")).rows[0].n === 1;
+    const aDayLater = async () => { if (twoDay) await admin.query("update filed_copies set first_seen = first_seen - interval '25 hours'"); };
     await click(t.w, '[data-tab="tasks"]', 600); await click(t.w, '[data-menu]', 200); await click(t.w, '[data-tab="photos"]', 1200);
-    ok("Off Supabase: the Photos tab says PROJ-00418's 3 files are due now", /3 files are due now: they go with the next save that finds them in both OneDrive and the backup folder/.test(txt(t.w)),
+    ok("Off Supabase: the Photos tab says PROJ-00418's 3 files are due now", /3 files are due now: they go once the save has found them in both OneDrive and the backup folder on two different days/.test(txt(t.w)),
        txt(t.w).match(/Space on Supabase.{0,500}/) || "");
 
     bk.gone = true;
@@ -351,7 +355,14 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
        await inStorage(PHOTO_PATH) && await inStorage(DEFECT_PATH) && await inStorage(TICKET) && !/came off Supabase/.test(txt(t.w)));
     bk.gone = false;
     r = await saveNow(t.w);
-    ok("Plugged back in: the next save finds them in both places, and the defect photo and the ticket come off Supabase",
+    if (twoDay) {
+      ok("Plugged back in: the next save finds them in both places, and nothing comes off Supabase the same day (R-26)",
+         await inStorage(PHOTO_PATH) && await inStorage(DEFECT_PATH) && await inStorage(TICKET) && !/came off Supabase/.test(txt(t.w)), txt(t.w).match(/Saved [^]{0,300}/) || "");
+      await aDayLater();
+      r = await saveNow(t.w);
+    }
+    ok(twoDay ? "A day later the save finds them again in both places, and the defect photo and the ticket come off Supabase"
+              : "Plugged back in: the next save finds them in both places, and the defect photo and the ticket come off Supabase",
        !await inStorage(DEFECT_PATH) && !await inStorage(TICKET) && /2 files came off Supabase: they're in both OneDrive and the backup folder/.test(txt(t.w)),
        txt(t.w).match(/Saved [^]{0,400}/) || "");
     ok("…but the site photo whose OneDrive copy was changed by hand (a different size) stays on Supabase, and the save says why",
@@ -380,7 +391,14 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
     await click(t.w, "[data-menu]", 200); await click(t.w, '[data-tab="photos"]', 1200);   // back to OneDrive for the save
     odJob.find("Delivery/TB-03").kids.delete("1 Delivery.jpg");     // Luke deletes the edited copy
     r = await saveNow(t.w);
-    ok("Deleting the changed copy: the next save puts the original back from Supabase, then takes it off",
+    if (twoDay) {
+      ok("Deleting the changed copy: the next save puts the original back from Supabase, and it stays on Supabase that day (its day starts again)",
+         Buffer.from(odJob.find("Delivery/TB-03/1 Delivery.jpg").data).equals(photoBytes) && await inStorage(PHOTO_PATH) && !/came off Supabase/.test(txt(t.w)), txt(t.w).match(/Saved [^]{0,300}/) || "");
+      await aDayLater();
+      r = await saveNow(t.w);
+    }
+    ok(twoDay ? "A day later the save finds it again and takes it off Supabase"
+              : "Deleting the changed copy: the next save puts the original back from Supabase, then takes it off",
        Buffer.from(odJob.find("Delivery/TB-03/1 Delivery.jpg").data).equals(photoBytes) && !await inStorage(PHOTO_PATH)
        && /1 file came off Supabase: it's in both OneDrive and the backup folder/.test(txt(t.w)), txt(t.w).match(/Saved [^]{0,300}/) || "");
   }

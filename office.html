@@ -1045,7 +1045,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-11-11.2";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-11-12.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -2453,7 +2453,7 @@ if (typeof document !== "undefined") (function () {
         <div class="meter" aria-hidden="true"><i style="width:${pct}%"></i></div>
         ${S.offMissing ? `<div class="banner warn">Saved files can't come off Supabase until off_supabase.sql has been run (Walkthrough 42). Then reload this page.</div>`
           : off ? `<p class="sub">${off.off_so_far ? `<b>${n(off.off_so_far, "file has", "files have")}</b> come off so far. ` : ""}${off.due
-              ? `<b>${n(off.due, "file is", "files are")}</b> due now: ${off.due === 1 ? "it goes" : "they go"} with the next save that finds ${off.due === 1 ? "it" : "them"} in both OneDrive and the backup folder.`
+              ? `<b>${n(off.due, "file is", "files are")}</b> due now: ${off.due === 1 ? "it goes" : "they go"} once the save has found ${off.due === 1 ? "it" : "them"} in both OneDrive and the backup folder on two different days.`
               : off.next_due_at ? `Nothing is due yet. The next files are due on ${esc(fmtDay(off.next_due_at))}.`
               : "Nothing is due yet: a job's files are due 60 days after it leaves the floor."}</p>` : ""}
         ${progress}
@@ -2469,7 +2469,7 @@ if (typeof document !== "undefined") (function () {
       ${savePanel()}
       <p class="sub">A job's photos and what left the building are on its page: open it on Jobs.</p>
       <section class="panel"><h2>Space on Supabase</h2>
-        <p class="sub">Supabase's free plan holds about 1 GB. A job's photos and delivery files come off it by themselves once the job has been past Delivery for 60 days and the save above has found each file in both its OneDrive folder and the backup folder. Every record stays for good, and the files stay in OneDrive.</p>
+        <p class="sub">Supabase's free plan holds about 1 GB. A job's photos and delivery files come off it by themselves once the job has been past Delivery for 60 days and the save above has found each file, on two different days, in both its OneDrive folder on this PC and the backup folder. The save can see a file is in the OneDrive folder on this PC; it can't see whether OneDrive has sent it on, so the day in between is there for OneDrive's icon to show a problem. Every record stays for good, and the files stay in OneDrive.</p>
         ${space}</section>`;
   }
 
@@ -2991,7 +2991,7 @@ if (typeof document !== "undefined") (function () {
       if (x.error) { if (res.problems.length < 50) res.problems.push(`What was filed couldn't be recorded, so nothing from the zips came off Supabase this time (${friendlyError(x.error)}).`); return; }
     }
     for (let i = 0; i < holds.length; i += 1000) await Promise.resolve(db.rpc("hold_parked", { p: holds.slice(i, i + 1000) })).catch(() => null);
-    // off Supabase: the database says which may go (filed in both, at their size, within the day)
+    // off Supabase: the database says which may go (filed in both, at their size, first found a day or more ago and found again within the day: two_day_rule.sql)
     const ready = await Promise.resolve(db.rpc("parked_ready_to_remove")).catch(e => ({ error: e }));
     if (!ready.error && ready.data && ready.data.length) {
       const gone = [];
@@ -3099,7 +3099,7 @@ if (typeof document !== "undefined") (function () {
           ${skipped.length > 30 ? `<p class="meta2">…and ${skipped.length - 30} more.</p>` : ""}</div>` : ""}
       ${problems.length ? `<div class="banner warn"><ul style="margin:0 0 0 18px; padding:0">${problems.slice(0, 20).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
       <p class="meta2" style="margin-top:10px">Each job's photos, files, signed tickets and records go into a folder called “${SAVE_DIR}” inside its own OneDrive folder (${SAVE_SUB.delivery}, ${SAVE_SUB.photos} and ${SAVE_SUB.data}), and a copy into the backup folder first. A file already saved is never overwritten. A job's old “${SAVE_DIR_OLD}” folder is moved into “${SAVE_DIR}” once, then removed.
-        Files from dropped zips go into ${SAVE_SUB.files}, or into the library (Claudes Shop System Folder › ${LIB_DIR}, with ${LIB_INDEX} kept up to date), and come off Supabase once they're in both places.</p>
+        Files from dropped zips go into ${SAVE_SUB.files}, or into the library (Claudes Shop System Folder › ${LIB_DIR}, with ${LIB_INDEX} kept up to date), and come off Supabase once the save has found them in both places on two different days.</p>
     </section>`;
   }
 

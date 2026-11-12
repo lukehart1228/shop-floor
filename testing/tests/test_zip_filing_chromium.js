@@ -122,13 +122,26 @@ const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
     await p.waitForFunction((s) => new RegExp(s).test(document.body.innerText), re); };
   await pick("od", "od", "OneDrive projects folder chosen: od"); await pick("bk", "bk", "Backup folder chosen: bk");
   ok("The saving panel offers the third folder, Claudes Shop System Folder", /Claudes Shop System Folder \(the library\)/.test(await p.innerText("body")));
-  const saveNow = async () => { const n0 = (await q("select count(*) n from save_runs"))[0].n; await p.click("[data-savenow]");
+  const saveOnce = async () => { const n0 = (await q("select count(*) n from save_runs"))[0].n; await p.click("[data-savenow]");
     await p.waitForFunction(() => !/Saving|Reading|Filing/.test((document.getElementById("saveProgress") || {}).textContent || ""), null, { timeout: 30000 });
     for (let i = 0; i < 40 && (await q("select count(*) n from save_runs"))[0].n === n0; i++) await p.waitForTimeout(250);
     await p.waitForTimeout(500); return (await q("select * from save_runs order by finished_at desc limit 1"))[0]; };
+  // 12 Nov (two_day_rule.sql, R-26): a zip's file leaves Supabase only once it was first found in both places a day or more ago and
+  // found again today. So a "save" here is today's save, then (every first sighting moved back 25 hours) the next day's save, which
+  // files nothing new and is where files come off. It answers with today's save, the one that filed things. On a database
+  // without the rule it's one save, as before.
+  const twoDay = (await q("select count(*)::int n from information_schema.columns where table_name = 'parked_files' and column_name = 'onedrive_first_at'"))[0].n === 1;
+  const aDayLater = async () => { await q("update parked_files set onedrive_first_at = onedrive_first_at - interval '25 hours', backup_first_at = backup_first_at - interval '25 hours' where removed_at is null"); };
+  const saveNow = async () => { const first = await saveOnce(); if (!twoDay) return first; await aDayLater(); await saveOnce(); return first; };
 
   // 1. no third folder yet
-  let run = await saveNow();
+  let run = await saveOnce();
+  if (twoDay) {
+    const still = await q("select count(*)::int n from parked_files f join storage.objects o on o.bucket_id = 'parked-files' and o.name = f.storage_path where f.place = 'job' and f.project_id = 'PROJ-00418' and f.removed_at is null and f.onedrive_at is not null and f.backup_at is not null");
+    ok("Filed in OneDrive and the backup today: every job file is still on Supabase that day (R-26)", still[0].n === 4, JSON.stringify(still));
+    await aDayLater(); const next = await saveOnce();
+    ok("…and the next day's save files nothing new and takes them off", next.files_written === 0, "files written: " + next.files_written);
+  }
   let od = await LIST(p, "od"), bk = await LIST(p, "bk");
   const F = "400s/PROJ-00418 Enid's Table/Production/Files/", B = "PROJ-00418/Production/Files/";
   ok("Job files are filed in OneDrive's Production › Files (the job in a hundreds folder): the work order at the top, the rest in the zip's folders",
