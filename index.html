@@ -294,6 +294,29 @@
   .loslot.here{background:var(--teal); border-color:var(--teal); color:var(--midnight)}
   .loslot.here small{color:#E6FAF9}
   .loslot.earlier{background:var(--paper); border-style:dashed; color:var(--ink2)}
+  /* 11 Nov: a trip's tables, one row per sheet (the spec's Deliveries tab: "Shorter trip screen") */
+  .tbrows{background:#fff; border:1.5px solid var(--gray); border-radius:12px; padding:2px 12px; margin-bottom:6px}
+  .tbrow{display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--line)}
+  .tbrow:first-child{border-top:none}
+  .tbpic{flex:none; width:76px; min-height:44px; padding:0; border:1.5px solid var(--gray); border-radius:7px; background:#fff; overflow:hidden; font-weight:700; color:var(--midnight)}
+  .tbpic .snip{width:100%; border:none; border-radius:0}
+  .tbid{flex:none; width:56px; min-width:0; overflow-wrap:anywhere; line-height:1.15}
+  .tbid .no{display:block; font-size:24px; font-weight:700; line-height:1}
+  .tbid small{display:block; font-size:12px; font-weight:600; color:var(--ink2)}
+  .tbrow.done .tbid .no{color:var(--teal-ink)}
+  .tbbtns{display:flex; flex-wrap:wrap; gap:6px; flex:1; min-width:0}
+  .tb{min-width:54px; min-height:48px; padding:0 10px; border:1.5px solid var(--gray); border-radius:9px; background:#fff; font-weight:700; font-size:16px; color:var(--midnight)}
+  .tb.here{background:var(--teal); border-color:var(--teal)}
+  .tb.here.wait{background:var(--teal-bg); border-style:dashed}
+  .tb.earlier{background:var(--paper); border-style:dashed; color:var(--ink2)}
+  .tbfold{display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:var(--teal-bg); color:var(--midnight); border:none; border-radius:9px; margin:8px 0; padding:10px 12px; font-weight:700; min-height:48px}
+  .tbfold span{margin-left:auto; font-weight:600; text-decoration:underline}
+  .tbhint{font-size:14px; color:var(--ink2); margin:0 2px 10px}
+  .lostep .opt{font-weight:500; color:var(--ink2)}
+  .startlo{display:block; width:100%; text-align:left; margin-top:22px; min-height:56px}
+  .startlo small{display:block; font-weight:500; font-size:14px; color:var(--ink2)}
+  .askbtns{display:flex; flex-direction:column; gap:10px; margin-top:18px}
+  .askbtns button{width:100%; min-height:54px}
   .lowo{margin-top:10px; background:none; border:1.5px solid var(--gray); border-radius:9px; padding:8px 14px; font-weight:600; color:var(--midnight); min-height:44px}
   /* 22 Oct: the Load-out tab as a calendar (week or month), the trip bar on every Delivery tab, saved for no signal, what changed */
   .calbar{display:flex; align-items:center; gap:8px; margin:0 0 8px}
@@ -609,7 +632,7 @@ const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 // This page's version. Change it with every edit (date, then .1, .2 … for more than one that day).
 // Each device reports it when it opens; see  select * from devices();  in the SQL Editor.
-const PAGE_VERSION = "2026-11-04.2";
+const PAGE_VERSION = "2026-11-11.1";
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -1645,6 +1668,9 @@ if (typeof document !== "undefined") (function () {
     photos: [],                 // photos on what's on screen (the piece, the problems list), from the database
     pending: [],                // photos still on this tablet, waiting to send (no image bytes kept here)
     failedPh: [],               // photos (and signed deliveries) the database refused, kept for the Couldn't send list
+    tbOpen: {},                 // 11 Nov: a long trip's done sheets, unfolded
+    loStartOpen: false,         // 11 Nov: Start a load-out, opened
+    tripsOut: null,             // 11 Nov: each open trip's first and last photo (v_trips_out); null on an older database
     loadouts: [], localLoadouts: store.get("loadouts_local", []), loView: null,
     loForm: { jobId: null, filter: "", kind: "delivery" }, loItem: "", loPhotos: [], viewer: null, dtasks: store.get("dtasks", []) || [], taskView: null, taskNote: store.get("task_notes", {}) || {},
     loSheets: {}, xtra: {}, loWo: null, loWoAll: false, loDoc: null, loPallets: store.get("lo_pallets", {}), loPages: {}, loDet: {},
@@ -1700,6 +1726,23 @@ if (typeof document !== "undefined") (function () {
     const all = list.map(({ blob, bytes, ...m }) => ({ ...m, url: pendingUrls.get(m.id) }));
     S.pending = all.filter(p => !p.failed);          // still trying: drawn on screens as "Waiting to send"
     S.failedPh = all.filter(p => p.failed);          // refused: only on the Couldn't send list, so the slot asks for the photo again
+    reportUnsent();
+  }
+  /** 11 Nov (delivery_photos_open.sql): a Delivery phone tells the database how many things are on its Couldn't send
+   *  list, so Julia's Deliveries page can say so. Only the count, the oldest's time and the PROJ numbers. Sent when
+   *  they change; never waits, never shows anything; an older database simply refuses it. */
+  let unsentSent = null;
+  function reportUnsent() {
+    try {
+      if (!S.me || !(S.me.departments || []).includes("delivery")) return;
+      const items = S.failed.length + S.failedPh.length, photos = S.failedPh.filter(p => !/_done$/.test(p.kind || "")).length;
+      const ats = [...S.failed.map(f => f.at), ...S.failedPh.map(p => p.failed && p.failed.at)].filter(Boolean).sort();
+      const jobs = [...new Set(S.failedPh.map(p => p.projectId).filter(Boolean))].slice(0, 50);
+      const sig = `${items}|${photos}|${jobs.join(",")}`, dev = store.get("device", null);
+      if (sig === unsentSent || !dev || (typeof navigator !== "undefined" && navigator.onLine === false)) return;
+      db.rpc("report_unsent", { p_device: dev, p_items: items, p_photos: photos, p_oldest: ats[0] || null, p_jobs: jobs })
+        .then(r => { if (r && !r.error) unsentSent = sig; }, () => {});
+    } catch (e) {}
   }
 
   /** Shrink a camera photo to about 300–500 KB: 1600 pixels on the long side, JPEG. Turned the right way up.
@@ -1965,6 +2008,8 @@ if (typeof document !== "undefined") (function () {
     if (cx) S.cancelled = cx;
     const rw = await read("restwait", db.from("v_rest_waiting").select("*"), "rest_waiting");   // 26 Oct: none on an older database
     S.restWaiting = S.missing.restwait ? [] : (rw || []);
+    const to = await read("tripsout", db.from("v_trips_out").select("*"), "trips_out");   // 11 Nov: none on an older database
+    S.tripsOut = to && !S.missing.tripsout ? Object.fromEntries(to.map(x => [x.client_id, x])) : null;
     if (d) {
       // open ones; deliveries still on the road (the truck left, not yet delivered); pickups not yet picked up; the last two weeks
       S.loadouts = d.filter(l => l.is_open || daysSince(l.finished_at) <= 14
@@ -2152,7 +2197,7 @@ if (typeof document !== "undefined") (function () {
   /* ---- "Couldn't send": what the database refused, kept on the tablet with what it was (R-1, 6 Oct) ---- */
   function keepFailed(list) {
     const add = list.filter(x => x.kind !== "photo").map(x => ({ id: x.id, kind: x.kind, label: x.label || "", reason: x.reason, at: new Date().toISOString(), payload: x.payload }));
-    if (add.length) { S.failed = S.failed.filter(f => !add.some(a => a.id === f.id)).concat(add); store.set("failed", S.failed); }
+    if (add.length) { S.failed = S.failed.filter(f => !add.some(a => a.id === f.id)).concat(add); store.set("failed", S.failed); reportUnsent(); }
   }
   const failedPhotos = () => S.failedPh;
   const failedCount = () => S.failed.length + failedPhotos().length;
@@ -2166,7 +2211,7 @@ if (typeof document !== "undefined") (function () {
   async function retryFailed(id) {
     const f = S.failed.find(x => x.id === id);
     if (f) {
-      S.failed = S.failed.filter(x => x.id !== id); store.set("failed", S.failed);
+      S.failed = S.failed.filter(x => x.id !== id); store.set("failed", S.failed); reportUnsent();
       if (f.kind === "count" && !S.outbox[f.payload.id]) { S.outbox = setPending(S.outbox, f.payload.id, f.payload.qty, f.label); store.set("outbox", S.outbox); }
       if (f.kind === "entry") {
         const { heldSince, ...e } = f.payload; S.logbox = { ...S.logbox, [f.id]: e }; store.set("logbox", S.logbox);
@@ -2183,7 +2228,7 @@ if (typeof document !== "undefined") (function () {
     await flush(); await flushLog();
   }
   async function dismissFailed(id) {
-    if (S.failed.some(x => x.id === id)) { S.failed = S.failed.filter(x => x.id !== id); store.set("failed", S.failed); }
+    if (S.failed.some(x => x.id === id)) { S.failed = S.failed.filter(x => x.id !== id); store.set("failed", S.failed); reportUnsent(); }
     else { const u = pendingUrls.get(id); if (u) { URL.revokeObjectURL(u); pendingUrls.delete(id); } await photoStore.remove(id); await refreshPending(); }
     S.modal = failedCount() ? { kind: "failed" } : null;
     render();
@@ -3178,13 +3223,13 @@ if (typeof document !== "undefined") (function () {
           <div class="li-top"><b>${r.is_test ? `<span class="tag">TEST</span>` : ""}${esc(r.project_id)}</b><span class="meta2">${esc(r.job_name)}</span></div>
           <div class="meta2">${esc(restLine({ of_at: r.rest_of_at, count: r.owed_count, extras: r.extras_left }))} · ${esc(r.kind === "dock" ? "dock to dock" : "white glove")} · ${esc(r.reason)}</div></div>`).join("")}` : ""}
       ${ready.length ? `<h2 class="sec">Ready for pickup</h2>${ready.map(loCard).join("")}` : ""}
-      <div class="card" style="margin-top:22px"><h3 style="margin:0 0 4px">Start a load-out</h3>
+      ${!S.loStartOpen && !f.jobId ? `<button class="btn startlo" data-lostartopen="1">+ Start a load-out<small>For a trip that isn't on the calendar</small></button>` : `<div class="card" style="margin-top:22px"><h3 style="margin:0 0 4px">Start a load-out</h3>
         <p class="sub" style="margin:0 0 6px">${S.pkReady ? "For a trip that isn't on the calendar. Pick the kind, then the job." : "For a trip that isn't on the calendar, or a shipment. Pick the job going on the truck."}</p>
         ${kindButtons(f.kind, "lostartkind")}
         ${jobPicker(f.jobId, f.filter)}
         ${already ? `<div class="banner info" style="margin:12px 0 0">${esc(already.project_id)} already has ${already.scheduled_for ? `a delivery scheduled for ${esc(fmtWhen(already.scheduled_for))}` : already.ready_at ? `a ${esc(tripName(already.kind).toLowerCase())} ready` : `a load-out open, started ${esc(agoText(already.started_at))}`}. Carry on with it, or start another for a second trip.
             <div class="rowbtns"><button data-loopen="${esc(already.client_id)}">Carry on with it</button></div></div>` : ""}
-        <button class="go wide" style="margin-top:14px" data-lostart="1" ${f.jobId ? "" : "disabled"}>Start load-out</button></div>
+        <button class="go wide" style="margin-top:14px" data-lostart="1" ${f.jobId ? "" : "disabled"}>Start load-out</button></div>`}
       ${others.length ? `<h2 class="sec">Open load-outs</h2>${others.map(loCard).join("")}` : ""}
       ${done.length || tasksDone.length ? `<h2 class="sec">Done in the last two weeks</h2>` + tasksDone.map(t => `<div class="li">
           <div class="li-top"><b>${t.is_test ? `<span class="tag">TEST</span>` : ""}Task</b><span class="meta2">${esc(taskSubject(t) || t.what)}</span></div>
@@ -3336,11 +3381,23 @@ if (typeof document !== "undefined") (function () {
     }
     return out.sort((a, b) => (b.road ? 1 : 0) - (a.road ? 1 : 0));      // a truck on the road first, then what's loading
   }
+  /** 11 Nov: the bar across the top is for today's trip. One kept open over days says "Out since" on its own card. */
+  function activeToday(l) {
+    if (!S.tripsOut) return true;                    // an older database: as before
+    const o = S.tripsOut[l.client_id], today = todayISO();
+    return dlPend(l).length > 0 || (o && localISO(o.last_photo_at) === today) || (!!l.finished_at && localISO(l.finished_at) === today)
+        || (!o && localISO(l.started_at) === today);
+  }
+  /** "Tue Oct 27" when an open trip's first photo was on an earlier day, else null */
+  function outSince(l) {
+    const o = S.tripsOut && S.tripsOut[l.client_id];
+    return o && o.first_photo_at && localISO(o.first_photo_at) < todayISO() ? dayName(localISO(o.first_photo_at)) : null;
+  }
   function tripBar() {
-    const list = tripsInProgress().filter(x => !(S.tab === "loadout" && S.loView === x.l.client_id));
+    const list = tripsInProgress().filter(x => activeToday(x.l) && !(S.tab === "loadout" && S.loView === x.l.client_id));
     return list.slice(0, 3).map(({ l, road }) => {
       const left = !l.finished_at ? "" : localISO(l.finished_at) === todayISO() ? fmtTime(l.finished_at) : fmtWhen(l.finished_at);
-      return `<button class="tripbar" data-tripbar="${esc(l.client_id)}"><span class="w"><small>${road ? `ON THE ROAD${left ? ` · LEFT ${esc(left.toUpperCase())}` : ""}` : "LOADING"}</small>
+      return `<button class="tripbar" data-tripbar="${esc(l.client_id)}"><span class="w"><small>${road ? `ON THE ROAD${left ? ` · LEFT ${esc(left.toUpperCase())}` : ""}` : isDl(l) && dlPlan(l).site.done ? "AT THE SITE" : "LOADING"}</small>
         <b>${l.is_test ? "TEST · " : ""}${esc(l.project_id)} · ${esc(l.job_name)}</b>
         <span class="l">${esc(isDl(l) ? deliveryLine(l, dlPlan(l)) : loadoutLine(l))}</span></span><span class="open">Open</span></button>`;
     }).join("");
@@ -3375,7 +3432,9 @@ if (typeof document !== "undefined") (function () {
     if (e.type === "trip") {
       const l = e.l, plan = isDl(l) ? dlPlan(l) : null, line = isDl(l) ? deliveryLine(l, plan) : loadoutLine(l);
       const p = prog.find(x => x.l.client_id === l.client_id);
-      const status = p ? `${p.road ? "On the road" : "Loading"}${rest(line) ? " · " + rest(line) : ""}` : plan && plan.waitingDone ? rest(line) : "";
+      const out = outSince(l);
+      const status = out ? `Out since ${out}${rest(line) ? " · " + rest(line) : ""}`
+                   : p ? `${p.road ? "On the road" : plan && plan.site.done ? "At the site" : "Loading"}${rest(line) ? " · " + rest(line) : ""}` : plan && plan.waitingDone ? rest(line) : "";
       return `<button class="calitem" data-loopen="${esc(l.client_id)}"><span class="t"><b>${esc(e.carried ? fmtWhen(l.scheduled_for) : fmtTime(l.scheduled_for))}</b><span>${l.kind === "dock" ? "Dock to dock" : "Delivery"}</span></span>
         <span class="j">${l.is_test ? `<span class="tag">TEST</span>` : ""}<b>${esc(l.project_id)}</b> <span>${esc(l.job_name)}</span></span>
         ${l.rest ? `<span class="m">${esc(restLine(l.rest))}</span>` : ""}${status ? `<span class="l s">${esc(status)}</span>` : ""}${changeLines(changesFor(l.client_id))}${saveLine(dlOf(l))}</button>`;
@@ -3479,6 +3538,22 @@ if (typeof document !== "undefined") (function () {
     return `<div class="loslots">${s.slots.map(x => `<button class="loslot${x.here ? " here" : x.earlier ? " earlier" : ""}" data-dlsite="${s.sheet_number}" data-piece="${x.piece}">
       ${(s.sheetQty || s.qty) === 1 ? "The table" : `Table ${x.piece}`}<small>${x.waiting ? "Waiting to send" : x.here ? "In place · tap for another" : x.earlier ? "Delivered earlier" : "Tap to photograph"}</small></button>`).join("")}</div>`;
   }
+  /** 11 Nov: a trip's tables, one row per sheet: the sheet's picture (it opens its work order page), its number and
+   *  label, and a button per table. On a long trip, sheets already done fold into one line. attr: dlsite (white glove,
+   *  at the site) or loshoot (our dock, a pickup): the same taps the old cards used. live = false: counts only. */
+  function tbRows(lo, list, attr, live) {
+    const key = lo.client_id + "|" + attr, doneS = (s) => s.slots.every(x => x.here || x.earlier);
+    const folded = !S.tbOpen[key] && list.length > 6 ? list.filter(doneS) : [];
+    const fold = folded.length >= 3, shown = fold ? list.filter(s => !folded.includes(s)) : list;
+    const nf = folded.reduce((a, s) => a + s.slots.length, 0);
+    const word = (x) => x.waiting ? "waiting to send" : x.here ? "photographed" : x.earlier ? "went earlier" : "not photographed yet";
+    return `<div class="tbrows">${fold ? `<button class="tbfold" data-tbopen="${esc(key)}">✓ ${folded.length} sheets · ${nf} table${nf === 1 ? "" : "s"} done<span>Show</span></button>` : ""}${shown.map(s => {
+      const one = (s.sheetQty || s.qty) === 1, lab = sizeLabel(s) || s.item_code || "";
+      const pic = s.png_path && s.pages_ready ? `<button class="tbpic" data-lowo="${s.sheet_number}" aria-label="Work order page, sheet ${s.sheet_number}">${snipHtml(s.png_path, s.pages_ready) || "WO"}</button>` : "";
+      return `<div class="tbrow${doneS(s) ? " done" : ""}">${pic}<div class="tbid"><span class="no num">${s.sheet_number}</span>${lab ? `<small>${esc(lab)}</small>` : ""}</div>
+        <div class="tbbtns">${live ? s.slots.map(x => `<button class="tb${x.here ? " here" : x.earlier ? " earlier" : ""}${x.waiting ? " wait" : ""}" data-${attr}="${s.sheet_number}" data-piece="${x.piece}" aria-label="Sheet ${s.sheet_number}, ${one ? "the table" : "table " + x.piece}: ${word(x)}">${x.here ? "✓ " : ""}${one ? "Table" : x.piece}</button>`).join("")
+          : `<span class="meta2">${s.done} of ${s.qty}</span>`}</div></div>`; }).join("")}</div>`;
+  }
   const dlCanFinish = (g) => !!g && (g.noSign ? !!g.reason && (g.reason !== "Other" || !!g.reasonNote.trim()) : !!(g.name.trim() && g.strokes.length));
 
   // ---------- 26 Oct: not everything went (incomplete_deliveries.sql; design: the Incomplete deliveries tab) ----------
@@ -3515,7 +3590,7 @@ if (typeof document !== "undefined") (function () {
     for (const t of list) { if (!by.has(t.sheet)) by.set(t.sheet, []); by.get(t.sheet).push(t); }
     return [...by.entries()].map(([sh, ts]) => `sheet ${sh}: ${(ts[0].s.sheetQty || ts[0].s.qty) === 1 ? "the table" : `table${ts.length === 1 ? "" : "s"} ${ts.map(t => t.piece).join(", ")}`}`).join(" · ");
   }
-  const finishOk = (lo, g) => dlCanFinish(g) && (!partOk(lo) || partState(lo, g).ready);
+  const finishOk = (lo, g) => dlCanFinish(g);      // 11 Nov: what went is asked when Delivered is tapped (askHtml)
   /** The box above the signature: off, or the trip's tables ticked from the photos, the extras, why, and what's still to come. */
   function partSection(lo, g) {
     if (!partOk(lo)) return "";
@@ -3549,6 +3624,50 @@ if (typeof document !== "undefined") (function () {
         <span>${st.something ? `Still to come: ${still}. ${pk ? "It goes back on Ready for pickup." : "It goes on a new trip; the office gives it a day."} The ${pk ? "customer" : lo.kind === "dock" ? "receiver" : "customer"} signs for today's.`
           : "Everything is ticked as gone. Untick what didn't go, or untick the box above."}</span></div>
     </div>`;
+  }
+  /** 11 Nov: asked when Delivered (or Picked up) is tapped with tables that have no photo, or no photo at all on the
+   *  trip. "They all went" finishes it; "Some stayed" asks which (only the unphotographed tables) and why, and the
+   *  rest goes on a new trip as before (complete_trip_part). Replaces the box that sat open above the signature. */
+  function askHtml(m) {
+    const lo = currentLoadout();
+    if (!lo) return `<h3>That trip isn't open any more</h3><div class="mdl-btns"><button class="btn" data-close="1">Close</button></div>`;
+    const pk = isPk(lo), bol = pk && pkPlan(lo).bol, word = pk ? "picked up" : "delivered", Word = pk ? "Picked up" : "Delivered";
+    const g = S.dlSig[lo.client_id] || {}, sfx = bol ? "" : g.noSign ? " · not signed" : " · signed";
+    const tables = partOk(lo) ? partTables(lo) : [], miss = tables.filter(t => !t.photo);
+    const cap1 = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+    if (m.mode !== "some") {
+      const head = m.none ? "No photos on this trip" : `${miss.length} table${miss.length === 1 ? " has" : "s have"} no photo`;
+      const what = m.none ? `${miss.length ? `None of the ${miss.length} table${miss.length === 1 ? "" : "s"} has a photo, and there's no other photo on this trip.` : "There's no photo of anything on this trip."} The photos are the only record of what went and how it arrived.`
+                          : `${cap1(piecesText(miss))}. Did ${miss.length === 1 ? "it" : "they"} go today?`;
+      const xs = extrasShortText(lo);
+      return `<h3>${esc(head)}</h3><div class="sub">${esc(what)}${m.none && miss.length ? ` Did ${miss.length === 1 ? "it" : "they"} go today?` : ""}</div>
+        ${xs ? `<div class="sub">${esc(xs)} That's fine if they're going later.</div>` : ""}
+        <div class="askbtns">${miss.length ? `<button class="go" data-askall="1">${miss.length === 1 ? "It went" : "They all went"} · ${Word}${sfx}</button>
+            <button class="btn" data-asksome="1">${miss.length === 1 ? "It stayed" : "Some stayed"}</button>`
+          : `<button class="btn" data-askall="1">Finish without photos · ${Word}${sfx}</button>`}
+          <button class="btn" data-close="1">Go back and ${m.none ? "take them" : `photograph ${miss.length === 1 ? "it" : "them"}`}</button></div>
+        <p class="meta2" style="margin:12px 0 0">${Word} can't be changed afterwards.</p>`;
+    }
+    const st = partState(lo, g), all = !!g.partAll, list = all ? st.tables : st.tables.filter(t => !t.photo);
+    const goes = pk ? "It goes back on Ready for pickup." : "It goes on a new trip; the office gives it a day.";
+    const still = [st.left.length ? `${st.left.length} table${st.left.length === 1 ? "" : "s"} (${esc(piecesText(st.left))})` : null,
+                   st.owedX ? `${st.owedX} extra${st.owedX === 1 ? "" : "s"}` : null].filter(Boolean).join(" and ");
+    return `<h3>Which ${all ? "tables" : list.length === 1 ? "one" : "of these"} went today?</h3>
+      <div class="sub">${all ? "Untick any that came back." : `The ${st.tables.length - list.length} you photographed went. Tap any of these that went too.`}</div>
+      <div class="askbtns" style="margin-top:10px">${list.map(t => { const on = st.went.includes(t), one = (t.s.sheetQty || t.s.qty) === 1;
+        return `<button class="loslot${on ? " here" : ""}" data-partpiece="${esc(t.key)}" aria-pressed="${on}" style="text-align:left">${on ? "✓ " : ""}Sheet ${t.sheet} · ${one ? "the table" : "table " + t.piece}<small>${on ? (t.photo ? "Went" : "Went, no photo") : t.photo ? "Came back" : "Stayed"}</small></button>`; }).join("")}</div>
+      ${all || list.length === st.tables.length ? "" : `<p style="margin:6px 0 0"><button class="linkish" data-askshowall="1">A photographed table came back too?</button></p>`}
+      ${st.extras.length ? `<label class="f">Extras <span class="meta2">— how many went</span></label>${st.extras.map(e => `<div class="partrow partx"><span><b>${esc(e.name)}</b><small>sheet ${e.sheet} · ${e.went} of ${e.here} went · ${e.here} loaded</small></span>
+          <button class="xstep" data-partx="${esc(e.key)}" data-to="${e.went - 1}" aria-label="One fewer ${esc(e.name)} went" ${e.went > 0 ? "" : "disabled"}>−</button>
+          <button class="xstep" data-partx="${esc(e.key)}" data-to="${e.went + 1}" aria-label="One more ${esc(e.name)} went" ${e.went < e.here ? "" : "disabled"}>+</button></div>`).join("")}` : ""}
+      <label class="f">Why didn't it all go?</label>
+      ${PART_REASONS.map(r => `<button class="pick" data-partreason="${esc(r)}" aria-pressed="${st.reason === r}">${esc(r)}</button>`).join("")}
+      <label class="f" for="partNote">For the office <span class="meta2">(${st.reason === "Other" ? "needed" : "optional"})</span></label>
+      <textarea class="in" id="partNote" data-partnote="1" maxlength="500" placeholder="${st.reason === "Other" ? "Say why (needed)" : "e.g. the 2nd-floor room is still being carpeted"}">${esc(g.partNote || "")}</textarea>
+      <div class="partsum"><b>Today: ${st.went.length} of ${st.tables.length} table${st.tables.length === 1 ? "" : "s"}</b>
+        <span>${st.something ? `Still to come: ${still}. ${goes}` : `Everything is ticked as gone. Tap Back and choose ${miss.length === 1 ? "It went" : "They all went"}.`}</span></div>
+      <div class="askbtns"><button class="go" data-askpart="1" ${st.ready ? "" : "disabled"}>Part ${word}${sfx}</button><button class="btn" data-askback="1">Back</button></div>
+      <p class="meta2" style="margin:12px 0 0">It can't be changed afterwards.</p>`;
   }
   /** What the phone keeps (and sends) with the finish: the lists as Delivery left them. */
   const partRecord = (st) => ({ went: st.went.map(t => t.key), left: st.left.map(t => t.key),
@@ -3605,7 +3724,7 @@ if (typeof document !== "undefined") (function () {
     const noSheet = (x) => x.sheet === null || x.sheet === undefined;
     const drops = photos.filter(x => x.stage === "site" && (x.sheet_number === null || x.sheet_number === undefined)).length + pend.filter(x => x.stage === "site" && noSheet(x)).length;
     const w = plan.waitingDone, dw = lo.part || (w && w.part) ? "Part delivered" : "Delivered";
-    const partOn = !plan.delivered && partOk(lo) && partState(lo, g).on;
+    const partOn = false;            // 11 Nov: "not everything" is asked when Delivered is tapped
     const customer = plan.delivered
       ? `<div class="dldone"><b>${lo.completed_at ? (lo.signed_name ? `${dw} · signed by ${esc(lo.signed_name)}` : `${dw} · not signed (${esc(lo.no_sign_reason)})`)
                                                  : w.signed ? `${dw} · signed by ${esc(w.signedName)}` : `${dw} · not signed (${esc(w.reason)})`}</b>
@@ -3639,31 +3758,24 @@ if (typeof document !== "undefined") (function () {
             ${d ? (d.files || []).filter(x => x.in_cloud !== false).map(x => `<button class="lowo" data-dlopen="${esc(x.path)}" data-mime="${esc(x.mime)}" data-name="${esc(x.name)}">${esc(x.name)}</button>`).join("") : ""}</div></div>` : ""}
       ${dock ? `<div class="lostep">1 · At our dock — each table before it leaves <span>— ${plan.dock.done} of ${plan.dock.total}</span></div>
         ${sheets === undefined ? `<div class="meta2">Loading the sheets…</div>` : ""}
-        ${plan.dock.list.length ? plan.dock.list.map(s => `<div class="locard${s.complete ? " done" : ""}">
-            ${tableHead(s)}
-            ${plan.delivered || left ? "" : loSlots(s)}
-            ${s.png_path && s.pages_ready ? `<button class="lowo" data-lowo="${s.sheet_number}">Work order</button>` : ""}</div>`).join("")
+        ${plan.dock.list.length ? tbRows(lo, plan.dock.list, "loshoot", !(plan.delivered || left))
           : sheets ? `<div class="meta2">No work order uploaded, so there are no tables to tick off. Photograph each item below, with a few words.</div>` : ""}` : ""}
-      <div class="lostep">${dock ? "Then the loaded truck" : "1 · At the dock — a photo of each loaded truck"} <span>— ${plan.trucksHere.length} of ${plan.trucks}</span></div>
-      ${Array.from({ length: plan.trucks }, (_, i) => i + 1).map(n => { const has = plan.trucksHere.includes(n), waiting = has && !(lo.trucks_here || []).includes(n);
-          return `<div class="locard${has ? " done" : ""}"><div class="lotop"><span class="no num">T${n}</span><span class="size">Truck ${n}</span><span class="cnt">${has ? "Photographed" : "Not yet"}</span></div>
-            ${plan.delivered ? "" : `<div class="loslots"><button class="loslot${has ? " here" : ""}" data-dltruck="${n}">${has ? "Loaded ✓" : "Photograph it loaded"}<small>${waiting ? "Waiting to send" : has ? "Tap for another photo" : "Once it's loaded"}</small></button></div>`}</div>`; }).join("")}
+      <div class="lostep">${dock ? "Then the loaded truck" : "1 · Truck photo"} <span class="opt">· optional</span></div>
+      ${plan.delivered ? `<div class="meta2" style="margin:0 2px">${plan.trucksHere.length ? `${plan.trucksHere.length} truck photo${plan.trucksHere.length === 1 ? "" : "s"}` : "No truck photo"}</div>`
+        : `<div class="loslots" style="margin-top:0">${Array.from({ length: plan.trucks }, (_, i) => i + 1).map(n => { const has = plan.trucksHere.includes(n), waiting = has && !(lo.trucks_here || []).includes(n);
+          return `<button class="loslot${has ? " here" : ""}" data-dltruck="${n}">${has ? `✓ Truck ${n}` : `Truck ${n}`}<small>${waiting ? "Waiting to send" : has ? "Loaded · tap for another" : "Photograph it loaded"}</small></button>`; }).join("")}
+          <button class="lowo" style="margin-top:0" data-dladdtruck="1">Add another truck</button></div>`}
       ${extrasBlock(lo, left || plan.delivered)}
-      ${left || plan.delivered ? `<div class="meta2" style="margin:6px 2px 0">${left ? `The truck left ${esc(fmtWhen(lo.finished_at))}${lo.finished_by_name ? ` · ${esc(lo.finished_by_name)}` : ""}` : ""}</div>`
-        : `<button class="btn" data-dladdtruck="1">Add another truck</button>
-           <button class="go wide" style="margin-top:12px" data-lofinish="1">The truck is leaving</button>`}
+      ${left ? `<div class="meta2" style="margin:6px 2px 0">The truck left ${esc(fmtWhen(lo.finished_at))}${lo.finished_by_name ? ` · ${esc(lo.finished_by_name)}` : ""}</div>` : ""}
       ${dock ? `<div class="lostep">2 · At their dock — a few photos of the drop <span>— ${drops} taken</span></div>
         ${plan.delivered ? "" : `<button class="addph" data-dldrop="1">${drops ? "Another photo of the drop" : "Photograph the drop"}</button>`}` : `
       <div class="lostep">2 · At the site — each table where it ended up <span>— ${p.done} of ${p.total}</span></div>
       ${sheets === undefined ? `<div class="meta2">Loading the sheets…</div>` : ""}
-      ${p.list.length ? p.list.map(s => `<div class="locard${s.complete ? " done" : ""}">
-          ${tableHead(s)}
-          ${plan.delivered ? "" : siteSlots(s)}
-          ${s.png_path && s.pages_ready ? `<button class="lowo" data-lowo="${s.sheet_number}">Work order</button>` : ""}</div>`).join("")
+      ${p.list.length ? tbRows(lo, p.list, "dlsite", !plan.delivered) + (plan.delivered ? "" : `<p class="tbhint">Tap a table to photograph it where it ended up. Turquoise is done; tap it again for another photo.${p.list.some(s => s.png_path && s.pages_ready) ? " The picture opens its work order page." : ""}</p>`)
         : sheets ? `<div class="meta2">No work order uploaded, so there are no tables to tick off. Photograph each item below, with a few words.</div>` : ""}
 `}
       <div class="lostep">3 · The ${dock ? "receiver" : "customer"}</div>
-      ${plan.delivered ? "" : partSection(lo, g)}${customer}
+      ${customer}
       ${plan.delivered ? "" : `<div class="card"><label class="f" style="margin-top:0" for="loItem">Something with no sheet</label>
         <input class="in" id="loItem" data-loitem="1" value="${esc(S.loItem)}" placeholder="e.g. hardware box, 2 of 2">
         <button class="addph" data-loshootitem="1" ${S.loItem.trim() ? "" : "disabled"}>Photograph it</button></div>`}
@@ -3686,15 +3798,12 @@ if (typeof document !== "undefined") (function () {
     const det = S.loDet[lo.client_id] || { carrier: lo.carrier || "", tracking: lo.tracking || "" };
     const changed = (det.carrier || "") !== (lo.carrier || "") || (det.tracking || "") !== (lo.tracking || "");
     const w = plan.waitingDone, done = plan.done, pw = lo.part || (w && w.part) ? "Part picked up" : "Picked up";
-    const partOn = !done && partOk(lo) && partState(lo, g).on, partReady = !partOk(lo) || partState(lo, g).ready;
+    const partOn = false, partReady = true;      // 11 Nov: "not everything" is asked when Picked up is tapped
     const slots = (s) => `<div class="loslots">${s.slots.map(x => `<button class="loslot${x.here ? " here" : x.earlier ? " earlier" : ""}" data-loshoot="${s.sheet_number}" data-piece="${x.piece}">
       ${(s.sheetQty || s.qty) === 1 ? "The table" : `Table ${x.piece}`}<small>${x.waiting ? "Waiting to send" : x.here ? "Photographed · tap for another" : x.earlier ? "Went on an earlier trip" : "Tap to photograph"}</small></button>`).join("")}</div>`;
     const tablesStep = `<div class="lostep">1 · ${bol ? "Every table, before it's wrapped" : "Each table as it's handed over"} <span>— ${p.done} of ${p.total}</span></div>
       ${sheets === undefined ? `<div class="meta2">Loading the sheets…</div>` : ""}
-      ${p.list.length ? p.list.map(s => `<div class="locard${s.complete ? " done" : ""}">
-          ${tableHead(s)}
-          ${done ? "" : slots(s)}
-          ${s.png_path && s.pages_ready ? `<button class="lowo" data-lowo="${s.sheet_number}">Work order</button>` : ""}</div>`).join("")
+      ${p.list.length ? tbRows(lo, p.list, "loshoot", !done)
         : sheets ? `<div class="meta2">No work order uploaded, so there are no tables to tick off. Photograph each item below, with a few words.</div>` : ""}`;
     const palletStep = bol ? `<div class="lostep">2 · Each pallet, once it's wrapped <span>— ${plan.palletsHere.length} of ${plan.pallets}</span></div>
       ${Array.from({ length: plan.pallets }, (_, i) => i + 1).map(n => { const has = plan.palletsHere.includes(n);
@@ -3717,12 +3826,12 @@ if (typeof document !== "undefined") (function () {
       ? `<div class="dldone"><b>${lo.completed_at ? (bol ? pw : lo.signed_name ? `${pw} · signed by ${esc(lo.signed_name)}` : `${pw} · not signed (${esc(lo.no_sign_reason)})`)
                                                  : bol ? pw : w.signed ? `${pw} · signed by ${esc(w.signedName)}` : `${pw} · not signed (${esc(w.reason)})`}</b>
           ${lo.completed_at ? `${esc(fmtWhen(lo.completed_at))}${lo.completed_by_name ? ` · ${esc(lo.completed_by_name)}` : ""}` : "Waiting to send — it goes by itself when there's signal."}${partDoneLines(lo, w)}</div>`
-      : bol ? `${partSection(lo, g)}<div class="card">
+      : bol ? `<div class="card">
           <label class="f" style="margin-top:0" for="dlNote">A note <span class="meta2">(optional)</span></label>
           <textarea class="in" id="dlNote" data-dlsig="note" maxlength="1000" placeholder="e.g. 3 pallets, the driver counted them">${esc(g.note)}</textarea>
           ${plan.ready ? "" : `<p class="meta2" style="margin:10px 0 0">Needs ${[plan.palletsHere.length ? null : "a photo of a wrapped pallet", plan.bolHere ? null : "a photo of the BOL"].filter(Boolean).join(" and ")} first.</p>`}
           <button class="go wide" style="margin-top:14px" data-pkdone="1" ${plan.ready && partReady ? "" : "disabled"}>${partOn ? "Part picked up" : "Picked up"} — BOL pickup done</button></div>`
-      : `<div class="lostep">2 · The customer</div>${partSection(lo, g)}<div class="card">
+      : `<div class="lostep">2 · The customer</div><div class="card">
           <label class="f" style="margin-top:0" for="dlNote">The customer's note <span class="meta2">(optional — anything they want written down)</span></label>
           <textarea class="in" id="dlNote" data-dlsig="note" maxlength="1000" placeholder="e.g. Scuff on the leg of table 3">${esc(g.note)}</textarea>
           ${g.noSign ? `<label class="f">Why is there no signature?</label>
@@ -4147,6 +4256,8 @@ if (typeof document !== "undefined") (function () {
         ${items.map(x => `<div class="failitem">${x.img ? `<img alt="" src="${esc(x.img)}">` : ""}<div class="failtext"><b>${esc(x.label || "Something")}</b><div>${esc(x.reason || "")}</div>
           <small>${esc(fmtWhen(x.at))}</small></div><div class="failbtns"><button class="btn" data-failretry="${esc(x.id)}">Try again</button><button class="link" data-faildismiss="${esc(x.id)}">Dismiss</button></div></div>`).join("") || `<div class="sub">Nothing left.</div>`}
         <div class="mdl-btns"><button class="btn" data-close="1">Close</button></div>`;
+    } else if (m.kind === "dlask") {             // 11 Nov: tables with no photo when Delivered / Picked up is tapped
+      inner = askHtml(m);
     } else if (m.kind === "confirm") {
       inner = `<h3>${esc(m.title)}</h3><div class="sub">${esc(m.text)}</div>
         <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button><button class="go" data-confirm="1">${esc(m.yes)}</button></div>`;
@@ -4897,33 +5008,46 @@ if (typeof document !== "undefined") (function () {
     app.querySelectorAll("[data-partnote]").forEach(el => el.oninput = () => {
       const g = partG(); if (!g || !lo) return; g.partNote = el.value;
       const btn = app.querySelector("[data-dldone]"); if (btn) btn.disabled = !finishOk(lo, g);
-      const pk = app.querySelector("[data-pkdone]"); if (pk) pk.disabled = !(pkPlan(lo).ready && partState(lo, g).ready);
+      const pk = app.querySelector("[data-pkdone]"); if (pk) pk.disabled = !pkPlan(lo).ready;
+      const ap = app.querySelector("[data-askpart]"); if (ap) ap.disabled = !partState(lo, g).ready;
     });
     on("[data-reportjob]", (b) => { S.modal = { kind: "report", jobId: b.dataset.reportjob, sheet: null, pick: false, filter: "" }; render(); });
     on("[data-dlnosign]", (b) => { const g = sig(); if (!g) return; g.noSign = b.dataset.dlnosign === "1"; render(); });
     on("[data-dlreason]", (b) => { const g = sig(); if (!g) return; g.reason = b.dataset.dlreason; render(); });
     on("[data-dlclear]", () => { const g = sig(); if (!g) return; g.strokes = []; render(); });
+    // 11 Nov: tables with no photo, or no photo at all, are asked about first (askHtml); a part delivery is chosen there
+    const tripHasPhoto = () => S.loPhotos.some(x => x.loadout_id === lo.id) || (lo.photo_count || 0) > 0
+                            || S.pending.some(x => x.parent === lo.client_id && !/_done$/.test(x.kind || ""));
+    const askFirst = () => {
+      const miss = partOk(lo) ? partTables(lo).filter(t => !t.photo) : [], none = !tripHasPhoto();
+      if (!miss.length && !none) return false;
+      const g = sig(); if (g) { g.part = undefined; g.partAll = false; }
+      S.modal = { kind: "dlask", mode: "ask", none }; render(); return true;
+    };
+    const finishDl = async (g, part) => {
+      const pos = await whereAmI();
+      const blob = g.noSign ? null : await signaturePng(g.strokes, g.aspect);
+      await photoStore.put({ id: newId(), kind: "delivery_done", parent: lo.client_id, projectId: lo.project_id, label: "Delivery",
+                             at: new Date().toISOString(), tries: 0, blob, type: "image/png", signed: !g.noSign, signedName: g.name.trim(),
+                             customerNote: g.note.trim(), reason: g.noSign ? g.reason : null, reasonNote: g.reasonNote.trim(),
+                             lat: pos ? pos.lat : null, lng: pos ? pos.lng : null, accuracy: pos ? pos.accuracy : null,
+                             part: part ? partRecord(part) : null });
+      delete S.dlSig[lo.client_id];
+      await refreshPending(); render(); flushPhotos();
+    };
     on("[data-dldone]", () => {
       const g = sig(); if (!finishOk(lo, g)) return;
+      if (askFirst()) return;
       if (isPk(lo)) return pickupDone(g);
-      const plan = dlPlan(lo), ps = partOk(lo) ? partState(lo, g) : null, part = ps && ps.on ? ps : null;
-      const gaps = !part && plan.site.missing.length && lo.kind !== "dock" ? `Not photographed at the site — ${missingText(plan.site.missing)}. ` : "";
+      const plan = dlPlan(lo), part = null;
+      const xs = extrasShortText(lo);     // 11 Nov: asked here now there's no "The truck is leaving"
+      const gaps = (!part && plan.site.missing.length && lo.kind !== "dock" ? `Not photographed at the site — ${missingText(plan.site.missing)}. ` : "") + (xs ? xs + " " : "");
       S.modal = { kind: "confirm", title: part ? (g.noSign ? "Part delivered, not signed?" : `Part delivered, signed by ${g.name.trim()}?`)
                                                : g.noSign ? "Delivered, not signed?" : `Delivered, signed by ${g.name.trim()}?`,
         text: part ? partConfirmText(lo, part)
                    : `${gaps}This marks ${lo.project_id} delivered now${lo.finished_at ? "" : ", and the truck as left"}.${gaps ? " Finish anyway? That's fine if something is going later." : ""} It can't be changed afterwards.`,
         yes: part ? "Mark it part delivered" : "Mark it delivered",
-        run: async () => {
-          const pos = await whereAmI();
-          const blob = g.noSign ? null : await signaturePng(g.strokes, g.aspect);
-          await photoStore.put({ id: newId(), kind: "delivery_done", parent: lo.client_id, projectId: lo.project_id, label: "Delivery",
-                                 at: new Date().toISOString(), tries: 0, blob, type: "image/png", signed: !g.noSign, signedName: g.name.trim(),
-                                 customerNote: g.note.trim(), reason: g.noSign ? g.reason : null, reasonNote: g.reasonNote.trim(),
-                                 lat: pos ? pos.lat : null, lng: pos ? pos.lng : null, accuracy: pos ? pos.accuracy : null,
-                                 part: part ? partRecord(part) : null });
-          delete S.dlSig[lo.client_id];
-          await refreshPending(); render(); flushPhotos();
-        } };
+        run: () => finishDl(g, part) };
       render();
     });
 
@@ -4936,9 +5060,9 @@ if (typeof document !== "undefined") (function () {
         render(); flushPhotos();
       }, { fresh: true }); });
     on("[data-pkbolmore]", () => { if (!lo) return; S.pkBolMore[lo.client_id] = (S.pkBolMore[lo.client_id] || 0) + 1; render(); });
-    on("[data-pkdone]", () => { const g = sig(); if (lo && pkPlan(lo).ready && (!partOk(lo) || partState(lo, g).ready)) pickupDone(g || { note: "" }); });
+    on("[data-pkdone]", () => { const g = sig(); if (lo && pkPlan(lo).ready) { if (askFirst()) return; pickupDone(g || { note: "" }); } });
     const pickupDone = (g) => {
-      const plan = pkPlan(lo), bol = plan.bol, ps = partOk(lo) ? partState(lo, g) : null, part = ps && ps.on ? ps : null;
+      const plan = pkPlan(lo), bol = plan.bol, part = null;      // 11 Nov: a part pickup is chosen in askHtml
       const gaps = part ? "" : [plan.tables.missing.length ? `Not photographed — ${missingText(plan.tables.missing)}.` : "",
                     bol && plan.palletsMissing.length ? `No wrapped photo of pallet${plan.palletsMissing.length === 1 ? "" : "s"} ${plan.palletsMissing.join(", ")}.` : "",
                     extrasShortText(lo)].filter(Boolean).join(" ");
@@ -4948,7 +5072,11 @@ if (typeof document !== "undefined") (function () {
         text: part ? partConfirmText(lo, part)
                    : `${gaps ? gaps + " " : ""}This marks ${lo.project_id} picked up now.${gaps ? " Finish anyway? That's fine if something is going later." : ""} It can't be changed afterwards.`,
         yes: part ? "Mark it part picked up" : "Mark it picked up",
-        run: async () => {
+        run: () => finishPk(g, part) };
+      render();
+    };
+    const finishPk = async (g, part) => {
+          const bol = pkPlan(lo).bol;
           if (S.loDet[lo.client_id]) saveDet();
           const blob = bol || g.noSign ? null : await signaturePng(g.strokes, g.aspect);
           await photoStore.put({ id: newId(), kind: "pickup_done", parent: lo.client_id, projectId: lo.project_id, label: "Pickup",
@@ -4957,9 +5085,17 @@ if (typeof document !== "undefined") (function () {
                                  part: part ? partRecord(part) : null });
           delete S.dlSig[lo.client_id];
           await refreshPending(); render(); flushPhotos();
-        } };
-      render();
     };
+    // 11 Nov: the question's buttons (askHtml)
+    on("[data-askall]", async () => { const g = sig(); if (!lo || !g) return; g.part = false; S.modal = null; render();
+      if (isPk(lo)) await finishPk(g, null); else await finishDl(g, null); });
+    on("[data-asksome]", () => { const g = partG(); if (!g) return; g.part = true; S.modal = { ...S.modal, mode: "some" }; render(); });
+    on("[data-askback]", () => { const g = sig(); if (g) { g.part = undefined; g.partAll = false; } S.modal = { ...S.modal, mode: "ask" }; render(); });
+    on("[data-askshowall]", () => { const g = partG(); if (!g) return; g.partAll = true; render(); });
+    on("[data-askpart]", async () => { const g = sig(); if (!lo || !g) return; const st = partState(lo, g); if (!st.on || !st.ready) return;
+      S.modal = null; render(); if (isPk(lo)) await finishPk(g, st); else await finishDl(g, st); });
+    on("[data-tbopen]", (b) => { S.tbOpen[b.dataset.tbopen] = true; render(); });
+    on("[data-lostartopen]", () => { S.loStartOpen = true; render(); });
 
     // ---- Arrow ----
     on("[data-aropen]", () => { S.arrowForm = { jobId: null, filter: "", sheets: [], description: "", service: "powdercoat", sentOn: localISO(new Date()), from: arrowFromDefault(S.me, S.dept) }; render();
@@ -5157,7 +5293,7 @@ if (typeof document !== "undefined") (function () {
     try { me = await loadMe(user); } catch (e) { return signIn(friendlyError(e)); }
     if (!me) return signIn("This login has no role yet. In Supabase, give it one (walkthrough 1, step 8).");
     if (!S.depts.length) return signIn("This login isn't assigned to a department yet. In Supabase, add one to its profile.");
-    reportDevice();
+    reportDevice(); reportUnsent();
     const cached = store.get("rows_" + wd(), null);
     if (cached) { S.rows = cached.rows; S.rowsAt = cached.at; }
     const pastCached = store.get("past_" + S.dept, null);

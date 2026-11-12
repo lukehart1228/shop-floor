@@ -90,12 +90,11 @@ async function snap(w) {                                   // the driver takes t
   // Shawn: the dock photo, the truck leaves, a table at the site
   let { w } = boot(users.shawn);
   await click(w, await tripButton(w, (b) => b.dataset.loopen === cid), 800);
-  ok("Shawn opens the white glove delivery: dock, site, customer", /1 · At the dock/.test(txt(w)) && /2 · At the site/.test(txt(w)) && !!$(w, '[data-dltruck="1"]'));
+  ok("Shawn opens the white glove delivery: truck photo, site, customer", /1 · Truck photo/.test(txt(w)) && /2 · At the site/.test(txt(w)) && !!$(w, '[data-dltruck="1"]'));
   await click(w, '[data-dltruck="1"]'); await snap(w);
   await until(async () => (await q1("select count(*)::int n from photos where loadout_id = $1 and truck = 1", [lo.id])).n === 1);
   ok("The truck photo saves as before, and the camera stand-in was not asked for a TV copy", (await q1("select count(*)::int n from photos where loadout_id = $1 and truck = 1", [lo.id])).n === 1 && w.__shrinks[0] === false, String(w.__shrinks));
-  await click(w, "[data-lofinish]"); await click(w, "[data-confirm]", 300);
-  await until(async () => !!(await q1("select finished_at from loadouts where id = $1", [lo.id])).finished_at);
+  // 11 Nov: no "The truck is leaving": the site's tables are there from the start
   await until(() => $$(w, "[data-dlsite]").length > 0, 6000);
   const slot = $(w, "[data-dlsite]");
   const sheet = Number(slot.dataset.dlsite), piece = Number(slot.dataset.piece);

@@ -139,7 +139,7 @@ async function openTrip(w, pid) {
   w.dispatchEvent(new w.Event("online")); await wait(600);
   ok("Coming back to it doesn't draw it again", t.seen.length === 1 && $$(w, "#lodoc img").length === 2);
   await click(w, "[data-lowoback]", 400);
-  ok("← Delivery goes back to the delivery", !!btn(w, "Delivery ticket") && /At the dock/.test(txt(w)) && !$(w, "#lodoc"));
+  ok("← Delivery goes back to the delivery", !!btn(w, "Delivery ticket") && /Truck photo/.test(txt(w)) && !$(w, "#lodoc"));      // 11 Nov: step 1 is "Truck photo · optional"
   await click(w, btn(w, "Site photo.jpg"), 400);
   await until(() => $(w, ".viewer img"));
   ok("A picture site file still opens in the photo viewer, as before", !!$(w, ".viewer img") && t.opened.length === 0);

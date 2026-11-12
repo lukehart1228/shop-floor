@@ -45,6 +45,7 @@
   .me a.link{color:inherit; text-decoration:underline; font-weight:500}
   .btns{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; align-items:center}
   .card.rest{border:1.5px solid var(--midnight)}
+  .card.out{border:1.5px solid var(--midnight)}            /* 11 Nov: a trip out, not finished */
   .restform{display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-top:8px; align-items:end}
   .restform .wide{grid-column:1 / -1}
   .jobs{max-height:260px; overflow:auto; border:1px solid var(--line); border-radius:9px; margin-top:8px}
@@ -110,7 +111,7 @@
 <script>
 /* The two settings (project address, publishable key), the key check, the connection test, the id maker and the
    Feedback button are in the shared file loaded above, sf-common-2026-10-05.1.js. */
-var PAGE_VERSION = "2026-11-04.1";          // this page's version: bump it with every change (it shows in select * from devices();)
+var PAGE_VERSION = "2026-11-11.1";          // this page's version: bump it with every change (it shows in select * from devices();)
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -166,6 +167,12 @@ function fmtWhen(ts, withYear = false) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric", year: "numeric",
     hour: "numeric", minute: "2-digit", hour12: true }).formatToParts(d).map(x => [x.type, x.value]));
   return `${parts.weekday} ${parts.month} ${parts.day}${withYear ? ", " + parts.year : ""}, ${parts.hour}:${parts.minute} ${String(parts.dayPeriod).toLowerCase()}`;
+}
+/** "Tue Oct 27" on the shop's clock (11 Nov: "Out since"). */
+function fmtDay(ts) {
+  if (!ts) return "";
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric" }).formatToParts(new Date(ts)).map(x => [x.type, x.value]));
+  return `${p.weekday} ${p.month} ${p.day}`;
 }
 /** "2026-10-02" on the shop's clock. */
 function shopDate(ts) {
@@ -445,6 +452,10 @@ if (typeof document !== "undefined") (function () {
     if (!S.tt && NEW_KINDS.includes(S.form.kind)) S.form = blankForm();
     const rw = await db.from("v_rest_waiting").select("*").order("made_at");      // 26 Oct: none on an older database
     S.rest = rw.error ? [] : (rw.data || []);
+    // 11 Nov (delivery_photos_open.sql): Delivery phones holding things they couldn't send; each open trip's first and last photo
+    const [un, to] = await Promise.all([db.rpc("unsent_on_phones", {}), db.from("v_trips_out").select("*")]);
+    S.unsent = un.error ? [] : (un.data || []);
+    S.out = to.error ? {} : Object.fromEntries((to.data || []).map(x => [x.client_id, x]));
     S.loaded = true;
   }
   const deliveries = () => splitDeliveries(S.list);
@@ -652,18 +663,17 @@ if (typeof document !== "undefined") (function () {
                  <button class="link" data-cancel="${esc(d.id)}">Cancel this pickup</button></div>`}
         <div class="meta" style="margin-top:8px">Set up by ${esc(d.scheduled_by_name || d.started_by_name || "")}</div></div>`;
   }
-  function upScreen() {
-    const { up, ready } = deliveries();
-    const tasks = openTasks();
-    return `${msgBanner()}${S.rest.length ? `<h3 class="sec" style="margin-top:0">Needs a new date</h3>${S.rest.map(restCard).join("")}` : ""}${ready.length ? `<h3 class="sec" style="${S.rest.length ? "" : "margin-top:0"}">Ready for pickup</h3>${ready.map(readyCard).join("")}
-        ${up.length ? `<h3 class="sec">Scheduled deliveries</h3>` : ""}` : ""}${up.length ? up.map(d => {
+  /** 11 Nov: a trip's first photo, when it was on an earlier day than today: it's out, not finished. */
+  const outFirst = (d) => { const o = S.out && S.out[d.client_id]; return o && o.first_photo_at && shopDate(o.first_photo_at) < shopDate(new Date()) ? o.first_photo_at : null; };
+  function upCard(d) {
       const ed = S.edit && S.edit.id === d.id;
       const line = tripLine(d);
-      return `<div class="card" data-card="${esc(d.id)}">
+      return `<div class="card${outFirst(d) ? " out" : ""}" data-card="${esc(d.id)}">
         <div class="top"><span class="when">${esc(fmtWhen(d.scheduled_for))}</span>
           <span class="pid">${d.is_test ? `<span class="tag">TEST</span>` : ""}${esc(d.project_id)}</span><span>${esc(d.job_name)}</span>${d.kind === "dock" ? `<span class="meta">Dock to dock</span>` : ""}</div>
         ${d.rest ? `<div class="meta" style="margin-top:4px"><b>${esc(restWords(d.rest))}</b></div>` : ""}
         ${d.schedule_note ? `<div class="meta" style="margin-top:4px">Note for the driver: ${esc(d.schedule_note)}</div>` : ""}
+        ${outFirst(d) ? `<div style="margin-top:4px"><b>Out since ${esc(fmtDay(outFirst(d)))}</b><span class="meta"> · last photo ${esc(fmtDay(S.out[d.client_id].last_photo_at))}</span></div>` : ""}
         ${line ? `<div class="meta" style="margin-top:4px">${esc(line)}</div>` : ""}
         ${filesBlock(d, true)}
         ${ed ? `<div class="row2"><div><label class="f" for="ed">Date</label><input class="in" id="ed" type="date" data-edit="date" value="${esc(S.edit.date)}"></div>
@@ -674,8 +684,20 @@ if (typeof document !== "undefined") (function () {
                  <button class="drop sm" data-addfiles="${esc(d.id)}" data-dropzone="files" data-for="${esc(d.id)}" ${S.busy ? "disabled" : ""}>Add site files<span>Drag them here, or click</span></button></div>
                <div class="btns"><button data-editwhen="${esc(d.id)}">Change date, time or note</button>
                  <button class="link" data-cancel="${esc(d.id)}">Cancel this delivery</button></div>`}
-        <div class="meta" style="margin-top:8px">Scheduled by ${esc(d.scheduled_by_name || d.started_by_name || "")}</div></div>`; }).join("")
-      : ready.length || tasks.length || S.rest.length ? "" : `<div class="empty"><b>Nothing scheduled</b>Schedule a delivery${S.pk ? " or set up a pickup" : ""} and it shows here, and on Delivery's phone.</div>`}
+        <div class="meta" style="margin-top:8px">Scheduled by ${esc(d.scheduled_by_name || d.started_by_name || "")}</div></div>`;   }
+  /** 11 Nov: "Shawn K's phone is holding 7 photos it couldn't send" */
+  function unsentBanner() {
+    return (S.unsent || []).map(u => { const ph = u.photos === u.items, n = u.items;
+      return `<div class="banner warn"><b>${esc(u.person)}'s phone is holding ${n} ${ph ? (n === 1 ? "photo" : "photos") : (n === 1 ? "thing" : "things")} it couldn't send</b>
+        <div>${(u.jobs || []).length ? `${esc(u.jobs.join(", "))} · ` : ""}the oldest from ${esc(fmtWhen(u.oldest_at))}. ${n === 1 ? "It's" : "They're"} safe on the phone: ask ${esc(String(u.person).split(" ")[0])} to open the app with signal and tap Try again on Couldn't send.</div></div>`; }).join("");
+  }
+  function upScreen() {
+    const { up: all, ready } = deliveries();
+    const out = all.filter(outFirst), up = all.filter(d => !outFirst(d));
+    const tasks = openTasks();
+    return `${msgBanner()}${unsentBanner()}${out.length ? `<h3 class="sec" style="margin-top:0">Out, not finished</h3>${out.map(upCard).join("")}` : ""}${S.rest.length ? `<h3 class="sec" style="margin-top:0">Needs a new date</h3>${S.rest.map(restCard).join("")}` : ""}${ready.length ? `<h3 class="sec" style="${S.rest.length ? "" : "margin-top:0"}">Ready for pickup</h3>${ready.map(readyCard).join("")}
+        ${up.length ? `<h3 class="sec">Scheduled deliveries</h3>` : ""}` : out.length && up.length ? `<h3 class="sec">Scheduled deliveries</h3>` : ""}${up.length ? up.map(upCard).join("")
+      : ready.length || tasks.length || S.rest.length || out.length ? "" : `<div class="empty"><b>Nothing scheduled</b>Schedule a delivery${S.pk ? " or set up a pickup" : ""} and it shows here, and on Delivery's phone.</div>`}
       ${tasks.length ? `<h3 class="sec">Tasks</h3>${tasks.map(taskCard).join("")}` : ""}${cancelledList()}`;
   }
   const keptLine = (d) => { const k = [d.has_ticket ? "the ticket" : null, d.site_files ? `${d.site_files} site file${d.site_files === 1 ? "" : "s"}` : null].filter(Boolean);

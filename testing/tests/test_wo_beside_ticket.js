@@ -92,7 +92,7 @@ async function openTrip(w, pid) {
   ok("…labelled with the number of sheets", b && b.textContent.trim() === "Work order · 9 sheets");
   const box = $$(w, ".dlinfo .loslots button").map(x => x.textContent.trim());
   ok("…right after the Delivery ticket", box[0] === "Delivery ticket" && box[1] === "Work order · 9 sheets", box.join(" | "));
-  ok("The per-sheet Work order buttons on the table cards are still there", $$(w, ".locard [data-lowo]").length === 9);
+  ok("Each sheet's row still opens its own work order page (11 Nov: its picture is the button)", $$(w, ".tbrow [data-lowo]").length === 9, String($$(w, ".tbrow [data-lowo]").length));
   await click(w, b, 300);
   await until(() => !!$(w, "#lopage img"));
   ok("It opens the viewer on sheet 1: ← Delivery, Work order, PROJ, Sheet 1 of 9",
@@ -127,7 +127,7 @@ async function openTrip(w, pid) {
   await wait(200); ok("…still on sheet 9", /Sheet 9 of 9/.test(sub(w)));
   await click(w, "[data-lowoback]", 300);
   ok("← Delivery goes back to the delivery", !!$(w, "[data-lowoall]") && /At the site/.test(txt(w)));
-  await click(w, $$(w, ".locard [data-lowo]")[2], 300); await until(() => !!$(w, "#lopage img"));
+  await click(w, $$(w, ".tbrow [data-lowo]")[2], 300); await until(() => !!$(w, "#lopage img"));
   ok("A table card's own Work order button still opens that sheet with its photo buttons, as before",
      $(w, "#app h1").textContent === "Sheet 3" && !!$(w, "[data-dlsite]") && !$(w, ".wopick"), $(w, "#app h1").textContent);
   await click(w, "[data-lowoback]", 300);

@@ -121,46 +121,39 @@ const piece = (w, k) => $(w, `[data-partpiece="${k}"]`);
     console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);
   }
 
-  // ---- the box ticks itself; the tables come ticked from the photos ----
-  const box = $(w, ".partbox");
-  ok("The trip's last step has the Not everything was delivered box, ticked by itself", !!box && !!$(w, '[data-partbox="1"]') && $(w, '[data-partbox="1"]').checked, tx(box).slice(0, 90));
-  ok("…saying why: 3 tables have no photo at the site", /Ticked because 3 tables have no photo at the site/.test(tx(box)), tx(box).slice(0, 140));
-  ok("Tables photographed at the site come ticked as gone; the three without a photo don't",
-     piece(w, "7:1").getAttribute("aria-pressed") === "true" && piece(w, "7:3").getAttribute("aria-pressed") === "false" && piece(w, "9:1").getAttribute("aria-pressed") === "false"
-     && /To come/.test(tx(piece(w, "7:3"))), [tx(piece(w, "7:1")), tx(piece(w, "7:3"))].join(" | "));
-  ok("Each sheet shows its count: sheet 7, 2 of 4 went", /2 of 4 went/.test(tx(piece(w, "7:3").closest(".partrow"))), tx(piece(w, "7:3").closest(".partrow")).slice(0, 60));
-  ok("The summary: today 17 of 20 tables, Data port 3 of 3", /Today: 17 of 20 tables · Data port 3 of 3/.test(tx($(w, ".partsum"))), tx($(w, ".partsum")).slice(0, 120));
+  // ---- 11 Nov: no box on the screen; Delivered asks about the tables with no photo (askHtml) ----
+  ok("No Not everything was delivered box on the trip any more, and the button is the plain one", !$(w, ".partbox") && /^Delivered — signed$/.test(tx($(w, "[data-dldone]"))), tx($(w, "[data-dldone]")));
+  await click(w, '[data-dlnosign="1"]'); await click(w, '[data-dlreason="Nobody on site"]');
+  await click(w, "[data-dldone]", 300);
+  ok("Delivered asks first: 3 tables have no photo, naming them", /3 tables have no photo/.test(txt(w, ".mdl")) && /Sheet 7: tables 3, 4 · sheet 9: the table\. Did they go today\?/.test(txt(w, ".mdl")), txt(w, ".mdl").slice(0, 200));
+  ok("…with They all went, Some stayed, and Go back", /They all went · Delivered · not signed/.test(tx($(w, "[data-askall]"))) && !!$(w, "[data-asksome]") && /Go back and photograph them/.test(txt(w, ".mdl")));
+  await click(w, "[data-asksome]", 300);
+  ok("Some stayed: only the three without a photo, each Stayed", $$(w, ".mdl [data-partpiece]").length === 3 && piece(w, "7:3").getAttribute("aria-pressed") === "false" && /Stayed/.test(tx(piece(w, "9:1"))) && !piece(w, "7:1"),
+     $$(w, ".mdl [data-partpiece]").map(tx).join(" | "));
+  ok("The summary: today 17 of 20 tables", /Today: 17 of 20 tables/.test(tx($(w, ".partsum"))), tx($(w, ".partsum")).slice(0, 120));
 
-  // ---- fixing it by a tap; the extras; why ----
+  // ---- fixing it by a tap; one photographed that came back; the extras; why ----
   await click(w, piece(w, "9:1"));                // went, with no photo
-  await click(w, piece(w, "1:1"));                // photographed, but it came back
+  await click(w, "[data-askshowall]", 300);       // a photographed one came back
+  await click(w, piece(w, "1:1"));
   await click(w, '[data-partx="4|Data port"][data-to="2"]');
-  ok("A tap ticks one that went with no photo, and unticks one that came back",
-     /Went · no photo/.test(tx(piece(w, "9:1"))) && /Came back/.test(tx(piece(w, "1:1"))) && piece(w, "1:1").getAttribute("aria-pressed") === "false", [tx(piece(w, "9:1")), tx(piece(w, "1:1"))].join(" | "));
+  ok("A tap ticks one that went with no photo; all the tables open to untick one that came back",
+     /Went, no photo/.test(tx(piece(w, "9:1"))) && /Came back/.test(tx(piece(w, "1:1"))) && piece(w, "1:1").getAttribute("aria-pressed") === "false", [tx(piece(w, "9:1")), tx(piece(w, "1:1"))].join(" | "));
   ok("Data ports: how many went, 2 of the 3 loaded", /2 of 3 went · 3 loaded/.test(tx($(w, ".partx"))), tx($(w, ".partx")));
   const sum = tx($(w, ".partsum"));
-  ok("Still to come: 3 tables (sheet 1: the table · sheet 7: tables 3, 4) and 1 extra", /Still to come: 3 tables \(sheet 1: the table · sheet 7: tables 3, 4\) and 1 extra\./.test(sum), sum);
-  await click(w, '[data-dlnosign="1"]'); await click(w, '[data-dlreason="Nobody on site"]');
-  const btn = () => $(w, "[data-dldone]");
-  ok("The button says Part delivered, and waits for why", /^Part delivered — not signed$/.test(tx(btn())) && btn().disabled, tx(btn()));
+  ok("Still to come: 3 tables (sheet 1: the table · sheet 7: tables 3, 4) and 1 extra, on a new trip", /Still to come: 3 tables \(sheet 1: the table · sheet 7: tables 3, 4\) and 1 extra\. It goes on a new trip; the office gives it a day\./.test(sum), sum);
+  const btn = () => $(w, "[data-askpart]");
+  ok("The button says Part delivered, and waits for why", /^Part delivered · not signed$/.test(tx(btn())) && btn().disabled, tx(btn()));
   await click(w, '[data-partreason="Other"]');
   ok("Other needs a few words first", btn().disabled && /needed/.test(tx($(w, 'label[for="partNote"]'))));
   await click(w, '[data-partreason="Site not ready"]');
   const note = $(w, "[data-partnote]"); note.value = "Reading room still being carpeted"; note.dispatchEvent(new w.Event("input")); await wait(100);
   ok("One tap for why, and it can be finished", !btn().disabled && $(w, '[data-partreason="Site not ready"]').getAttribute("aria-pressed") === "true");
-  // the box off: an ordinary delivery's button; on again
-  $(w, '[data-partbox="1"]').checked = false; $(w, '[data-partbox="1"]').dispatchEvent(new w.Event("change")); await wait(200);
-  ok("Unticking the box gives back the ordinary button", /^Delivered — not signed$/.test(tx(btn())) && !$(w, ".partsum"), tx(btn()));
-  $(w, '[data-partbox="1"]').checked = true; $(w, '[data-partbox="1"]').dispatchEvent(new w.Event("change")); await wait(200);
-  ok("…and ticking it again keeps what was set", /Came back/.test(tx(piece(w, "1:1"))) && /2 of 3 went/.test(tx($(w, ".partx"))) && /^Part delivered — not signed$/.test(tx(btn())));
+  await click(w, "[data-askback]", 200); await click(w, "[data-asksome]", 300);
+  ok("Back and Some stayed again keeps what was set", /Still to come: 3 tables/.test(tx($(w, ".partsum"))) && $(w, '[data-partreason="Site not ready"]').getAttribute("aria-pressed") === "true" && !btn().disabled, tx($(w, ".partsum")));
 
-  // ---- the check, and the one-step send ----
-  await click(w, btn());
-  const m = txt(w, ".mdl");
-  ok("The check says what went, what didn't and where the rest goes",
-     /Part delivered, not signed\?/.test(m) && /17 of 20 tables and 2 of 3 × Data port went today/.test(m)
-     && /The other 3 tables \(sheet 1: the table · sheet 7: tables 3, 4\) and 1 extra go on a new trip for PROJ-00418; the office gives it a day and time/.test(m), m.slice(0, 260));
-  await click(w, "[data-confirm]", 800);
+  // ---- the one-step send ----
+  await click(w, btn(), 800);
   await until(async () => (await q("select completed_at from loadouts where client_id = $1", [c1])).rows[0].completed_at, 10000);
   const tp = (await q(`select tp.*, r.client_id as rest_cid, r.kind as rest_kind, r.scheduled_for as rest_when from trip_parts tp join loadouts r on r.id = tp.rest_id where tp.loadout_id = $1`, [lo1.id])).rows[0];
   const pe = (await q("select went, loaded from part_extras where loadout_id = $1", [lo1.id])).rows[0];
@@ -247,10 +240,11 @@ const piece = (w, k) => $(w, `[data-partpiece="${k}"]`);
   ok("Opened, a box at the top says whose rest it is and why", new RegExp(`The rest of ${dayWord(new Date())}'s delivery 3 tables and 1 extra still to go\\. Why: Site not ready — “Reading room still being carpeted”`).test(rb), rb);
   const site = $$(w, "[data-dlsite]").map(b => `${b.dataset.dlsite}:${b.dataset.piece}`).sort();
   ok("Only its own 3 tables to photograph at the site: sheet 1's table and sheet 7's tables 3 and 4", JSON.stringify(site) === JSON.stringify(["1:1", "7:3", "7:4"]) && /At the site — each table where it ended up — 0 of 3/.test(txt(w)), JSON.stringify(site));
-  ok("…labelled as on the sheet: The table, Table 3, Table 4", /The table/.test(tx($(w, '[data-dlsite="1"]'))) && /Table 3/.test(tx($(w, '[data-dlsite="7"][data-piece="3"]'))));
+  ok("…labelled as on the sheet: Table for sheet 1's only one, 3 and 4 for sheet 7's (read out as table 3)", /^Table$/.test(tx($(w, '[data-dlsite="1"]'))) && /^3$/.test(tx($(w, '[data-dlsite="7"][data-piece="3"]')))
+     && /Sheet 7, table 3: not photographed yet/.test($(w, '[data-dlsite="7"][data-piece="3"]').getAttribute("aria-label")), [tx($(w, '[data-dlsite="1"]')), tx($(w, '[data-dlsite="7"][data-piece="3"]'))].join(" | "));
   ok("The ticket went with it", !!$$(w, "[data-dlopen]").find(b => /Delivery ticket/.test(tx(b))));
   ok("Its extras: Data port, 2 went on an earlier trip", /2 went on an earlier trip/.test(txt(w)), (txt(w).match(/Data port[^.]{0,80}/) || [""])[0]);
-  ok("Nothing on it has a photo yet, so its own box is ticked by itself", !!$(w, '[data-partbox="1"]') && $(w, '[data-partbox="1"]').checked && /Ticked because 3 tables have no photo/.test(tx($(w, ".partbox"))));
+  ok("Nothing on it has a photo yet, and no box: it's asked when Delivered is tapped", !$(w, ".partbox") && /At the site — each table where it ended up/.test(txt(w)));
 
   // ---- a customer pickup, part-way: the rest back on Ready for pickup; damage, and the offer to report it ----
   const c3 = crypto.randomUUID();
@@ -260,15 +254,17 @@ const piece = (w, k) => $(w, `[data-partpiece="${k}"]`);
   await toLoadout(w);
   const pkBtn = await tripButton(w, (b) => b.dataset.loopen === c3);
   await click(w, pkBtn, 900); await until(() => /The customer/.test(txt(w)), 6000); await wait(300);
-  ok("A customer pickup has the box too: Not everything was picked up, 1 table with no photo", /Not everything was picked up/.test(tx($(w, ".partbox"))) && /Ticked because 1 table has no photo\./.test(tx($(w, ".partbox"))), tx($(w, ".partbox")).slice(0, 120));
+  await click(w, '[data-dlnosign="1"]'); await click(w, '[data-dlreason="Customer refused"]');
+  await click(w, "[data-dldone]", 300);
+  ok("A customer pickup asks too: 1 table has no photo", /1 table has no photo/.test(txt(w, ".mdl")) && /It went · Picked up · not signed/.test(tx($(w, "[data-askall]"))), txt(w, ".mdl").slice(0, 160));
+  await click(w, "[data-asksome]", 300);
   await click(w, piece(w, "2:2"));
-  ok("Everything ticked as gone: it says so, and the button waits", /Everything is ticked as gone/.test(tx($(w, ".partsum"))));
+  ok("Everything ticked as gone: it says so, and the button waits", /Everything is ticked as gone/.test(tx($(w, ".partsum"))) && $(w, "[data-askpart]").disabled);
   await click(w, piece(w, "2:2"));
-  await click(w, '[data-dlnosign="1"]'); await click(w, '[data-dlreason="Customer refused"]'); await click(w, '[data-partreason="Damaged"]');
-  ok("The button: Part picked up — not signed", /^Part picked up — not signed$/.test(tx($(w, "[data-dldone]"))) && !$(w, "[data-dldone]").disabled, tx($(w, "[data-dldone]")));
-  await click(w, "[data-dldone]");
-  ok("The check: the other table goes back on Ready for pickup", /The other table \(sheet 2: table 2\) goes back on Ready for pickup/.test(txt(w, ".mdl")), txt(w, ".mdl").slice(0, 200));
-  await click(w, "[data-confirm]", 800);
+  await click(w, '[data-partreason="Damaged"]');
+  ok("The button: Part picked up · not signed", /^Part picked up · not signed$/.test(tx($(w, "[data-askpart]"))) && !$(w, "[data-askpart]").disabled, tx($(w, "[data-askpart]")));
+  ok("The summary: the other table goes back on Ready for pickup", /Still to come: 1 table \(sheet 2: table 2\)\. It goes back on Ready for pickup\./.test(tx($(w, ".partsum"))), tx($(w, ".partsum")));
+  await click(w, "[data-askpart]", 800);
   await until(async () => (await q("select completed_at from loadouts where client_id = $1", [c3])).rows[0].completed_at, 10000);
   const tp3 = (await q(`select r.client_id, r.kind, r.ready_at from trip_parts tp join loadouts r on r.id = tp.rest_id where tp.loadout_id = $1`, [lo3.id])).rows[0];
   ok("Its rest is a customer pickup, ready at once", !!tp3 && tp3.kind === "customer_pickup" && !!tp3.ready_at, tp3 ? tp3.kind : "none");

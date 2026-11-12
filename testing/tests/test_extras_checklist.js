@@ -115,7 +115,7 @@ async function openTrip(w, pid, nth = 0) {
   ok("…one card per extra, with its sheet, name and quantity", cnt(w, "Data port") === "0 of 4" && cnt(w, "Grommet") === "0 of 3" && cnt(w, "Cabinet shelf") === "0 of 2"
      && card(w, "Data port").querySelector(".no").textContent === "1" && card(w, "Cabinet shelf").querySelector(".no").textContent === "3");
   const pos = (re) => txt(w).search(re);
-  ok("…in step 1, after the truck photos and before The truck is leaving", pos(/1 · At the dock/) < pos(/Don't forget/) && pos(/Don't forget/) < pos(/Add another truck/) && pos(/Don't forget/) < pos(/2 · At the site/));
+  ok("…after the truck photo (11 Nov: optional, no The truck is leaving) and before the site", pos(/1 · Truck photo/) < pos(/Don't forget/) && pos(/Add another truck/) < pos(/Don't forget/) && pos(/Don't forget/) < pos(/2 · At the site/) && !$(w, "[data-lofinish]"));
   await click(w, btnIn(w, "Data port", /^\+$/), 400);
   await until(async () => (await loaded("PROJ-00418", "Data port")) === 1);
   ok("+ on Data port: 1 of 4, and the trip records 1 loaded", cnt(w, "Data port") === "1 of 4" && (await loaded("PROJ-00418", "Data port")) === 1, cnt(w, "Data port"));
@@ -145,20 +145,21 @@ async function openTrip(w, pid, nth = 0) {
   await until(async () => (await loaded("PROJ-00418", "Grommet")) === 3, 6000);
   ok("…and sends itself when the signal is back", (await loaded("PROJ-00418", "Grommet")) === 3);
 
-  console.log("--- Leaving short");
-  await click(w, "[data-lofinish]", 300);
-  ok("The truck is leaving names what isn't loaded and asks", /Not loaded: Data port × 1 \(sheet 1\), Cabinet shelf × 2 \(sheet 3\)\. Leave anyway\?/.test(modal(w)), modal(w));
+  console.log("--- Delivered short (11 Nov: asked when Delivered is tapped, there's no The truck is leaving)");
+  await click(w, '[data-dlnosign="1"]', 200); await click(w, '[data-dlreason="Nobody on site"]', 200);
+  await click(w, "[data-dldone]", 300);
+  ok("Delivered with no photo yet asks, and names what isn't loaded", /No photos on this trip/.test(modal(w)) && /Not loaded: Data port × 1 \(sheet 1\), Cabinet shelf × 2 \(sheet 3\)\./.test(modal(w)), modal(w));
   await click(w, "[data-close]", 200);
   await click(w, btnIn(w, "Data port", /^All 4 loaded$/), 300);
   await click(w, btnIn(w, "Cabinet shelf", /^All 2 loaded$/), 300);
   await until(async () => (await loaded("PROJ-00418", "Cabinet shelf")) === 2);
   ok("Everything ticked: 3 of 3 loaded", /3 of 3 loaded/.test(txt(w)));
-  await click(w, "[data-lofinish]", 300);
-  ok("…and the question no longer mentions extras", /The truck is leaving/.test(modal(w)) && !/Not loaded/.test(modal(w)), modal(w));
-  await click(w, "[data-confirm]", 800);
-  await until(async () => (await q("select finished_at from loadouts where client_id = $1", [dcid])).rows[0].finished_at);
-  await openTrip(w, "PROJ-00418");
-  ok("After the truck left, the extras show as loaded with nothing to tap", /3 of 3 loaded/.test(txt(w)) && !$(w, "[data-xset]"));
+  await click(w, "[data-dldone]", 300);
+  ok("…and the question no longer mentions extras", /No photos on this trip/.test(modal(w)) && !/Not loaded/.test(modal(w)), modal(w));
+  await click(w, "[data-askall]", 800);
+  await until(async () => (await q("select completed_at from loadouts where client_id = $1", [dcid])).rows[0].completed_at, 8000);
+  const ld = (await q("select coalesce(sum(x.loaded), 0)::int n from loadout_extras x join loadouts l on l.id = x.loadout_id where l.client_id = $1", [dcid])).rows[0].n;
+  ok("Delivered: the trip is done, with every extra recorded loaded (9 of 9 pieces)", ld === 9 && !!(await q("select completed_at from loadouts where client_id = $1", [dcid])).rows[0].completed_at, String(ld));
 
   console.log("--- A second trip for the same job");
   const d2 = crypto.randomUUID();
@@ -170,8 +171,9 @@ async function openTrip(w, pid, nth = 0) {
   ok("The second trip counts what went on the first: Data port 4 of 6, 4 went on an earlier trip",
      cnt(w, "Data port") === "4 of 6" && /4 went on an earlier trip/.test(card(w, "Data port").textContent) && card(w, "Grommet").classList.contains("done"), cnt(w, "Data port"));
   ok("…and only the rest can be added here (All 2 loaded)", !!btnIn(w, "Data port", /^All 2 loaded$/));
-  const refused = await makeClient(users.shawn).rpc("set_extra_loaded", { p_loadout: dcid, p_sheet: 1, p_name: "Data port", p_loaded: 9, p_client_id: null });
-  ok("The database refuses more than the quantity", !!refused.error && /from 0 to 6/.test(refused.error.message), refused.error ? refused.error.message : "accepted");
+  // 11 Nov: asked of the second trip (the first is delivered now, so it refuses for that reason first)
+  const refused = await makeClient(users.shawn).rpc("set_extra_loaded", { p_loadout: d2, p_sheet: 1, p_name: "Data port", p_loaded: 9, p_client_id: null });
+  ok("The database refuses more than the quantity", !!refused.error && /from 0 to \d/.test(refused.error.message), refused.error ? refused.error.message : "accepted");
   const mike = await makeClient(users.mike).from("v_sheet_extras").select("*");
   ok("Mike (Sanding and Finishing) reads no extras through the same login path", !mike.error && mike.data.length === 0, mike.error ? mike.error.message : mike.data.length + " rows");
 

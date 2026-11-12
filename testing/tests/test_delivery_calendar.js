@@ -151,9 +151,11 @@ async function toLoadout(w) { if ($(w, "[data-loback]")) await click(w, "[data-l
   console.log("--- A trip from the calendar");
   await click(w, tripIn($(w, `.wkday[data-day="${TODAY}"]`), "PROJ-00418"), 600);
   await until(() => /2 · At the site/.test(txt(w)) && !/Loading the sheets/.test(txt(w)), 5000);
-  ok("Tapping it opens the trip for load-out", tx($(w, "#app h1")) === "PROJ-00418" && /1 · At the dock/.test(txt(w)) && /2 · At the site/.test(txt(w)));
-  const cards = $$(w, ".locard .tbhead");
-  ok("Each table card has its sheet's drawing beside the number, size and count", $$(w, ".locard .tbhead [data-snip]").length === 9 && cards.every(h => h.querySelector(".lotop .size")), `${$$(w, ".locard .tbhead [data-snip]").length} drawings, ${cards.length} cards`);
+  ok("Tapping it opens the trip for load-out", tx($(w, "#app h1")) === "PROJ-00418" && /1 · Truck photo/.test(txt(w)) && /2 · At the site/.test(txt(w)));
+  const cards = $$(w, ".tbrows .tbrow");      // 11 Nov: one row per sheet; its drawing is the button that opens its work order page
+  ok("Each sheet's row has its drawing (the work order button) beside the number and label, and a button per table",
+     $$(w, ".tbrow .tbpic[data-lowo] [data-snip]").length === 9 && cards.length === 9 && cards.every(h => h.querySelector(".tbid .no"))
+     && $$(w, ".tbrow [data-dlsite]").length === 20, `${$$(w, ".tbrow .tbpic [data-snip]").length} drawings, ${cards.length} rows, ${$$(w, ".tbrow [data-dlsite]").length} tables`);
   ok("…while the trip's own banner says Ready for no signal, as before", !!$(w, ".lopages.ready"));
   ok("No trip bar while nothing is in progress", !$(w, ".tripbar"));
   await toLoadout(w);
@@ -172,7 +174,7 @@ async function toLoadout(w) { if ($(w, "[data-loback]")) await click(w, "[data-l
   ok("Tapping tomorrow's square lists tomorrow's dock to dock", !!tripIn($(w, ".mlist"), "PROJ-00501") && $(w, `.mday[data-calday="${TOMORROW}"]`).getAttribute("aria-pressed") === "true");
   await click(w, tripIn($(w, ".mlist"), "PROJ-00501"), 600);
   await until(() => /1 · At our dock/.test(txt(w)) && !/Loading the sheets/.test(txt(w)), 5000);
-  ok("…which opens from there; dock to dock's table cards have the drawings too", tx($(w, "#app h1")) === "PROJ-00501" && $$(w, ".locard .tbhead [data-snip]").length === 2, String($$(w, ".locard .tbhead [data-snip]").length));
+  ok("…which opens from there; dock to dock's table cards have the drawings too", tx($(w, "#app h1")) === "PROJ-00501" && $$(w, ".tbrow .tbpic [data-snip]").length === 2, String($$(w, ".tbrow .tbpic [data-snip]").length));
   await toLoadout(w);
   let store = kept(w); w.close();
   ({ w, downloads } = boot(users.shawn, { cache: cacheA, store }));
@@ -330,7 +332,7 @@ async function toLoadout(w) { if ($(w, "[data-loback]")) await click(w, "[data-l
   ok("Ready for pickup stays a list under the calendar", /Ready for pickup/.test(txt(w)) && !!$$(w, "#app h2.sec").find(h => tx(h) === "Ready for pickup"));
   await click(w, $$(w, "#app [data-loopen]").find(x => /PROJ-00099/.test(tx(x)) && /ready since/.test(tx(x))), 600);
   await until(() => /Each table as it's handed over/.test(txt(w)) && !/Loading the sheets/.test(txt(w)), 5000);
-  ok("…and a pickup's table cards have the drawings", $$(w, ".locard .tbhead [data-snip]").length === 3, String($$(w, ".locard .tbhead [data-snip]").length));
+  ok("…and a pickup's table rows have the drawings", $$(w, ".tbrow .tbpic [data-snip]").length === 3, String($$(w, ".tbrow .tbpic [data-snip]").length));
   w.close();
 
   console.log("--- The calendar's days");

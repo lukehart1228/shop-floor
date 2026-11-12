@@ -98,6 +98,7 @@ run test_wo_beside_ticket  seed  PAGE=$PAGE -- node test_wo_beside_ticket.js
 run test_extras_checklist  seed  PAGE=$PAGE -- node test_extras_checklist.js
 run test_delivery_calendar seed  PAGE=$PAGE -- node test_delivery_calendar.js
 run test_incomplete_deliveries seed PAGE=$PAGE OUT=$P -- node test_incomplete_deliveries.js
+run test_delivery_photos_open seed PAGE=$PAGE OUT=$P -- node test_delivery_photos_open.js
 run test_job_status_db  seed -- bash $B/test_job_status_db.sh
 run test_job_status     seed OUT=$P -- node test_job_status.js
 fi
