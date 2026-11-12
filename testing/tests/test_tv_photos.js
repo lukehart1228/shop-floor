@@ -143,11 +143,13 @@ async function snap(w) {                                   // the driver takes t
   const officeRaw = fs.readFileSync(`${OUT}/office.html`, "utf8");
   if (newPage && /tv_job_pictures/.test(officeRaw)) {
     const o = bootOffice(users.luke); const ow = o.w;
-    await until(() => $$(ow, "[data-jobfind]").length, 8000); await wait(300);
+    // 11 Nov: jobs are found on the Jobs tab; the box in the corner went (an older office page still has the corner box)
+    await until(() => $$(ow, 'header [data-tab="jobs"]').length || $$(ow, "[data-jobfind]").length, 8000); await wait(300);
+    if ($(ow, 'header [data-tab="jobs"]')) { await click(ow, 'header [data-tab="jobs"]', 900); await until(() => $$(ow, "[data-jobfind]").length, 6000); }
     const fnd = $(ow, "[data-jobfind]"); fnd.focus(); await wait(800);
     fnd.value = "00418"; fnd.dispatchEvent(new ow.Event("input", { bubbles: true })); await wait(300);
     await until(() => $$(ow, "[data-openjob]").length, 6000);
-    $(ow, "[data-openjob]").dispatchEvent(new ow.MouseEvent("mousedown", { bubbles: true })); await wait(1500);
+    $(ow, "[data-openjob]").dispatchEvent(new ow.MouseEvent("mousedown", { bubbles: true })); $(ow, "[data-openjob]").click(); await wait(1500);
     await until(() => /Floor TV/.test(txt(ow)), 6000);
     ok("The job page says one picture of the job shows on the floor TV", /1 picture (of this job shows )?on the floor TV/.test(txt(ow)), (txt(ow).match(/Floor TV.{0,120}/) || [""])[0]);
     await click(ow, '[data-tvjob][data-hide="1"]', 1500);

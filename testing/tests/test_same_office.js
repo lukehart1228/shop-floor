@@ -71,6 +71,14 @@ const aside = (h) => {
         + Object.keys(panels).sort().map(k => panels[k]).join("");
     }
   }
+  // JOBS11=ignore (11 Nov, office.html 2026-11-11.2): Jobs replaced Find a job and OneDrive's Look up a job. Sets aside the corner
+  // search box, the Jobs in production tile's button and words, OneDrive's opening line and its Look up a job panel.
+  if (process.env.JOBS11 === "ignore") {
+    h = h.replace(/<div class="find"><input data-jobfind[\s\S]*?<\/div><\/div>/g, '<span style="flex:1"></span>')
+      .replace(/<button class="st" data-(findfocus="1"|tab="jobs")>/g, "<button class=\"st\">").replace(/<small>(find one by PROJ or name|open the list)<\/small>/g, "")
+      .replace(/<section class="panel"><h2>Look up a job<\/h2>[\s\S]*?<\/section>/g, "LOOKUP").replace(/<p class="sub">A job's photos and what left the building are on its page: open it on Jobs\.<\/p>/g, "LOOKUP")
+      .replace(/<h1>OneDrive<\/h1>\s*<p class="sub">[^<]*<\/p>/g, "<h1>OneDrive</h1>INTRO");
+  }
   return h;
 };
 (async () => {

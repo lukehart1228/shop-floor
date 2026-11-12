@@ -118,6 +118,33 @@
   .jobband.watch{background:#fff; border:1.5px solid var(--midnight)}
   .jobband small{font-weight:400; margin-left:8px; font-size:15px}
   .jobcols{display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:16px; align-items:start}
+  /* 11 Nov: the Jobs tab, the one sentence, and an item's page */
+  .jobsearch{display:flex; align-items:center; gap:10px; background:#fff; border:2px solid var(--midnight); border-radius:10px; padding:0 14px; margin:4px 0 14px; max-width:560px; color:var(--ink2)}
+  .jobsearch input{flex:1; min-width:0; border:none; outline:none; background:transparent; font:inherit; font-size:17px; padding:12px 0; color:var(--midnight)}
+  .joblist{background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden}
+  .jrow{display:grid; grid-template-columns:140px minmax(0,1.4fr) minmax(0,1fr) 170px; gap:14px; align-items:center; width:100%; text-align:left; background:#fff; border:none; border-bottom:1px solid var(--line); border-radius:0; padding:12px 16px; min-height:56px; font-size:16px; color:var(--midnight); font-weight:400}
+  .jrow:last-child{border-bottom:none}
+  .jrow:hover, .jrow.first{background:#F7F5EF}
+  .jrow .pid{font-family:'Barlow Condensed',sans-serif; font-size:19px; white-space:nowrap}
+  .jrow .sum, .jrow .due{color:var(--ink2)} .jrow .due{text-align:right}
+  @media (max-width: 760px){ .jrow{grid-template-columns:1fr; gap:2px} .jrow .due{text-align:left} }
+  .say{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin:6px 0 12px}
+  .say p{margin:0; font-size:20px; line-height:1.4; font-weight:500}
+  .say small{color:var(--ink2)}
+  .grid .gs .itemlink{background:none; border:none; padding:0; min-height:0; text-align:left; color:var(--midnight); font:inherit; cursor:pointer}
+  .grid .gs .itemlink b{text-decoration:underline; text-underline-offset:3px}
+  .grid .gs .itemlink small{display:block; color:var(--ink2); font-size:14px; font-weight:400}
+  .drow{display:grid; grid-template-columns:minmax(0,1fr) 120px; gap:4px 10px; padding:10px 0; border-top:1px solid var(--line)}
+  .drow .dn{font-weight:600} .drow .why{display:block; font-weight:400; font-size:14px; color:var(--ink2)}
+  .drow .prog .num{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:18px}
+  .drow .tbar{display:block; height:8px; background:var(--paper); border-radius:99px; overflow:hidden; margin-top:3px}
+  .drow .tbar i{display:block; height:100%; background:var(--orange); border-radius:99px} .drow .tbar i.full{background:var(--teal)}
+  .drow .due{grid-column:1 / -1; font-size:14px; color:var(--ink2)}
+  .drow.done .dn{color:var(--teal-ink)}
+  .pg{display:block; width:100%; padding:0; border:1px solid var(--line); background:#fff; border-radius:8px; overflow:hidden; cursor:zoom-in; min-height:0}
+  .pg img{display:block; width:100%; max-height:560px; object-fit:contain}
+  .pg.big{cursor:zoom-out} .pg.big img{max-height:none}
+  .pgwait{padding:40px 20px; text-align:center; color:var(--ink2); background:var(--paper); border-radius:8px}
   @media (max-width: 1000px){ .jobcols{grid-template-columns:minmax(0,1fr)} }
   .grid{display:grid; gap:6px; font-size:15px; min-width:min-content}
   .grid .gh{font-weight:700; text-align:center; padding:4px 2px; line-height:1.15; align-self:end}
@@ -1018,7 +1045,7 @@ function normProject(text) {
 
 /* ---- the screen ---- */
 /* ---- this build (25 Sep): menu, sync alert, find a job, the job page ---- */
-const OFFICE_VERSION = "2026-11-11.1";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
+const OFFICE_VERSION = "2026-11-11.2";   // bump with every change (it shows in the ☰ menu and in select * from devices();)
 const SYNC_ALERT_MINUTES = 60;
 
 // Is the Monday sync healthy? last = the newest log row, good = the newest row that worked.
@@ -1123,7 +1150,6 @@ if (typeof document !== "undefined") (function () {
     // Data (4 Nov; was Pace): every tracked number lives here from now on, each kind as a tab inside data's page (pace.html)
     { key: "pace", label: "Data", file: "pace.html", page: "pace", note: "Pace, time in stage, working days" },
     // Job status is a tab beside Operations (4 Nov), still opened as a section; tab: true keeps it out of the ☰ list
-    { key: "status", label: "Job status", file: "status.html", page: "status", note: "Where a job is, in one sentence", tab: true },
   ];
   const sectionOf = (k) => SECTIONS.find(x => x.key === k) || null;
   const mySections = () => SECTIONS.filter(x => x.lab ? !!(S.me && S.me.lab)       // the lab: only logins let in with lab_allow() (lab.sql)
@@ -1173,6 +1199,7 @@ if (typeof document !== "undefined") (function () {
     taskForm: { name: "", department: "sanding", assigned_to: "", schedule_type: "weekly", week_interval: 1, monthly_occurrence: 1, weekday: 1, start_date: "", is_test: false },
     msg: null, missing: false, openDetails: new Set(),
     supItems: [], supMissing: false, supEdit: null,
+    item: null, pgImg: {}, pgErr: {}, pgBusy: {}, pgBig: false, jobProg: null,
     // photos
     photos: [], photoStatus: null, photoMissing: false, phText: "", phJob: null, viewer: null, arch: null, jobZip: null,
     // this build: the menu, the sync alert, find a job, the job page
@@ -1184,7 +1211,8 @@ if (typeof document !== "undefined") (function () {
   // Job status sits beside Operations but is a section (status.html in the frame), hence data-section
   // 11 Nov (Luke): the tabs are the daily work, Operations · Job status · Purchasing · Deliveries. Arrow's list moved onto
   // Operations and its POs to Purchasing; OneDrive went to the ☰ menu (Operations says when the save needs you)
-  const TABS = [["tasks", "Operations"], ["status", "Job status", "section"], ["purchasing", "Purchasing", "section"], ["deliveries", "Deliveries", "section"]];
+  // 11 Nov (later): Jobs replaced the Job status tab and the corner Find a job: one list, one job page (Walkthrough 59)
+  const TABS = [["tasks", "Operations"], ["jobs", "Jobs"], ["purchasing", "Purchasing", "section"], ["deliveries", "Deliveries", "section"]];
 
   // ---------- data ----------
   const q = async (p) => { const { data, error } = await p; if (error) throw error; return data; };
@@ -1243,9 +1271,19 @@ if (typeof document !== "undefined") (function () {
     S.notice = null; S.missing = false;
     if (!isManager(S.me)) return;
     try {
+      if (S.tab === "jobs") {
+        S.allJobs = null;
+        // every job, a page at a time: Supabase hands back 1,000 rows a request, and the jobs table only grows
+        const [jj, fb] = await Promise.all([allRows(() => db.from("jobs").select("id, project_id, name, phase, delivery_date, is_active, is_test").order("id")).catch(() => null),
+          allRows(() => db.from("v_finish_by").select("job_id, department, department_name, pieces_done, pieces_required").eq("is_active", true).order("job_id").order("department")).catch(() => null)]);
+        S.allJobs = jj || [];
+        const prog = {}; for (const r of fb || []) if (r.pieces_required > 0) (prog[r.job_id] = prog[r.job_id] || []).push({ key: r.department, name: r.department_name, done: r.pieces_done, req: r.pieces_required });
+        const order = Object.keys(DEPT_NAME); for (const k in prog) prog[k].sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+        S.jobProg = prog;
+        return;
+      }
       if (S.tab === "photos") {
         await loadPhotoStatus();
-        if (S.phJob) await findJobPhotos(S.phJob.project);
         return;
       }
       if (S.tab === "tasks") {          // Operations: problems, ordering, stale flags, overdue routine tasks, Arrow, saving, handoffs, then flags
@@ -1342,23 +1380,44 @@ if (typeof document !== "undefined") (function () {
         <span class="brand">PRODUCTION</span><span class="place">${S.section ? esc(sectionOf(S.section).label) : "Office"}</span>
         ${isManager(S.me) ? `<nav class="tabs">${TABS.map(([k, label, kind]) => kind === "section"
           ? `<button class="tab" data-section="${k}" aria-current="${S.section === k && !S.jobView}">${label}</button>`
-          : `<button class="tab" data-tab="${k}" aria-current="${S.tab === k && !S.jobView && !S.section}">${label}${k === "tasks" && c.tasks ? `<span class="n">${c.tasks}</span>` : ""}</button>`).join("")}</nav>
-        <div class="find"><input data-jobfind="1" value="${esc(S.jobFind)}" placeholder="Find a job — PROJ or name" aria-label="Find a job" autocomplete="off" inputmode="search">
-          <div class="hits" id="jobhits" hidden>${hitsHtml()}</div></div>` : `<span style="flex:1"></span>`}
+          : `<button class="tab" data-tab="${k}" aria-current="${(S.tab === k && !S.jobView && !S.section) || (k === "jobs" && !!S.jobView)}">${label}${k === "tasks" && c.tasks ? `<span class="n">${c.tasks}</span>` : ""}</button>`).join("")}</nav>
+        <span style="flex:1"></span>` : `<span style="flex:1"></span>`}
         <span class="who"><b>${esc(S.me.name)}</b></span>
         <button class="sf-fb-btn" data-sffb="1" aria-label="Feedback"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h14v9H8l-4 3v-3H3z"/></svg><span>Feedback</span></button>
         ${(store.get("pin", null) || {}).hash ? `<button class="lockbtn" data-lock="1">Lock</button>` : ""}
       </div></header>`;
   }
 
-  function hitsHtml() {
-    if (!S.jobFind.trim()) return "";
-    if (!S.allJobs) return `<div class="none">Loading the jobs…</div>`;
-    const hits = jobMatches(S.allJobs, S.jobFind);
-    if (!hits.length) return `<div class="none">No job matches that.</div>`;
-    return hits.map((j, i) => `<button class="${i === 0 ? "first" : ""}" data-openjob="${esc(j.id)}"><b>${testTag(j)}${esc(j.project_id || "(no PROJ number)")}</b>
-      <span class="hn">${esc(j.name)}</span><span class="hp">${j.is_active ? "on the floor" : esc(j.phase || "not active")}</span></button>`).join("");
+  /** The Jobs tab's list (11 Nov): every job in production, soonest delivery first; typing finds any job, in production or not. */
+  function jobProgress(id) {
+    const L = (S.jobProg || {})[id]; if (!L || !L.length) return "";
+    const done = L.reduce((a, d) => a + d.done, 0), req = L.reduce((a, d) => a + d.req, 0);
+    if (!req) return "";
+    if (done >= req) return "Built";
+    if (!done) return "Not started";
+    let pct = Math.round(100 * done / req); if (pct === 100) pct = 99; if (pct === 0) pct = 1;
+    const act = L.filter(d => d.done > 0 && d.done < d.req);
+    return act.length ? `In ${act[0].name}${act.length > 1 ? " +" + (act.length - 1) : ""} · ${pct}%` : `${pct}% done`;
   }
+  function jobsListHtml() {
+    if (!S.allJobs) return `<div class="empty">Loading the jobs…</div>`;
+    const q = S.jobFind.trim();
+    const list = q ? jobMatches(S.allJobs, q).slice().sort((a, b) => a.is_test - b.is_test)   // a real job before its test copy
+      : S.allJobs.filter(j => j.is_active).sort((a, b) => (a.is_test - b.is_test) || String(a.delivery_date || "9999").localeCompare(String(b.delivery_date || "9999")) || String(a.project_id).localeCompare(String(b.project_id)));
+    if (!list.length) return `<div class="empty"><b>${q ? `No job matches “${esc(q)}”` : "No jobs in production"}</b>${q ? "Try the PROJ number, or fewer letters of the name." : "Jobs show here when Monday's Phase says In Production."}</div>`;
+    return `<div class="joblist">${list.map((j, i) => `<button class="jrow${i === 0 && q ? " first" : ""}" data-openjob="${esc(j.id)}">
+        <b class="pid">${testTag(j)}${esc(j.project_id || "(no PROJ number)")}</b><span class="nm">${esc(j.name)}</span>
+        <span class="sum">${esc(j.is_active ? jobProgress(j.id) || "In production" : j.phase || "Not in production")}</span>
+        <span class="due">${j.delivery_date ? `${esc(fmtDate(j.delivery_date))}${daysLeft(j.delivery_date) !== null ? ` · ${esc(daysText(daysLeft(j.delivery_date)))}` : ""}` : "no date"}</span></button>`).join("")}</div>`;
+  }
+  function jobsScreen() {
+    return `<h1>Jobs</h1>
+      <p class="sub">Every job in production, soonest delivery first. Search finds any job, in production or not.</p>
+      <label class="jobsearch"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
+        <input data-jobfind="1" value="${esc(S.jobFind)}" placeholder="PROJ number or job name (just 418 works)" aria-label="Find a job" autocomplete="off" inputmode="search"></label>
+      <div id="jobhits">${jobsListHtml()}</div>`;
+  }
+
 
   function menuHtml() {
     if (!S.menu) return "";
@@ -1410,10 +1469,17 @@ if (typeof document !== "undefined") (function () {
     S.job = { id, job, wo: cur, sheets, progress: progress || [], flags: flags || [], problems: problems || [], arrow: arrow || [],
               defects: defects || [], loadouts: loadouts || [], photoCount: photos ? photos.length : null, finishBy: finishBy || [], tv: tv || null, designs: designs || [] };
     rememberTvPics(tv);
+    // 11 Nov: where it is in one sentence and item by item (job_status.sql + job_items.sql), and its photos and trips
+    const [st] = await Promise.all([job.project_id || job.name ? quiet(db.rpc("job_lookup", { p_q: job.project_id || job.name })) : null,
+                                    job.project_id ? findJobPhotos(job.project_id).catch(() => {}) : null]);
+    if (S.jobView !== id || !S.job) return;
+    S.job.st = st && Array.isArray(st.jobs) ? st.jobs.find(x => x.job_id === id) || null : null;
+    S.job.at = st && st.at;
+    if (!job.project_id) S.phJob = null;
   }
   async function openJob(id) {
     S.jobBack = S.jobView ? S.jobBack : S.tab;
-    S.jobView = id; S.job = null; S.jobFind = ""; S.menu = false; S.msg = null; S.d3 = null;
+    S.jobView = id; S.job = null; S.item = null; S.menu = false; S.msg = null; S.d3 = null;
     if (S.section) { S.section = null; store.set("section", null); try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {} }
     render(); scrollTo(0, 0);
     await loadJob(id); render();
@@ -1421,7 +1487,8 @@ if (typeof document !== "undefined") (function () {
 
   function jobScreen() {
     const J = S.job;
-    const back = `<button class="link" data-jobback="1" style="padding-left:0">← Back</button>`;
+    if (J && S.item !== null && S.item !== undefined && J.st) return itemScreen();
+    const back = `<button class="link" data-jobback="1" style="padding-left:0">← ${S.jobBack === "jobs" ? "Jobs" : "Back"}</button>`;
     if (!J) return back + `<div class="empty">Loading the job…</div>`;
     if (J.missing) return back + `<div class="empty"><b>Can't find that job</b>It may have been removed from Monday, or the connection dropped.</div>`;
     const j = J.job;
@@ -1446,7 +1513,7 @@ if (typeof document !== "undefined") (function () {
              return `<div class="gh">${esc(DEPT_NAME[d])}${f ? `<small class="fbd">${esc(f.main)}${f.when ? `<br><b>${esc(f.when)}</b>` : ""}</small>` : ""}</div>`; }).join("")}
            <div class="gs tot"><b>Whole job</b><small>${pieces} pieces</small></div>
            ${g.totals.map(t => `<div class="tot"><div class="c">${t.done}/${t.req}</div><div class="tbar"><i class="${t.done >= t.req ? "full" : ""}" style="width:${t.pct}%"></i></div></div>`).join("")}
-           ${g.rows.map(r => `<div class="gs"><b>Sheet ${r.n}</b><small>${esc(r.code)}</small>${d3Button(J, r.code)}</div>${r.cells.map(c => `<div class="c ${c.kind}">${esc(c.text)}</div>`).join("")}`).join("")}
+           ${g.rows.map(r => `<div class="gs">${J.st && (J.st.sheets || []).some(x => x.n === r.n) ? `<button class="itemlink" data-item="${r.n}" aria-label="Sheet ${r.n}, ${esc(r.code)}: open the item"><b>Sheet ${r.n}</b> ›<small>${esc(r.code)}</small></button>` : `<b>Sheet ${r.n}</b><small>${esc(r.code)}</small>`}${d3Button(J, r.code)}</div>${r.cells.map(c => `<div class="c ${c.kind}">${esc(c.text)}</div>`).join("")}`).join("")}
          </div></div>`;
 
     // 20 Oct: one Status card, a line per fact, instead of six panels
@@ -1468,23 +1535,260 @@ if (typeof document !== "undefined") (function () {
         <div class="srow"><span class="k">Issues${openP.length + askedD.length ? `<span class="n">${openP.length + askedD.length} open</span>` : ""}</span><span class="v">${issuesV}</span>${openP.length + askedD.length ? `<button class="a" data-tab="tasks">Answer</button>` : "<span></span>"}</div>
         <div class="srow"><span class="k">Arrow${toGo.length + atArrow.length ? `<span class="n">${toGo.length + atArrow.length}</span>` : ""}</span><span class="v">${arrowV}</span><button class="a" data-arrowjump="1">On Operations</button></div>
         <div class="srow"><span class="k">Defects${J.defects.length ? `<span class="n">${J.defects.length}</span>` : ""}</span><span class="v">${defectsV}</span><span></span></div>
-        <div class="srow"><span class="k">Photos${J.photoCount ? `<span class="n">${J.photoCount}</span>` : ""}</span><span class="v">${J.photoCount ? `${J.photoCount} photo${J.photoCount === 1 ? "" : "s"}` : "None yet"}</span>${J.photoCount ? `<button class="a" data-jobphotos="${esc(j.project_id)}">See them</button>` : "<span></span>"}</div>
-        ${tv.length ? `<div class="srow"><span class="k">Floor TV</span><span class="v">${tvV}<span class="m">To hide one picture, open it on OneDrive (in the ☰ menu) and use the button under it.</span></span>${tvA || "<span></span>"}</div>` : ""}
+        <div class="srow"><span class="k">Photos${J.photoCount ? `<span class="n">${J.photoCount}</span>` : ""}</span><span class="v">${J.photoCount ? `${J.photoCount} photo${J.photoCount === 1 ? "" : "s"}` : "None yet"}</span>${J.photoCount ? `<button class="a" data-jobphotos="1">See them</button>` : "<span></span>"}</div>
+        ${tv.length ? `<div class="srow"><span class="k">Floor TV</span><span class="v">${tvV}<span class="m">To hide one picture, open it under Photos and deliveries below and use the button under it.</span></span>${tvA || "<span></span>"}</div>` : ""}
         <div class="srow"><span class="k">Load-outs</span><span class="v">${loV}</span><span></span></div>
       </section>`;
 
     const done = J.sheets.length ? g.totals.reduce((a, t) => a + t.done, 0) : 0;
     return `${back}
       <div class="jobhead"><h1>${testTag(j)}${esc(j.project_id || "(no PROJ number)")}<span class="jn">${esc(j.name)}</span></h1></div>
+      ${J.st ? `<div class="say"><p>${esc(JS.summary(J.st, J.st.departments || []))}</p><small>The sentence sales see on their Job status page${J.at ? ` · updated ${esc(clockOf(J.at))}` : ""}</small></div>` : ""}
       <div class="facts">
         <div class="fact"><small>Phase</small><b>${esc(facts[0])}</b></div>
         <div class="fact"><small>Delivery</small><b>${esc(j.delivery_date ? fmtDate(j.delivery_date) : "no date")}${j.delivery_date && daysLeft(j.delivery_date) !== null ? ` · ${esc(daysText(daysLeft(j.delivery_date)))}` : ""}</b></div>
         <div class="fact"><small>Work order</small><b>${J.wo ? `v${J.wo.version} · ${J.sheets.length} sheet${J.sheets.length === 1 ? "" : "s"} · ${pieces} pieces` : "none uploaded"}</b></div>
+        ${J.st ? `<div class="fact"><small>Trip</small><b>${esc(JS.tripFact(J.st))}</b></div>` : ""}
         ${J.wo ? `<div class="fact"><small>Steps done</small><b>${done} of ${g.totals.reduce((a, t) => a + t.req, 0)}</b></div>` : ""}
         ${flag ? `<div class="fact flag ${flag.level}"><small>${esc(LEVEL_NAME[flag.level])} · set by ${esc(flag.set_by_name)}, ${esc(ago(flag.set_at))}${flag.department_name ? ` · ${esc(flag.department_name)} only` : ""}</small><b>${esc(flag.note)}</b></div>` : ""}
       </div>
-      <div class="jobcols"><section class="panel"><h2 style="margin-bottom:10px">Progress by sheet</h2>${grid}</section><div class="side">${side}</div></div>`;
+      <div class="jobcols"><section class="panel"><h2 style="margin-bottom:4px">Items, by department</h2>${J.st && (J.st.sheets || []).length ? `<p class="sub" style="margin:0 0 10px">One row per work order sheet. Tap a sheet for its work order page, its 3D design and where it is.</p>` : ""}${grid}</section><div class="side">${side}</div></div>
+      <section class="panel" id="jobphotos"><h2>Photos and deliveries</h2>${!j.project_id ? `<p class="sub">This job has no PROJ number, so its photos can't be looked up.</p>`
+        : S.phJob && S.phJob.project === j.project_id ? jobPhotosHtml(S.phJob) : `<p class="sub">Loading…</p>`}</section>`;
   }
+
+  // ---------- one item of the open job (11 Nov; Job status's item page, inside the office) ----------
+  function itemScreen() {
+    const J = S.job, j = J.st, s = j.sheets[S.item], L = JS.itemDepts(j, s), prev = j.sheets[S.item - 1], next = j.sheets[S.item + 1];
+    const design = (J.designs || []).find(x => d3Norm(x.item) === d3Norm(s.code));
+    const rows = L.map(D => {
+      const w = JS.itemWhy(j, s, D, L), done = JS.itemComplete(s, D), pct = D.total ? Math.round(100 * D.done / D.total) : 0;
+      const dt = D.done >= D.total ? "Done" : D.finish_by ? `Done by ${fmtDate(D.finish_by)}` : "";
+      return `<div class="drow${done ? " done" : ""}"><div class="dn">${esc(D.name)}${w ? `<span class="why">${esc(w)}</span>` : ""}</div>
+        <div class="prog"><span class="num">${D.done}/${D.total}</span><span class="tbar"><i class="${D.done >= D.total ? "full" : ""}" style="width:${pct}%"></i></span></div><div class="due">${esc(dt)}</div></div>`;
+    }).join("");
+    const a = s.arrow, arrow = !a ? "" : a.back ? `Back from Arrow ${fmtDate(a.back)}${a.po ? ` (${a.po})` : ""}` : a.waiting ? "Waiting to go to Arrow" : `At Arrow${a.po ? " on " + a.po : ""} since ${fmtDate(a.since)}`;
+    const img = s.page ? S.pgImg[s.page] : null, err = s.page ? S.pgErr[s.page] : null;
+    if (s.page && !img && !err) loadItemPage(s.page);
+    const pic = !("page" in s) ? `<div class="pgwait">The work order page shows here once job_items.sql has run.</div>`
+      : !s.page ? `<div class="pgwait">This sheet's page hasn't been uploaded.</div>`
+      : img ? `<button class="pg${S.pgBig ? " big" : ""}" data-pgbig="1" aria-label="${S.pgBig ? "Make the page smaller" : "Make the page bigger"}"><img src="${esc(img)}" alt="Work order page for sheet ${s.n}"></button>`
+      : `<div class="pgwait">${esc(err || "Loading the work order page…")}</div>`;
+    return `<button class="link" data-itemback="1" style="padding-left:0">← ${esc(J.job.project_id || "Job")}</button>
+      <div class="jobhead"><h1>${testTag(J.job)}Sheet ${s.n}${s.code ? " · " + esc(s.code) : ""}<span class="jn">${s.qty} ${s.qty === 1 ? "piece" : "pieces"}</span></h1></div>
+      <div class="say"><p>${esc(JS.itemSentence(j, s))}</p><small>${esc(J.job.project_id || "")} · ${esc(J.job.name)}</small></div>
+      <div class="facts"><div class="fact"><small>This item's trip</small><b>${esc(JS.itemTripFact(j, s))}</b></div>
+        ${arrow ? `<div class="fact"><small>Arrow</small><b>${esc(arrow)}</b></div>` : ""}
+        ${s.issue ? `<div class="fact"><small>Open issue · ${esc(s.issue.dept)}${s.issue.stopped ? " · work stopped" : ""}</small><b>${esc(s.issue.text)}</b></div>` : ""}</div>
+      <div class="jobcols"><section class="panel"><h2>Work order page</h2>${pic}${s.page && img ? `<p class="sub" style="margin:6px 0 0">Tap the page to make it ${S.pgBig ? "smaller" : "bigger"}.</p>` : ""}</section>
+        <div class="side"><section class="panel"><h2>Departments</h2>${rows || `<p class="sub">No departments on this sheet.</p>`}
+          ${design ? `<button class="go" style="width:100%; margin-top:12px" data-d3="${esc(design.id)}">Open the 3D design</button>` : ""}
+          <div class="btns" style="margin-top:12px">${prev ? `<button class="plain" data-item="${prev.n}">‹ Sheet ${prev.n}</button>` : ""}${next ? `<button class="plain" data-item="${next.n}">Sheet ${next.n} ›</button>` : ""}</div></section></div></div>`;
+  }
+  async function loadItemPage(path) {
+    if (S.pgBusy[path]) return; S.pgBusy[path] = true;
+    try {
+      const { data, error } = await db.storage.from("work-orders").createSignedUrl(path, 3600);
+      if (error || !data || !data.signedUrl) throw error || new Error("no link");
+      S.pgImg[path] = data.signedUrl;
+    } catch (e) { S.pgErr[path] = isNetworkError(e) ? "No connection right now. The page shows once you're back online." : "The work order page couldn't be loaded."; }
+    S.pgBusy[path] = false;
+    if (S.jobView && S.item !== null) render();
+  }
+  const clockOf = (iso) => { const t = new Date(iso); let h = t.getHours(); const m = String(t.getMinutes()).padStart(2, "0"); const ap = h < 12 ? "am" : "pm"; h = h % 12 || 12; return `${h}:${m} ${ap}`; };
+
+  /* Where a job is, in words: COPIED FROM status.html, word for word (test_job_status_same.js keeps them equal), so the
+     office and the sales logins read the same sentence. Change status.html's and paste it here, never this one alone. */
+  const JS = (() => {
+  // ---------- dates, in the words the shop pages already use ----------
+  const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const d = (s) => { const [y, m, dd] = String(s).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, dd); };
+  const today = () => { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); };
+  const diffDays = (s) => Math.round((d(s) - today()) / 86400000);
+  const fmtDate = (s) => { const x = d(s); return `${MON[x.getMonth()]} ${x.getDate()}`; };
+  const days = (n) => `${n} ${n === 1 ? "day" : "days"}`;
+  const daysText = (n) => n < 0 ? `${days(-n)} late` : n === 0 ? "due today" : `${days(n)} left`;     // the office's delivery words
+  const finishWords = (n) => n > 0 ? `${days(n)} left` : n === 0 ? "today" : `${days(-n)} past`;   // the tablet's done-by words
+  const andList = (a) => a.length <= 1 ? (a[0] || "") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const pieces = (n) => `${n} ${n === 1 ? "piece" : "pieces"}`;
+  const clock = (iso) => { const t = new Date(iso); let h = t.getHours(); const m = String(t.getMinutes()).padStart(2, "0"); const ap = h < 12 ? "am" : "pm"; h = h % 12 || 12; return `${h}:${m} ${ap}`; };
+
+  // ---------- working out where a job is (from job_lookup's reply) ----------
+  const out = (j) => (j.arrow || []).filter(a => !a.waiting);
+  const isComplete = (j, D) => D.done >= D.total && !(D.key === "metal" && out(j).length);
+  const overall = (L) => {
+    const done = L.reduce((a, D) => a + D.done, 0), total = L.reduce((a, D) => a + D.total, 0);
+    let pct = total ? Math.round(100 * done / total) : 0;
+    if (done > 0 && pct === 0) pct = 1; if (done < total && pct === 100) pct = 99;
+    return { done, total, pct };
+  };
+  const trips = (j) => {
+    const T = j.trips || [], went = T.filter(t => t.done_on).reduce((a, t) => a + (t.went || 0), 0);
+    const of = T.length ? Math.max(...T.map(t => t.of || 0)) : 0;
+    return { T, done: T.filter(t => t.done_on), open: T.find(t => !t.done_on), went, of };
+  };
+  const tripPhrase = (t) => t.day
+    ? `${t.kind.toLowerCase()} ${fmtDate(t.day)}${t.time ? " at " + t.time : ""}, ${daysText(diffDays(t.day))}`
+    : `ready for ${t.kind.toLowerCase().replace(/ delivery$/, "")}, not picked up yet`;
+  const dateClause = (j, open) => {
+    if (open && open.day) return cap(tripPhrase(open)) + ".";
+    if (!j.delivery) return "No delivery date on Monday yet.";
+    return `Delivery ${fmtDate(j.delivery)}, ${daysText(diffDays(j.delivery))}.`;
+  };
+  function why(j, D) {
+    if (D.key === "metal" && D.done >= D.total && out(j).length) { const a = out(j)[0]; return `At Arrow since ${fmtDate(a.since)} · ${days(Math.max(0, -diffDays(a.since)))} out`; }
+    if (D.done > 0 || D.done >= D.total) return "";
+    if (D.ready > 0) return `${pieces(D.ready)} ready`;
+    if (D.held) return "Waiting on hand-off";
+    if ((D.waiting || []).length) return "Waiting on " + andList(D.waiting.map(w => w === "arrow" ? "Arrow" : w));
+    return "Not started";
+  }
+  function dateOf(D) {
+    if (D.done >= D.total) return { main: D.done_on ? `Done ${fmtDate(D.done_on)}` : "Done", when: "" };
+    if (D.finish_by) return { main: `Done by ${fmtDate(D.finish_by)}`, when: finishWords(diffDays(D.finish_by)) };
+    return null;                                                   // look-up logins get no done-by dates
+  }
+  function summary(j, L) {
+    if (!(j.sheets || []).length)
+      return j.phase && j.phase !== "In Production" ? `Not on the floor yet. Monday shows ${j.phase}. ${dateClause(j, null)}`
+                                                    : `In production on Monday; its work order isn't uploaded yet. ${dateClause(j, null)}`;
+    const t = trips(j), built = L.some(D => D.key === "assembly_qc") ? "Built and through QC." : "Built.";
+    if (t.done.length && t.went >= t.of) return `Delivered ${fmtDate(t.done[t.done.length - 1].done_on)}. All ${pieces(t.of)}${t.done.length > 1 ? `, in ${t.done.length} trips` : ""}.`;
+    const allDone = L.every(D => isComplete(j, D));
+    if (t.done.length) {
+      const rest = t.of - t.went, who = rest === 1 ? "The last one is" : `The other ${rest} are`;
+      const head = `Part delivered ${fmtDate(t.done[t.done.length - 1].done_on)}: ${t.went} of ${pieces(t.of)} went.`;
+      if (allDone) return `${head} ${who} built${t.open ? ": " + tripPhrase(t.open) : ", not scheduled yet"}.`;
+      const act = L.filter(D => D.done > 0 && D.done < D.total);
+      return `${head} ${who} in ${andList((act.length ? act : L.filter(D => !isComplete(j, D))).map(D => D.name))}.`;
+    }
+    if (allDone) {
+      if (t.open) return `${built} ${cap(tripPhrase(t.open))}.`;
+      if (!j.active) return `${built} Monday shows ${j.phase || "it's left production"}.`;
+      return `${built} Not scheduled for delivery yet.${j.delivery ? ` Monday’s date is ${fmtDate(j.delivery)}.` : ""}`;
+    }
+    const o = overall(L);
+    if (o.done === 0) return j.handed_off === false ? `Not handed off to the floor yet. ${dateClause(j, t.open)}` : `On the floor, nothing started yet. ${dateClause(j, t.open)}`;
+    const active = L.filter(D => D.done > 0 && D.done < D.total);
+    let s;
+    if (active.length) s = `In ${andList(active.map(D => D.name))}, ${o.pct}% done overall.`;
+    else { const ready = L.filter(D => D.done === 0 && D.ready > 0); s = ready.length ? `Ready for ${andList(ready.map(D => D.name))}, ${o.pct}% done overall.` : `${o.pct}% done overall.`; }
+    if (out(j).length) s += ` Part of it is at Arrow, ${days(Math.max(0, -diffDays(out(j)[0].since)))} so far.`;
+    const late = L.filter(D => D.done < D.total && D.finish_by).map(D => ({ D, n: -diffDays(D.finish_by) })).filter(x => x.n > 0).sort((a, b) => b.n - a.n)[0];
+    if (late) s += ` ${late.D.name} is ${days(late.n)} past its done-by date.`;
+    return `${s} ${dateClause(j, t.open)}`;
+  }
+  function shortStatus(j) {
+    const L = j.departments || [];
+    if (!(j.sheets || []).length) return j.phase || "No work order yet";
+    const t = trips(j);
+    if (t.done.length && t.went >= t.of) return `Delivered ${fmtDate(t.done[t.done.length - 1].done_on)}`;
+    if (t.done.length) return "Part delivered";
+    if (L.every(D => isComplete(j, D))) return t.open ? (t.open.day ? `${t.open.kind.replace(/ delivery$/, "")} ${fmtDate(t.open.day)}` : "Ready for pickup") : "Built, not scheduled";
+    const o = overall(L);
+    if (o.done === 0) return j.handed_off === false ? "Not handed off" : "Not started";
+    const active = L.filter(D => D.done > 0 && D.done < D.total);
+    return active.length ? `In ${active[0].name}${active.length > 1 ? " +" + (active.length - 1) : ""} · ${o.pct}%` : `${o.pct}% done`;
+  }
+  function tripFact(j) {
+    const t = trips(j); if (!t.T.length) return "Not scheduled yet";
+    const parts = [];
+    if (t.done.length) parts.push(`${t.went} of ${t.of} delivered ${fmtDate(t.done[t.done.length - 1].done_on)}`);
+    if (t.open) parts.push(t.open.day ? `${t.open.kind} ${fmtDate(t.open.day)}${t.open.time ? ", " + t.open.time : ""}` : `${t.open.kind}, ready`);
+    else if (t.went < t.of) parts.push("rest not scheduled");
+    return cap(parts.join("; "));
+  }
+
+  // ---------- one item (one work order sheet): 4 Nov ----------
+  const SHORT = { full_custom: "FC", milling: "Mill", cnc: "CNC", sanding: "Sand", finishing: "Fin", metal_paint: "Paint", metal: "Metal", assembly_qc: "QC" };
+  const WOOD = ["milling", "cnc", "sanding", "finishing"];
+  const itemDepts = (j, s) => (j.departments || []).filter(D => (s.p || {})[D.key])
+    .map(D => ({ key: D.key, name: D.name, finish_by: D.finish_by, done: s.p[D.key].done, total: s.p[D.key].of }));
+  const arrowOut = (s) => !!(s.arrow && !s.arrow.back);
+  const itemComplete = (s, D) => D.done >= D.total && !(D.key === "metal" && arrowOut(s));
+  function itemReady(j, s, D) {                                     // pieces of this sheet ready for D, from the sheet's own counts
+    const v = (k) => (s.p || {})[k] ? s.p[k].done : null;
+    if (D.key === "assembly_qc") {
+      let a = s.qty;
+      if (v("finishing") != null) a = Math.min(a, v("finishing")); else if (v("full_custom") != null) a = Math.min(a, v("full_custom"));
+      if (v("metal") != null) a = Math.min(a, arrowOut(s) ? 0 : v("metal"));
+      return Math.max(0, a - D.done);
+    }
+    const i = WOOD.indexOf(D.key);
+    for (let x = i - 1; x >= 0; x--) if (v(WOOD[x]) != null) return Math.max(0, v(WOOD[x]) - D.done);
+    if (i > 0 && v("full_custom") != null) return Math.max(0, (v("full_custom") >= s.qty ? s.qty : 0) - D.done);
+    return j.handed_off === false ? 0 : Math.max(0, D.total - D.done);
+  }
+  function itemWaits(s, D, L) {
+    const has = (k) => L.find(x => x.key === k);
+    if (D.key === "assembly_qc") {
+      const w = [], f = has("finishing"), fc = has("full_custom"), m = has("metal");
+      if (f && !itemComplete(s, f)) w.push(f.name); else if (!f && fc && !itemComplete(s, fc)) w.push(fc.name);
+      if (m && m.done < m.total) w.push(m.name); else if (m && arrowOut(s)) w.push("Arrow");
+      return w;
+    }
+    const i = WOOD.indexOf(D.key);
+    for (let x = i - 1; x >= 0; x--) { const p = has(WOOD[x]); if (p) return [p.name]; }
+    return i > 0 && has("full_custom") ? ["Full Custom"] : [];
+  }
+  function itemWhy(j, s, D, L) {
+    if (D.key === "metal" && D.done >= D.total && arrowOut(s))
+      return s.arrow.waiting ? "Waiting to go to Arrow" : `At Arrow${s.arrow.po ? " on " + s.arrow.po : ""} since ${fmtDate(s.arrow.since)}`;
+    if (D.done > 0) return "";
+    const r = itemReady(j, s, D); if (r > 0) return `${pieces(r)} ready`;
+    const w = itemWaits(s, D, L); if (w.length) return "Waiting on " + andList(w);
+    return j.handed_off === false ? "Waiting on hand-off" : "Not started";
+  }
+  function itemSentence(j, s) {
+    const L = itemDepts(j, s), open = trips(j).open, went = s.went || 0;
+    if (s.qty && went >= s.qty) return `Delivered ${fmtDate(s.went_on)}: all ${pieces(s.qty)} went${s.went_kind ? ` (${s.went_kind.toLowerCase()})` : ""}.`;
+    let x = went ? `${went} of ${pieces(s.qty)} went ${fmtDate(s.went_on)}. ` : "";
+    if (L.every(D => itemComplete(s, D))) {
+      const head = went ? "The rest is built" : "Built and through QC";
+      x += open ? `${head}. Goes on the ${tripPhrase(open)}.` : `${head}, waiting for ${went ? "a" : "its"} trip.`;
+    } else {
+      const act = L.filter(D => D.done > 0 && D.done < D.total);
+      if (act.length === 1) x += `In ${act[0].name}: ${act[0].done} of ${pieces(act[0].total)} done.`;
+      else if (act.length) x += `In ${andList(act.map(D => D.name))}.`;
+      else {
+        const nx = L.find(D => !itemComplete(s, D));
+        if (nx) { const r = itemReady(j, s, nx), w = itemWaits(s, nx, L);
+          x += r > 0 ? `Ready for ${nx.name}: ${pieces(r)} waiting to start.`
+             : !w.length && j.handed_off === false ? "Not handed off to the floor yet." : `${nx.name} next${w.length ? ": waiting on " + andList(w) : ""}.`; }
+      }
+      if (arrowOut(s)) x += s.arrow.waiting ? " Its metal is waiting to go to Arrow."
+                                            : ` Its metal is at Arrow${s.arrow.po ? " on " + s.arrow.po : ""}, ${days(Math.max(0, -diffDays(s.arrow.since)))} so far.`;
+    }
+    if (s.issue) x += ` ${s.issue.dept} has an open issue${s.issue.stopped ? " (work stopped)" : ""}.`;
+    const late = L.filter(D => D.done < D.total && D.finish_by).map(D => ({ D, n: -diffDays(D.finish_by) })).filter(z => z.n > 0).sort((a, b) => b.n - a.n)[0];
+    if (late) x += ` ${late.D.name} is ${days(late.n)} past its done-by date.`;
+    return x.trim();
+  }
+  function itemShort(j, s) {
+    const L = itemDepts(j, s), went = s.went || 0;
+    if (s.qty && went >= s.qty) return `Delivered ${fmtDate(s.went_on)}`;
+    if (went) return `${went} of ${s.qty} delivered`;
+    if (L.every(D => itemComplete(s, D))) return "Built";
+    const act = L.filter(D => D.done > 0 && D.done < D.total); if (act.length) return `In ${act[0].name}`;
+    if (arrowOut(s)) return s.arrow.waiting ? "Waiting for Arrow" : "At Arrow";
+    const nx = L.find(D => !itemComplete(s, D)); return nx ? `${nx.name} next` : "";
+  }
+  function dots(j, s) {
+    return itemDepts(j, s).map(D => {
+      const cls = D.key === "metal" && D.done >= D.total && arrowOut(s) ? "arrow" : D.done >= D.total ? "done" : D.done > 0 ? "part" : "zero";
+      return `<span class="dot ${cls}" title="${esc(D.name)}: ${D.done} of ${D.total}${cls === "arrow" ? ", at Arrow" : ""}">${esc(SHORT[D.key] || D.name)}</span>`;
+    }).join("");
+  }
+  function itemTripFact(j, s) {
+    const went = s.went || 0, open = trips(j).open;
+    const nxt = open ? (open.day ? `${open.kind} ${fmtDate(open.day)}${open.time ? ", " + open.time : ""}` : `${open.kind}, ready`) : "";
+    if (s.qty && went >= s.qty) return `Went ${fmtDate(s.went_on)} · ${s.went_kind || "trip"}`;
+    if (went) return `${went} of ${s.qty} went ${fmtDate(s.went_on)}; the rest ${nxt ? "on the " + nxt : "isn't scheduled yet"}`;
+    return nxt || "Not scheduled yet";
+  }
+    return { summary, tripFact, itemDepts, itemComplete, itemWhy, itemSentence, itemTripFact };
+  })();
 
   // ---------- 3D designs (1 Nov): an item's 3D model, from the job page's sheet rows ----------
   // The rows are the database's to give (design_viewer.sql): managers see them all. The viewer (sf-3d-viewer.js, then
@@ -1854,7 +2158,7 @@ if (typeof document !== "undefined") (function () {
     const openFl = openFlags(S.flags), stopped = open.filter(x => x.work_stopped).length;
     const tiles = strip.map(t => `<button class="st${(t.key === "problems" && stopped) || !t.n ? " hot" : ""}" data-jump="need-${t.key}"><span class="n num">${t.n || "!"}</span><span class="l">${esc(t.title)}${t.key === "problems" && stopped ? `<small>${stopped} work stopped</small>` : ""}</span></button>`)
       .concat([`<button class="st${openFl.length ? "" : " zero"}" data-jump="opsflags"><span class="n num">${openFl.length}</span><span class="l">Flags open${stale.length ? `<small>${stale.length} older than two weeks</small>` : ""}</span></button>`,
-               `<button class="st" data-findfocus="1"><span class="n num">${(S.activeJobs || []).length}</span><span class="l">Jobs in production<small>find one by PROJ or name</small></span></button>`]);
+               `<button class="st" data-tab="jobs"><span class="n num">${(S.activeJobs || []).length}</span><span class="l">Jobs in production<small>open the list</small></span></button>`]);
     return `<h1>Operations</h1>
       <p class="sub">What's waiting on the office, most urgent first, then the flags in front of the floor.</p>
       <div class="status">${tiles.join("")}</div>
@@ -2052,7 +2356,7 @@ if (typeof document !== "undefined") (function () {
     return `<section class="panel"><h2>Floor TV</h2><p class="sub" style="margin:0 0 8px">${esc(words)}</p>
       ${jobHidden ? `<button class="plain" data-tvjob="${esc(J.id)}" data-hide="0">Let this job's pictures show again</button>`
                   : withCopy ? `<button class="plain" data-tvjob="${esc(J.id)}" data-hide="1">Hide this job's pictures from the TV</button>` : ""}
-      <p class="meta2" style="margin:8px 0 0">To hide one picture, open it on OneDrive (in the ☰ menu) and use the button under it.</p></section>`;
+      <p class="meta2" style="margin:8px 0 0">To hide one picture, open it under Photos and deliveries below and use the button under it.</p></section>`;
   }
   /** Thumbnails; a photo off Supabase says where it is: an archive batch's zip, or OneDrive (off_supabase.sql, 31 Oct). */
   function photoStrip(list, caption = false) {
@@ -2091,19 +2395,16 @@ if (typeof document !== "undefined") (function () {
     const byId = new Map(S.photos.map(p => [p.id, p])); for (const x of S.phJob.photos) byId.set(x.id, x); S.photos = [...byId.values()];
   }
 
-  function photosScreen() {
-    const st = S.photoStatus;
-    const j = S.phJob;
-    let jobHtml = "";
-    if (j) {
+  /** A job's photos and what left the building (OneDrive's Look up a job until 11 Nov; now at the foot of the job page). */
+  function jobPhotosHtml(j) {
       const live = j.photos.filter(p => !p.voided);
       const onEntries = live.filter(p => p.kind !== "loadout");
       const away = j.photos.filter(p => p.in_cloud === false), archived = [...new Set(away.map(p => p.archive_batch).filter(Boolean))];
       const offSaved = away.filter(p => !p.archive_batch).length;
       const mistakes = j.photos.length - live.length;
       const time = (ts) => `${fmtDay(ts)} ${new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
-      jobHtml = !j.photos.length && !j.loadouts.length ? `<div class="empty" style="margin-top:12px"><b>No photos on ${esc(j.project)}</b>Nothing has been photographed on this job, or the number isn't right.</div>`
-        : `<h2 style="margin-top:18px">${esc(j.project)} <span class="meta2">${esc((j.photos[0] || j.loadouts[0] || {}).job_name || "")}</span></h2>
+      return !j.photos.length && !j.loadouts.length ? `<div class="empty" style="margin-top:12px"><b>No photos yet</b>Photos taken on this job's defects, issues and trips show here.</div>`
+        : `
         ${j.filing ? `<div class="btns"><button class="go" data-jobzip="1" ${S.jobZip && S.jobZip.busy ? "disabled" : ""}>Download this job's photos</button>
             <span class="meta2">One zip: a folder per item (TB-03/TB-03-2 Delivery Picture.jpg), the trucks, the delivery tickets and signed tickets, and a spreadsheet.</span></div>
           ${S.jobZip ? `<div class="banner ${S.jobZip.ok === false ? "warn" : "ok"}" style="margin-top:10px">${esc(S.jobZip.text)}</div>` : ""}` : ""}
@@ -2131,7 +2432,10 @@ if (typeof document !== "undefined") (function () {
         ${archived.length ? `<p class="sub" style="margin-top:12px">Some of this job's photos have been archived: ${archived.map(b => `photo-archive-${esc(b)}.zip, folder ${esc(j.project)}`).join("; ")}.</p>` : ""}
         ${offSaved ? `<p class="sub" style="margin-top:12px">${offSaved} of this job's photos ${offSaved === 1 ? "is" : "are"} off Supabase: ${offSaved === 1 ? "it's" : "they're"} in the job's OneDrive folder (${esc(SAVE_DIR)}) and the backup folder.</p>` : ""}
         ${mistakes ? `<p class="sub">${mistakes} photo${mistakes === 1 ? " was" : "s were"} marked entered by mistake and ${mistakes === 1 ? "isn't" : "aren't"} shown.</p>` : ""}`;
-    }
+  }
+
+  function photosScreen() {
+    const st = S.photoStatus;
     let space;
     const off = S.offStatus;
     if (S.photoMissing) space = `<div class="banner warn">The photos part isn't in the database yet. Run photos.sql (Walkthrough 7), then reload this page.</div>`;
@@ -2160,13 +2464,10 @@ if (typeof document !== "undefined") (function () {
             ${b.files_left > 0 ? `<button class="link" data-archagain="${esc(b.id)}">Download again</button>` : ""}</div>`).join("")}</details>` : ""}`;
     }
     return `<h1>OneDrive</h1>
-      <p class="sub">Saving everything to OneDrive and the hard drive, and the photos taken on the floor: on defects and issues, and Delivery's load-outs. Look a job up to see everything photographed on it, and what left the building when.</p>
+      <p class="sub">Saving everything to OneDrive and the hard drive, and the space photos and delivery files take on Supabase.</p>
       ${msgBanner()}
       ${savePanel()}
-      <section class="panel"><h2>Look up a job</h2>
-        <div class="btns" style="margin-top:4px"><input class="in" id="phJob" style="flex:1 1 220px; max-width:320px" value="${esc(S.phText)}" placeholder="PROJ number, e.g. 418">
-          <button class="go" data-phfind="1">Show</button></div>
-        ${jobHtml}</section>
+      <p class="sub">A job's photos and what left the building are on its page: open it on Jobs.</p>
       <section class="panel"><h2>Space on Supabase</h2>
         <p class="sub">Supabase's free plan holds about 1 GB. A job's photos and delivery files come off it by themselves once the job has been past Delivery for 60 days and the save above has found each file in both its OneDrive folder and the backup folder. Every record stays for good, and the files stay in OneDrive.</p>
         ${space}</section>`;
@@ -2807,7 +3108,7 @@ if (typeof document !== "undefined") (function () {
     showSections();
     if (S.locked) return pinScreen("unlock");
     if (S.section) { app.innerHTML = topBar() + menuHtml(); wire(); return; }
-    const screens = { setup: setupScreen, photos: photosScreen, feedback: feedbackScreen };
+    const screens = { jobs: jobsScreen, setup: setupScreen, photos: photosScreen, feedback: feedbackScreen };
     const body = S.jobView ? jobScreen() : (screens[S.tab] || needsScreen)();
     // a redraw mustn't pull the cursor out of Find a job while someone is typing in it
     const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches("[data-jobfind]");
@@ -2841,20 +3142,16 @@ if (typeof document !== "undefined") (function () {
       S.msg = ok ? { ok: true, text: "Copied. Paste it into a chat to plan changes." } : { ok: false, text: "This browser wouldn't copy. Select the notes on the page instead." };
       render();
     });
-    // find a job: only the list under the box redraws while typing, so the box keeps its place
+    // Jobs: only the list under the search box redraws while typing, so the box keeps its place
     const find = app.querySelector("[data-jobfind]");
     if (find) {
       const hits = app.querySelector("#jobhits");
-      const redraw = () => { hits.innerHTML = hitsHtml(); hits.hidden = !S.jobFind.trim() || document.activeElement !== find;
-        hits.querySelectorAll("[data-openjob]").forEach(b => b.onmousedown = (ev) => { ev.preventDefault(); openJob(b.dataset.openjob); }); };
-      find.onfocus = async () => { await loadAllJobs(); redraw(); };
+      const redraw = () => { hits.innerHTML = jobsListHtml(); hits.querySelectorAll("[data-openjob]").forEach(b => b.onclick = () => openJob(b.dataset.openjob)); };
       find.oninput = () => { S.jobFind = find.value; redraw(); };
       find.onkeydown = (ev) => {
-        if (ev.key === "Enter") { const first = hits.querySelector("[data-openjob]"); if (first) openJob(first.dataset.openjob); }
-        if (ev.key === "Escape") { S.jobFind = ""; find.value = ""; redraw(); find.blur(); }
+        if (ev.key === "Enter") { const first = hits.querySelector("[data-openjob]"); if (first && S.jobFind.trim()) openJob(first.dataset.openjob); }
+        if (ev.key === "Escape") { S.jobFind = ""; find.value = ""; redraw(); }
       };
-      find.onblur = () => setTimeout(() => { if (document.activeElement !== find) { hits.hidden = true; } }, 150);
-      redraw();
     }
     app.querySelectorAll("main [data-openjob]").forEach(b => b.onclick = () => openJob(b.dataset.openjob));
     app.querySelectorAll("[data-d3]").forEach(b => b.onclick = () => openDesign3(b.dataset.d3));
@@ -2862,10 +3159,14 @@ if (typeof document !== "undefined") (function () {
     app.querySelectorAll("[data-jobback]").forEach(b => b.onclick = async () => {
       S.d3 = null; S.jobView = null; S.job = null; S.tab = S.jobBack || S.tab; render(); scrollTo(0, 0); await loadTab(); render();
     });
-    app.querySelectorAll("[data-jobphotos]").forEach(b => b.onclick = async () => {
-      S.jobView = null; S.job = null; S.tab = "photos"; store.set("tab", "photos"); S.phText = b.dataset.jobphotos;
-      render(); scrollTo(0, 0); await loadTab(); await findJobPhotos(b.dataset.jobphotos); render();
-    });
+    app.querySelectorAll("[data-jobphotos]").forEach(b => b.onclick = () => { const el = document.getElementById("jobphotos"); if (el && el.scrollIntoView) el.scrollIntoView({ block: "start" }); });
+    // 11 Nov: one item (a work order sheet) of the open job
+    app.querySelectorAll("[data-item]").forEach(b => b.onclick = () => {
+      const st = S.job && S.job.st; if (!st) return;
+      const i = (st.sheets || []).findIndex(x => String(x.n) === b.dataset.item); if (i < 0) return;
+      S.item = i; S.pgBig = false; S.d3 = null; render(); scrollTo(0, 0); });
+    app.querySelectorAll("[data-itemback]").forEach(b => b.onclick = () => { S.item = null; S.d3 = null; render(); scrollTo(0, 0); });
+    app.querySelectorAll("[data-pgbig]").forEach(b => b.onclick = () => { S.pgBig = !S.pgBig; render(); });
     app.querySelectorAll("[data-lock]").forEach(b => b.onclick = () => { S.locked = true; S.pinEntry = ""; render(); });
     app.querySelectorAll("[data-live]").forEach(b => b.onclick = async () => {
       const d = S.depts.find(x => x.key === b.dataset.live); if (!d) return;
@@ -2927,7 +3228,7 @@ if (typeof document !== "undefined") (function () {
       const { data, error } = await db.rpc(fn, args);
       S.busy = false;
       S.msg = error ? { ok: false, text: friendlyError(error) } : { ok: true, text: typeof data === "string" ? data : (data && data.summary) || "Done." };
-      if (!error && after) after(data);
+      if (!error && after) await after(data);          // 11 Nov: wait for it (a job page's reload), or the redraw below can show the page as it was
       await loadTab(); render();
       return !error;
     };
@@ -2935,7 +3236,6 @@ if (typeof document !== "undefined") (function () {
       S.drafts[t.dataset.draft] = t.value;
       app.querySelectorAll(`[data-answer="${t.dataset.draft}"], [data-danswer="${t.dataset.draft}"]`).forEach(b => b.disabled = !t.value.trim());
     });
-    on("[data-findfocus]", () => { const f = document.querySelector("[data-jobfind]"); if (f) { f.focus(); f.select(); } });
     on("[data-openanswer]", (b) => { S.answering.add(b.dataset.openanswer); render(); const t = app.querySelector(`[data-draft="${b.dataset.openanswer}"]`); if (t) t.focus(); });
     on("[data-closeanswer]", (b) => { S.answering.delete(b.dataset.closeanswer); delete S.drafts[b.dataset.closeanswer]; render(); });
     on("[data-answer]", (b) => act("answer_problem", { p_problem: b.dataset.answer, p_body: (S.drafts[b.dataset.answer] || "").trim(), p_close: b.dataset.close === "1" },
@@ -3005,10 +3305,6 @@ if (typeof document !== "undefined") (function () {
       S.viewer = null;
       act("void_photo", { p_photo: b.dataset.voidphoto, p_reason: null }, () => { const x = S.photos.find(p => p.id === b.dataset.voidphoto); if (x) x.voided = true; });
     });
-    const phFind = async () => { const i = app.querySelector("#phJob"); S.phText = i ? i.value : ""; if (!S.phText.trim()) return;
-      S.msg = null; await findJobPhotos(normProject(S.phText)); render(); };
-    on("[data-phfind]", phFind);
-    app.querySelectorAll("#phJob").forEach(i => i.onkeydown = (e) => { if (e.key === "Enter") phFind(); });
     on("[data-archstart]", async () => {
       S.busy = true; S.msg = null; render();
       const { data, error } = await db.rpc("prepare_photo_archive");
@@ -3154,7 +3450,8 @@ if (typeof document !== "undefined") (function () {
       S.me.lab = !!(l && !l.error && l.data === true);
     }
     // which section to open: Julia always Deliveries; a manager, the link's #section or where they were last
-    const want = (location.hash || "").slice(1) || store.get("section", null);
+    let want = (location.hash || "").slice(1) || store.get("section", null);
+    if (want === "status") { want = null; S.tab = "jobs"; store.set("tab", "jobs"); store.set("section", null); }   // the old Job status tab opens Jobs
     S.section = scheduler ? "deliveries" : (want && sectionOf(want) ? want : null);
     const pin = store.get("pin", null);
     if (!pin) return pinScreen("set");

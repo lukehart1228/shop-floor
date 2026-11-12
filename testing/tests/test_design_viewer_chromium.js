@@ -169,8 +169,9 @@ async function tapAt(p, pt, dx = 0, dy = 0) { const s = await p.evaluate((pt) =>
     ok("…no page errors", !E.errs.length, E.errs.join(" | "));
     const L = await session(browser, users.luke);
     await L.p.goto(base + "office.html");
+    await L.p.waitForSelector('header.top [data-tab="jobs"]', { timeout: 20000 }); await L.p.click('header.top [data-tab="jobs"]');   // 11 Nov: Jobs
     await L.p.waitForSelector("[data-jobfind]", { timeout: 20000 }); await L.p.fill("[data-jobfind]", "PROJ-00418"); await sleep(500); await L.p.press("[data-jobfind]", "Enter");
-    await L.p.waitForFunction(() => /Progress by sheet/.test(document.body.innerText), null, { timeout: 20000 }); await sleep(500);
+    await L.p.waitForFunction(() => /Progress by sheet|Items, by department/i.test(document.body.innerText), null, { timeout: 20000 }); await sleep(500);
     ok("Older database: the office's job page has no 3D buttons, and no errors", !(await L.p.$("[data-d3]")) && /Sheet 1/.test(await appText(L.p)) && !L.errs.length, L.errs.join(" | "));
     console.log(`\n${pass} passed, ${fail} failed`); await browser.close(); server.close(); process.exit(fail ? 1 : 0);
   }
@@ -602,8 +603,9 @@ async function tapAt(p, pt, dx = 0, dy = 0) { const s = await p.evaluate((pt) =>
   // ---------- 7. the office's job page ----------
   const O = await session(browser, users.luke), op = O.p;
   await op.goto(base + "office.html");
+  await op.waitForSelector('header.top [data-tab="jobs"]', { timeout: 20000 }); await op.click('header.top [data-tab="jobs"]');   // 11 Nov: Jobs
   await op.waitForSelector("[data-jobfind]", { timeout: 20000 }); await op.fill("[data-jobfind]", "PROJ-00418"); await sleep(600); await op.press("[data-jobfind]", "Enter");
-  await op.waitForFunction(() => /Progress by sheet/.test(document.body.innerText) && document.querySelectorAll("[data-d3]").length, null, { timeout: 20000 });
+  await op.waitForFunction(() => /Progress by sheet|Items, by department/i.test(document.body.innerText) && document.querySelectorAll("[data-d3]").length, null, { timeout: 20000 });
   const btns = await op.evaluate(() => [...document.querySelectorAll(".grid .gs")].map(g => [g.querySelector("b") && g.querySelector("b").innerText, !!g.querySelector("[data-d3]")]).filter(x => x[0]));
   ok("The office's job page: a 3D button on each sheet row whose item has a model (sheets 1–6 and 9), none on 7–8", JSON.stringify(btns.filter(x => x[1]).map(x => x[0])) === JSON.stringify(["Sheet 1", "Sheet 2", "Sheet 3", "Sheet 4", "Sheet 5", "Sheet 6", "Sheet 9"]), JSON.stringify(btns));
   await op.click(".grid .gs [data-d3]");

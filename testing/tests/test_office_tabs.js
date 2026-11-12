@@ -1,5 +1,5 @@
 // 11 Nov: the office, simpler (office.html, purchasing.html and pace.html 2026-11-11.1), in real Chromium through the real
-// database as Luke. The tabs are the daily work (Operations · Job status · Purchasing · Deliveries); the ☰ menu holds Project
+// database as Luke. The tabs are the daily work (Operations · Jobs · Purchasing · Deliveries; Jobs replaced Job status later on 11 Nov); the ☰ menu holds Project
 // Handoff, Inventory, Data and OneDrive. Arrow's lists are on Operations (Gone to Arrow, Mark returned, back in three months); a
 // computer that remembers the old Arrow tab opens Operations; the job page's Arrow line jumps there. Setup: the floor's rules,
 // the Arrow alert (saved), then the connections; no Supply lists. Purchasing: AR-10 under POs with Make it again, the next AR
@@ -87,7 +87,7 @@ async function session(browser, user) {
   p.on("dialog", d => d.accept());
   await p.goto(base); await p.waitForSelector("header.top nav.tabs .tab", { timeout: 15000 });
   const tabs = await p.$$eval("nav.tabs .tab", els => els.map(e => ((e.firstChild && e.firstChild.textContent) || e.textContent).trim()));
-  ok("The office's tabs: Operations, Job status, Purchasing, Deliveries", JSON.stringify(tabs) === JSON.stringify(["Operations", "Job status", "Purchasing", "Deliveries"]), tabs.join(", "));
+  ok("The office's tabs: Operations, Jobs, Purchasing, Deliveries (Jobs since 11 Nov, test_jobs_tab)", JSON.stringify(tabs) === JSON.stringify(["Operations", "Jobs", "Purchasing", "Deliveries"]), tabs.join(", "));
   await p.click("[data-menu]"); await p.waitForSelector(".menu");
   const items2 = await p.$$eval(".menu .mitem, .menu a", els => els.map(e => ((e.firstChild && e.firstChild.textContent) || e.textContent).trim()));
   ok("The ☰ menu: Operations, Project Handoff, Inventory, Data, OneDrive, Tablet app, Setup, Feedback, Sign out",
@@ -105,6 +105,7 @@ async function session(browser, user) {
   a = await arr();
   ok("Mark returned: it leaves At Arrow and shows under Back from Arrow (1)", /Back from Arrow — last three months \(1\)/.test(a) && !/1 at Arrow/.test(a) && (await q("select count(*)::int n from outside_jobs where returned_on is not null"))[0].n === 1, a.slice(0, 200));
   // the job page's Arrow line jumps to Operations' Arrow section
+  await p.click('header.top [data-tab="jobs"]'); await p.waitForSelector("[data-jobfind]", { timeout: 10000 });   // 11 Nov: Jobs
   await p.fill("[data-jobfind]", "418"); await p.waitForSelector("#jobhits button[data-openjob]", { state: "attached", timeout: 8000 });
   await p.press("[data-jobfind]", "Enter"); await p.waitForSelector("[data-arrowjump]", { timeout: 15000 });   // Enter opens the first hit
   await p.click("[data-arrowjump]"); await p.waitForSelector("#opsarrow", { timeout: 10000 }); await p.waitForTimeout(1500);

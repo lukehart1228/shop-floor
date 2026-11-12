@@ -370,9 +370,14 @@ async function saveNow(w) { const n0 = (await runs()).length; await click(w, "[d
     ok("The next save: nothing new written, nothing missing, and the save is complete", r.files_written === 0 && LOG.length === w2 && r.onedrive_ok && r.backup_ok, JSON.stringify(r.problems));
     ok("The Photos tab counts what has come off (with the photo archived before) and what's still due", /3 files have come off so far\. 1 file is due now/.test(txt(t.w)),
        (txt(t.w).match(/Every record stays for good.{0,500}/) || [""])[0]);
-    t.w.document.querySelector("#phJob").value = "418"; await click(t.w, "[data-phfind]", 1500);
-    ok("Looking up PROJ-00418: the photo that went says it's in OneDrive", /Off Supabase · in OneDrive/.test(txt(t.w)) && /1 of this job's photos is off Supabase: it's in the job's OneDrive folder \(Production\) and the backup folder/.test(txt(t.w)),
+    // 11 Nov: a job's photos are at the foot of its page (Jobs), no longer looked up on OneDrive
+    await click(t.w, 'header [data-tab="jobs"]', 900); await until(() => $(t.w, "[data-jobfind]"), 6000);
+    t.w.document.querySelector("[data-jobfind]").value = "418"; t.w.document.querySelector("[data-jobfind]").dispatchEvent(new t.w.Event("input", { bubbles: true }));
+    await until(() => $(t.w, "#jobhits [data-openjob]"), 6000); await click(t.w, "#jobhits [data-openjob]", 300);
+    await until(() => /On defects and issues/.test(txt(t.w)), 10000);
+    ok("Opening PROJ-00418: the photo that went says it's in OneDrive", /Off Supabase · in OneDrive/.test(txt(t.w)) && /1 of this job's photos is off Supabase: it's in the job's OneDrive folder \(Production\) and the backup folder/.test(txt(t.w)),
        (txt(t.w).match(/On defects and issues.{0,300}/) || [""])[0]);
+    await click(t.w, "[data-menu]", 200); await click(t.w, '[data-tab="photos"]', 1200);   // back to OneDrive for the save
     odJob.find("Delivery/TB-03").kids.delete("1 Delivery.jpg");     // Luke deletes the edited copy
     r = await saveNow(t.w);
     ok("Deleting the changed copy: the next save puts the original back from Supabase, then takes it off",

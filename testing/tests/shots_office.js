@@ -38,6 +38,7 @@ const server = http.createServer((req, res) => {
   await p.goto(base + "/office.html"); try { await p.waitForFunction(() => /Needs you/i.test(document.getElementById("app").innerText), null, { timeout: 20000 }); } catch (e) { console.log("TEXT:", (await p.evaluate(() => document.getElementById("app").innerText)).slice(0, 400)); } await p.waitForTimeout(1200);
   await p.screenshot({ path: `${SHOTS}/office-home.png` });
   const ans = await p.$("[data-openanswer]"); if (ans) { await ans.click(); await p.waitForTimeout(500); await p.screenshot({ path: `${SHOTS}/office-home-answer.png` }); }
+  await p.click('header.top [data-tab="jobs"]'); await p.waitForSelector("[data-jobfind]");
   await p.fill("[data-jobfind]", "00418"); await p.waitForTimeout(600); await p.keyboard.press("Enter"); await p.waitForTimeout(1500);
   await p.screenshot({ path: `${SHOTS}/office-job.png` });
   console.log("errors:", errs.length ? errs : "none"); await browser.close(); server.close();

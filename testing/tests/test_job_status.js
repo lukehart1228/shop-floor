@@ -1,7 +1,7 @@
 // 28 Oct: Job status (status.html) in Chromium, through the real test database as each login.
 // Mike (a supervisor) finds a job by number and reads its sentence, departments, done-by dates and sheet grid;
 // Sally (a look-up login, made here) gets the same job with no done-by dates; a login with no profile is turned
-// away; a #PROJ link opens the job; Luke's office menu has Job status and opens it inside the office.
+// away; a #PROJ link opens the job. In the office, Jobs replaced the Job status tab (11 Nov).
 // 4 Nov: each job's Items list and an item's page (its work order page, open issue, Arrow, ‹ ›, #PROJ….n), for Mike;
 // Sally gets the page but no issue, done-by or 3D; Luke gets the 3D panel where the database gives him a design.
 // OLDDB=1 (no job_status.sql): the page says the database part isn't there yet. Screenshots with SHOTS=.
@@ -182,23 +182,18 @@ const shot = async (p, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
     ok("A login with no profile is told it can't look up jobs", /can't look up jobs/.test(await text(p)), (await text(p)).slice(0, 100));
     await ctx.close(); }
 
-  // ---- Luke: Job status is a tab beside Operations (4 Nov), and it opens inside the office ------------------------
+  // ---- Luke: Jobs replaced the Job status tab (11 Nov, test_jobs_tab.js has the rest); status.html stays the sales page --------
   { const { p, errs, ctx } = await session(browser, users.luke, { width: 1366, height: 860 });
     await p.goto(`${BASE}/office.html`); await p.waitForSelector("nav.tabs .tab", { timeout: 8000 });
     const tabs = await p.$$eval("nav.tabs .tab", els => els.map(e => ((e.firstChild && e.firstChild.textContent) || e.textContent).trim()));
-    ok("The office's tabs are Operations, Job status, Purchasing, Deliveries (11 Nov)", JSON.stringify(tabs) === JSON.stringify(["Operations", "Job status", "Purchasing", "Deliveries"]), tabs.join(", "));
+    ok("The office's tabs are Operations, Jobs, Purchasing, Deliveries (11 Nov)", JSON.stringify(tabs) === JSON.stringify(["Operations", "Jobs", "Purchasing", "Deliveries"]), tabs.join(", "));
     await p.click("[data-menu]"); await p.waitForSelector(".menu");
     // each item's own label (its first text), not innerText: the office re-draws as its data arrives (31 Oct)
     const items = await p.$$eval(".menu .mitem, .menu a", els => els.map(e => ((e.firstChild && e.firstChild.textContent) || e.textContent).trim()));
     ok("The ☰ menu doesn't list Job status (its first item, Operations, goes back to the tabs)", !items.includes("Job status") && items[0] === "Operations", items.join(", "));
     await p.click("[data-menuclose]").catch(() => {}); await p.waitForTimeout(200);
-    await p.click('nav.tabs [data-section="status"]'); await p.waitForTimeout(1500);
-    const fr = p.frames().find(f => f.url().includes("status.html"));
-    const hdr = fr ? await fr.$eval("header .hrow", el => getComputedStyle(el).display).catch(() => "?") : "no frame";
-    ok("The Job status tab opens it inside the office, with the page's own header hidden", !!fr && hdr === "none", `frame ${!!fr}, header ${hdr}`);
-    const cur = await p.$$eval("nav.tabs .tab", els => els.filter(e => e.getAttribute("aria-current") === "true").map(e => e.textContent.trim()));
-    ok("…and only the Job status tab is marked as the one open", JSON.stringify(cur) === JSON.stringify(["Job status"]), cur.join(", "));
-    ok("The address says #status, so a bookmark opens it", (await p.evaluate(() => location.hash)) === "#status");
+    await p.goto(`${BASE}/office.html?again=1#status`); await p.waitForSelector("main h1", { timeout: 8000 }); await p.waitForTimeout(1200);   // a new address, so it really loads again
+    ok("An old #status link opens Jobs, not status.html inside the office", /Jobs/.test(await p.$eval("main h1", e => e.textContent)) && !p.frames().some(f => f.url().includes("status.html")));
     await p.click('nav.tabs [data-tab="tasks"]'); await p.waitForTimeout(800);
     const back = await p.evaluate(() => ({ inSec: document.documentElement.classList.contains("in-section"), h1: (document.querySelector("main h1") || {}).textContent || "" }));
     ok("Operations takes it back to the office's own screen", !back.inSec && /Operations/.test(back.h1), JSON.stringify(back));

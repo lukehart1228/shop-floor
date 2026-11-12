@@ -212,12 +212,12 @@ const piece = (w, k) => $(w, `[data-partpiece="${k}"]`);
      /Part delivery record/.test(page) && / Today 17 of 20 tables went /.test(page) && /Still to come 3 tables \(sheet 1: table 1 · sheet 7: tables 3, 4\) and 1 extra, on a later trip/.test(page)
      && / Why Site not ready /.test(page) && !/Reading room/.test(page), page.slice(0, 400));
 
-  // ---- the office: the job's trips (Photos › Look up a job), and its own record page, the one the OneDrive save files ----
+  // ---- the office: the job's trips (at the foot of its page since 11 Nov; OneDrive's Look up a job before), and its own record page ----
   const O = bootPage("office.html", users.luke, { sfo_pin: JSON.stringify({ none: true }) }).w;
-  await until(() => $(O, '[data-menu]'), 8000);
-  await click(O, '[data-menu]', 300); await click(O, '[data-tab="photos"]', 900);   // 11 Nov: OneDrive is in the ☰ menu
-  await until(() => $(O, "#phJob"), 6000);
-  $(O, "#phJob").value = "PROJ-00418"; await click(O, "[data-phfind]", 300);
+  await until(() => $(O, 'header [data-tab="jobs"]'), 8000);
+  await click(O, 'header [data-tab="jobs"]', 900); await until(() => $(O, "[data-jobfind]"), 6000);
+  $(O, "[data-jobfind]").value = "PROJ-00418"; $(O, "[data-jobfind]").dispatchEvent(new O.Event("input", { bubbles: true }));
+  await until(() => $(O, "#jobhits [data-openjob]"), 6000); await click(O, "#jobhits [data-openjob]", 300);
   await until(() => /Part delivered/.test(txt(O)), 8000);
   ok("The office's job page: Part delivered, how much went, what's still to come, where the rest is, and why",
      /Part delivered/.test(txt(O)) && /17 of 20 tables went · still to come: 3 tables \(sheet 1: table 1 · sheet 7: tables 3, 4\) and 1 extra · the rest goes [^·]+ · Site not ready/.test(txt(O)),
