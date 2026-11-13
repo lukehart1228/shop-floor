@@ -52,7 +52,8 @@ fresh() { TEMPLATE=sync_base_new bash $B/fresh.sh "$@" >/dev/null 2>&1 || echo "
 scenario() { local f=$OUT/testing/tests/$1; [ -f "$f" ] || f=$REPO/testing/tests/$1; $PSQL -d sync -f "$f" >/dev/null 2>&1 || echo "  (scenario $1 failed to load)"; }
 
 want() { [ -z "${ONLY:-}" ] || echo " $ONLY " | grep -q " $1 "; }
-score_of() { local p f; p=$(grep -c "^PASS" "$1"); f=$(grep -c "^FAIL" "$1"); echo "$p PASS, $f FAIL"; [ "$f" == 0 ] && [ "$p" -gt 0 ]; }
+# 12 Nov (R-36): a line that skips itself (SKIP …: it shows an old database failing, and its release is live) is counted on the row, so it stays in sight
+score_of() { local p f s; p=$(grep -c "^PASS" "$1"); f=$(grep -c "^FAIL" "$1"); s=$(grep -c "^SKIP" "$1"); echo "$p PASS, $f FAIL$([ "$s" -gt 0 ] && echo ", $s SKIP")"; [ "$f" == 0 ] && [ "$p" -gt 0 ]; }
 # run <name> <needs: none|seed|scenario> <env…> -- the command runs in $T
 run() {
   local name=$1 needs=$2; shift 2; want $name || return
