@@ -44,8 +44,17 @@ done
 
 # the file runs on the old database (what live is today) twice, each as one transaction
 mk t_cs_run sync_base_old
-a=$($P -1 -d t_cs_run -f $F 2>&1 | tail -4 | tr '\n' ' '); b=$($P -1 -d t_cs_run -f $F 2>&1 | grep -c PASS)
-ok $([ "$b" = "4" ] && echo 1 || echo 0) "runs on the old database twice, 4/4 PASS both times" "$a / $b"
+a=$($P -1 -d t_cs_run -f $F 2>&1 | tail -4 | tr '\n' ' ')
+# 12 Nov (R-36): once a newer file that replaced some of this file's pieces is live (checks_clean.sql), the old database
+# has it too and the install log rightly refuses this file. Then there is nothing to show here: the line skips itself,
+# as test_direct_counts_off's old-check line does. That the refusal changes nothing is test_guards' and test_checks_clean's.
+if echo "$a" | grep -q "Stop — nothing was changed"; then
+  by=$(echo "$a" | grep -oE "is older than [a-z_0-9]+\.sql" | head -1 | sed 's/is older than //')
+  echo "SKIP  runs on the old database twice: ${by:-a newer file} replaced some of its pieces and is live, so the file is refused, as it should be (4/4 twice was shown on 7 Oct)"
+else
+  b=$($P -1 -d t_cs_run -f $F 2>&1 | grep -c PASS)
+  ok $([ "$b" = "4" ] && echo 1 || echo 0) "runs on the old database twice, 4/4 PASS both times" "$a / $b"
+fi
 
 # ---- each step broken on purpose; the right step must fail ----
 brk(){ # name, expected failing steps (space-separated), sql to break
@@ -79,8 +88,13 @@ w=$(echo "set role sim_pg; $sec1 reset role;" | $P -d t_cs_f 2>&1); rc=$?
 ok $([ $rc = 0 ] && echo 1 || echo 0) "not the owner: section 1 finishes without an error (Postgres only warns)" "$w"
 $P -d t_cs_f -f $F >/dev/null 2>&1   # as superuser it would revoke; put a public grant back as the owner to model the editor
 $P -d t_cs_f -c "set role sim_admin; grant execute on function extensions.http_get(varchar) to public; reset role;"
+# 12 Nov (R-36): since checks_clean.sql, R-14 is on record as accepted and step 1 then passes in words (that half is
+# test_checks_clean.sh). This line guards the other half: with no acceptance on record, step 1 still fails and says whose
+# the functions are. So take the acceptance back first, where the database has one.
+$P -d t_cs_f -c "do \$\$ begin if to_regclass('public.accepted_findings') is not null then
+  update accepted_findings set withdrawn_at = now() where finding = 'R-14' and withdrawn_at is null; end if; end \$\$;"
 m=$($P -d t_cs_f -c "select if_it_failed from check_connector_safety() where step=1 and result='FAIL'")
-ok $(echo "$m" | grep -q "belong to sim_admin, not postgres" && echo 1 || echo 0) "not the owner: step 1 says who owns them and not to turn a connector on" "$m"
+ok $(echo "$m" | grep -q "belong to sim_admin, not postgres" && echo "$m" | grep -q "Don't turn a connector on" && echo 1 || echo 0) "not the owner (and R-14 not on record as accepted): step 1 says who owns them and not to turn a connector on" "$m"
 
 for d in t_cs_old t_cs_new t_cs_run t_cs_b t_cs_f; do $P -d postgres -c "drop database if exists $d with (force)"; done
 echo "== $pass passed, $fail failed"

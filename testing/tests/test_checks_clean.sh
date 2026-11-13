@@ -10,7 +10,14 @@ H="-h /tmp/pg -p 5433"; P="timeout 280 psql $H -U postgres -X -q -At -v ON_ERROR
 SQL=${SQL:-/tmp/run_all_sql}
 pg_isready -q -h /tmp/pg -p 5433 || { su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pg/data -o '-k /tmp/pg -p 5433' -l /tmp/pg/log start" >/dev/null; sleep 2; }
 for d in sync_base_old sync_base_new; do $P -d $d -c 'select 1' >/dev/null 2>&1 || { echo "FAIL no $d database. Make it first (README §2)."; exit 1; }; done
-pass() { echo "PASS $1"; }; fail() { echo "FAIL $1  [$2]"; }
+pass() { echo "PASS $1"; }; fail() { echo "FAIL $1  [$2]"; }; skip() { echo "SKIP $1"; }
+# 12 Nov (R-36): once this release is on GitHub the kit builds sync_base_old from it too, so the "old" database already has
+# the new checks and the lines that show the old ones failing can't fail. They skip themselves then (as
+# test_direct_counts_off's old-check line does); everything else runs the same on either database.
+RELEASED=$($P -d sync_base_old -c "select (to_regprocedure('public.check_checks_clean()') is not null and to_regprocedure('public.check_two_day_rule()') is not null)::text")
+WAS="the release is live, so the old database has the new checks (shown failing on 12 Nov, before it went in)"
+# how many files the run order names: the count whats_installed() must show, whatever is added later
+N=$(grep -cE '^\| *[0-9]+ *\| *`[a-z_0-9]+\.sql`' $SQL/README.md)
 is() { if [ "$1" == "$2" ]; then pass "$3"; else fail "$3" "got '$1', expected '$2'"; fi; }
 has() { if echo "$1" | grep -q -- "$2"; then pass "$3"; else fail "$3" "got '$1'"; fi; }
 mk() { $P -d postgres -c "select pg_terminate_backend(pid) from pg_stat_activity where datname='$1' and pid<>pg_backend_pid()" -c "drop database if exists $1 with (force)" -c "create database $1 template $2" >/dev/null; }
@@ -47,11 +54,19 @@ SQL
 $P -d $D -f /tmp/cc_live.sql >/dev/null 2>/tmp/cc_live.err || { fail "the old database made to look like live" "$(tail -2 /tmp/cc_live.err)"; exit 1; }
 
 echo "--- the old checks on it, failing the way live's did on 12 Nov"
+if [ "$RELEASED" == "true" ]; then
+  skip "old: check_incomplete_deliveries 9/10 (a sales look-up login taken for another department's supervisor): $WAS"
+  skip "old: it is step 5 that fails: $WAS"
+  skip "old: check_onedrive_save 7/8 (a real good save in the last 8 days): $WAS"
+  skip "old: check_connector_safety 2/4 (R-14: the functions aren't the SQL Editor's to close): $WAS"
+  skip "old: check_inventory 15/16 when the live Maple 6/4 has no opening count: $WAS"
+else
 is "$(score $D check_incomplete_deliveries)" "9/10" "old: check_incomplete_deliveries 9/10 (a sales look-up login taken for another department's supervisor)"
 is "$(bad $D check_incomplete_deliveries)" "5" "old: it is step 5 that fails"
 is "$(score $D check_onedrive_save)" "7/8" "old: check_onedrive_save 7/8 (a real good save in the last 8 days)"
 is "$(score $D check_connector_safety)" "2/4" "old: check_connector_safety 2/4 (R-14: the functions aren't the SQL Editor's to close)"
 is "$(score $D check_inventory)" "15/16" "old: check_inventory 15/16 when the live Maple 6/4 has no opening count"
+fi
 is "$($P -d $D -c "select result from check_monday_sync() where step = 6")" "FAIL" "old: check_monday_sync step 6 fails on PROJ-00421-2"
 has "$($P -d $D -c "select problems::text from monday_sync_log order by run_at desc limit 1")" "PROJ-00421-2 has a work order uploaded" "old: the sync reports PROJ-00421-2 on every run"
 r=$($P -d $D -c "select count(*) from check_pace() where result <> 'PASS'")
@@ -62,7 +77,7 @@ for f in two_day_rule checks_clean install_log; do
   a=$($P -1 -d $D -f $SQL/$f.sql 2>&1 | grep -c "FAIL\|ERROR"); b=$($P -1 -d $D -f $SQL/$f.sql 2>&1 | grep -c "FAIL\|ERROR")
   is "$a $b" "0 0" "$f.sql runs twice with no FAIL row and no error"
 done
-is "$($P -d $D -c "select count(*) || ' ' || count(*) filter (where result = 'PASS') from whats_installed()")" "62 62" "whats_installed(): 62 files, all PASS"
+is "$($P -d $D -c "select count(*) || ' ' || count(*) filter (where result = 'PASS') from whats_installed()")" "$N $N" "whats_installed(): every file in the run order ($N), all PASS"
 
 echo "--- the same checks afterwards"
 for c in check_incomplete_deliveries:10/10 check_onedrive_save:8/8 check_connector_safety:4/4 check_inventory:16/16 check_pace:13/13 check_off_supabase:10/10 check_zip_drop:12/12 check_two_day_rule:6/6 check_checks_clean:8/8 check_job_status:10/10 check_job_items:5/5; do
@@ -187,9 +202,14 @@ brk "a found zip file with no first-found time" check_two_day_rule "1" "insert i
 echo "--- the other paste order (install_log.sql first) and the old files now stop"
 TEMPLATE=sync_base_old bash /home/claude/sf/base/fresh.sh >/dev/null 2>&1; mk t_cc2 sync
 r=$($P -1 -d t_cc2 -f $SQL/install_log.sql 2>&1 | grep -c "Not installed")
+if [ "$RELEASED" == "true" ]; then
+  skip "install_log.sql pasted first: its table shows the two new files as not installed yet, nothing else: the release is live, so both are installed already (2 was shown on 12 Nov)"
+  is "$r" "0" "install_log.sql pasted again on today's database: no file shown as not installed"
+else
 is "$r" "2" "install_log.sql pasted first: its table shows the two new files as not installed yet, nothing else"
+fi
 for f in two_day_rule checks_clean; do is "$($P -1 -d t_cc2 -f $SQL/$f.sql 2>&1 | grep -c "FAIL\|ERROR")" "0" "then $f.sql: no FAIL, no error"; done
-is "$($P -d t_cc2 -c "select count(*) filter (where result = 'PASS') from whats_installed()")" "62" "and whats_installed() is 62 PASS"
+is "$($P -d t_cc2 -c "select count(*) || ' ' || count(*) filter (where result = 'PASS') from whats_installed()")" "$N $N" "and whats_installed() is all PASS, every file in the run order ($N)"
 for f in off_supabase short_names pace onedrive_save connector_safety incomplete_deliveries inventory office job_status; do
   has "$($P -1 -d t_cc2 -f /home/claude/sf/repo/sql/$f.sql 2>&1 | grep -m1 "ERROR")" "Stop — nothing was changed" "$f.sql run again now stops, changing nothing"
 done

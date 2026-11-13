@@ -136,8 +136,10 @@ async function session(browser, user) {
   ok("Purchasing › POs lists AR-10 under Arrow POs, with PDF and Make it again, and says the next is AR-11", /Arrow POs/.test(t) && /AR-10/.test(t) && /418/.test(t) && !!(await p.$("[data-arremake]")) && /The next is AR-11/.test(t));
   await p.click('#tabs [data-tab="setup"]'); await p.waitForSelector("#nextArrow", { timeout: 10000 });
   ok("Setup › PO numbers has the next Arrow PO beside the other two, and says the last was AR-10", (await p.inputValue("#nextArrow")) === "11" && /The last Arrow PO is AR-10/.test(await p.innerText("main")));
-  await p.fill("#nextArrow", "40"); await p.click("[data-savenextarrow]"); await p.waitForTimeout(1500);
-  ok("…saving it sets the next AR number, and only that", (await q("select next_number, phone from arrow_po_settings"))[0].next_number === 40 && (await q("select phone from arrow_po_settings"))[0].phone === "555-0100");
+  await p.fill("#nextArrow", "40"); await p.click("[data-savenextarrow]");
+  // 12 Nov (R-36): wait for the save itself, up to 10 s, not a fixed 1.5 s (after a long run of browser tests the save once landed later and this line failed)
+  let saved = {}; for (let i = 0; i < 20; i++) { saved = (await q("select next_number, phone from arrow_po_settings"))[0] || {}; if (saved.next_number === 40) break; await p.waitForTimeout(500); }
+  ok("…saving it sets the next AR number, and only that", saved.next_number === 40 && saved.phone === "555-0100");
   t = await p.innerText("main");
   ok("Setup has Supply lists, one fold per department with a Supplies tab", /Supply lists/.test(t) && (await p.$$('details[data-keep^="sup_"]')).length === 7);
   await p.evaluate(() => { document.querySelector('details[data-keep="sup_cnc"]').open = true; });
