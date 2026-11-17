@@ -76,7 +76,7 @@ const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
     await luke.rpc("set_arrow_po_settings", { p: { issued_by: "Luke Hart", address: "Purposeful Design", next_number: 10 } });
     const j99 = (await q("select id from jobs where project_id = 'PROJ-00099'"))[0].id;
     await q(`insert into outside_jobs (job_id, sheet_numbers, service, department, sent_on, waiting, queued_on, queued_by_name, sent_by_name)
-             values ($1, '{1}', 'powdercoat', 'metal', current_date, true, current_date, 'Willie', 'Willie')`, [j99]);
+             values ($1, '{1}', 'powdercoat', 'metal', local_today(), true, local_today(), 'Willie', 'Willie')`, [j99]);
     const item = (await q("select id from outside_jobs where job_id = $1 and waiting", [j99]))[0].id;
     const mk = await makeClient(users.willie).rpc("arrow_po_make", { p_client_id: crypto.randomUUID(), p_gone_on: null, p_items: [{ id: item }] });
     poRow = mk.data;

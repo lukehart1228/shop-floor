@@ -20,7 +20,9 @@ WAS="the release is live, so the old database has the new checks (shown failing 
 N=$(grep -cE '^\| *[0-9]+ *\| *`[a-z_0-9]+\.sql`' $SQL/README.md)
 # 17 Nov: files after checks_clean.sql in the run order (later releases), pasted on top so every file is installed
 LATER=$(grep -oE '^\| *[0-9]+ *\| *`[a-z_0-9]+\.sql`' $SQL/README.md | awk -F'|' '$2+0 > 62' | grep -oE '[a-z_0-9]+\.sql')
-NL=$(echo "$LATER" | grep -c .)
+# 17 Nov: of those, only the ones today's database hasn't run count as not installed there (once a later file is live,
+# the old database has it too; counting all of them went stale the moment partial_sends.sql went live)
+NL=$(for f in $LATER; do [ "$($P -d sync_base_old -c "select count(*) from sql_file_runs where file = '$f'")" == 0 ] && echo $f; done | grep -c .)
 is() { if [ "$1" == "$2" ]; then pass "$3"; else fail "$3" "got '$1', expected '$2'"; fi; }
 has() { if echo "$1" | grep -q -- "$2"; then pass "$3"; else fail "$3" "got '$1'"; fi; }
 mk() { $P -d postgres -c "select pg_terminate_backend(pid) from pg_stat_activity where datname='$1' and pid<>pg_backend_pid()" -c "drop database if exists $1 with (force)" -c "create database $1 template $2" >/dev/null; }

@@ -94,7 +94,9 @@ function words(iso, today) {
     });
     await page.clock.install({ time: new Date(`${today}T15:00:05`) });
     await page.clock.resume();
-    await page.goto("file://" + path.resolve(pagePath) + "#k=" + key);
+    // 17 Nov: a page works out live or test from the folder it sits in, so the TV is opened from a folder named shop-floor
+    const dir = fs.mkdtempSync("/tmp/tv_coming-") + "/shop-floor"; fs.mkdirSync(dir); fs.copyFileSync(pagePath, dir + "/tv.html");
+    await page.goto("file://" + dir + "/tv.html#k=" + key);
     await page.waitForSelector(".main", { timeout: 20000 }).catch(() => {});      // the first snapshot (a cold database can be slow)
     await page.waitForFunction(() => !document.querySelector(".home .waiting") || !/Loading/.test(document.querySelector(".home .waiting").textContent), null, { timeout: 15000 }).catch(() => {});
     await wait(1500);

@@ -5,7 +5,8 @@
 const fs = require("fs"); const OUT = process.env.OUT || "/tmp/allpages";
 let pass = 0, fail = 0; const ok = (name, cond, info = "") => { cond ? pass++ : fail++; console.log(`${cond ? "PASS" : "FAIL"}  ${name}${!cond && info ? "  — " + info : ""}`); };
 const PAGES = ["index.html", "office.html", "delivery.html", "inventory.html", "pace.html", "drop.html", "status.html", "machine.html", "purchasing.html"];   // purchasing.html 7 Nov
-const strip = (s) => s.replace(/<!--[\s\S]*?-->/g, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1")     // comments
+// 17 Nov: the site block names the two GitHub folders (shop-floor, shop-floor-test) and their addresses: internal names too
+const strip = (s) => s.replace(/\/\* ===== THE SITE: LIVE OR TEST[\s\S]*?END OF THE SITE BLOCK ===== \*\//g, "").replace(/<!--[\s\S]*?-->/g, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1")     // comments
   .replace(/shop-floor-[a-z-]+/g, "").replace(/shop-floor data/g, "").replace(/lukehart1228\.github\.io\/shop-floor/g, "");          // internal names
 for (const p of PAGES) {
   const s = strip(fs.readFileSync(`${OUT}/${p}`, "utf8"));

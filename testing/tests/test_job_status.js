@@ -62,7 +62,7 @@ const text = (p) => p.$eval("#app", el => el.innerText).catch(() => "");
 const shot = async (p, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await p.screenshot({ path: path.join(SHOTS, name + ".png"), fullPage: true }); } };
 
 (async () => {
-  await new Promise(r => server.listen(0, r)); const BASE = `http://127.0.0.1:${server.address().port}`;
+  await new Promise(r => server.listen(0, r)); const BASE = `http://127.0.0.1:${server.address().port}/shop-floor`;   // 17 Nov: pages work out live or test from their folder
   const job = (await admin.query(`select j.id, j.project_id from jobs j join work_orders w on w.job_id = j.id and w.is_current
                                    where not j.is_test order by j.project_id limit 1`)).rows[0];
   const num = job.project_id.replace(/\D/g, "").replace(/^0+/, "");

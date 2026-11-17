@@ -8,14 +8,19 @@
 #   OUT=/some/folder bash run_all.sh …                        another folder of changed files (laid out like the repo)
 #   ONLY="test_same test_feedback" bash run_all.sh pages1     a few tests by name (no .js/.sh)
 #
-# What it does: builds sync_base_old (the live repo's sql/) and sync_base_new (the same plus OUT's sql/), lays every page
-# out in /tmp/allpages (live pages, OUT's on top), then runs each test on a fresh seeded copy of the NEW database with the
+# What it does: builds sync_base_old (the live repo's sql/) and sync_base_new (the test repo's sql/ plus OUT's), lays every page
+# out in /tmp/allpages (the test repo's pages, OUT's on top), then runs each test on a fresh seeded copy of the NEW database with the
 # environment its README entry names. Each test's full output is in /tmp/run_all/<test>.log. A test's own OLDDB= / MODE=
 # proofs for its build are not run here: those belong to the build chat that made the file (see testing/README.md §2).
+# 17 Nov (the test environment): the OLD side is the live repo (shop-floor), unchanged. The NEW side is the test repo
+# (shop-floor-test, the next release, which setup.sh downloads to /home/claude/sf/test) with OUT's files on top. Until the
+# test repo exists, the new side is the live repo, and the run says so. The kit's own files always come from the live repo
+# (then OUT): a test repo imported earlier may carry an older kit.
 # Exit code: 0 when every test is all PASS.
 set -u
 G=${1:-all}
 SF=/home/claude/sf; REPO=$SF/repo; OUT=${OUT:-$SF/out}; T=$SF/t; B=$SF/base; LOG=/tmp/run_all; mkdir -p $LOG
+NEXT=$SF/test; [ -f $NEXT/index.html ] || NEXT=$REPO                 # the next release: the test repo, if setup.sh got it
 PSQL="psql -h /tmp/pg -p 5433 -U postgres -q"
 PW="PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS=1"
 export TZ=America/Indiana/Indianapolis
@@ -27,7 +32,8 @@ pg_isready -q -h /tmp/pg -p 5433 || su postgres -c "/usr/lib/postgresql/16/bin/p
 # 1. the pages: live, with OUT's on top; the kit files the same way (tests and helpers from OUT win)
 if [ "$G" != table ]; then
 rm -rf /tmp/allpages && mkdir -p /tmp/allpages
-cp $REPO/*.html $REPO/*.js $REPO/*.css $REPO/*.png $REPO/manifest.webmanifest /tmp/allpages/ 2>/dev/null
+[ "$NEXT" == "$REPO" ] && echo "!! no test repo at $SF/test: the new side is the live repo (run setup.sh once shop-floor-test exists)"
+cp $NEXT/*.html $NEXT/*.js $NEXT/*.css $NEXT/*.png $NEXT/manifest.webmanifest /tmp/allpages/ 2>/dev/null
 [ -d $OUT ] && cp $OUT/*.html $OUT/*.js $OUT/*.css $OUT/*.png $OUT/manifest.webmanifest /tmp/allpages/ 2>/dev/null
 # 11 Nov: pages taken off GitHub. Listed in OUT/testing/RETIRED_PAGES (one name a line) while the release is being built, so the
 # run sees the repo as it will be; once they're gone from the repo the list does nothing.
@@ -41,10 +47,10 @@ fi
 # 2. the databases
 NEWSQL=/tmp/run_all_sql
 if in_group build; then
-  rm -rf $NEWSQL && cp -r $REPO/sql $NEWSQL && [ -d $OUT/sql ] && cp $OUT/sql/* $NEWSQL/ 2>/dev/null
+  rm -rf $NEWSQL && cp -r $NEXT/sql $NEWSQL && [ -d $OUT/sql ] && cp $OUT/sql/* $NEWSQL/ 2>/dev/null
   echo "== building sync_base_old (live sql/)"; LIVE=$REPO/sql bash $B/load.sh 2>&1 | grep -E "FAILED|LOADED [0-9]" || { echo "BUILD FAILED (old)"; exit 1; }
   $PSQL -d postgres -c "drop database if exists sync_base_old with (force)" -c "create database sync_base_old template sync_base" >/dev/null 2>&1
-  echo "== building sync_base_new (live sql/ + $OUT/sql)"; LIVE=$NEWSQL bash $B/load.sh 2>&1 | grep -E "FAILED|LOADED [0-9]" || { echo "BUILD FAILED (new)"; exit 1; }
+  echo "== building sync_base_new ($NEXT/sql + $OUT/sql)"; LIVE=$NEWSQL bash $B/load.sh 2>&1 | grep -E "FAILED|LOADED [0-9]" || { echo "BUILD FAILED (new)"; exit 1; }
   $PSQL -d postgres -c "drop database if exists sync_base_new with (force)" -c "create database sync_base_new template sync_base" >/dev/null 2>&1
   [ "$G" == build ] && { echo "built; now: sql, pages1, pages2, browser1, browser2, browser3, then table"; exit 0; }
 fi
@@ -91,8 +97,9 @@ run test_arrow_po_same     none  OUT=$P -- node test_arrow_po_same.js   # 11 Nov
 run test_builder_catch     none  OUT=$P -- node test_builder_catch.js   # 2 Nov: real supabase-js requests have no .catch
 want test_lab_reference && row test_lab_reference skipped "retired 11 Nov: lab.html left GitHub"
 run test_app_name          none  OUT=$P -- node test_app_name.js   # 4 Nov: the app is called Production
+run test_site_block        none  OUT=$P LIVEREPO=$REPO -- node test_site_block.js   # 17 Nov: the site block, every saved name through sfName(), live's names unchanged
 # 4 Nov: test_same sets the top bar and tab strip aside and skips Arrow: Arrow left Metal's, Assembly's and Delivery's tabs for its own department
-if [ -f $OUT/index.html ]; then run test_same seed NEWPAGE=$OUT/index.html HEADER=ignore NAV=ignore SKIP_TABS=arrow -- node test_same.js; else want test_same && row test_same skipped "no tablet page in OUT"; fi
+if ! cmp -s $P/index.html $REPO/index.html; then run test_same seed NEWPAGE=$P/index.html HEADER=ignore NAV=ignore SKIP_TABS=arrow -- node test_same.js; else want test_same && row test_same skipped "the tablet page is live's"; fi
 run test_same_office       seed  OUT=$P PHOTOSPACE=ignore ARROWPOS=ignore NAMES=ignore EXPORT=ignore BUYING=ignore OFFICE11=ignore JOBS11=ignore -- node test_same_office.js   # 31 Oct: the Photos tab changed on purpose; 1 Nov: the Arrow POs panel; 4 Nov: the office names, and Inventory's Export counts; 11 Nov: Arrow onto Operations, Setup's order, Data's Setup button
 run test_feedback          seed  OUT=$P -- node test_feedback.js
 run test_feedback_close    seed  OUT=$P -- node test_feedback_close.js
@@ -122,6 +129,7 @@ run test_office_sections   seed  OUT=$P $PW -- node test_office_sections.js
 run test_office_link       seed  PAGE=$PAGE $PW -- node test_office_link.js
 run test_auto_update       seed  PAGE=$PAGE ROOT=$P $PW -- node test_auto_update.js
 run test_sw_assets         none  SW=$P/sw.js $PW -- node test_sw_assets.js
+run test_site_split_chromium seed OUT=$P LIVEREPO=$REPO $PW -- node test_site_split_chromium.js   # 17 Nov: live and test in one browser share nothing
 run test_drawing_pictures  seed  PAGE=$PAGE $PW -- node test_drawing_pictures.js
 run test_inv_export       seed  OUT=$P $PW -- node test_inv_export.js   # 4 Nov: Export counts on the Inventory page
 fi
@@ -146,7 +154,7 @@ run test_design_viewer_chromium seed OUT=$P $PW -- node test_design_viewer_chrom
 fi
 
 if in_group table; then
-echo; echo "===================== run_all: $(date '+%d %b %H:%M') — pages from $P, sql from $NEWSQL ====================="
+echo; echo "===================== run_all: $(date '+%d %b %H:%M') — new side: $NEXT with $OUT on top (pages $P, sql $NEWSQL) ====================="
 printf '%-32s %-10s %s\n' TEST RESULT SCORE; cat $ROWS
 echo "Not run here: shots_tablet.js and shots_office.js (screenshots, not tests); each test's OLDDB=/MODE= proofs for its own build; the three Monday checks (need the real Monday)."
 if grep -qE '^\S+\s+FAIL' $ROWS; then echo "SOMETHING FAILED — read the log named on its row"; exit 1; else echo "ALL PASS ($(grep -c 'all PASS' $ROWS) tests full, $(grep -c ' skipped ' $ROWS) skipped)"; fi

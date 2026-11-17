@@ -76,7 +76,7 @@ const appText = (p) => p.evaluate(() => document.querySelector("#app").innerText
                  await willie.rpc("send_sheet", { p_sheet: s5.id, p_from: "metal", p_route: "arrow" })];
   const j99 = (await q("select id from jobs where project_id = 'PROJ-00099'"))[0].id;
   await q(`insert into outside_jobs (job_id, sheet_numbers, service, department, sent_on, waiting, queued_on, queued_by_name, sent_by_name)
-           values ($1, '{1}', 'powdercoat', 'metal', current_date, true, current_date, 'Willie', 'Willie')`, [j99]);
+           values ($1, '{1}', 'powdercoat', 'metal', local_today(), true, local_today(), 'Willie', 'Willie')`, [j99]);
   if (!OLDDB) {
     setup.push(await luke.rpc("set_sheet_arrow", { p_work_order: s5.work_order_id, p_sheets: [{ sheet_number: 5, arrow: [
       { qty: 15, base: "JESS", description: "Pedestal Base, Round Disc, 3.5\" Post", pd_color: "Stardust Silver", arrow_color: "RAL 9006 White Aluminum" }] }] }));

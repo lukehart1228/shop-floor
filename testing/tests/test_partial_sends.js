@@ -49,6 +49,12 @@ async function close(w) { await until(() => !/waiting to send/.test(app(w)) && O
 (async () => {
   const hasFile = (await q("select count(*)::int n from information_schema.columns where table_name = 'sheet_sends' and column_name = 'qty_sent'"))[0].n === 1;
   console.log(hasFile ? "(new database: partial_sends.sql)" : "(old database: no partial_sends.sql)");
+  // 17 Nov (README §8, after a release is on GitHub): once partial_sends.sql is live the kit's old database has it too, so
+  // this mode can't be shown any more. It skips itself then, and says why; never left to fail.
+  if (OLDDB && hasFile) {
+    console.log("SKIP  The new page on a database without partial_sends.sql, exactly as before: partial_sends.sql is live, so the old database has it too (shown passing 17 Nov, before it went live)");
+    console.log(`\n0 PASS, 0 FAIL, 1 SKIP`); process.exit(0);
+  }
   if (OLDDB === hasFile) { console.log("Wrong database for this mode."); process.exit(1); }
 
   // two Full Custom sheets on PROJ-00501: 80 of one item (cabinet, no top), and 4 for the old page
@@ -158,39 +164,48 @@ async function close(w) { await until(() => !/waiting to send/.test(app(w)) && O
   await close(e.w);
 
   // ---- the page now on the floor, against the new database ----
-  await count(B.pid, 2);
-  let o = boot(LIVE, users.eric, "full_custom"); await settled(o.w); await openSheet(o.w, "FC-4");
-  ok("Page now on the floor, new database: 2 of 4 counted, no send button (as today)", !$(o.w, "[data-send]") && /2\s?of 4 done/.test(app(o.w)), app(o.w).slice(0, 300));
-  await close(o.w);
-  await count(B.pid, 4);
-  o = boot(LIVE, users.eric, "full_custom"); await settled(o.w); await openSheet(o.w, "FC-4");
-  ok("Page now on the floor: a finished sheet asks where it goes, as today", /Done — where does it go next\?/.test(app(o.w)) && !!$(o.w, '[data-send="finishing"]'));
-  await click(o.w, $(o.w, '[data-send="finishing"]'), 300);
-  ok("…its whole-sheet send goes (send_sheet) and it shows Sent straight to Finishing",
-     await until(async () => { const s = await sends(B.sheet); return s.length === 1 && s[0].qty_sent === null && s[0].route === "finishing"; })
-     && await until(() => /Sent straight to Finishing/.test(app(o.w))));
-  await close(o.w);
-  // and a sheet the new page partly sent, finished from the page now on the floor
-  const C = await mk(11, 3, "FC-3");
-  await count(C.pid, 1);
-  e = boot(NEW, users.eric, "full_custom"); await settled(e.w); await openSheet(e.w, "FC-3");
-  await click(e.w, btn(e.w, /^Send 1 straight to Finishing$/), 300);
-  await until(async () => (await sends(C.sheet)).length === 1);
-  await close(e.w);
-  await count(C.pid, 3);
-  o = boot(LIVE, users.eric, "full_custom"); await settled(o.w); await openSheet(o.w, "FC-3");
-  await click(o.w, $(o.w, '[data-send="sanding"]'), 500);
-  await until(() => JSON.parse(o.w.localStorage.getItem("sf_failed") || "[]").length > 0);
-  const failed = JSON.parse(o.w.localStorage.getItem("sf_failed") || "[]");
-  ok("Page now on the floor, sheet partly sent straight to Finishing: Send to Sanding is refused and kept on Couldn't send, with the reason",
-     await until(() => JSON.parse(o.w.localStorage.getItem("sf_failed") || "[]").some(f => /already going straight to Finishing \(1 sent\)/.test(f.reason))),
-     JSON.stringify(failed).slice(0, 200));
-  await close(o.w);
-  o = boot(LIVE, users.eric, "full_custom"); await settled(o.w); await openSheet(o.w, "FC-3");
-  await click(o.w, $(o.w, '[data-send="finishing"]'), 300);
-  ok("…and Send straight to Finishing finishes it", await until(async () => (await sends(C.sheet)).some(s => s.qty_sent === null && s.route === "finishing")));
-  await close(o.w);
+  // 17 Nov (README §8): once index.html 2026-11-17.1 is live, "the page now on the floor" IS this page (it already sends
+  // pieces), so these lines can't show the page from before. They skip themselves then, and say why.
+  let skipped = 0;
+  if (/send_pieces/.test(LIVE)) {
+    for (const n of ["Page now on the floor, new database: 2 of 4 counted, no send button (as today)", "Page now on the floor: a finished sheet asks where it goes, as today", "…its whole-sheet send goes (send_sheet) and it shows Sent straight to Finishing", "Page now on the floor, sheet partly sent straight to Finishing: Send to Sanding is refused and kept on Couldn't send, with the reason", "…and Send straight to Finishing finishes it"]) {
+      console.log(`SKIP  ${n}: the page now on the floor is this release's (index.html 2026-11-17.1 went live 17 Nov; shown passing before it did)`); skipped++;
+    }
+  } else {
+    await count(B.pid, 2);
+    let o = boot(LIVE, users.eric, "full_custom"); await settled(o.w); await openSheet(o.w, "FC-4");
+    ok("Page now on the floor, new database: 2 of 4 counted, no send button (as today)", !$(o.w, "[data-send]") && /2\s?of 4 done/.test(app(o.w)), app(o.w).slice(0, 300));
+    await close(o.w);
+    await count(B.pid, 4);
+    o = boot(LIVE, users.eric, "full_custom"); await settled(o.w); await openSheet(o.w, "FC-4");
+    ok("Page now on the floor: a finished sheet asks where it goes, as today", /Done — where does it go next\?/.test(app(o.w)) && !!$(o.w, '[data-send="finishing"]'));
+    await click(o.w, $(o.w, '[data-send="finishing"]'), 300);
+    ok("…its whole-sheet send goes (send_sheet) and it shows Sent straight to Finishing",
+       await until(async () => { const s = await sends(B.sheet); return s.length === 1 && s[0].qty_sent === null && s[0].route === "finishing"; })
+       && await until(() => /Sent straight to Finishing/.test(app(o.w))));
+    await close(o.w);
+    // and a sheet the new page partly sent, finished from the page now on the floor
+    const C = await mk(11, 3, "FC-3");
+    await count(C.pid, 1);
+    e = boot(NEW, users.eric, "full_custom"); await settled(e.w); await openSheet(e.w, "FC-3");
+    await click(e.w, btn(e.w, /^Send 1 straight to Finishing$/), 300);
+    await until(async () => (await sends(C.sheet)).length === 1);
+    await close(e.w);
+    await count(C.pid, 3);
+    o = boot(LIVE, users.eric, "full_custom"); await settled(o.w); await openSheet(o.w, "FC-3");
+    await click(o.w, $(o.w, '[data-send="sanding"]'), 500);
+    await until(() => JSON.parse(o.w.localStorage.getItem("sf_failed") || "[]").length > 0);
+    const failed = JSON.parse(o.w.localStorage.getItem("sf_failed") || "[]");
+    ok("Page now on the floor, sheet partly sent straight to Finishing: Send to Sanding is refused and kept on Couldn't send, with the reason",
+       await until(() => JSON.parse(o.w.localStorage.getItem("sf_failed") || "[]").some(f => /already going straight to Finishing \(1 sent\)/.test(f.reason))),
+       JSON.stringify(failed).slice(0, 200));
+    await close(o.w);
+    o = boot(LIVE, users.eric, "full_custom"); await settled(o.w); await openSheet(o.w, "FC-3");
+    await click(o.w, $(o.w, '[data-send="finishing"]'), 300);
+    ok("…and Send straight to Finishing finishes it", await until(async () => (await sends(C.sheet)).some(s => s.qty_sent === null && s.route === "finishing")));
+    await close(o.w);
+  }
 
-  console.log(`\n${pass} PASS, ${fail} FAIL`);
+  console.log(`\n${pass} PASS, ${fail} FAIL${skipped ? `, ${skipped} SKIP` : ""}`);
   process.exit(fail ? 1 : 0);
 })().catch((err) => { console.log("FAIL  the test stopped: " + (err && err.stack || err)); process.exit(1); });

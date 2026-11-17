@@ -3,6 +3,7 @@
 #   bash setup.sh            (from anywhere; takes a few minutes the first time)
 # Afterwards:
 #   /home/claude/sf/repo     the live repo: pages at the top, sql/, testing/
+#   /home/claude/sf/test     the test repo (shop-floor-test): the next release, the new side of every old-and-new test
 #   /home/claude/sf/base     helpers (load.sh, fresh.sh, checks.sh, seeds, stubs)
 #   /home/claude/sf/t        browser tests (pgsupa.js, test_same.js …)
 #   /home/claude/sf/out      put new or changed files here while building
@@ -45,6 +46,17 @@ if [ -z "$KEEP_REPO" ]; then
   curl -sfL -o /tmp/sf-repo.zip https://codeload.github.com/lukehart1228/shop-floor/zip/refs/heads/main
   cd /tmp && unzip -q -o sf-repo.zip && mv /tmp/shop-floor-main $SF/repo
 fi
+
+echo "== 2b. The test repo, the next release (shop-floor-test, 17 Nov)"
+if [ -z "$KEEP_REPO" ]; then
+  rm -rf $SF/test /tmp/sf-test.zip /tmp/shop-floor-test-main
+  if curl -sfL -o /tmp/sf-test.zip https://codeload.github.com/lukehart1228/shop-floor-test/zip/refs/heads/main; then
+    cd /tmp && unzip -q -o sf-test.zip && mv /tmp/shop-floor-test-main $SF/test
+  else
+    echo "!! shop-floor-test couldn't be downloaded (not made yet, or not public): until it is, the new side is the live repo"
+  fi
+fi
+[ -f $SF/test/index.html ] && echo "   new side: shop-floor-test ($(ls $SF/test/sql/*.sql | wc -l) SQL files, tablet page $(grep -o 'PAGE_VERSION = "[^"]*"' $SF/test/index.html | head -1))"
 cp $SF/repo/testing/helpers/*.sql $SF/repo/testing/helpers/*.sh $SF/repo/testing/helpers/*.py $SF/base/
 cp $SF/repo/testing/helpers/pgsupa.js $SF/repo/testing/tests/*.js $SF/repo/testing/tests/*.py $SF/t/
 cp $SF/repo/testing/tests/*.sh $SF/base/
@@ -56,5 +68,9 @@ ln -sfn $SF/node_modules $SF/t/node_modules
 
 echo "== 4. The database, from every SQL file in the live order (each run twice, as one transaction)"
 bash $SF/base/load.sh 2>&1 | grep -v NOTICE | tail -1
-bash $SF/base/checks.sh
+# 17 Nov (R-36): the list runs on a seeded copy, as run_all's checks row does. On the bare database there is no
+# Delivery login yet, so two delivery checks showed 0/1 there.
+bash $SF/base/fresh.sh >/tmp/setup_seed.out 2>&1 || { echo "!! the seed didn't load, so the check list can't run:"; cat /tmp/setup_seed.out; exit 1; }
+echo "== 5. Every check, on a seeded copy (database sync)"
+DB=sync bash $SF/base/checks.sh
 echo "(check_monday_sync, check_office and check_catch_up aren't in that list: they need the real Monday and always fail here.)"
