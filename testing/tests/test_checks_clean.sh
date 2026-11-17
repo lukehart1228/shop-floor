@@ -18,6 +18,9 @@ RELEASED=$($P -d sync_base_old -c "select (to_regprocedure('public.check_checks_
 WAS="the release is live, so the old database has the new checks (shown failing on 12 Nov, before it went in)"
 # how many files the run order names: the count whats_installed() must show, whatever is added later
 N=$(grep -cE '^\| *[0-9]+ *\| *`[a-z_0-9]+\.sql`' $SQL/README.md)
+# 17 Nov: files after checks_clean.sql in the run order (later releases), pasted on top so every file is installed
+LATER=$(grep -oE '^\| *[0-9]+ *\| *`[a-z_0-9]+\.sql`' $SQL/README.md | awk -F'|' '$2+0 > 62' | grep -oE '[a-z_0-9]+\.sql')
+NL=$(echo "$LATER" | grep -c .)
 is() { if [ "$1" == "$2" ]; then pass "$3"; else fail "$3" "got '$1', expected '$2'"; fi; }
 has() { if echo "$1" | grep -q -- "$2"; then pass "$3"; else fail "$3" "got '$1'"; fi; }
 mk() { $P -d postgres -c "select pg_terminate_backend(pid) from pg_stat_activity where datname='$1' and pid<>pg_backend_pid()" -c "drop database if exists $1 with (force)" -c "create database $1 template $2" >/dev/null; }
@@ -73,7 +76,12 @@ r=$($P -d $D -c "select count(*) from check_pace() where result <> 'PASS'")
 echo "     (old check_pace today: $r failing; it fails only in the two weeks after a clock change, as on 12 Nov)"
 
 echo "--- the release: two_day_rule.sql, checks_clean.sql, install_log.sql, each twice, each as one transaction"
-for f in two_day_rule checks_clean install_log; do
+for f in two_day_rule checks_clean; do
+  a=$($P -1 -d $D -f $SQL/$f.sql 2>&1 | grep -c "FAIL\|ERROR"); b=$($P -1 -d $D -f $SQL/$f.sql 2>&1 | grep -c "FAIL\|ERROR")
+  is "$a $b" "0 0" "$f.sql runs twice with no FAIL row and no error"
+done
+for f in $LATER; do is "$($P -1 -d $D -f $SQL/$f 2>&1 | grep -c "FAIL\|ERROR")" "0" "a later release's $f, pasted on top (before install_log.sql, which now lists it): no FAIL, no error"; done
+for f in install_log; do
   a=$($P -1 -d $D -f $SQL/$f.sql 2>&1 | grep -c "FAIL\|ERROR"); b=$($P -1 -d $D -f $SQL/$f.sql 2>&1 | grep -c "FAIL\|ERROR")
   is "$a $b" "0 0" "$f.sql runs twice with no FAIL row and no error"
 done
@@ -204,11 +212,12 @@ TEMPLATE=sync_base_old bash /home/claude/sf/base/fresh.sh >/dev/null 2>&1; mk t_
 r=$($P -1 -d t_cc2 -f $SQL/install_log.sql 2>&1 | grep -c "Not installed")
 if [ "$RELEASED" == "true" ]; then
   skip "install_log.sql pasted first: its table shows the two new files as not installed yet, nothing else: the release is live, so both are installed already (2 was shown on 12 Nov)"
-  is "$r" "0" "install_log.sql pasted again on today's database: no file shown as not installed"
+  is "$r" "$NL" "install_log.sql pasted again on today's database: only the later releases' files ($NL) shown as not installed"
 else
 is "$r" "2" "install_log.sql pasted first: its table shows the two new files as not installed yet, nothing else"
 fi
 for f in two_day_rule checks_clean; do is "$($P -1 -d t_cc2 -f $SQL/$f.sql 2>&1 | grep -c "FAIL\|ERROR")" "0" "then $f.sql: no FAIL, no error"; done
+for f in $LATER; do is "$($P -1 -d t_cc2 -f $SQL/$f 2>&1 | grep -c "FAIL\|ERROR")" "0" "then the later $f: no FAIL, no error"; done
 is "$($P -d t_cc2 -c "select count(*) || ' ' || count(*) filter (where result = 'PASS') from whats_installed()")" "$N $N" "and whats_installed() is all PASS, every file in the run order ($N)"
 for f in off_supabase short_names pace onedrive_save connector_safety incomplete_deliveries inventory office job_status; do
   has "$($P -1 -d t_cc2 -f /home/claude/sf/repo/sql/$f.sql 2>&1 | grep -m1 "ERROR")" "Stop — nothing was changed" "$f.sql run again now stops, changing nothing"

@@ -110,6 +110,7 @@ if in_group pages2; then
 run test_handoff_recent    scenario MODE=new PAGE=$PAGE -- node test_handoff_recent.js
 run test_recent_delivery   scenario PAGE=$PAGE -- node test_recent_delivery.js
 run test_look_only         seed  PAGE=$PAGE -- node test_look_only.js
+run test_partial_sends     seed  PAGE=$PAGE LIVEPAGE=$REPO/index.html -- bash -c "node test_partial_sends.js; TEMPLATE=sync_base_old bash $B/fresh.sh >/dev/null 2>&1; OLDDB=1 node test_partial_sends.js"   # 17 Nov: Full Custom sends its finished pieces; then the new page on the old database
 run test_send_safety       seed  NEWPAGE=$PAGE -- node test_send_safety.js
 run test_tv_photos         seed  OUT=$P -- node test_tv_photos.js
 run test_onedrive_save     seed  OUT=$P SF_MAX_ROWS=2 -- node test_onedrive_save.js

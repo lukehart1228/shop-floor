@@ -632,7 +632,7 @@ const SUPABASE_URL = "https://fueyfxjxlicqekaqtydi.supabase.co";
 const SUPABASE_KEY = "sb_publishable_A5rEVQSSejSsQW7nhAX6iw_gNA5EZ9A";
 // This page's version. Change it with every edit (date, then .1, .2 … for more than one that day).
 // Each device reports it when it opens; see  select * from devices();  in the SQL Editor.
-const PAGE_VERSION = "2026-11-11.1";
+const PAGE_VERSION = "2026-11-17.1";
 
 
 /* ---- core: no screen code in here, so it can be tested on its own ---- */
@@ -720,6 +720,11 @@ function withSends(rows, routes, dept) {
     if (!x) return r;
     const out = { ...r, sendKnown: true, not_needed: !!x.sanding_not_needed && r.department === "sanding" };
     if (SEND_DEPTS.includes(dept)) out.send = x[k + "_route"] ? { id: x[k + "_send_id"], route: x[k + "_route"], at: x[k + "_sent_at"], by: x[k + "_sent_by"], can_undo: !!x[k + "_can_undo"] } : null;
+    // 17 Nov (partial_sends.sql): Full Custom sends the pieces it has finished. Without that file the view has no fc_sent: as before.
+    if (dept === "full_custom" && r.department === "full_custom" && "fc_sent" in x) {
+      out.partsKnown = true;
+      out.part = x.fc_part_send_id ? { id: x.fc_part_send_id, route: x.fc_part_route, sent: Number(x.fc_sent) || 0, at: x.fc_part_sent_at, by: x.fc_part_sent_by, can_undo: !!x.fc_part_can_undo } : null;
+    }
     return out;
   });
 }
@@ -730,6 +735,11 @@ function withoutHeld(rows, held) {
 }
 /** A finished sheet that still has to be sent on. */
 const toSend = (r) => r.sendKnown && SEND_DEPTS.includes(r.department) && r.qty_done >= r.qty_required && !r.send;
+/** 17 Nov (partial_sends.sql): how many of a Full Custom sheet have gone on so far, and how many are counted done and not sent. */
+const sentOf = (r) => r.part ? Math.min(r.part.sent, r.qty_required) : 0;
+const unsentOf = (r) => r.partsKnown && !r.send ? Math.max(0, Math.min(r.qty_done, r.qty_required) - sentOf(r)) : 0;
+/** Something on this sheet to send on: a finished sheet, or (Full Custom) pieces counted and not sent. */
+const hasToSend = (r) => toSend(r) || unsentOf(r) > 0;
 
 /* ---- Recently completed (handoff_recent.sql; the old Past tab): jobs this department has finished ---- */
 /** The list from v_recent_work rows: one entry per job, most recently finished first. */
@@ -2635,18 +2645,23 @@ if (typeof document !== "undefined") (function () {
     const fb = dateLine(j, done >= total);
     const when = fb ? [fb.main + (fb.when ? " · " + fb.when : ""), `${done} of ${total} pieces done`, fb.delivery].filter(Boolean).join(" · ")
                     : `due ${fmtDate(j.delivery_date)} · ${done} of ${total} pieces done`;
-    const unsent = lookOnly(S.dept) ? [] : list.filter(toSend);
+    const unsent = lookOnly(S.dept) ? [] : list.filter(hasToSend);
+    const partly = unsent.some(r => !toSend(r));
     return `<div class="head"><button class="back" data-back="queue">← ${esc(DEPT_NAME[wd()])}</button>
       <h1>${j.is_test ? `<span class="tag">TEST</span>` : ""}${esc(j.project_id)}</h1>
       <span class="hsub${fb ? " wrap" : ""}">${esc(j.job_name)} · ${esc(when)}</span></div>
       ${flagBand(flagFor(S.flags, j.job_id, S.dept))}
-      ${unsent.length ? `<div class="sendbar"><span>${unsent.length} finished sheet${unsent.length === 1 ? "" : "s"} to send on</span>
+      ${unsent.length ? `<div class="sendbar"><span>${partly ? `${unsent.length} sheet${unsent.length === 1 ? "" : "s"} with pieces done and not sent` : `${unsent.length} finished sheet${unsent.length === 1 ? "" : "s"} to send on`}</span>
         <button class="go" data-sendall="${esc(j.job_id)}">${unsent.length === 1 ? "Send it on" : `Send all ${unsent.length} the same way`}</button></div>` : ""}
       ${list.map(r => {
         const full = r.qty_done >= r.qty_required;
         const size = [r.width, r.length, r.thickness].filter(Boolean).join(" × ");
         const rd = HAS_UPSTREAM.includes(wd()) && !full ? readyOf(r) : null;
+        const n = unsentOf(r);
         const status = r.not_needed ? `<span class="why">Not needed — sent straight to Finishing</span>`
+                     : r.partsKnown && !r.send && r.part ? (n ? `<span class="rchip">Sent ${sentOf(r)} ${esc(routeWords(r.part.route))} · ${n} to send</span>`
+                                                             : `<span class="why">Sent ${sentOf(r)} of ${r.qty_required} ${esc(routeWords(r.part.route))}</span>`)
+                     : n ? `<span class="rchip">${n} to send</span>`
                      : toSend(r) ? `<span class="rchip">To send</span>`
                      : full && r.send ? `<span class="why">Sent ${esc(routeWords(r.send.route))}</span>`
                      : rd === null ? "" : rd > 0 ? `<span class="rchip">${rd} ready</span>` : `<span class="why">${esc(waitingText(r, S.arrow))}</span>`;
@@ -2704,6 +2719,7 @@ if (typeof document !== "undefined") (function () {
 
   /** On a Full Custom or Metal sheet that's done: where to send it, or where it went (with Undo while it can be). */
   function sendBlock(r) {
+    if (r.partsKnown && r.department === "full_custom" && !r.send) return partBlock(r);
     if (!SEND_DEPTS.includes(r.department) || !r.sendKnown || r.qty_done < r.qty_required) return "";
     if (r.send) {
       const who = [r.send.at && r.send.route !== "before" ? fmtDate(localISO(r.send.at)) : null, r.send.by && r.send.route !== "before" ? r.send.by : null].filter(Boolean).join(" · ");
@@ -2714,6 +2730,25 @@ if (typeof document !== "undefined") (function () {
     return `<div class="sendto"><div class="sub" style="margin:0 2px 8px">Done — where does it go next?</div>
       <div class="actions" style="margin-top:0">${(ROUTES[r.department] || []).map(([k, label]) =>
         `<button class="sendbtn" data-send="${k}">${esc(label)}</button>`).join("")}</div></div>`;
+  }
+
+  /** 17 Nov (partial_sends.sql): a Full Custom sheet not sent in full: what's gone so far (with Undo for the last send),
+   *  and a button sending what's counted and not sent. The first send picks the way; the rest follow it. */
+  function partBlock(r) {
+    const part = r.part, n = unsentOf(r), sent = sentOf(r);
+    if (!part && !n) return "";
+    const who = part ? [part.at ? fmtDate(localISO(part.at)) : null, part.by || null].filter(Boolean).join(" · ") : "";
+    const small = [who, part && part.pending ? "waiting to send" : ""].filter(Boolean).join(" · ");
+    const line = part ? `<div class="sent"><div><b>Sent ${sent} of ${r.qty_required} ${esc(routeWords(part.route))}</b>${small ? `<small>${esc(small)}</small>` : ""}</div>
+        ${part.can_undo && !part.pending ? `<button data-unsend="${esc(part.id)}" data-unsendpart="1">Undo</button>` : ""}</div>` : "";
+    if (!n) return line + (r.qty_done < r.qty_required ? `<div class="sub" style="margin:8px 2px 0">Count more done to send them on.</div>` : "");
+    const whole = !part && r.qty_done >= r.qty_required;
+    const ask = part ? `${n} more done, not sent yet.` : whole ? "Done — where does it go next?"
+              : `${n} of ${r.qty_required} done. Send ${n === 1 ? "it" : "them"} on now, or keep going.`;
+    const btns = part ? [[part.route, `Send ${n} more ${routeWords(part.route)}`]]
+               : ROUTES.full_custom.map(([k, label]) => [k, whole ? label : `Send ${n} ${routeWords(k)}`]);
+    return line + `<div class="sendto"${part ? ` style="margin-top:8px"` : ""}><div class="sub" style="margin:0 2px 8px">${esc(ask)}</div>
+      <div class="actions" style="margin-top:0">${btns.map(([k, label]) => `<button class="sendbtn" data-sendpart="${k}">${esc(label)}</button>`).join("")}</div></div>`;
   }
 
   // ---------- Recently completed (the old Past tab): jobs this department finished in the last 3 weeks, read only ----------
@@ -4166,9 +4201,15 @@ if (typeof document !== "undefined") (function () {
         ${m.jobId ? `<label class="f">Sheet</label>${sheetChips(m.jobId, m.sheet, false, { allowNone: true })}` : ""}` : "";
     let inner = "";
     if (m.kind === "sendall") {               // send every finished sheet on a job the same way
-      const n = rowsHere().filter(r => r.job_id === m.jobId && toSend(r)).length;
-      inner = `<h3>Send ${n} sheet${n === 1 ? "" : "s"} on</h3>
-        <div class="sub">${esc((rowsHere().find(r => r.job_id === m.jobId) || {}).project_id || "")} · every finished sheet not sent yet. Where do they go?</div>
+      const list = rowsHere().filter(r => r.job_id === m.jobId && hasToSend(r));
+      const n = list.length, fixed = n > 0 && list.every(r => r.part);          // 17 Nov: every sheet already going one way
+      const pid = esc((rowsHere().find(r => r.job_id === m.jobId) || {}).project_id || "");
+      inner = fixed ? `<h3>Send ${n} sheet${n === 1 ? "" : "s"} on</h3>
+        <div class="sub">${pid} · the pieces done and not sent yet. Each sheet goes the way its first send went.</div>
+        <div class="choice"><button data-sendallroute="same"><b>Send them on</b><span>${esc(list.map(r => `Sheet ${r.sheet_number}: ${unsentOf(r) || r.qty_required - sentOf(r)} ${routeWords(r.part.route)}`).join(" · "))}</span></button></div>
+        <div class="mdl-btns"><button class="btn" data-close="1">Cancel</button></div>`
+        : `<h3>Send ${n} sheet${n === 1 ? "" : "s"} on</h3>
+        <div class="sub">${pid} · ${list.some(r => !toSend(r)) ? "the pieces done and not sent yet; a sheet already going one way keeps going that way." : "every finished sheet not sent yet."} Where do they go?</div>
         <div class="choice">${(ROUTES[S.dept] || []).map(([k, label]) => `<button data-sendallroute="${k}"><b>${esc(label)}</b><span>${
           { sanding: "Sanding sees them next, then Finishing.", finishing: "Finishing sees them next. With no top, Sanding's count is marked Not needed.",
             paint: "Finishing's Metal to paint list gets them.", arrow: "Each goes on the Arrow pick-up list until it's taken over. Assembly / QC sees them once they're back." }[k]}</span></button>`).join("")}</div>
@@ -4656,20 +4697,52 @@ if (typeof document !== "undefined") (function () {
       await flushLog();
       if (Object.keys(S.logbox).length) showToast("Saved on this tablet — it will send when the connection is back.");
     });
+    // 17 Nov (partial_sends.sql): Full Custom sends what it has counted, as the running total, never an increment
+    const queuePart = (r, route) => {
+      const n = Math.min(r.qty_done, r.qty_required);
+      const q = queueEntry(S.logbox, "send_pieces", { p_sheet: r.sheet_id, p_from: r.department, p_route: route, p_qty: n, p_client_id: null },
+                           n >= r.qty_required && !r.part ? `Sheet ${r.sheet_number} ${routeWords(route)}` : `Sheet ${r.sheet_number}: ${n} of ${r.qty_required} ${routeWords(route)}`);
+      S.logbox = q.box;
+    };
+    const markPart = (list, route) => {
+      const by = new Map(list.map(r => [r.progress_id, r]));
+      const at = new Date().toISOString();
+      const upd = (rows) => rows.map(r => {
+        const x = by.get(r.progress_id); if (!x) return r;
+        const way = x.part ? x.part.route : route, n = Math.min(x.qty_done, x.qty_required);
+        return { ...r, part: { route: way, sent: n, pending: true, at }, send: n >= r.qty_required ? { route: way, pending: true, at } : r.send };
+      });
+      S.rows = upd(S.rows); S.past = upd(S.past);
+      store.set("rows_" + wd(), { rows: S.rows, at: S.rowsAt });
+    };
+    on("[data-sendpart]", async (b) => {
+      const r = current(); if (!r || !unsentOf(r)) return;
+      const route = r.part ? r.part.route : b.dataset.sendpart;
+      queuePart(r, route); store.set("logbox", S.logbox);
+      markPart([r], route); S.notice = null; render();
+      await flushLog();
+      if (Object.keys(S.logbox).length) showToast("Saved on this tablet — it will send when the connection is back.");
+    });
     on("[data-sendall]", (b) => { S.modal = { kind: "sendall", jobId: b.dataset.sendall }; render(); });
     on("[data-sendallroute]", async (b) => {
       const m = S.modal; if (!m) return;
-      const list = rowsHere().filter(r => r.job_id === m.jobId && toSend(r));
-      for (const r of list) queueSend(r, b.dataset.sendallroute);
+      const route = b.dataset.sendallroute;
+      const list = rowsHere().filter(r => r.job_id === m.jobId && hasToSend(r));
+      const parts = list.filter(r => r.partsKnown), whole = list.filter(r => !r.partsKnown && route !== "same");
+      for (const r of parts) if (r.part || route !== "same") queuePart(r, r.part ? r.part.route : route);
+      for (const r of whole) queueSend(r, route);
       store.set("logbox", S.logbox);
-      markSent(list.map(r => r.progress_id), b.dataset.sendallroute);
+      if (parts.length) markPart(parts.filter(r => r.part || route !== "same"), route);
+      if (whole.length) markSent(whole.map(r => r.progress_id), route);
       S.modal = null; S.notice = null; render();
       await flushLog();
       if (Object.keys(S.logbox).length) showToast("Saved on this tablet — it will send when the connection is back.");
     });
     on("[data-unsend]", (b) => {
       const r = current();
-      S.modal = { kind: "confirm", title: "Undo this send?", text: `Sheet ${r ? r.sheet_number : ""} goes back to not sent. The send stays in the history, marked undone.`, yes: "Undo it",
+      S.modal = { kind: "confirm", title: "Undo this send?",
+                  text: b.dataset.unsendpart ? `The last send on sheet ${r ? r.sheet_number : ""} is taken back, to what was sent before it. The send stays in the history, marked undone.`
+                                             : `Sheet ${r ? r.sheet_number : ""} goes back to not sent. The send stays in the history, marked undone.`, yes: "Undo it",
                   run: () => send("undo_sheet_send", { p_send: b.dataset.unsend }, "Undo send") };
       render();
     });
@@ -5358,7 +5431,7 @@ if (typeof document !== "undefined") (function () {
 })();
 
 /* lets the core be tested outside a browser */
-if (typeof module !== "undefined") module.exports = { arrowFromDefault, ARROW_DEPTS, arrowPoHtml, SNIP, snipRect, PAGE_VERSION, versionIn, isNewerVersion, safeToReload, UPDATE_SAFE_TABS, arrowWaiting, arrowWaitFor, arrowOut, waitingText, withSends, routeWords, toSend, ROUTES, SEND_DEPTS, DEPT_NAME, buildPast, pastLine, PAST_DEPTS, withFinishBy, finishWords, dateLine, keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
+if (typeof module !== "undefined") module.exports = { arrowFromDefault, ARROW_DEPTS, arrowPoHtml, SNIP, snipRect, PAGE_VERSION, versionIn, isNewerVersion, safeToReload, UPDATE_SAFE_TABS, arrowWaiting, arrowWaitFor, arrowOut, waitingText, withSends, routeWords, toSend, sentOf, unsentOf, hasToSend, ROUTES, SEND_DEPTS, DEPT_NAME, buildPast, pastLine, PAST_DEPTS, withFinishBy, finishWords, dateLine, keyProblem, departmentsFor, tabsFor, isLogOnly, withPending, flagFor, buildQueue, jobSheets, pagerFor,
   daysLeft, daysText, fmtDate, localISO, daysSince, agoText, setPending, flushOutbox, newId, queueEntry, flushLogbox, dueForMe, taskWhen,
   problemState, splitProblems, defectState, splitIssues, withReady, readyOf, readyKnown, waitingText, HAS_UPSTREAM, defectCounts, supplyLine, filterJobs, sheetsText, isNetworkError, friendlyError, DEPTS,
   fitSize, photoPath, photoError, flushPhotobox, sendOutcome, heldTooLong, loadoutSheets, sizeLabel, loadoutPieces, missingText,
